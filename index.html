@@ -680,13 +680,21 @@ svg.leaflet-image-layer.leaflet-interactive path {
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 :root{
   --ff:-apple-system,'SF Pro Display','Helvetica Neue',Arial,sans-serif;
-  --bg:#F7F7F5;--card:#fff;--text:#111;--muted:#666;--subtle:#999;
-  --border:#E8E8E4;--accent:#0F172A;--gold:#8B6914;
+  --bg:#F4F3EF;--card:#fff;--text:#12100B;--muted:#625D52;--subtle:#9A9386;
+  --border:#E4DED2;--accent:#15120C;--gold:#A78039;--ink:#211B12;
+  --glass:rgba(255,255,255,.78);--shadow:0 18px 60px rgba(24,20,12,.14);
   --d0:#8B6914;--d1:#0369A1;--d2:#6D28D9;--d3:#B45309;
   --d45:#B91C1C;--d6:#065F46;--dl:#9D174D;--dn:#3730A3;
   --ease:cubic-bezier(.4,0,.2,1);--dur:.28s;
 }
-html,body{height:100%;overflow:hidden;font-family:var(--ff);background:var(--bg);color:var(--text)}
+html,body{height:100%;overflow:hidden;font-family:var(--ff);background:
+  radial-gradient(circle at 18% -10%,rgba(167,128,57,.16),transparent 30%),
+  linear-gradient(135deg,#F8F6F0 0%,#ECE7DB 48%,#F7F5EF 100%);color:var(--text)}
+.icon{width:16px;height:16px;display:inline-block;vertical-align:-3px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.brand{display:flex;align-items:center;gap:10px;min-width:max-content}
+.brand-logo{width:88px;height:auto;display:block;object-fit:contain}
+.brand-title{font-size:13px;font-weight:780;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);padding-left:10px;border-left:1px solid rgba(167,128,57,.28)}
+.watermark-logo{width:58px;height:58px;object-fit:contain;opacity:.4;filter:contrast(1.1)}
 
 /* ─── INTRO ─── */
 #intro{position:fixed;inset:0;background:var(--accent);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9000;transition:opacity .8s var(--ease),visibility .8s}
@@ -713,13 +721,13 @@ html,body{height:100%;overflow:hidden;font-family:var(--ff);background:var(--bg)
 #app.hidden-app{display:none}
 
 /* ─── HEADER ─── */
-#header{height:52px;background:var(--card);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;padding:0 16px;flex-shrink:0;z-index:200;position:relative}
-#h-logo{font-size:14px;font-weight:700;letter-spacing:-.02em;color:var(--text);white-space:nowrap}
-#h-logo span{color:var(--muted);font-weight:400}
+#header{height:58px;background:rgba(255,255,255,.84);backdrop-filter:blur(18px);border-bottom:1px solid rgba(228,222,210,.72);display:flex;align-items:center;gap:12px;padding:0 16px;flex-shrink:0;z-index:200;position:relative;box-shadow:0 10px 32px rgba(20,16,9,.06)}
+#h-logo{font-size:14px;font-weight:760;letter-spacing:-.02em;color:var(--text);white-space:nowrap;display:flex;align-items:center;gap:7px}
+#h-logo span{color:var(--gold);font-weight:560}
 #h-countdown{flex:1;text-align:center;font-size:12px;color:var(--muted)}
 #h-countdown strong{color:var(--text);font-weight:600}
-.h-btn{width:34px;height:34px;border-radius:50%;border:1px solid var(--border);background:var(--card);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;transition:background .15s;color:var(--text)}
-.h-btn:hover{background:var(--bg)}
+.h-btn{width:36px;height:36px;border-radius:50%;border:1px solid rgba(228,222,210,.9);background:rgba(255,255,255,.78);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;transition:background .15s,transform .15s,box-shadow .15s;color:var(--text)}
+.h-btn:hover{background:#fff;transform:translateY(-1px);box-shadow:0 8px 20px rgba(0,0,0,.08)}
 #h-search-bar{position:relative;flex:1;max-width:220px}
 #h-search{width:100%;padding:7px 12px 7px 30px;border:1px solid var(--border);border-radius:20px;font-family:var(--ff);font-size:13px;background:var(--bg);color:var(--text);outline:none;transition:border .2s,background .2s}
 #h-search:focus{border-color:var(--d1);background:#fff}
@@ -764,8 +772,10 @@ html,body{height:100%;overflow:hidden;font-family:var(--ff);background:var(--bg)
 .li.visited .li-vis{opacity:1}
 
 /* ─── MAP ─── */
-#map{flex:1;z-index:1}
-.leaflet-tile-pane{filter:grayscale(100%) brightness(112%) contrast(70%) sepia(3%)}
+#map-wrap{flex:1;position:relative;overflow:hidden;perspective:1300px;background:#E6E0D3}
+#map{position:absolute;inset:0;z-index:1;transition:transform .55s var(--ease),filter .55s var(--ease);transform-origin:center center}
+.map-immersive #map{transform:rotateX(4.5deg) scale(1.035);filter:saturate(1.08) contrast(1.03)}
+.leaflet-tile-pane{filter:grayscale(96%) brightness(109%) contrast(76%) sepia(8%) saturate(74%)}
 .leaflet-marker-pane,.leaflet-popup-pane,.leaflet-overlay-pane,.leaflet-shadow-pane{filter:none!important}
 .leaflet-control-zoom{border:1px solid var(--border)!important;border-radius:10px!important;box-shadow:0 2px 8px rgba(0,0,0,.08)!important;overflow:hidden}
 .leaflet-control-zoom a{background:var(--card)!important;color:var(--text)!important;border:none!important;width:30px!important;height:30px!important;line-height:30px!important;font-size:16px!important}
@@ -773,7 +783,7 @@ html,body{height:100%;overflow:hidden;font-family:var(--ff);background:var(--bg)
 .leaflet-control-attribution{font-size:9px!important}
 
 /* ─── MARKERS ─── */
-.mk{width:28px;height:28px;border-radius:50%;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;cursor:pointer;transition:transform .15s,box-shadow .15s;font-family:var(--ff)}
+.mk{width:30px;height:30px;border-radius:50%;border:2px solid rgba(255,255,255,.95);box-shadow:0 10px 22px rgba(0,0,0,.22),0 0 0 1px rgba(0,0,0,.08);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:760;color:#fff;cursor:pointer;transition:transform .15s,box-shadow .15s;font-family:var(--ff)}
 .mk:hover{transform:scale(1.2);box-shadow:0 4px 12px rgba(0,0,0,.25)}
 .mk.sel{transform:scale(1.3);box-shadow:0 0 0 4px rgba(255,255,255,.7),0 4px 14px rgba(0,0,0,.2)}
 .mk.visited-mk{opacity:.5}
@@ -815,13 +825,13 @@ html,body{height:100%;overflow:hidden;font-family:var(--ff);background:var(--bg)
 .vis-toggle.on{border-color:var(--d6);background:#f0fdf4;color:var(--d6)}
 
 /* ─── FLOATING BTNS ─── */
-#map-btns{position:absolute;bottom:20px;left:8px;z-index:400;display:flex;flex-direction:column;gap:6px}
-.mapbtn{padding:7px 12px;background:rgba(255,255,255,.95);backdrop-filter:blur(8px);border:1px solid var(--border);border-radius:20px;font-size:11px;font-weight:500;cursor:pointer;white-space:nowrap;transition:all .15s;font-family:var(--ff);color:var(--text);display:flex;align-items:center;gap:5px}
+#map-btns{position:absolute;bottom:20px;left:308px;z-index:400;display:flex;gap:8px;transition:left .32s var(--ease),bottom .32s var(--ease)}
+.mapbtn{padding:9px 12px;background:rgba(255,255,255,.82);backdrop-filter:blur(14px);border:1px solid rgba(228,222,210,.9);border-radius:999px;font-size:12px;font-weight:650;cursor:pointer;white-space:nowrap;transition:all .15s;font-family:var(--ff);color:var(--text);display:flex;align-items:center;gap:6px;box-shadow:0 12px 32px rgba(20,16,9,.09)}
 .mapbtn:hover{background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.1)}
 #view-row{position:absolute;bottom:20px;right:50px;z-index:400;display:flex;gap:6px}
 
 /* ─── LEGEND ─── */
-#legend{position:absolute;bottom:60px;left:8px;z-index:400;background:rgba(255,255,255,.95);backdrop-filter:blur(8px);border:1px solid var(--border);border-radius:12px;padding:12px 14px;box-shadow:0 2px 12px rgba(0,0,0,.08);min-width:170px}
+#legend{display:none}
 .leg{display:flex;align-items:center;gap:7px;padding:3px 0;cursor:pointer;transition:opacity .15s}
 .leg:hover{opacity:.7}
 .leg-d{width:8px;height:8px;border-radius:50%;flex-shrink:0}
@@ -874,16 +884,45 @@ html,body{height:100%;overflow:hidden;font-family:var(--ff);background:var(--bg)
 /* ─── TOAST ─── */
 #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;padding:9px 18px;border-radius:20px;font-size:12px;font-weight:500;z-index:9999;opacity:0;transition:opacity .22s;pointer-events:none;white-space:nowrap}
 #toast.on{opacity:1}
+.map-watermark{position:absolute;z-index:350;right:28px;bottom:28px;display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:999px;background:rgba(255,255,255,.52);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,.64);color:rgba(21,18,12,.42);font-size:12px;font-weight:760;letter-spacing:.08em;text-transform:uppercase;pointer-events:none;box-shadow:0 18px 44px rgba(20,16,9,.09)}
+.map-watermark .watermark-logo{width:46px;height:46px;opacity:.32}
+.contact-card{margin:14px 16px 16px;padding:14px;border:1px solid var(--border);border-radius:16px;background:linear-gradient(180deg,#fff,#FAF8F2);box-shadow:0 12px 34px rgba(26,20,11,.06)}
+.contact-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:11px}
+.contact-head strong{font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.contact-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.contact-grid label{display:flex;flex-direction:column;gap:5px;font-size:10px;color:var(--subtle);text-transform:uppercase;letter-spacing:.05em}
+.contact-grid input,.contact-card textarea{width:100%;border:1px solid var(--border);border-radius:10px;background:#fff;padding:10px 11px;font:inherit;font-size:13px;color:var(--text);outline:none}
+.contact-card textarea{margin-top:9px;min-height:86px;resize:vertical}
+.contact-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
 
 /* ─── RESPONSIVE ─── */
 @media(max-width:680px){
-  #sidebar{display:none}
+  #header{height:56px;padding:0 12px;gap:8px}
+  #h-logo{font-size:13px}
+  .brand-logo{width:76px}
+  .brand-title{font-size:11px;padding-left:8px}
+  #h-countdown{display:none}
+  #main{display:block}
+  #map-wrap{position:absolute;inset:0}
+  #sidebar{display:flex;position:absolute;left:10px;right:10px;bottom:10px;width:auto;height:138px;border:1px solid rgba(228,222,210,.9);border-radius:20px;background:rgba(255,255,255,.84);backdrop-filter:blur(18px);box-shadow:var(--shadow);z-index:360;overflow:hidden}
+  #sb-prog{display:none}
+  #sb-list{display:flex;gap:10px;overflow-x:auto;overflow-y:hidden;padding:12px;scroll-snap-type:x mandatory}
+  .dg-head{display:none}
+  .li{min-width:232px;height:112px;align-items:flex-start;border:1px solid var(--border);border-radius:16px;background:#fff;padding:12px;scroll-snap-align:start;box-shadow:0 8px 22px rgba(20,16,9,.06)}
+  .li-name{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.25}
+  .li-time{margin-top:6px}
+  .li-icons{position:absolute;right:12px;bottom:12px}
   #detail{display:none}
   #legend{display:none}
   #sheet{display:flex}
-  #map-btns{bottom:80px}
+  #map-btns{left:10px;right:10px;bottom:156px;overflow-x:auto;padding-bottom:2px}
+  .mapbtn{min-width:max-content;padding:9px 11px}
+  .map-watermark{right:12px;bottom:316px;padding:9px 12px;font-size:10px}
   #view-row{display:none}
   #h-search-bar{display:none}
+  .contact-grid{grid-template-columns:1fr}
+  .intro-stats{gap:18px;flex-wrap:wrap;justify-content:center}
+  .intro-flights{flex-direction:column;width:calc(100% - 48px);max-width:320px}
 }
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}::-webkit-scrollbar-track{background:transparent}
 </style>
@@ -921,11 +960,12 @@ html,body{height:100%;overflow:hidden;font-family:var(--ff);background:var(--bg)
 <!-- ═══ APP ═══ -->
 <div id="app" class="hidden-app">
   <div id="header">
-    <div id="h-logo">GZ <span>2026</span></div>
-    <div id="h-search-bar"><span id="h-search-ico">⌕</span><input id="h-search" type="search" placeholder="Rechercher…"></div>
+    <div class="brand" id="h-logo"><img class="brand-logo" src="assets-orbes.png" alt="Orbes"><span class="brand-title">GZ 2026</span></div>
+    <div id="h-search-bar"><span id="h-search-ico"></span><input id="h-search" type="search" placeholder="Rechercher…"></div>
     <div id="h-countdown">—</div>
-    <button class="h-btn" id="btn-story" title="Vue Story">◫</button>
-    <button class="h-btn" id="btn-flights" title="Vols">✈</button>
+    <button class="h-btn" id="btn-3d" title="Vue immersive"></button>
+    <button class="h-btn" id="btn-story" title="Vue Story"></button>
+    <button class="h-btn" id="btn-flights" title="Vols"></button>
   </div>
   <div id="timeline"></div>
   <div id="main">
@@ -936,7 +976,10 @@ html,body{height:100%;overflow:hidden;font-family:var(--ff);background:var(--bg)
       </div>
       <div id="sb-list"></div>
     </div>
-    <div id="map"></div>
+    <div id="map-wrap">
+      <div id="map"></div>
+      <div class="map-watermark"><img class="watermark-logo" src="assets-orbesmonogram.png" alt=""><span>Orbes Guangzhou</span></div>
+    </div>
     <div id="detail">
       <div id="dt-hero">
         <button id="dt-close">✕</button>
@@ -945,7 +988,7 @@ html,body{height:100%;overflow:hidden;font-family:var(--ff);background:var(--bg)
         <div id="dt-meta"></div>
       </div>
       <div id="dt-body">
-        <div id="dt-sofitel-dist" class="dt-sofitel" style="display:none">🏨 <span id="dt-sofitel-txt"></span></div>
+        <div id="dt-sofitel-dist" class="dt-sofitel" style="display:none"><span id="dt-sofitel-ico"></span><span id="dt-sofitel-txt"></span></div>
         <div id="dt-actions"></div>
         <div id="dt-content"></div>
       </div>
@@ -958,9 +1001,9 @@ html,body{height:100%;overflow:hidden;font-family:var(--ff);background:var(--bg)
 
 <!-- ═══ OVERLAYS ═══ -->
 <div id="map-btns">
-  <button class="mapbtn" onclick="_w.flyTo(23.125,113.27,12)">🏙 Guangzhou</button>
-  <button class="mapbtn" onclick="_w.flyTo(22.817,113.734,13)">🏭 Dongguan</button>
-  <button class="mapbtn" onclick="_w.flyTo(22.534,113.930,12)">🛍 Shenzhen</button>
+  <button class="mapbtn" onclick="_w.flyTo(23.125,113.27,12)" data-icon="building">Guangzhou</button>
+  <button class="mapbtn" onclick="_w.flyTo(22.817,113.734,13)" data-icon="factory">Dongguan</button>
+  <button class="mapbtn" onclick="_w.flyTo(22.534,113.930,12)" data-icon="shopping">Shenzhen</button>
 </div>
 
 <div id="legend">
@@ -988,7 +1031,7 @@ html,body{height:100%;overflow:hidden;font-family:var(--ff);background:var(--bg)
     <div class="fl">
       <div class="fl-airline">CX950 · Hong Kong → Guangzhou</div>
       <div class="fl-route">
-        <div class="fl-city">HKG</div><div class="fl-arrow">──────✈</div><div class="fl-city">CAN</div>
+        <div class="fl-city">HKG</div><div class="fl-arrow">──────</div><div class="fl-city">CAN</div>
       </div>
       <div class="fl-details">
         <span>Arrivée <strong style="color:#fff">02:20</strong></span>
@@ -999,7 +1042,7 @@ html,body{height:100%;overflow:hidden;font-family:var(--ff);background:var(--bg)
     <div class="fl">
       <div class="fl-airline">CX953 · Guangzhou → Hong Kong</div>
       <div class="fl-route">
-        <div class="fl-city">CAN</div><div class="fl-arrow">──────✈</div><div class="fl-city">HKG</div>
+        <div class="fl-city">CAN</div><div class="fl-arrow">──────</div><div class="fl-city">HKG</div>
       </div>
       <div class="fl-details">
         <span>Départ <strong style="color:#fff">05:00</strong></span>
@@ -1019,10 +1062,34 @@ html,body{height:100%;overflow:hidden;font-family:var(--ff);background:var(--bg)
 <div id="toast"></div>
 
 <script>
+const ICONS={
+  search:'<svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
+  route:'<svg class="icon" viewBox="0 0 24 24"><path d="M6 19c2.8 0 3.2-3 6-3s3.2 3 6 3"/><path d="M6 5c2.8 0 3.2 3 6 3s3.2-3 6-3"/><path d="M6 5v14"/><path d="M18 5v14"/></svg>',
+  map:'<svg class="icon" viewBox="0 0 24 24"><path d="m3 6 6-2 6 2 6-2v16l-6 2-6-2-6 2Z"/><path d="M9 4v16"/><path d="M15 6v16"/></svg>',
+  copy:'<svg class="icon" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+  globe:'<svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2c2.5 2.8 4 6.2 4 10s-1.5 7.2-4 10c-2.5-2.8-4-6.2-4-10s1.5-7.2 4-10Z"/></svg>',
+  heart:'<svg class="icon" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z"/></svg>',
+  clock:'<svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  train:'<svg class="icon" viewBox="0 0 24 24"><path d="M6 3h12a2 2 0 0 1 2 2v9a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V5a2 2 0 0 1 2-2Z"/><path d="M8 19l-2 3"/><path d="M16 19l2 3"/><path d="M8 7h8"/><path d="M8 13h.01"/><path d="M16 13h.01"/></svg>',
+  pin:'<svg class="icon" viewBox="0 0 24 24"><path d="M12 21s7-5.3 7-12a7 7 0 1 0-14 0c0 6.7 7 12 7 12Z"/><circle cx="12" cy="9" r="2.5"/></svg>',
+  light:'<svg class="icon" viewBox="0 0 24 24"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M8.2 14.2A6 6 0 1 1 16 14c-.8.7-1.2 1.5-1.2 2.5H9.2c0-.9-.4-1.8-1-2.3Z"/></svg>',
+  check:'<svg class="icon" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>',
+  square:'<svg class="icon" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="3"/></svg>',
+  story:'<svg class="icon" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="16" rx="2"/><rect x="13" y="4" width="7" height="16" rx="2"/></svg>',
+  plane:'<svg class="icon" viewBox="0 0 24 24"><path d="M17.8 19.2 12 13.8 6.2 19.2l1.2-7.4L2 7l7.5.4L12 1.8l2.5 5.6L22 7l-5.4 4.8Z"/></svg>',
+  cube:'<svg class="icon" viewBox="0 0 24 24"><path d="m12 2 9 5-9 5-9-5Z"/><path d="M3 7v10l9 5 9-5V7"/><path d="M12 12v10"/></svg>',
+  building:'<svg class="icon" viewBox="0 0 24 24"><path d="M4 21V5a2 2 0 0 1 2-2h8v18"/><path d="M14 9h4a2 2 0 0 1 2 2v10"/><path d="M8 7h2M8 11h2M8 15h2"/></svg>',
+  factory:'<svg class="icon" viewBox="0 0 24 24"><path d="M3 21V9l6 4V9l6 4V5h5v16Z"/><path d="M7 17h.01M12 17h.01M17 17h.01"/></svg>',
+  shopping:'<svg class="icon" viewBox="0 0 24 24"><path d="M6 8h16l-2 12H8Z"/><path d="M6 8 5 4H2"/><path d="M10 11V6a4 4 0 0 1 8 0v5"/></svg>',
+  phone:'<svg class="icon" viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.4 19.4 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 2 .7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2Z"/></svg>',
+  save:'<svg class="icon" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg>'
+};
+function icon(name){return ICONS[name]||''}
 const COLORS={0:'#8B6914',1:'#0369A1',2:'#6D28D9',3:'#B45309',45:'#B91C1C',6:'#065F46',l:'#9D174D',n:'#3730A3'};
 const DLABELS={0:'Hôtel',1:'Jour 1 — 7 juin',2:'Jour 2 — 8 juin',3:'Jour 3 — Dongguan',45:'Jours 4-5 — Style GZ',6:'Jour 6 — 12 juin',l:'Lifestyle',n:'Notes'};
 const TDAYS={0:'7 juin',1:'7 juin',2:'8 juin',3:'9 juin',45:'10-11 juin',6:'12 juin',l:'',n:''};
-const TYPES={bijoux:'💎 Bijoux',mode:'👗 Mode',fabricant:'🏭 Fabricant',salon:'🎪 Salon',lifestyle:'✨ Lifestyle',bar:'🍸 Bar/Club',hotel:'🏨 Hôtel',packaging:'📦 Packaging',textile:'🧵 Textile',landmark:'🗼 Repère',restaurant:'🍜 Restaurant',mall:'🛍 Shopping',cashmere:'🧶 Cachemire'};
+const TYPES={bijoux:'Bijoux',mode:'Mode',fabricant:'Fabricant',salon:'Salon',lifestyle:'Lifestyle',bar:'Bar/Club',hotel:'Hôtel',packaging:'Packaging',textile:'Textile',landmark:'Repère',restaurant:'Restaurant',mall:'Shopping',cashmere:'Cachemire'};
+const TYPE_ICONS={bijoux:'cube',mode:'shopping',fabricant:'factory',salon:'building',lifestyle:'map',bar:'pin',hotel:'building',packaging:'cube',textile:'map',landmark:'pin',restaurant:'pin',mall:'shopping',cashmere:'map'};
 const SOFITEL={lat:23.1393,lng:113.3163};
 
 // Haversine distance km
@@ -1049,7 +1116,7 @@ const locs=[
 {id:'baifu_f',name:'BaiFu Jewelry — Usine',day:3,type:'fabricant',lat:22.8155,lng:113.7380,time:'Journée — RDV',address:"Chang'an Town, Dongguan",addressCN:'东莞市长安镇',metro:'DiDi depuis Guangzhou (~1h)',desc:'Usine OEM SS depuis 2004 — 5 000 m², 300 artisans. Bijoux homme : cufflinks, manchettes, bracelets.',highlights:['20+ ans OEM stainless steel','Bijoux homme — ta cible directe','Showroom à Xijiao 10F — vus J1'],tip:'Valide en usine ce que tu as vu en showroom J1.'},
 {id:'winda',name:'Winda Jewelry',day:3,type:'fabricant',lat:22.8175,lng:113.7330,time:'Journée — RDV',address:"Chang'an Town, Dongguan",addressCN:'东莞市长安镇',metro:'DiDi depuis Guangzhou (~1h)',desc:'10+ ans OEM, très grande capacité. Benchmark marché stainless steel.',highlights:['Grande capacité de production','Catalogue massif pour benchmarking','Prix factory direct'],tip:'Pour voir l\'étendue du marché et benchmarker les prix.'},
 {id:'zhongda',name:'Zhongda Textile Market',day:45,type:'textile',lat:23.1015,lng:113.2950,time:'Jour 4 matin, 9h–12h',address:'Ruikang Road, Haizhu District',addressCN:'海珠区瑞康路中大布匹市场',metro:'Ligne 8 — Zhongda Station, sortie A/B',desc:'Plus grand district textile de Chine — 5 km², 23 000+ boutiques. Soie, cachemire, laine premium.',highlights:['Étages supérieurs : soie, cachemire Grade A','Cachemire au mètre qualité Loro Piana','5 km² — prévoir une matinée complète'],tip:'Arrive à 9h — ferme à 17h30.'},
-{id:'stylegd',name:'Style GZ — Canton Fair Complex',day:45,type:'salon',lat:23.1057,lng:113.3234,time:'Jours 4-5, 10h–18h',address:'Halls 19.2 & 20.2, 380 Yuejiang Zhong Road, Pazhou, Haizhu',addressCN:'海珠区阅江中路380号琶洲馆19.2、20.2馆',metro:'Ligne 8 — Pazhou Station',website:'https://www.jufair.com/exhibition/9071.html',desc:'4 salons simultanés : bijoux/accessoires, habillement, maroquinerie, lunetterie. 35 000 m², 400+ marques.',highlights:['💍 Bijoux & Accessoires — PRIORITÉ ABSOLUE','🎟 Inscription : jufair.com/exhibition/9071.html','Passeport obligatoire'],tip:'Inscris-toi en avance. WeChat QR à échanger systématiquement.'},
+{id:'stylegd',name:'Style GZ — Canton Fair Complex',day:45,type:'salon',lat:23.1057,lng:113.3234,time:'Jours 4-5, 10h–18h',address:'Halls 19.2 & 20.2, 380 Yuejiang Zhong Road, Pazhou, Haizhu',addressCN:'海珠区阅江中路380号琶洲馆19.2、20.2馆',metro:'Ligne 8 — Pazhou Station',website:'https://www.jufair.com/exhibition/9071.html',desc:'4 salons simultanés : bijoux/accessoires, habillement, maroquinerie, lunetterie. 35 000 m², 400+ marques.',highlights:['Bijoux & Accessoires — PRIORITÉ ABSOLUE','Inscription : jufair.com/exhibition/9071.html','Passeport obligatoire'],tip:'Inscris-toi en avance. WeChat QR à échanger systématiquement.'},
 {id:'partypier',name:'Party Pier (琶醍)',day:45,type:'bar',lat:23.1024,lng:113.3183,time:'Soir après Style GZ',address:'Pazhou Island, Haizhu District',addressCN:'海珠区琶醍啤酒文化创意艺术区',metro:'Ligne 8 — Pazhou Station (5 min)',desc:'Strip de bars riverside avec vue directe sur le Canton Tower illuminé — 5 min du Canton Fair.',highlights:['Terrasse face au Canton Tower','Mix locals et acheteurs internationaux'],tip:'Arrive tôt (18h) pour une bonne table face au Canton Tower.'},
 {id:'hongmian',name:'Hongmian International Fashion City',day:6,type:'mode',lat:23.1367,lng:113.2591,time:'10h–13h',address:'No. 184 Huanshi West Road, Yuexiu',addressCN:'越秀区环市西路184号红棉国际时装城',metro:'Ligne 2 — Guangzhou Railway Station ou Ligne 5 — Xiaobei',desc:'60 000 m², 1 800+ marchands. Plus créatif que Baima — marques originales, inspirations coréennes et japonaises.',highlights:['Positionnement plus créatif que Baima','Marques originales locales','Styles coréens et japonais'],tip:'Complémentaire à Baima J1 — même segment, approche créative.'},
 {id:'blackhead',name:'Dongshankou — Blackhead & Concept Stores',day:6,type:'lifestyle',lat:23.1292,lng:113.2843,time:'18h–21h',address:'Dongshankou district, Yuexiu District',addressCN:'越秀区东山口',metro:'Ligne 1 ou 6 — Dongshankou Station',website:'https://www.blackheadshop.com',desc:'Quartier créatif indie. Blackhead : bijoux 316L SS avant-garde — ta matière exacte.',highlights:['Blackhead : 316L SS rebelle et gender-neutral','KANGOL Space, Moromoro, concept stores'],tip:'S\'imprégner de l\'esthétique des marques locales qui te ressemblent.'},
@@ -1074,17 +1141,27 @@ const S={
   filter:'all',sel:null,
   favs:new Set(JSON.parse(localStorage.getItem('gz_favs')||'[]')),
   visited:new Set(JSON.parse(localStorage.getItem('gz_vis')||'[]')),
+  contacts:JSON.parse(localStorage.getItem('gz_contacts')||'{}'),
   routes:{},mapState:JSON.parse(localStorage.getItem('gz_map')||'null')
 };
 function saveState(){
   localStorage.setItem('gz_favs',JSON.stringify([...S.favs]));
   localStorage.setItem('gz_vis',JSON.stringify([...S.visited]));
 }
+function saveContacts(){localStorage.setItem('gz_contacts',JSON.stringify(S.contacts))}
 
 // ─── HELPERS ───
 function col(d){return COLORS[d]||'#888'}
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),2200)}
 function $(id){return document.getElementById(id)}
+function esc(v){return String(v||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function cleanPhone(v){return String(v||'').replace(/[^\d+]/g,'')}
+function hydrateStaticIcons(){
+  const pairs=[['btn-3d','cube'],['btn-story','story'],['btn-flights','plane']];
+  pairs.forEach(([id,name])=>{const el=$(id);if(el)el.innerHTML=icon(name)});
+  const search=$('h-search-ico');if(search)search.innerHTML=icon('search');
+  document.querySelectorAll('[data-icon]').forEach(el=>{el.insertAdjacentHTML('afterbegin',icon(el.dataset.icon))});
+}
 
 // ─── COUNTDOWN ───
 const ARRIVAL=new Date('2026-06-07T02:20:00+08:00');
@@ -1104,6 +1181,7 @@ function updateCountdown(){
 
 // ─── MAP INIT ───
 window.onload=function(){
+  hydrateStaticIcons();
   updateCountdown();setInterval(updateCountdown,60000);
 
   const savedMap=S.mapState;
@@ -1119,6 +1197,23 @@ _tl.addTo(map);
   map.on('moveend',()=>{const c=map.getCenter();localStorage.setItem('gz_map',JSON.stringify({lat:c.lat,lng:c.lng,z:map.getZoom()}))});
 
   const mkObjs={},routeLayers={};
+  function mapPadding(){
+    if(window.innerWidth<=680)return {paddingTopLeft:[18,74],paddingBottomRight:[18,190]};
+    return {paddingTopLeft:[34,34],paddingBottomRight:[34,34]};
+  }
+  function visibleLocs(day){
+    return locs.filter(l=>day==='all'||String(l.day)===String(day));
+  }
+  function fitFocus(day,opts={}){
+    const pts=visibleLocs(day).map(l=>[l.lat,l.lng]);
+    if(!pts.length)return;
+    if(pts.length===1){map.flyTo(pts[0],opts.zoom||14,{duration:opts.animate===false?0:.75});return}
+    map.fitBounds(L.latLngBounds(pts),{...mapPadding(),maxZoom:opts.maxZoom||14,animate:opts.animate!==false,duration:.8});
+  }
+  function focusPoint(lat,lng,z){
+    map.flyTo([lat,lng],z,{duration:.9});
+    if(window.innerWidth<=680)setTimeout(()=>map.panBy([0,86],{animate:true,duration:.35}),950);
+  }
 
   function mkIcon(loc,sel){
     const c=col(loc.day);
@@ -1139,6 +1234,37 @@ _tl.addTo(map);
     routeLayers[day]=L.polyline(pts,{color:c,weight:2,opacity:.5,dashArray:'6,8'}).addTo(map);
   }
   function clearRoutes(){Object.values(routeLayers).forEach(r=>r.remove());Object.keys(routeLayers).forEach(k=>delete routeLayers[k])}
+  function bindPanel(scope,loc){
+    if(!scope)return;
+    const copy=scope.querySelector('[data-action="copy-didi"]');
+    if(copy)copy.onclick=()=>{
+      if(loc.addressCN){
+        navigator.clipboard.writeText(loc.addressCN).then(()=>toast('Adresse DiDi copiée')).catch(()=>toast(loc.addressCN));
+      }
+    };
+    const fav=scope.querySelector('[data-action="fav"]');
+    if(fav)fav.onclick=()=>{
+      if(S.favs.has(loc.id)){S.favs.delete(loc.id);toast('Retiré des favoris')}
+      else{S.favs.add(loc.id);toast('Ajouté aux favoris')}
+      saveState();refreshSidebar();openDetail(loc);
+    };
+    const save=scope.querySelector('[data-action="save-contact"]');
+    if(save)save.onclick=()=>{
+      const next={};
+      scope.querySelectorAll('[data-contact]').forEach(input=>next[input.dataset.contact]=input.value.trim());
+      S.contacts[loc.id]=next;
+      saveContacts();
+      toast('Contact et notes sauvegardés');
+    };
+    const wa=scope.querySelector('[data-action="open-whatsapp"]');
+    if(wa)wa.onclick=()=>{
+      const phone=cleanPhone(scope.querySelector('[data-contact="phone"]')?.value);
+      if(!phone){toast('Ajoute un numéro WhatsApp');return}
+      window.open(`https://wa.me/${phone.replace(/^\+/,'')}`,'_blank','noopener');
+    };
+    const close=scope.querySelector('#dt-close');
+    if(close)close.onclick=closeDetail;
+  }
 
   // ─── DETAIL ───
   function openDetail(loc){
@@ -1156,12 +1282,13 @@ _tl.addTo(map);
 
     // Meta
     const type=TYPES[loc.type]||loc.type;
-    $('dt-meta').innerHTML=`<span class="dt-pill">${type}</span>${loc.time?`<span class="dt-pill">⏰ ${loc.time}</span>`:''}`;
+    $('dt-meta').innerHTML=`<span class="dt-pill">${icon(TYPE_ICONS[loc.type]||'pin')}${type}</span>${loc.time?`<span class="dt-pill">${icon('clock')}${esc(loc.time)}</span>`:''}`;
 
     // Sofitel distance
     const mins=minsFromSofitel(loc);
     if(loc.id!=='hotel'){
       $('dt-sofitel-dist').style.display='flex';
+      $('dt-sofitel-ico').innerHTML=icon('building');
       $('dt-sofitel-txt').innerHTML=`<strong>~${mins} min</strong> depuis le Sofitel (marche estimée)`;
     } else {$('dt-sofitel-dist').style.display='none'}
 
@@ -1169,42 +1296,44 @@ _tl.addTo(map);
     const mapsUrl=`https://www.google.com/maps/dir/?api=1&destination=${loc.lat},${loc.lng}&travelmode=transit`;
     const mapsSearch=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc.name+' Guangzhou')}`;
     const isFav=S.favs.has(loc.id);
-    let act=`<a class="dta primary" href="${mapsUrl}" target="_blank" rel="noopener">🗺 Itinéraire Google Maps</a>`;
-    act+=`<a class="dta" href="${mapsSearch}" target="_blank" rel="noopener">🔍 Voir sur Maps</a>`;
-    act+=`<button class="dta" id="copy-didi">📋 Adresse DiDi</button>`;
-    if(loc.website)act+=`<a class="dta" href="${loc.website}" target="_blank" rel="noopener" style="grid-column:1/-1">🌐 Site web</a>`;
-    act+=`<button class="dta${isFav?' active-fav':''}" id="fav-btn">${isFav?'❤️ Favori':'🤍 Favori'}</button>`;
+    let act=`<a class="dta primary" href="${mapsUrl}" target="_blank" rel="noopener">${icon('route')}Itinéraire Google Maps</a>`;
+    act+=`<a class="dta" href="${mapsSearch}" target="_blank" rel="noopener">${icon('map')}Voir sur Maps</a>`;
+    act+=`<button class="dta" data-action="copy-didi">${icon('copy')}Adresse DiDi</button>`;
+    if(loc.website)act+=`<a class="dta" href="${loc.website}" target="_blank" rel="noopener" style="grid-column:1/-1">${icon('globe')}Site web</a>`;
+    act+=`<button class="dta${isFav?' active-fav':''}" data-action="fav">${icon('heart')}Favori</button>`;
     $('dt-actions').innerHTML=act;
 
-    // Bind copy DiDi (safe - no Chinese in HTML attrs)
-    $('copy-didi').addEventListener('click',()=>{
-      if(loc.addressCN){
-        navigator.clipboard.writeText(loc.addressCN).then(()=>{toast('Adresse copiée : '+loc.addressCN)}).catch(()=>toast(loc.addressCN));
-      }
-    });
-    $('fav-btn').addEventListener('click',()=>{
-      if(S.favs.has(loc.id)){S.favs.delete(loc.id);toast('Retiré des favoris')}
-      else{S.favs.add(loc.id);toast('♥ Ajouté aux favoris')}
-      saveState();refreshSidebar();openDetail(loc);
-    });
-
     // Body content
+    const contact=S.contacts[loc.id]||{};
     let body='';
-    body+=`<div class="dt-section">Description</div><p class="dt-desc">${loc.desc}</p>`;
-    if(loc.metro){body+=`<div class="dt-row"><div class="dt-ico">🚇</div><div><div class="dt-val">${loc.metro}</div></div></div>`}
-    if(loc.address){body+=`<div class="dt-row"><div class="dt-ico">📍</div><div><div class="dt-val">${loc.address}</div>${loc.addressCN?`<div class="dt-cn">${loc.addressCN}</div>`:''}</div></div>`}
+    body+=`<div class="dt-section">Description</div><p class="dt-desc">${esc(loc.desc)}</p>`;
+    if(loc.metro){body+=`<div class="dt-row"><div class="dt-ico">${icon('train')}</div><div><div class="dt-val">${esc(loc.metro)}</div></div></div>`}
+    if(loc.address){body+=`<div class="dt-row"><div class="dt-ico">${icon('pin')}</div><div><div class="dt-val">${esc(loc.address)}</div>${loc.addressCN?`<div class="dt-cn">${esc(loc.addressCN)}</div>`:''}</div></div>`}
     if(loc.highlights&&loc.highlights.length){
       body+=`<div class="dt-section">Points clés</div>`;
-      loc.highlights.forEach(h=>{body+=`<div class="dt-hl"><div class="dt-hl-dot" style="background:${c}"></div><div class="dt-hl-t">${h}</div></div>`});
+      loc.highlights.forEach(h=>{body+=`<div class="dt-hl"><div class="dt-hl-dot" style="background:${c}"></div><div class="dt-hl-t">${esc(h)}</div></div>`});
     }
-    if(loc.tip){body+=`<div class="tip-box"><p>💡 ${loc.tip}</p></div>`}
+    if(loc.tip){body+=`<div class="tip-box"><p>${icon('light')} ${esc(loc.tip)}</p></div>`}
+    body+=`<div class="contact-card">
+      <div class="contact-head"><strong>Contact WhatsApp</strong></div>
+      <div class="contact-grid">
+        <label>Nom<input data-contact="name" value="${esc(contact.name)}" placeholder="Ex. Manager showroom"></label>
+        <label>WhatsApp<input data-contact="phone" value="${esc(contact.phone)}" placeholder="+86 ..."></label>
+      </div>
+      <textarea data-contact="notes" placeholder="Notes privées pour ce lieu, prix, MOQ, stand, relance...">${esc(contact.notes)}</textarea>
+      <div class="contact-actions">
+        <button class="dta primary" data-action="save-contact">${icon('save')}Sauvegarder</button>
+        <button class="dta" data-action="open-whatsapp">${icon('phone')}WhatsApp</button>
+      </div>
+    </div>`;
     $('dt-content').innerHTML=body;
+    bindPanel($('detail'),loc);
 
     // Visited toggle
     const vt=$('vis-toggle');
     const isVis=S.visited.has(loc.id);
     vt.className='vis-toggle'+(isVis?' on':'');
-    vt.textContent=isVis?'✓  Visité — annuler':'☐  Marquer comme visité';
+    vt.innerHTML=isVis?`${icon('check')} Visité — annuler`:`${icon('square')} Marquer comme visité`;
     vt.onclick=()=>{
       if(S.visited.has(loc.id))S.visited.delete(loc.id);
       else S.visited.add(loc.id);
@@ -1218,6 +1347,7 @@ _tl.addTo(map);
     if(window.innerWidth<=680){
       $('sheet-body').innerHTML=$('detail').innerHTML;
       $('sheet').classList.add('open');
+      bindPanel($('sheet'),loc);
     }
   }
 
@@ -1253,8 +1383,9 @@ _tl.addTo(map);
     if(day!=='all'&&day!=='l'&&day!=='n')drawRoute(day);else clearRoutes();
     refreshSidebar();
     if(S.sel){const sl=locs.find(l=>l.id===S.sel);if(sl&&String(sl.day)!==String(day)&&day!=='all')closeDetail()}
+    fitFocus(day);
   };
-  _w.flyTo=function(lat,lng,z){map.flyTo([lat,lng],z,{duration:1.2})};
+  _w.flyTo=function(lat,lng,z){focusPoint(lat,lng,z)};
 
   // ─── SIDEBAR ───
   function refreshSidebar(){
@@ -1272,7 +1403,7 @@ _tl.addTo(map);
         html+=`<div class="li${S.sel===loc.id?' active':''}${isVis?' visited':''}" data-id="${loc.id}">
           <div class="li-badge" style="background:${c}">${lbl}</div>
           <div class="li-info"><div class="li-name">${loc.name}</div><div class="li-time">${loc.time||''}</div></div>
-          <div class="li-icons"><span class="li-fav${isFav?' active':''}">${isFav?'❤':'🤍'}</span><span class="li-vis${isVis?' active':''}">${isVis?'✓':'○'}</span></div>
+          <div class="li-icons"><span class="li-fav${isFav?' active':''}">${icon('heart')}</span><span class="li-vis${isVis?' active':''}">${isVis?icon('check'):icon('square')}</span></div>
         </div>`;
       });
     });
@@ -1281,7 +1412,7 @@ _tl.addTo(map);
       el.addEventListener('click',()=>{
         const loc=locs.find(l=>l.id===el.dataset.id);
         if(!loc)return;
-        map.flyTo([loc.lat,loc.lng],14,{duration:.8});
+        focusPoint(loc.lat,loc.lng,14);
         openDetail(loc);
       });
     });
@@ -1347,6 +1478,10 @@ _tl.addTo(map);
   }
   $('btn-story').addEventListener('click',()=>{buildStory();$('story').classList.add('open')});
   $('story-close').addEventListener('click',()=>$('story').classList.remove('open'));
+  $('btn-3d').addEventListener('click',()=>{
+    $('map-wrap').classList.toggle('map-immersive');
+    setTimeout(()=>map.invalidateSize(),280);
+  });
 
   // ─── FLIGHTS ───
   $('btn-flights').addEventListener('click',()=>$('flights').classList.add('open'));
