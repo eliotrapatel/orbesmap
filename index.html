@@ -973,8 +973,41 @@ html,body{height:100%;overflow:hidden;font-family:var(--ff);background:var(--bg)
 .leaflet-popup-content-wrapper{border-radius:14px!important;box-shadow:0 8px 32px rgba(0,0,0,0.18)!important}
 .leaflet-popup-content{margin:13px 15px!important;font-family:var(--ff)!important}
 
+
+/* PHRASES */
+#phrases-body{padding:14px 16px calc(env(safe-area-inset-bottom,0) + 20px);max-width:720px;margin:0 auto}
+.ph-cat{margin-bottom:18px}
+.ph-cat-t{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);padding:0 4px 8px}
+.phr{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:var(--r);background:rgba(255,255,255,0.6);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border:0.5px solid var(--g-stroke);margin-bottom:7px;cursor:pointer;transition:transform .15s}
+.phr:active{transform:scale(0.98)}
+.phr-txt{flex:1;min-width:0}
+.phr-cn{font-size:16px;font-weight:600;letter-spacing:.01em;color:var(--t1);line-height:1.3}
+.phr-py{font-size:11px;color:var(--t3);margin-top:2px}
+.phr-fr{font-size:12px;color:var(--t2);margin-top:3px}
+.phr-copy{width:34px;height:34px;border-radius:10px;background:rgba(0,122,255,0.1);color:var(--accent);border:none;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;transition:all .15s}
+.phr-copy:active{transform:scale(0.9)}.phr-copy svg{width:15px;height:15px}
+/* show big screen */
+#bigshow{position:fixed;inset:0;background:#fff;z-index:9600;display:none;flex-direction:column;align-items:center;justify-content:center;padding:30px;text-align:center}
+#bigshow.open{display:flex}
+#bigshow-cn{font-size:clamp(34px,9vw,68px);font-weight:700;color:#000;line-height:1.25;letter-spacing:.01em}
+#bigshow-fr{font-size:15px;color:#888;margin-top:24px}
+#bigshow-close{position:absolute;top:calc(env(safe-area-inset-top,0) + 16px);right:16px;width:40px;height:40px;border-radius:50%;background:rgba(0,0,0,0.06);border:none;display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer;color:#333}
+#bigshow-hint{position:absolute;bottom:calc(env(safe-area-inset-bottom,0) + 24px);font-size:11px;color:#bbb;letter-spacing:.04em}
+/* locate button */
+#btn-locate{position:absolute;bottom:22px;left:14px;z-index:80;width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--t1);background:rgba(255,255,255,0.6);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border:0.5px solid var(--g-stroke);box-shadow:var(--g-shadow);transition:all .15s}
+#btn-locate:active{transform:scale(0.9)}#btn-locate.on{color:var(--accent)}#btn-locate svg{width:19px;height:19px}
+.me-dot{width:18px;height:18px;border-radius:50%;background:#007AFF;border:3px solid #fff;box-shadow:0 0 0 2px rgba(0,122,255,0.3),0 2px 8px rgba(0,0,0,0.3);position:relative}
+.me-dot::after{content:"";position:absolute;inset:-8px;border-radius:50%;background:rgba(0,122,255,0.15);animation:pulse 2s infinite}
+@keyframes pulse{0%{transform:scale(0.8);opacity:0.8}100%{transform:scale(2.2);opacity:0}}
+/* custom pin marker */
+.mk-custom{background:repeating-linear-gradient(45deg,#5856D6,#5856D6 4px,#6e6cdf 4px,#6e6cdf 8px)!important}
+/* add-pin mode banner */
+#pin-banner{position:absolute;top:104px;left:50%;transform:translateX(-50%);z-index:300;background:var(--accent);color:#fff;padding:9px 18px;border-radius:20px;font-size:12px;font-weight:500;box-shadow:0 4px 20px rgba(0,122,255,0.35);display:none;align-items:center;gap:10px;white-space:nowrap}
+#pin-banner.on{display:flex}
+#pin-banner button{background:rgba(255,255,255,0.25);border:none;color:#fff;border-radius:12px;padding:4px 10px;font-size:11px;font-family:var(--ff);cursor:pointer}
+
 ::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.12);border-radius:2px}
-</style></head><body><div id="intro"><div class="i-card"><div class="i-wm wordmark">Orbes</div><div class="i-tag">Voyage Sourcing Premium</div><div class="i-title">Guangzhou<br>Business Journey</div><div class="i-sub">7 – 13 Juin 2026 · Sofitel Guangzhou Sunrich</div><div class="i-sep"></div><div class="i-stats"><div class="ist"><div class="ist-n">37</div><div class="ist-l">Lieux</div></div><div class="ist"><div class="ist-n">6</div><div class="ist-l">Jours</div></div><div class="ist"><div class="ist-n">4</div><div class="ist-l">Villes</div></div><div class="ist"><div class="ist-n">316L</div><div class="ist-l">Focus</div></div></div><div class="i-fl"><div class="ifl"><div class="ifl-c">CX950</div><div class="ifl-r">HKG → CAN</div><div class="ifl-t">Arr. 02:20 · 7 juin</div></div><div class="ifl"><div class="ifl-c">CX953</div><div class="ifl-r">CAN → HKG</div><div class="ifl-t">Dép. 05:00 · 13 juin</div></div></div><button class="i-cta" id="intro-btn">Découvrir le séjour</button><div class="i-cd" id="intro-cd"></div></div></div><div id="app" class="hidden-app"><div id="map"></div><div id="topbar"><div id="tb-wm" class="wordmark">Orbes</div><div id="tb-sep"></div><div id="tb-title">GZ 2026</div><div class="tb-sp"></div><div id="tb-sw"><span id="tb-si">⌕</span><input id="tb-search" type="search" placeholder="Rechercher…" autocomplete="off"></div><div id="tb-cd"></div><button class="tb-b" id="btn-phrases" title="Phrases chinoises"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></button><button class="tb-b" id="btn-agenda" title="Agenda"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></button><button class="tb-b" id="btn-story" title="Story"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></button><button class="tb-b" id="btn-cur" title="Convertisseur">¥</button><button class="tb-b" id="btn-export" title="Export"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button><button class="tb-b" id="btn-flights" title="Vols"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg></button></div><div id="timeline"></div><div id="sb-tog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="3" y1="7" x2="21" y2="7"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="17" x2="21" y2="17"/></svg></div><div id="sidebar"><div id="sb-prog"><div class="sb-pl"><span>Progression</span><span id="sb-pt">0 / 37</span></div><div class="sb-pb"><div class="sb-pf" id="sb-pf" style="width:0"></div></div></div><div id="sb-list"></div></div><div id="detail"><div id="dt-hand"></div><div id="dt-hero"><button id="dt-x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button><div id="dt-badge"></div><div id="dt-name"></div><div id="dt-meta"></div></div><div id="dt-sd"><span id="dt-sd-t"></span></div><div id="dt-body"></div><div id="dt-vis-bar"><div class="vis-tog" id="vis-tog"><span id="vis-ic">○</span><span id="vis-tx">Marquer comme visité</span></div></div></div><div id="mc"><button class="mc-b mc-ic" id="btn-locate" title="Ou suis-je"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button><button class="mc-b mc-ic" id="btn-pin" title="Epingler un lieu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><line x1="12" y1="7" x2="12" y2="13"/><line x1="9" y1="10" x2="15" y2="10"/></svg></button><button class="mc-b" onclick="_w.fly(23.125,113.27,12)">Guangzhou</button><button class="mc-b" onclick="_w.fly(22.817,113.734,13)">Dongguan</button><button class="mc-b" onclick="_w.fly(22.534,113.930,12)">Shenzhen</button></div></div><div id="story" class="overlay"><div class="ov-hd"><button class="tb-b" id="story-x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button><h2>Vue Story — Séjour complet</h2></div><div id="story-grid"></div></div><div id="agenda" class="overlay"><div class="ov-hd"><button class="tb-b" id="agenda-x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button><h2>Agenda — Planning du séjour</h2></div><div id="agenda-body"></div></div><div id="placelist" class="overlay"><div class="ov-hd"><button class="tb-b" id="placelist-x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button><h2>Tous les lieux</h2></div><div id="placelist-body" style="padding:6px 0 30px"></div></div><div id="flights" class="modal"><div class="modal-card"><div class="fl-ey"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg> Cathay Pacific — Vols</div><div class="fl-item"><div class="fl-code">CX950 · HONG KONG → GUANGZHOU</div><div class="fl-rt"><div class="fl-city">HKG</div><div class="fl-arr"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg></div><div class="fl-city">CAN</div></div><div class="fl-det"><span>Arrivée <strong>02:20</strong> · 7 juin</span><span class="fl-status" id="fl1-st">Prévu</span></div></div><div class="fl-item"><div class="fl-code">CX953 · GUANGZHOU → HONG KONG</div><div class="fl-rt"><div class="fl-city">CAN</div><div class="fl-arr"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg></div><div class="fl-city">HKG</div></div><div class="fl-det"><span>Départ <strong>05:00</strong> · 13 juin</span><span class="fl-status" id="fl2-st">Prévu</span></div></div><button class="fl-cls" id="fl-x">Fermer</button></div></div><div id="cur" class="modal"><div class="modal-card"><div class="cm-title">Convertisseur RMB ↔ EUR</div><div class="cur-row"><input class="cur-inp" id="cur-rmb" type="number" placeholder="0" inputmode="decimal"><span class="cur-cur">RMB ¥</span></div><div class="cur-swap">⇅</div><div class="cur-row"><input class="cur-inp" id="cur-eur" type="number" placeholder="0" inputmode="decimal"><span class="cur-cur">EUR €</span></div><div class="cur-rate">Taux : 1 € = <input id="cur-rate-i" type="number" value="7.7" step="0.01"> ¥</div><button class="fl-cls" id="cur-x" style="margin-top:16px">Fermer</button></div></div><div id="export" class="modal"><div class="modal-card"><div class="cm-title">Exporter le carnet</div><p style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:16px">Génère un rapport complet : lieux, statuts, fiches fournisseurs, contacts, notes et notations.</p><button class="cm-btn cm-save" id="exp-pdf" style="width:100%;margin-bottom:8px">Exporter en PDF (impression)</button><button class="cm-btn cm-cancel" id="exp-csv" style="width:100%;color:var(--t1)">Exporter en CSV (tableur)</button><button class="fl-cls" id="exp-x" style="margin-top:12px">Fermer</button></div></div><div id="cm" class="modal"><div class="modal-card"><div class="cm-title">Ajouter un contact</div><div class="cm-lbl">Type</div><select class="cm-sel" id="cm-type"><option value="wa">WhatsApp</option><option value="wc">WeChat</option></select><div class="cm-lbl">Nom</div><input class="cm-inp" id="cm-n" type="text" placeholder="Ex: Jack — MSX Jewelry"><div class="cm-lbl" id="cm-cl">Numéro WhatsApp</div><input class="cm-inp" id="cm-p" type="text" placeholder="+86 138 0000 0000"><div class="cm-lbl" id="cm-ml">Message par défaut</div><input class="cm-inp" id="cm-m" type="text" placeholder="Bonjour, je développe la marque Orbes..."><div class="cm-btns"><button class="cm-btn cm-cancel" id="cm-x">Annuler</button><button class="cm-btn cm-save" id="cm-ok">Enregistrer</button></div></div></div><div id="lightbox"><img id="lb-img" src=""></div><div id="mnav"><button class="mn-b on" id="mn-map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg><span>Carte</span></button><button class="mn-b" id="mn-list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="3" y1="7" x2="21" y2="7"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="17" x2="21" y2="17"/></svg><span>Lieux</span></button><button class="mn-b" id="mn-agenda"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span>Agenda</span></button><button class="mn-b" id="mn-phrases"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg><span>Phrases</span></button><button class="mn-b" id="mn-story"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>Story</span></button></div><div id="phrases" class="overlay"><div class="ov-hd"><button class="tb-b" id="phrases-x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button><h2>Phrases chinoises</h2></div><div id="phrases-body"></div></div><div id="phshow"><button id="phshow-x">✕</button><div id="phshow-zh"></div><div id="phshow-fr"></div><div id="phshow-py"></div><div id="phshow-hint">Montre cet écran à ton interlocuteur</div></div><div id="pinmodal" class="modal"><div class="modal-card"><div class="cm-title">Épingler un lieu</div><div class="cm-lbl">Nom</div><input class="cm-inp" id="pin-name" type="text" placeholder="Ex: Fournisseur trouvé au salon"><div class="cm-lbl">Note (optionnel)</div><input class="cm-inp" id="pin-note" type="text" placeholder="Ex: stand A12, contact Lily"><div class="cm-btns"><button class="cm-btn cm-cancel" id="pin-cancel">Annuler</button><button class="cm-btn cm-save" id="pin-save">Épingler</button></div></div></div><div id="pinbanner">📍 Tape sur la carte pour placer ton point</div><div id="toast"></div><script id="leaflet-inline-js">
+</style></head><body><div id="intro"><div class="i-card"><div class="i-wm wordmark">Orbes</div><div class="i-tag">Voyage Sourcing Premium</div><div class="i-title">Guangzhou<br>Business Journey</div><div class="i-sub">7 – 13 Juin 2026 · Sofitel Guangzhou Sunrich</div><div class="i-sep"></div><div class="i-stats"><div class="ist"><div class="ist-n">37</div><div class="ist-l">Lieux</div></div><div class="ist"><div class="ist-n">6</div><div class="ist-l">Jours</div></div><div class="ist"><div class="ist-n">4</div><div class="ist-l">Villes</div></div><div class="ist"><div class="ist-n">316L</div><div class="ist-l">Focus</div></div></div><div class="i-fl"><div class="ifl"><div class="ifl-c">CX950</div><div class="ifl-r">HKG → CAN</div><div class="ifl-t">Arr. 02:20 · 7 juin</div></div><div class="ifl"><div class="ifl-c">CX953</div><div class="ifl-r">CAN → HKG</div><div class="ifl-t">Dép. 05:00 · 13 juin</div></div></div><button class="i-cta" id="intro-btn">Découvrir le séjour</button><div class="i-cd" id="intro-cd"></div></div></div><div id="app" class="hidden-app"><div id="map"></div><div id="topbar"><div id="tb-wm" class="wordmark">Orbes</div><div id="tb-sep"></div><div id="tb-title">GZ 2026</div><div class="tb-sp"></div><div id="tb-sw"><span id="tb-si">⌕</span><input id="tb-search" type="search" placeholder="Rechercher…" autocomplete="off"></div><div id="tb-cd"></div><button class="tb-b" id="btn-phrases" title="Phrases chinoises"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></button><button class="tb-b" id="btn-agenda" title="Agenda"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></button><button class="tb-b" id="btn-story" title="Story"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></button><button class="tb-b" id="btn-cur" title="Convertisseur">¥</button><button class="tb-b" id="btn-export" title="Export"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button><button class="tb-b" id="btn-phrases" title="Phrases chinoises" style="font-size:15px;font-weight:600">语</button><button class="tb-b" id="btn-flights" title="Vols"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg></button></div><div id="timeline"></div><div id="sb-tog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="3" y1="7" x2="21" y2="7"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="17" x2="21" y2="17"/></svg></div><div id="sidebar"><div id="sb-prog"><div class="sb-pl"><span>Progression</span><span id="sb-pt">0 / 37</span></div><div class="sb-pb"><div class="sb-pf" id="sb-pf" style="width:0"></div></div></div><div id="sb-list"></div></div><div id="detail"><div id="dt-hand"></div><div id="dt-hero"><button id="dt-x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button><div id="dt-badge"></div><div id="dt-name"></div><div id="dt-meta"></div></div><div id="dt-sd"><span id="dt-sd-t"></span></div><div id="dt-body"></div><div id="dt-vis-bar"><div class="vis-tog" id="vis-tog"><span id="vis-ic">○</span><span id="vis-tx">Marquer comme visité</span></div></div></div><div id="mc"><button class="mc-b mc-ic" id="btn-locate" title="Ou suis-je"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button><button class="mc-b mc-ic" id="btn-pin" title="Epingler un lieu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><line x1="12" y1="7" x2="12" y2="13"/><line x1="9" y1="10" x2="15" y2="10"/></svg></button><button class="mc-b" onclick="_w.fly(23.125,113.27,12)">Guangzhou</button><button class="mc-b" onclick="_w.fly(22.817,113.734,13)">Dongguan</button><button class="mc-b" onclick="_w.fly(22.534,113.930,12)">Shenzhen</button><button class="mc-b" id="mc-pin" style="background:rgba(88,86,214,0.12);color:#5856D6">📌 Épingler</button></div><button id="btn-locate" title="Ma position"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg></button><div id="pin-banner"><span>Touchez la carte pour placer le lieu</span><button id="pin-cancel">Annuler</button></div></div><div id="story" class="overlay"><div class="ov-hd"><button class="tb-b" id="story-x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button><h2>Vue Story — Séjour complet</h2></div><div id="story-grid"></div></div><div id="agenda" class="overlay"><div class="ov-hd"><button class="tb-b" id="agenda-x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button><h2>Agenda — Planning du séjour</h2></div><div id="agenda-body"></div></div><div id="placelist" class="overlay"><div class="ov-hd"><button class="tb-b" id="placelist-x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button><h2>Tous les lieux</h2></div><div id="placelist-body" style="padding:6px 0 30px"></div></div><div id="flights" class="modal"><div class="modal-card"><div class="fl-ey"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg> Cathay Pacific — Vols</div><div class="fl-item"><div class="fl-code">CX950 · HONG KONG → GUANGZHOU</div><div class="fl-rt"><div class="fl-city">HKG</div><div class="fl-arr"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg></div><div class="fl-city">CAN</div></div><div class="fl-det"><span>Arrivée <strong>02:20</strong> · 7 juin</span><span class="fl-status" id="fl1-st">Prévu</span></div></div><div class="fl-item"><div class="fl-code">CX953 · GUANGZHOU → HONG KONG</div><div class="fl-rt"><div class="fl-city">CAN</div><div class="fl-arr"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg></div><div class="fl-city">HKG</div></div><div class="fl-det"><span>Départ <strong>05:00</strong> · 13 juin</span><span class="fl-status" id="fl2-st">Prévu</span></div></div><button class="fl-cls" id="fl-x">Fermer</button></div></div><div id="cur" class="modal"><div class="modal-card"><div class="cm-title">Convertisseur RMB ↔ EUR</div><div class="cur-row"><input class="cur-inp" id="cur-rmb" type="number" placeholder="0" inputmode="decimal"><span class="cur-cur">RMB ¥</span></div><div class="cur-swap">⇅</div><div class="cur-row"><input class="cur-inp" id="cur-eur" type="number" placeholder="0" inputmode="decimal"><span class="cur-cur">EUR €</span></div><div class="cur-rate">Taux : 1 € = <input id="cur-rate-i" type="number" value="7.7" step="0.01"> ¥</div><button class="fl-cls" id="cur-x" style="margin-top:16px">Fermer</button></div></div><div id="export" class="modal"><div class="modal-card"><div class="cm-title">Exporter le carnet</div><p style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:16px">Génère un rapport complet : lieux, statuts, fiches fournisseurs, contacts, notes et notations.</p><button class="cm-btn cm-save" id="exp-pdf" style="width:100%;margin-bottom:8px">Exporter en PDF (impression)</button><button class="cm-btn cm-cancel" id="exp-csv" style="width:100%;color:var(--t1)">Exporter en CSV (tableur)</button><button class="fl-cls" id="exp-x" style="margin-top:12px">Fermer</button></div></div><div id="cm" class="modal"><div class="modal-card"><div class="cm-title">Ajouter un contact</div><div class="cm-lbl">Type</div><select class="cm-sel" id="cm-type"><option value="wa">WhatsApp</option><option value="wc">WeChat</option></select><div class="cm-lbl">Nom</div><input class="cm-inp" id="cm-n" type="text" placeholder="Ex: Jack — MSX Jewelry"><div class="cm-lbl" id="cm-cl">Numéro WhatsApp</div><input class="cm-inp" id="cm-p" type="text" placeholder="+86 138 0000 0000"><div class="cm-lbl" id="cm-ml">Message par défaut</div><input class="cm-inp" id="cm-m" type="text" placeholder="Bonjour, je développe la marque Orbes..."><div class="cm-btns"><button class="cm-btn cm-cancel" id="cm-x">Annuler</button><button class="cm-btn cm-save" id="cm-ok">Enregistrer</button></div></div></div><div id="lightbox"><img id="lb-img" src=""></div><div id="mnav"><button class="mn-b on" id="mn-map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg><span>Carte</span></button><button class="mn-b" id="mn-list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="3" y1="7" x2="21" y2="7"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="17" x2="21" y2="17"/></svg><span>Lieux</span></button><button class="mn-b" id="mn-agenda"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span>Agenda</span></button><button class="mn-b" id="mn-phrases"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg><span>Phrases</span></button><button class="mn-b" id="mn-phrases"><span style="font-size:19px;font-weight:600;line-height:21px">语</span><span>Phrases</span></button><button class="mn-b" id="mn-story"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>Story</span></button></div><div id="phrases" class="overlay"><div class="ov-hd"><button class="tb-b" id="phrases-x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button><h2>Phrases chinoises</h2></div><div id="phrases-body"></div></div><div id="phshow"><button id="phshow-x">✕</button><div id="phshow-zh"></div><div id="phshow-fr"></div><div id="phshow-py"></div><div id="phshow-hint">Montre cet écran à ton interlocuteur</div></div><div id="pinmodal" class="modal"><div class="modal-card"><div class="cm-title">Épingler un lieu</div><div class="cm-lbl">Nom</div><input class="cm-inp" id="pin-name" type="text" placeholder="Ex: Fournisseur trouvé au salon"><div class="cm-lbl">Note (optionnel)</div><input class="cm-inp" id="pin-note" type="text" placeholder="Ex: stand A12, contact Lily"><div class="cm-btns"><button class="cm-btn cm-cancel" id="pin-cancel">Annuler</button><button class="cm-btn cm-save" id="pin-save">Épingler</button></div></div></div><div id="pinbanner">📍 Tape sur la carte pour placer ton point</div><div id="phrases" class="overlay"><div class="ov-hd"><button class="tb-b" id="phrases-x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button><h2>Phrases utiles · 中文</h2></div><div id="phrases-body"></div></div><div id="bigshow"><button id="bigshow-close">✕</button><div id="bigshow-cn"></div><div id="bigshow-fr"></div><div id="bigshow-hint">Montrez cet écran · Touchez pour fermer</div></div><div id="pinmodal" class="modal"><div class="modal-card"><div class="cm-title">Épingler un lieu</div><div class="cm-lbl">Nom du lieu</div><input class="cm-inp" id="pin-name-i" type="text" placeholder="Ex: Fournisseur trouvé au salon"><div class="cm-lbl">Note (optionnel)</div><input class="cm-inp" id="pin-note-i" type="text" placeholder="Stand B12, contact Mr Chen..."><div class="cm-btns"><button class="cm-btn cm-cancel" id="pin-modal-x">Annuler</button><button class="cm-btn cm-save" id="pin-modal-ok">Épingler</button></div></div></div><div id="toast"></div><script id="leaflet-inline-js">
 /* @preserve
  * Leaflet 1.9.4, a JS library for interactive maps. https://leafletjs.com
  * (c) 2010-2023 Vladimir Agafonkin, (c) 2010-2011 CloudMade
@@ -1172,6 +1205,7 @@ window.onload=function(){
   }
 
   function openDetail(loc){
+    document.getElementById("dt-vis-bar").style.display="";
     if(S.sel&&MKS[S.sel]&&S.sel!==loc.id){const p=LOCS.find(l=>l.id===S.sel);if(p)MKS[S.sel].setIcon(mkIcon(p,false))}
     S.sel=loc.id;MKS[loc.id].setIcon(mkIcon(loc,true));
     document.querySelectorAll(".li").forEach(e=>e.classList.remove("on"));
@@ -1402,6 +1436,151 @@ window.onload=function(){
   $("mn-agenda").onclick=()=>{buildAgenda();$("agenda").classList.add("open")};
 
   refreshSidebar();updateProg();_w.filter("all");
+
+
+  // ============ PHRASES CHINOISES ============
+  const PHRASES=[
+    {cat:"Taxi / DiDi",items:[
+      {cn:"请带我去这个地址",py:"Qǐng dài wǒ qù zhège dìzhǐ",fr:"Emmenez-moi à cette adresse"},
+      {cn:"请打表",py:"Qǐng dǎ biǎo",fr:"Mettez le compteur s'il vous plaît"},
+      {cn:"在这里停车，谢谢",py:"Zài zhèlǐ tíngchē, xièxie",fr:"Arrêtez-vous ici, merci"},
+      {cn:"还要多久？",py:"Hái yào duōjiǔ?",fr:"Combien de temps encore ?"},
+      {cn:"我赶时间",py:"Wǒ gǎn shíjiān",fr:"Je suis pressé"}
+    ]},
+    {cat:"Négociation / Achat",items:[
+      {cn:"这个多少钱？",py:"Zhège duōshao qián?",fr:"Combien ça coûte ?"},
+      {cn:"太贵了，能便宜一点吗？",py:"Tài guì le, néng piányi yìdiǎn ma?",fr:"C'est trop cher, un peu moins ?"},
+      {cn:"最小起订量是多少？",py:"Zuìxiǎo qǐdìng liàng shì duōshao?",fr:"Quel est le MOQ ?"},
+      {cn:"可以定制吗？",py:"Kěyǐ dìngzhì ma?",fr:"Pouvez-vous faire du sur-mesure ?"},
+      {cn:"可以做我们的品牌吗？",py:"Kěyǐ zuò wǒmen de pǐnpái ma?",fr:"Faites-vous le private label ?"},
+      {cn:"交货期多久？",py:"Jiāohuò qī duōjiǔ?",fr:"Quel est le délai de livraison ?"},
+      {cn:"可以发样品吗？",py:"Kěyǐ fā yàngpǐn ma?",fr:"Pouvez-vous envoyer un échantillon ?"},
+      {cn:"加我微信",py:"Jiā wǒ wēixìn",fr:"Ajoutez-moi sur WeChat"}
+    ]},
+    {cat:"Sourcing / Usine",items:[
+      {cn:"你们用316不锈钢吗？",py:"Nǐmen yòng 316 bùxiùgāng ma?",fr:"Utilisez-vous de l'acier 316L ?"},
+      {cn:"你们做PVD电镀吗？",py:"Nǐmen zuò PVD diàndù ma?",fr:"Faites-vous le placage PVD ?"},
+      {cn:"我可以参观工厂吗？",py:"Wǒ kěyǐ cānguān gōngchǎng ma?",fr:"Puis-je visiter l'usine ?"},
+      {cn:"你们能根据3D文件生产吗？",py:"Nǐmen néng gēnjù 3D wénjiàn shēngchǎn ma?",fr:"Produisez-vous à partir de fichiers 3D ?"},
+      {cn:"我在开发一个新品牌",py:"Wǒ zài kāifā yí gè xīn pǐnpái",fr:"Je développe une nouvelle marque"}
+    ]},
+    {cat:"Général",items:[
+      {cn:"你好",py:"Nǐ hǎo",fr:"Bonjour"},
+      {cn:"谢谢",py:"Xièxie",fr:"Merci"},
+      {cn:"对不起",py:"Duìbuqǐ",fr:"Désolé / Excusez-moi"},
+      {cn:"我不会说中文",py:"Wǒ bú huì shuō zhōngwén",fr:"Je ne parle pas chinois"},
+      {cn:"请用微信付款",py:"Qǐng yòng wēixìn fùkuǎn",fr:"Paiement par WeChat svp"},
+      {cn:"洗手间在哪里？",py:"Xǐshǒujiān zài nǎlǐ?",fr:"Où sont les toilettes ?"},
+      {cn:"可以用英文吗？",py:"Kěyǐ yòng yīngwén ma?",fr:"Peut-on parler anglais ?"}
+    ]}
+  ];
+  function buildPhrases(){
+    let h="";
+    PHRASES.forEach(c=>{
+      h+='<div class="ph-cat"><div class="ph-cat-t">'+c.cat+'</div>';
+      c.items.forEach(p=>{
+        h+='<div class="phr" data-cn="'+p.cn+'" data-fr="'+p.fr+'"><div class="phr-txt"><div class="phr-cn">'+p.cn+'</div><div class="phr-py">'+p.py+'</div><div class="phr-fr">'+p.fr+'</div></div><button class="phr-copy" data-c="'+p.cn+'">'+I_COPY+'</button></div>';
+      });
+      h+='</div>';
+    });
+    $("phrases-body").innerHTML=h;
+    // tap row = big show; tap copy = clipboard
+    $("phrases-body").querySelectorAll(".phr").forEach(el=>el.onclick=ev=>{
+      if(ev.target.closest(".phr-copy"))return;
+      $("bigshow-cn").textContent=el.dataset.cn;$("bigshow-fr").textContent=el.dataset.fr;$("bigshow").classList.add("open");
+    });
+    $("phrases-body").querySelectorAll(".phr-copy").forEach(b=>b.onclick=ev=>{ev.stopPropagation();navigator.clipboard.writeText(b.dataset.c).then(()=>toast("Copié : "+b.dataset.c)).catch(()=>toast(b.dataset.c))});
+  }
+  function openPhrases(){buildPhrases();$("phrases").classList.add("open")}
+  $("btn-phrases").onclick=openPhrases;
+  $("phrases-x").onclick=()=>closeOverlay("phrases");
+  if($("mn-phrases"))$("mn-phrases").onclick=openPhrases;
+  $("bigshow-close").onclick=()=>$("bigshow").classList.remove("open");
+  $("bigshow").onclick=e=>{if(e.target===$("bigshow"))$("bigshow").classList.remove("open")};
+
+  // ============ OÙ SUIS-JE (geolocation) ============
+  let meMarker=null,watchId=null;
+  $("btn-locate").onclick=()=>{
+    if(!navigator.geolocation){toast("Géolocalisation non supportée par ce navigateur");return}
+    if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null;if(meMarker){meMarker.remove();meMarker=null}$("btn-locate").classList.remove("on");toast("Localisation désactivée");return}
+    $("btn-locate").classList.add("on");toast("Recherche de votre position…");
+    try{
+      watchId=navigator.geolocation.watchPosition(pos=>{
+        const ll=[pos.coords.latitude,pos.coords.longitude];
+        if(!meMarker){meMarker=L.marker(ll,{icon:L.divIcon({className:"",html:'<div class="me-dot"></div>',iconSize:[18,18],iconAnchor:[9,9]}),zIndexOffset:9999}).addTo(map);map.flyTo(ll,15,{duration:1});toast("Position trouvée")}
+        else meMarker.setLatLng(ll);
+      },err=>{
+        $("btn-locate").classList.remove("on");watchId=null;
+        let msg="Position introuvable";
+        if(err.code===1)msg="Géolocalisation bloquée — activez-la dans le navigateur (HTTPS requis)";
+        else if(err.code===2)msg="Position indisponible";
+        else if(err.code===3)msg="Délai dépassé — réessayez";
+        toast(msg);
+      },{enableHighAccuracy:true,maximumAge:10000,timeout:15000});
+    }catch(ex){$("btn-locate").classList.remove("on");watchId=null;toast("Géolocalisation bloquée dans cet environnement")}
+  };
+
+  // ============ ÉPINGLER UN LIEU CUSTOM ============
+  function getPins(){try{return JSON.parse(localStorage.getItem("gz_pins")||"[]")}catch(e){return[]}}
+  function savePins(p){localStorage.setItem("gz_pins",JSON.stringify(p))}
+  let pinMode=false;
+  const customMarkers={};
+  function renderPins(){
+    Object.values(customMarkers).forEach(m=>m.remove());
+    for(const k in customMarkers)delete customMarkers[k];
+    getPins().forEach(p=>{
+      const mk=L.marker([p.lat,p.lng],{icon:L.divIcon({className:"",html:'<div class="mk mk-custom">📌</div>',iconSize:[30,30],iconAnchor:[15,15]})});
+      mk.on("click",()=>openCustomPin(p));mk.addTo(map);customMarkers[p.id]=mk;
+    });
+  }
+  function openCustomPin(p){
+    S.sel=null;
+    $("dt-hero").style.background="linear-gradient(145deg,#5856D6f0,#5856D6c0)";
+    $("dt-badge").textContent="Lieu épinglé";
+    $("dt-name").textContent=p.name;
+    $("dt-meta").innerHTML='<span class="dt-pill">📌 Personnel</span>';
+    $("dt-sd").style.display="none";
+    const md="https://www.google.com/maps/dir/?api=1&destination="+p.lat+","+p.lng+"&travelmode=transit";
+    let h='<div class="dt-acts"><a class="dta primary" href="'+md+'" target="_blank" rel="noopener">'+I_DIR+' Itinéraire Google Maps</a>';
+    h+='<button class="dta" id="pin-del" style="background:rgba(255,59,48,0.1);color:#FF3B30">Supprimer ce lieu</button></div>';
+    h+='<div class="dt-sec">Note</div><div class="ct-wrap"><textarea class="notes-ta" id="pin-note" placeholder="Note sur ce lieu...">'+(p.note||"")+'</textarea></div>';
+    $("dt-body").innerHTML=h;
+    $("dt-vis-bar").style.display="none";
+    $("detail").classList.remove("full");$("detail").classList.add("open");
+    $("pin-del").onclick=()=>{const pins=getPins().filter(x=>x.id!==p.id);savePins(pins);renderPins();closeDetail();$("dt-vis-bar").style.display="";toast("Lieu supprimé")};
+    const nt=$("pin-note");nt.oninput=()=>{const pins=getPins();const ix=pins.findIndex(x=>x.id===p.id);if(ix>=0){pins[ix].note=nt.value;savePins(pins)}};
+  }
+  $("btn-locate");// noop anchor
+  function togglePinMode(on){
+    pinMode=on;
+    $("pin-banner").classList.toggle("on",on);
+    map.getContainer().style.cursor=on?"crosshair":"";
+  }
+  $("pin-cancel").onclick=()=>togglePinMode(false);
+  if($("mc-pin"))$("mc-pin").onclick=()=>togglePinMode(!pinMode);
+  // long-press OR via a dedicated control: add "+" option in map controls
+  let pendingLatLng=null;
+  map.on("click",e=>{
+    if(!pinMode)return;
+    pendingLatLng=e.latlng;
+    togglePinMode(false);
+    $("pin-name-i").value="";$("pin-note-i").value="";
+    $("pinmodal").classList.add("open");
+    setTimeout(()=>$("pin-name-i").focus(),80);
+  });
+  $("pin-modal-x").onclick=()=>$("pinmodal").classList.remove("open");
+  $("pinmodal").onclick=e=>{if(e.target===$("pinmodal"))$("pinmodal").classList.remove("open")};
+  $("pin-modal-ok").onclick=()=>{
+    const name=$("pin-name-i").value.trim();
+    if(!name){toast("Nom requis");return}
+    if(!pendingLatLng)return;
+    const pins=getPins();const id="pin_"+Date.now();
+    pins.push({id,name,lat:pendingLatLng.lat,lng:pendingLatLng.lng,note:$("pin-note-i").value.trim()});
+    savePins(pins);renderPins();$("pinmodal").classList.remove("open");pendingLatLng=null;
+    toast("Lieu épinglé : "+name);
+  };
+  $("pin-name-i").addEventListener("keydown",ev=>{if(ev.key==="Enter")$("pin-modal-ok").click()});
+  renderPins();
 
   // OFFLINE service worker (cache app + tiles) via Blob
   if("serviceWorker" in navigator){
