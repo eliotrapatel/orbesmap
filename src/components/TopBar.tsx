@@ -13,7 +13,7 @@ export const TOOLS: { key: ToolKey; label: string; icon: React.ReactElement; wid
   { key: "overview", label: "Aperçu", icon: <IGrid />, wide: true },
   { key: "agenda", label: "Agenda", icon: <ICal /> },
   { key: "phrases", label: "Phrases", icon: <IChat /> },
-  { key: "converter", label: "¥ ↔ €", icon: <span style={{ fontWeight: 600, fontSize: 15, lineHeight: 1 }}>¥</span> },
+  { key: "converter", label: "Devises", icon: <span style={{ fontWeight: 600, fontSize: 15, lineHeight: 1 }}>¥</span> },
   { key: "flights", label: "Vols", icon: <IPlane /> },
   { key: "practical", label: "Infos", icon: <IInfo /> },
   { key: "export", label: "Export", icon: <IDownload /> },
