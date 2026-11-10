@@ -72,7 +72,10 @@ export default function App() {
   const [pinMode, setPinMode] = useState(false);
   const [pendingPin, setPendingPin] = useState<LL | null>(null);
   const [addLink, setAddLink] = useState(false);
-  const [pendingFound, setPendingFound] = useState<Found | null>(null);
+  // found places without a position, placed by hand one after the other
+  const [placeQueue, setPlaceQueue] = useState<Found[]>([]);
+  const [queueTotal, setQueueTotal] = useState(0);
+  const pendingFound = placeQueue[0] || null;
   const fix = useLoc((s) => s.fix);
   const follow = useLoc((s) => s.follow);
   const locStatus = useLoc((s) => s.status);
@@ -283,32 +286,39 @@ export default function App() {
     },
     [fly],
   );
-  // several suggestions picked at once: add those with a position, show them all; one without position: place it by hand
+  // places picked in "Ajouter un lieu": those with a position go on the map now, the others are placed by hand one by one
+  const startQueue = useCallback(
+    (q: Found[]) => {
+      setPlaceQueue(q);
+      setQueueTotal(q.length);
+      setSel(null);
+      setTool(null);
+      setPinMode(true);
+      if (q[0]?.hint) fly({ center: q[0].hint, zoom: 15 });
+    },
+    [fly],
+  );
   const addFound = useCallback(
     (list: Found[]) => {
       setAddLink(false);
-      if (list.length === 1 && !list[0].ll) {
-        setPendingFound(list[0]);
-        setSel(null);
-        setTool(null);
-        setPinMode(true);
-        return;
-      }
-      if (list.length === 1) {
-        saveFound(list[0], list[0].ll!);
-        return;
-      }
       const ok = list.filter((f) => f.ll);
-      const pins = ok.map((f) => saveFound(f, f.ll!, true));
-      setTool(null);
-      if (pins.length) {
-        setSel({ kind: "pin", id: pins[pins.length - 1].id });
-        fly(pins.length === 1 ? { center: [pins[0].lng, pins[0].lat], zoom: 15 } : { bounds: boundsOf(pins) });
+      const manual = list.filter((f) => !f.ll);
+      if (ok.length === 1 && !manual.length) {
+        saveFound(ok[0], ok[0].ll!);
+        return;
       }
-      const skipped = list.length - ok.length;
-      toast(`${ok.length} lieu${ok.length > 1 ? "x" : ""} ajouté${ok.length > 1 ? "s" : ""} sur la carte${skipped ? ` · ${skipped} sans position, à ajouter seul` : ""}`);
+      const pins = ok.map((f) => saveFound(f, f.ll!, true));
+      if (pins.length) {
+        toast(`${pins.length} lieu${pins.length > 1 ? "x" : ""} ajouté${pins.length > 1 ? "s" : ""} sur la carte${manual.length ? ` · ${manual.length} à placer à la main` : ""}`);
+        if (!manual.length) {
+          setTool(null);
+          setSel({ kind: "pin", id: pins[pins.length - 1].id });
+          fly(pins.length === 1 ? { center: [pins[0].lng, pins[0].lat], zoom: 15 } : { bounds: boundsOf(pins) });
+        }
+      }
+      if (manual.length) startQueue(manual);
     },
-    [saveFound, fly],
+    [saveFound, fly, startQueue],
   );
 
   const openTool = (k: ToolKey) => {
@@ -406,8 +416,13 @@ export default function App() {
           if (pinMode) {
             setPinMode(false);
             if (pendingFound) {
-              saveFound(pendingFound, ll);
-              setPendingFound(null);
+              saveFound(pendingFound, ll, placeQueue.length > 1);
+              const rest = placeQueue.slice(1);
+              setPlaceQueue(rest);
+              if (rest.length) {
+                setPinMode(true);
+                if (rest[0].hint) fly({ center: rest[0].hint, zoom: 15 });
+              }
             } else setPendingPin(ll);
             return;
           }
@@ -541,7 +556,7 @@ export default function App() {
               >
                 <ILocate />
               </button>
-              <button className={"ctl" + (pinMode ? " on" : "")} onClick={() => { setPendingFound(null); setPinMode((v) => !v); }} aria-pressed={pinMode} aria-label="Ajouter un lieu sur la carte" title="Ajouter un lieu">
+              <button className={"ctl" + (pinMode ? " on" : "")} onClick={() => { setPlaceQueue([]); setPinMode((v) => !v); }} aria-pressed={pinMode} aria-label="Ajouter un lieu sur la carte" title="Ajouter un lieu">
                 <IPinPlus />
               </button>
               <button className="ctl" onClick={() => setAddLink(true)} aria-label="Ajouter un lieu : lien, nom ou description" title="Ajouter un lieu (lien, nom ou description)">
@@ -555,8 +570,11 @@ export default function App() {
 
           {pinMode && (
             <div className="banner glass" role="status">
-              {pendingFound ? `Touchez la carte à l'endroit de « ${pendingFound.name || pendingFound.nameCn} »` : "Touchez la carte pour placer le lieu"}
-              <button onClick={() => { setPinMode(false); setPendingFound(null); }}>Annuler</button>
+              {pendingFound
+                ? `Touchez la carte à l'endroit de « ${pendingFound.name || pendingFound.nameCn} »${queueTotal > 1 ? ` (${queueTotal - placeQueue.length + 1}/${queueTotal})` : ""}`
+                : "Touchez la carte pour placer le lieu"}
+              {placeQueue.length > 1 && <button onClick={() => { const rest = placeQueue.slice(1); setPlaceQueue(rest); if (rest[0]?.hint) fly({ center: rest[0].hint, zoom: 15 }); }}>Passer</button>}
+              <button onClick={() => { setPinMode(false); setPlaceQueue([]); }}>{placeQueue.length > 1 ? "Arrêter" : "Annuler"}</button>
             </div>
           )}
           {basemapFailed && !pinMode && (
@@ -616,6 +634,20 @@ export default function App() {
           trip={trip}
           onClose={() => setAddLink(false)}
           onAdd={addFound}
+          onOpenExisting={(e) => {
+            setAddLink(false);
+            if (e.kind === "place") {
+              const p = trip.places.find((x) => x.id === e.id);
+              if (p) openPlace(p);
+            } else {
+              const p = data.pins.find((x) => x.id === e.id);
+              if (p) {
+                setSel({ kind: "pin", id: p.id });
+                setTool(null);
+                fly({ center: [p.lng, p.lat], zoom: 15 });
+              }
+            }
+          }}
         />
       )}
       {pendingPin && (

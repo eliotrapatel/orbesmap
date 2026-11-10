@@ -28,12 +28,12 @@ export function useEscape(onClose: () => void) {
   }, []);
 }
 
-export function Modal({ title, intro, onClose, children }: { title: string; intro?: string; onClose: () => void; children: ReactNode }) {
+export function Modal({ title, intro, onClose, children, className }: { title: string; intro?: string; onClose: () => void; children: ReactNode; className?: string }) {
   useEscape(onClose);
   return (
     <Portal>
       <div className="modal-bg" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-        <div className="modal" role="dialog" aria-modal="true" aria-label={title}>
+        <div className={"modal" + (className ? " " + className : "")} role="dialog" aria-modal="true" aria-label={title}>
           <h3>{title}</h3>
           {intro && <p>{intro}</p>}
           {children}

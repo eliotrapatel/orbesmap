@@ -38,12 +38,18 @@ export type PlaceItem = {
 };
 export type PlacesResult = { kind: "precise" | "suggestions" | "not_found"; message: string; places: PlaceItem[] };
 
-export async function ai<T>(task: "photo" | "interpret" | "place", payload: Record<string, unknown>, timeoutMs = 60_000): Promise<T> {
+export async function ai<T>(task: "photo" | "interpret" | "place", payload: Record<string, unknown>, timeoutMs = 60_000, signal?: AbortSignal): Promise<T> {
   if (!navigator.onLine) throw new AiError("Pas de réseau : cette fonction a besoin d'Internet.");
   const token = supabase ? (await supabase.auth.getSession()).data.session?.access_token : null;
   if (!token) throw new AiError("Connectez-vous dans l'onglet Compte pour utiliser cette fonction.");
   const ctl = new AbortController();
-  const t = window.setTimeout(() => ctl.abort(), timeoutMs);
+  let timedOut = false;
+  const t = window.setTimeout(() => {
+    timedOut = true;
+    ctl.abort();
+  }, timeoutMs);
+  const onAbort = () => ctl.abort();
+  signal?.addEventListener("abort", onAbort, { once: true });
   try {
     const res = await fetch(ENDPOINT, {
       method: "POST",
@@ -56,10 +62,11 @@ export async function ai<T>(task: "photo" | "interpret" | "place", payload: Reco
     return body as T;
   } catch (e) {
     if (e instanceof AiError) throw e;
-    if ((e as Error)?.name === "AbortError") throw new AiError("Trop long : le réseau est peut-être lent. Réessayez.");
+    if ((e as Error)?.name === "AbortError") throw new AiError(timedOut ? "Trop long : le réseau est peut-être lent. Réessayez." : "Recherche arrêtée.");
     throw new AiError("Le service est injoignable (réseau ou VPN ?). Réessayez.");
   } finally {
     window.clearTimeout(t);
+    signal?.removeEventListener("abort", onAbort);
   }
 }
 

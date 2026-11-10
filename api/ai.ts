@@ -216,19 +216,19 @@ const DS_TOOLS = [
   { type: "function", function: { name: "web_fetch", description: "Lit une page web et renvoie son texte en Markdown.", parameters: { type: "object", properties: { url: { type: "string" } }, required: ["url"] } } },
 ];
 
-async function dsTool(name: string, args: Json, key: string, f: typeof fetch): Promise<string> {
+async function dsTool(name: string, args: Json, key: string, f: typeof fetch, cap = 20_000): Promise<string> {
   try {
     if (name === "web_search") {
       const q = String(args.query || "").slice(0, 128).trim();
       if (!q) return "requête vide";
-      const r = await dsPost("/v1/tools/search", { query: q, count: 6 }, key, f, 15_000);
+      const r = await dsPost("/v1/tools/search", { query: q, count: 6 }, key, f, Math.min(15_000, cap));
       const list = (r.results as Json[] | undefined) || [];
       return JSON.stringify(list.map((x) => ({ title: x.title, url: x.url, summary: String(x.summary || x.snippet || "").slice(0, 700) })));
     }
     if (name === "web_fetch") {
       const url = String(args.url || "");
       if (!/^https?:\/\//.test(url)) return "URL invalide";
-      const r = await dsPost("/v1/tools/fetch", { url }, key, f, 20_000);
+      const r = await dsPost("/v1/tools/fetch", { url }, key, f, Math.min(20_000, cap));
       return `${r.title || ""}\n${String(r.content || "").slice(0, 12_000)}`;
     }
   } catch {
@@ -252,7 +252,9 @@ async function runDeepSeek(key: string, job: Job, f: typeof fetch, deadline: num
     ];
     // fast mode first; if the API refuses tools without thinking, switch to thinking mode (low effort)
     let thinking = false;
-    for (let round = 0; round < 8 && left() > 60_000; round++) {
+    // keep ~130 s for the last research round + the summary + the JSON answer
+    const toolResults: string[] = [];
+    for (let round = 0; round < 8 && left() > 130_000; round++) {
       const req = (th: boolean) => dsPost("/chat/completions", { model: DS_MODEL, messages: msgs, tools: DS_TOOLS, max_tokens: 4000, ...(th ? { thinking: { type: "enabled" }, reasoning_effort: "low" } : { thinking: { type: "disabled" } }) }, key, f, ms(50_000));
       let r: Json;
       try {
@@ -278,13 +280,27 @@ async function runDeepSeek(key: string, job: Job, f: typeof fetch, deadline: num
           } catch {
             /* bad arguments */
           }
-          return { role: "tool" as const, tool_call_id: c.id, content: await dsTool(c.function.name, args, key, f) };
+          const content = await dsTool(c.function.name, args, key, f, Math.max(3_000, left() - 90_000));
+          toolResults.push(content);
+          return { role: "tool" as const, tool_call_id: c.id, content };
         }),
       );
       // every tool call needs an answer, even the ones we skipped
       for (const c of calls.slice(4)) results.push({ role: "tool", tool_call_id: c.id, content: "ignoré (trop d'appels)" });
       msgs.push(...results);
     }
+    // stopped by the round / time limit before the model wrote its summary: ask for it now, without tools
+    if (!notes && toolResults.length) {
+      try {
+        msgs.push({ role: "user", content: "Arrête les recherches. Résume maintenant, uniquement à partir des résultats ci-dessus, ce que tu as trouvé pour chaque lieu (nom, nom chinois, adresses, coordonnées et leur source, horaires, prix, URL)." });
+        const r = await dsPost("/chat/completions", { model: DS_MODEL, messages: msgs, thinking: { type: "disabled" }, max_tokens: 3000 }, key, f, ms(30_000));
+        notes = String(((r.choices as Json[] | undefined)?.[0]?.message as Json | undefined)?.content || "");
+      } catch {
+        /* fall back to the raw results below */
+      }
+      if (!notes) notes = toolResults.join("\n\n").slice(-30_000);
+    }
+    if (!notes && toolResults.length === 0 && job.task === "place") notes = "(aucune recherche n'a pu être faite : n'invente pas d'adresse ni de coordonnées ; mets confidence = faible)";
   }
   // final answer in JSON mode (retry once: an unrecognised JSON comes back as blank text)
   const system = `${job.system}\n\nRéponds UNIQUEMENT avec un objet json valide, exactement de cette forme (mêmes clés, mêmes types) :\n${JSON.stringify(skeleton(job.schema))}`;
@@ -297,7 +313,14 @@ async function runDeepSeek(key: string, job: Job, f: typeof fetch, deadline: num
     const text = String(((r.choices as Json[] | undefined)?.[0]?.message as Json | undefined)?.content || "").trim();
     if (!text) continue;
     try {
-      return coerce(job.schema, JSON.parse(text)) as Json;
+      const raw = JSON.parse(text);
+      const out = coerce(job.schema, raw) as Json;
+      // a malformed "kind" must not hide valid places
+      if (job.task === "place" && !["precise", "suggestions", "not_found"].includes(raw?.kind)) {
+        const n = (out.places as unknown[]).length;
+        out.kind = n > 1 ? "suggestions" : n === 1 ? "precise" : "not_found";
+      }
+      return out;
     } catch {
       /* retry */
     }
