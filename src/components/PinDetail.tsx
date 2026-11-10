@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { Trip } from "../data/types";
 import { amapDirections, googleDirections } from "../lib/geo";
 import type { Pin } from "../lib/model";
-import { deletePin, toast, updatePin, updateRecord, useStore } from "../lib/store";
+import { currentAuthor, deletePin, toast, updatePin, updateRecord, useStore } from "../lib/store";
 import { IBack, ICopy, IExpand, INav, IPin, ISpeaker, ITrash } from "./Icons";
 import { Modal, SavedInput, ShowScreen, copy, speak } from "./ui";
 import { GoBlock } from "./Nav";
@@ -66,7 +66,7 @@ export default function PinDetail({ trip, pin, onBack, onGo, sheetH }: { trip: T
         </div>
         <div className="sec">
           <span className="label">Notes</span>
-          <SavedInput multiline value={pin.note || ""} placeholder="Stand, contact, prix…" onSave={(v) => updatePin(pin.id, { note: v })} />
+          <SavedInput multiline value={pin.note || ""} placeholder="Stand, contact, prix…" onSave={(v) => { updatePin(pin.id, { note: v }); updateRecord(`_pin:${pin.id}`, { noteBy: currentAuthor() }); }} />
         </div>
       </div>
       {show && <ShowScreen zh={zh} sub={x.address || pin.name} onClose={() => setShow(false)} />}

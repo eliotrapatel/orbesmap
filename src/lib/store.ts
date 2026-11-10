@@ -717,6 +717,12 @@ export function updatePlace(id: string, patch: Partial<PlaceState>) {
   enqueue({ t: "place", trip, id });
 }
 
+/** Who is writing (first part of the signed-in e-mail), saved next to notes so the assistant can tell them apart */
+export function currentAuthor(): string | undefined {
+  const e = state.session?.user?.email;
+  return e ? e.split("@")[0] : undefined;
+}
+
 /** Free-form shared records (checklist items, insurance, extra info on my places), stored like place states:
  * same offline queue, same field-by-field merge, same live sync. Ids use a prefix ("_check:", "_info:", "_pin:"). */
 export function updateRecord(id: string, patch: Record<string, unknown>) {

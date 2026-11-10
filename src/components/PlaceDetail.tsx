@@ -4,7 +4,7 @@ import type { Place, Trip } from "../data/types";
 import { amapDirections, formatMinutes, googleDirections, travelMinutes } from "../lib/geo";
 import { isHotel, stopTime } from "../lib/plan";
 import { checkVisit, hoursLine, liveStatus } from "../lib/hours";
-import { addContact, addPhoto, deleteContact, deletePhoto, photoSrc, toast, updatePlace, useStore } from "../lib/store";
+import { addContact, addPhoto, currentAuthor, deleteContact, deletePhoto, photoSrc, toast, updatePlace, useStore } from "../lib/store";
 import { IBack, ICamera, ICheck, IClock, IClose, ICopy, IExpand, IGlobe, INav, IPin, IPlus, ISpeaker, IStar, ITrain, ITrash } from "./Icons";
 import { Lightbox, Modal, SavedInput, ShowScreen, compressImage, copy, speak } from "./ui";
 import { GoBlock } from "./Nav";
@@ -164,7 +164,7 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH }: { tri
 
         <div className="sec">
           <span className="label">Notes</span>
-          <SavedInput multiline value={state.note || ""} placeholder="Ce que vous avez vu, les prix, les impressions…" onSave={(v) => updatePlace(place.id, { note: v })} />
+          <SavedInput multiline value={state.note || ""} placeholder="Ce que vous avez vu, les prix, les impressions…" onSave={(v) => updatePlace(place.id, { note: v, ...({ noteBy: currentAuthor() } as object) })} />
         </div>
 
         <div className="sec">

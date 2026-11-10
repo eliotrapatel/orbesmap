@@ -539,6 +539,7 @@ export default function App() {
               {tool === "translate" && <Translate trip={trip} />}
               {tool === "ask" && (
                 <Ask
+                  key={trip.id}
                   trip={trip}
                   onOpenPlace={openPlace}
                   onOpenPin={(p) => {

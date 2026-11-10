@@ -1,15 +1,15 @@
-import { useEffect, useRef, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import type { Place, Trip } from "../data/types";
 import { ai, AiError } from "../lib/ai";
-import { buildCarnet } from "../lib/carnet";
-import { useLoc } from "../lib/locate";
+import { buildLive, buildStable } from "../lib/carnet";
+import { getLoc, startLocate, useLoc } from "../lib/locate";
 import type { Pin } from "../lib/model";
-import { useStore } from "../lib/store";
-import { useWeather } from "../lib/weather";
+import { getState, useStore } from "../lib/store";
+import { useWeather, type Wx } from "../lib/weather";
 import { IPin } from "./Icons";
 
 type Ref = { kind: "place" | "pin"; id: string };
-type Turn = { q: string; a: string; refs: Ref[]; at: number; err?: boolean };
+type Turn = { q: string; a: string; refs: Ref[]; at: number; err?: boolean; pending?: boolean };
 const KEY = "orbes.ask.v1";
 const SUGGESTIONS = [
   "On fait quoi demain ?",
@@ -20,79 +20,136 @@ const SUGGESTIONS = [
   "Qu'est-ce qui ferme tôt cette semaine ?",
 ];
 
-const readTurns = (tripId: string): Turn[] => {
-  try {
-    return JSON.parse(localStorage.getItem(`${KEY}.${tripId}`) || "[]");
-  } catch {
-    return [];
+// ---------- conversation store (outside the panel: closing it during an answer loses nothing) ----------
+const subs = new Set<() => void>();
+const cache = new Map<string, Turn[]>();
+function read(tripId: string): Turn[] {
+  if (!cache.has(tripId)) {
+    let t: Turn[] = [];
+    try {
+      t = JSON.parse(localStorage.getItem(`${KEY}.${tripId}`) || "[]");
+    } catch {
+      /* ignore */
+    }
+    // an answer still "pending" from an earlier session never came back
+    cache.set(tripId, t.map((x) => (x.pending && Date.now() - x.at > 120_000 ? { ...x, pending: false, err: true, a: "Réponse perdue (app fermée pendant l'attente). Réessayez." } : x)));
   }
-};
-
-/** Light formatting: paragraphs and "- " bullets */
-function Answer({ text }: { text: string }) {
-  const blocks = text.split(/\n{2,}/);
-  return (
-    <>
-      {blocks.map((b, i) => {
-        const lines = b.split("\n").filter((l) => l.trim());
-        if (lines.length && lines.every((l) => /^\s*[-•]\s/.test(l)))
-          return <ul key={i}>{lines.map((l, k) => <li key={k}>{l.replace(/^\s*[-•]\s/, "")}</li>)}</ul>;
-        return <p key={i}>{lines.join(" ")}</p>;
-      })}
-    </>
+  return cache.get(tripId)!;
+}
+function write(tripId: string, turns: Turn[]) {
+  const t = turns.slice(-30);
+  cache.set(tripId, t);
+  try {
+    localStorage.setItem(`${KEY}.${tripId}`, JSON.stringify(t));
+  } catch {
+    /* storage full: kept in memory */
+  }
+  subs.forEach((f) => f());
+}
+function useTurns(tripId: string): Turn[] {
+  return useSyncExternalStore(
+    (f) => {
+      subs.add(f);
+      return () => {
+        subs.delete(f);
+      };
+    },
+    () => read(tripId),
   );
+}
+
+async function send(trip: Trip, question: string, wx: Wx | null) {
+  const text = question.trim();
+  const turns = read(trip.id);
+  if (!text || turns.some((t) => t.pending)) return;
+  const at = Date.now();
+  write(trip.id, [...turns, { q: text, a: "", refs: [], at, pending: true }]);
+  // "près de moi" without a position: ask for it (no prompt if already allowed)
+  if (/près|proche|autour|ici/i.test(text) && getLoc().status === "off") startLocate(false, false);
+  const replace = (t: Turn) => write(trip.id, read(trip.id).map((x) => (x.at === at ? t : x)));
+  try {
+    const s = getState();
+    const loc = getLoc();
+    const context = buildStable(trip, s.data, s.settings);
+    const live = buildLive(trip, s.data, loc.fix, loc.stale, wx, { state: s.session ? s.sync : "local", pending: s.pending });
+    const fmt = (ms: number) => new Intl.DateTimeFormat("fr-FR", { timeZone: trip.timezone, weekday: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(ms);
+    // only recent exchanges (the same day): older answers depended on another moment
+    const history = turns.filter((t) => !t.err && !t.pending && Date.now() - t.at < 6 * 3600e3).slice(-6).map((t) => ({ q: t.q, a: t.a, at: fmt(t.at) }));
+    const r = await ai<{ answer: string; refs: Ref[] }>("ask", { question: text, context, live, history }, 100_000);
+    replace({ q: text, a: r.answer || "Pas de réponse.", refs: r.refs || [], at });
+  } catch (e) {
+    replace({ q: text, a: e instanceof AiError ? e.message : "La question n'a pas pu être envoyée. Réessayez.", refs: [], at, err: true });
+  }
+}
+
+/** Light formatting, line by line: bullet lines become a list, other lines paragraphs; **bold** markers removed */
+function Answer({ text }: { text: string }) {
+  const lines = text.replace(/\*\*(.+?)\*\*/g, "$1").split("\n");
+  const out: React.ReactNode[] = [];
+  let list: string[] = [];
+  let para: string[] = [];
+  const flush = () => {
+    if (para.length) out.push(<p key={out.length}>{para.join(" ")}</p>);
+    if (list.length) out.push(<ul key={out.length}>{list.map((l, k) => <li key={k}>{l}</li>)}</ul>);
+    para = [];
+    list = [];
+  };
+  for (const raw of lines) {
+    const l = raw.trim();
+    const m = l.match(/^([-•*]|\d+[.)])\s+(.*)$/);
+    if (!l) flush();
+    else if (m) {
+      if (para.length) {
+        out.push(<p key={out.length}>{para.join(" ")}</p>);
+        para = [];
+      }
+      list.push(m[2]);
+    } else {
+      if (list.length) {
+        out.push(<ul key={out.length}>{list.map((x, k) => <li key={k}>{x}</li>)}</ul>);
+        list = [];
+      }
+      para.push(l);
+    }
+  }
+  flush();
+  return <>{out}</>;
 }
 
 /** "Demander au carnet": read-only assistant that knows the whole notebook. */
 export default function Ask({ trip, onOpenPlace, onOpenPin }: { trip: Trip; onOpenPlace: (p: Place) => void; onOpenPin: (p: Pin) => void }) {
-  const data = useStore((s) => s.data);
-  const settings = useStore((s) => s.settings);
-  const fix = useLoc((s) => s.fix);
+  const pins = useStore((s) => s.data.pins);
+  useLoc((s) => s.status);
   const wx = useWeather(trip.center[1], trip.center[0], trip.timezone);
-  const [turns, setTurns] = useState<Turn[]>(() => readTurns(trip.id));
+  const turns = useTurns(trip.id);
   const [q, setQ] = useState("");
-  const [busy, setBusy] = useState(false);
-  const end = useRef<HTMLDivElement>(null);
+  const busy = turns.some((t) => t.pending);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(`${KEY}.${trip.id}`, JSON.stringify(turns.slice(-30)));
-    } catch {
-      /* storage full: keep in memory */
-    }
-    end.current?.scrollIntoView({ block: "end", behavior: "smooth" });
-  }, [turns, trip.id]);
-
-  const ask = async (question = q) => {
-    const text = question.trim();
-    if (!text || busy) return;
+  const ask = (question = q) => {
+    if (!question.trim() || busy) return;
     setQ("");
-    setBusy(true);
-    try {
-      const context = buildCarnet(trip, data, settings, fix, wx);
-      const history = turns.filter((t) => !t.err).slice(-6).map((t) => ({ q: t.q, a: t.a }));
-      const r = await ai<{ answer: string; refs: Ref[] }>("ask", { question: text, context, history }, 90_000);
-      setTurns((ts) => [...ts, { q: text, a: r.answer || "Pas de réponse.", refs: r.refs || [], at: Date.now() }]);
-    } catch (e) {
-      setTurns((ts) => [...ts, { q: text, a: e instanceof AiError ? e.message : "La question n'a pas pu être envoyée. Réessayez.", refs: [], at: Date.now(), err: true }]);
-    } finally {
-      setBusy(false);
-    }
+    send(trip, question, wx);
   };
 
-  const refButton = (r: Ref, k: number) => {
-    if (r.kind === "place") {
-      const p = trip.places.find((x) => x.id === r.id);
-      return p ? <button key={k} className="btn-sm" onClick={() => onOpenPlace(p)}><IPin /> {p.name}</button> : null;
-    }
-    const p = data.pins.find((x) => x.id === r.id);
-    return p ? <button key={k} className="btn-sm" onClick={() => onOpenPin(p)}><IPin /> {p.name}</button> : null;
+  // cited places: found by id in the programme or in my places (whatever "kind" says), no duplicates
+  const resolve = (refs: Ref[]) => {
+    const seen = new Set<string>();
+    return refs
+      .filter((r) => r && r.id && !seen.has(r.id) && (seen.add(r.id), true))
+      .map((r) => {
+        const place = trip.places.find((p) => p.id === r.id);
+        if (place) return <button key={r.id} className="btn-sm" onClick={() => onOpenPlace(place)}><IPin /> {place.name}</button>;
+        const pin = pins.find((p) => p.id === r.id);
+        return pin ? <button key={r.id} className="btn-sm" onClick={() => onOpenPin(pin)}><IPin /> {pin.name}</button> : null;
+      })
+      .filter(Boolean)
+      .slice(0, 8);
   };
 
   return (
     <div className="ask">
       <p className="ask-intro">
-        Posez une question sur votre carnet : programme, horaires, réservations, vos notes et celles de votre père, fournisseurs, check-list. L'assistant lit tout mais <b>ne modifie rien</b>.
+        Posez une question sur votre carnet : programme, horaires, réservations, vos notes, fournisseurs, check-list. L'assistant lit tout mais <b>ne modifie rien</b>.
       </p>
       {!turns.length && (
         <div className="ask-sugg">
@@ -102,26 +159,34 @@ export default function Ask({ trip, onOpenPlace, onOpenPin }: { trip: Trip; onOp
         </div>
       )}
       <div className="ask-thread">
-        {turns.map((t) => (
-          <div key={t.at} className="ask-turn">
-            <div className="ask-q">{t.q}</div>
-            <div className={"ask-a" + (t.err ? " err" : "")}>
-              <Answer text={t.a} />
-              {t.refs.length > 0 && <div className="ask-refs">{t.refs.slice(0, 8).map(refButton)}</div>}
+        {turns.map((t) => {
+          const refs = resolve(t.refs);
+          return (
+            <div key={t.at} className="ask-turn">
+              <div className="ask-q">{t.q}</div>
+              {t.pending ? (
+                <div className="tr-loading"><span className="spin" /> Lecture du carnet… (vous pouvez fermer ce panneau)</div>
+              ) : (
+                <div className={"ask-a" + (t.err ? " err" : "")}>
+                  <Answer text={t.a} />
+                  {refs.length > 0 && <div className="ask-refs">{refs}</div>}
+                  {t.err && (
+                    <button className="btn-sm" onClick={() => { write(trip.id, read(trip.id).filter((x) => x.at !== t.at)); ask(t.q); }}>Réessayer</button>
+                  )}
+                </div>
+              )}
             </div>
-          </div>
-        ))}
-        {busy && <div className="tr-loading"><span className="spin" /> Lecture du carnet…</div>}
-        <div ref={end} />
+          );
+        })}
       </div>
       <form className="ask-form" onSubmit={(e) => { e.preventDefault(); ask(); }}>
-        <input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ex. « Qu'a noté papa sur le Bund ? »" enterKeyHint="send" aria-label="Votre question" />
+        <input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ex. « Qu'avons-nous noté sur le Bund ? »" enterKeyHint="send" aria-label="Votre question" />
         <button className="btn primary" disabled={busy || !q.trim()}>Demander</button>
       </form>
-      {turns.length > 0 && (
-        <button className="btn-sm ask-clear" onClick={() => setTurns([])}>Effacer la discussion</button>
+      {turns.length > 0 && !busy && (
+        <button className="btn-sm ask-clear" onClick={() => write(trip.id, [])}>Effacer la discussion</button>
       )}
-      <p className="em-small">Chaque question envoie le carnet complet (notes, contacts et assurance compris) au service IA, en lecture seule. Environ 0,3 centime par question. Il faut du réseau (eSIM ou VPN en Chine).</p>
+      <p className="em-small">Chaque question envoie le carnet complet (notes, contacts et assurance compris) au service IA, en lecture seule. Environ 0,1 à 0,4 centime par question. Il faut du réseau (eSIM ou VPN en Chine).</p>
     </div>
   );
 }
