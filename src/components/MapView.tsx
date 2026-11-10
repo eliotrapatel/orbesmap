@@ -346,6 +346,14 @@ export default function MapView(p: Props) {
     const arcSrc = map.getSource("arc") as GeoJSONSource | undefined;
     const planeSrc = map.getSource("plane") as GeoJSONSource | undefined;
     if (!arcSrc || !planeSrc) return;
+    const labels = (map.getStyle().layers || []).filter((l) => l.type === "symbol").map((l) => l.id);
+    labels.forEach((id) => {
+      try {
+        map.setPaintProperty(id, "text-opacity", p.landing ? 0 : 1);
+      } catch {
+        /* ignore */
+      }
+    });
     if (!p.landing) {
       arcSrc.setData({ type: "FeatureCollection", features: [] });
       planeSrc.setData({ type: "FeatureCollection", features: [] });

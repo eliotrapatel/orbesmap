@@ -44,6 +44,8 @@ export default function App() {
   const trip = useTrip();
   const data = useStore((s) => s.data);
   const [landing, setLanding] = useState(true);
+  // the landing overlay stays mounted a little longer than the landing map mode, for its fade-out
+  const [landingOverlay, setLandingOverlay] = useState(true);
   const [day, setDay] = useState("all");
   const [filter, setFilter] = useState<Filter>({ types: new Set(), fav: false, todo: false });
   const [sel, setSel] = useState<Sel>(null);
@@ -307,6 +309,7 @@ export default function App() {
               setTool(null);
               setThreeD(false);
               setLanding(true);
+              setLandingOverlay(true);
             }}
           />
           <DayBar trip={trip} day={day} onDay={showDay} />
@@ -411,12 +414,13 @@ export default function App() {
         </>
       )}
 
-      {landing && (
+      {landingOverlay && (
         <Landing
           trip={trip}
           onPick={switchTrip}
           onEnter={() => {
-            window.setTimeout(() => setLanding(false), 450);
+            setLanding(false);
+            window.setTimeout(() => setLandingOverlay(false), 900);
             fly({ bounds: tripBounds(), pitch: 0, duration: 2600 });
           }}
         />
