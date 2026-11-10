@@ -26,16 +26,46 @@ function corsHeaders(origin: string | null): Record<string, string> {
 const json = (body: unknown, status: number, origin: string | null) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", ...corsHeaders(origin) } });
 
-/** The caller must be signed in to Supabase AND listed in public.members. */
-async function isMember(token: string): Promise<boolean> {
+/** The caller must be signed in to Supabase AND listed in public.members. Returns who it is (e-mail), or false. */
+async function isMember(token: string): Promise<string | false> {
   const u = await fetch(`${SUPA_URL}/auth/v1/user`, { headers: { apikey: SUPA_KEY, authorization: `Bearer ${token}` } });
   if (!u.ok) return false;
+  const email = String(((await u.json()) as Json)?.email || "");
   const r = await fetch(`${SUPA_URL}/rest/v1/rpc/is_member`, {
     method: "POST",
     headers: { apikey: SUPA_KEY, authorization: `Bearer ${token}`, "content-type": "application/json" },
     body: "{}",
   });
-  return r.ok && (await r.json()) === true;
+  return r.ok && (await r.json()) === true ? email || "membre" : false;
+}
+
+// ---------- spending log (DeepSeek has a balance API but no usage history API) ----------
+type Usage = { hit: number; miss: number; out: number; search: number; fetch: number };
+const newUsage = (): Usage => ({ hit: 0, miss: 0, out: 0, search: 0, fetch: 0 });
+/** DeepSeek V4.1 Flash list prices (USD / 1M tokens), half price off-peak; Search/Fetch 0.75 $ / 1000 */
+function costUsd(u: Usage, at = new Date()): number {
+  const h = at.getUTCHours();
+  const d = at.getUTCDay();
+  const peak = d >= 1 && d <= 5 && ((h >= 1 && h < 4) || (h >= 6 && h < 10));
+  const k = peak ? 2 : 1;
+  return (u.hit * 0.003 * k + u.miss * 0.15 * k + u.out * 0.6 * k) / 1e6 + (u.search + u.fetch) * 0.00075;
+}
+const USAGE_TRIP = "_ai_usage";
+/** One row per AI call in place_states (trip "_ai_usage", never synced into a trip), written as the member. */
+async function logUsage(token: string, row: Json, f: typeof fetch): Promise<void> {
+  try {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 3000);
+    await f(`${SUPA_URL}/rest/v1/rpc/upsert_place_state`, {
+      method: "POST",
+      headers: { apikey: SUPA_KEY, authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({ p_trip: USAGE_TRIP, p_place: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, p_data: row }),
+      signal: ctl.signal,
+    });
+    clearTimeout(t);
+  } catch {
+    /* the log is best effort: never fail the user's request because of it */
+  }
 }
 
 // ---------- output schemas (structured outputs: every object closed, every field required) ----------
@@ -232,9 +262,10 @@ const DS_TOOLS = [
   { type: "function", function: { name: "web_fetch", description: "Lit une page web et renvoie son texte en Markdown.", parameters: { type: "object", properties: { url: { type: "string" } }, required: ["url"] } } },
 ];
 
-async function dsTool(name: string, args: Json, key: string, f: typeof fetch, cap = 20_000): Promise<string> {
+async function dsTool(name: string, args: Json, key: string, f: typeof fetch, cap = 20_000, usage?: Usage): Promise<string> {
   try {
     if (name === "web_search") {
+      if (usage) usage.search++;
       const q = String(args.query || "").slice(0, 128).trim();
       if (!q) return "requête vide";
       const r = await dsPost("/v1/tools/search", { query: q, count: 6 }, key, f, Math.min(15_000, cap));
@@ -242,6 +273,7 @@ async function dsTool(name: string, args: Json, key: string, f: typeof fetch, ca
       return JSON.stringify(list.map((x) => ({ title: x.title, url: x.url, summary: String(x.summary || x.snippet || "").slice(0, 700) })));
     }
     if (name === "web_fetch") {
+      if (usage) usage.fetch++;
       const url = String(args.url || "");
       if (!/^https?:\/\//.test(url)) return "URL invalide";
       const r = await dsPost("/v1/tools/fetch", { url }, key, f, Math.min(20_000, cap));
@@ -253,7 +285,15 @@ async function dsTool(name: string, args: Json, key: string, f: typeof fetch, ca
   return "outil inconnu";
 }
 
-async function runDeepSeek(key: string, job: Job, f: typeof fetch, deadline: number): Promise<Json> {
+function addUsage(u: Usage | undefined, r: Json) {
+  const x = (r?.usage || {}) as Json;
+  if (!u) return;
+  u.hit += Number(x.prompt_cache_hit_tokens) || 0;
+  u.miss += Number(x.prompt_cache_miss_tokens ?? x.prompt_tokens) || 0;
+  u.out += Number(x.completion_tokens) || 0;
+}
+
+async function runDeepSeek(key: string, job: Job, f: typeof fetch, deadline: number, usage?: Usage): Promise<Json> {
   const left = () => deadline - Date.now();
   const ms = (cap: number) => Math.max(3_000, Math.min(cap, left()));
   const userContent: unknown = job.image
@@ -280,6 +320,7 @@ async function runDeepSeek(key: string, job: Job, f: typeof fetch, deadline: num
         thinking = true;
         r = await req(true);
       }
+      addUsage(usage, r);
       const m = ((r.choices as Json[] | undefined)?.[0]?.message || {}) as Json;
       const calls = (m.tool_calls as { id: string; function: { name: string; arguments: string } }[] | undefined) || [];
       if (!calls.length) {
@@ -301,7 +342,7 @@ async function runDeepSeek(key: string, job: Job, f: typeof fetch, deadline: num
           } catch {
             /* bad arguments */
           }
-          const content = await dsTool(c.function.name, args, key, f, Math.max(3_000, left() - 90_000));
+          const content = await dsTool(c.function.name, args, key, f, Math.max(3_000, left() - 90_000), usage);
           toolResults.push(content);
           return { role: "tool" as const, tool_call_id: c.id, content };
         }),
@@ -315,6 +356,7 @@ async function runDeepSeek(key: string, job: Job, f: typeof fetch, deadline: num
       try {
         msgs.push({ role: "user", content: "Arrête les recherches. Résume maintenant, uniquement à partir des résultats ci-dessus, ce que tu as trouvé pour chaque lieu (nom, nom chinois, adresses, coordonnées et leur source, horaires, prix, URL)." });
         const r = await dsPost("/chat/completions", { model: DS_MODEL, messages: msgs, thinking: { type: "disabled" }, max_tokens: 3000 }, key, f, ms(30_000));
+        addUsage(usage, r);
         notes = String(((r.choices as Json[] | undefined)?.[0]?.message as Json | undefined)?.content || "");
       } catch {
         /* fall back to the raw results below */
@@ -339,6 +381,7 @@ async function runDeepSeek(key: string, job: Job, f: typeof fetch, deadline: num
       if (attempt === 1) throw e;
       continue;
     }
+    addUsage(usage, r);
     const text = String(((r.choices as Json[] | undefined)?.[0]?.message as Json | undefined)?.content || "").trim();
     if (!text) continue;
     try {
@@ -368,8 +411,10 @@ export async function handle(req: Request, deps: Deps = {}): Promise<Response> {
   if (req.method !== "POST") return json({ error: "method" }, 405, origin);
   const token = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
   if (!token) return json({ error: "auth", message: "Connectez-vous dans l'onglet Compte pour utiliser cette fonction." }, 401, origin);
-  if (!(await (deps.member || isMember)(token).catch(() => false)))
-    return json({ error: "auth", message: "Ce compte n'a pas accès à l'espace partagé." }, 403, origin);
+  const who = await (deps.member || isMember)(token).catch(() => false);
+  if (!who) return json({ error: "auth", message: "Ce compte n'a pas accès à l'espace partagé." }, 403, origin);
+  const by = typeof who === "string" ? who.split("@")[0] : "membre";
+  const f = deps.fetch || fetch;
 
   const dsKey = (env.DEEPSEEK_API_KEY || env.DEEPSEEK_KEY || "").trim();
   const claudeKey = (env.ANTHROPIC_API_KEY || "").trim();
@@ -382,6 +427,32 @@ export async function handle(req: Request, deps: Deps = {}): Promise<Response> {
     body = await req.json();
   } catch {
     return json({ error: "bad", message: "Requête illisible." }, 400, origin);
+  }
+
+  // DeepSeek balance (official API) + our own spending log (DeepSeek has no history API)
+  if (body.task === "balance") {
+    let balance: Json | null = null;
+    if (dsKey) {
+      try {
+        const ctl = new AbortController();
+        const t = setTimeout(() => ctl.abort(), 8000);
+        const r = await f(`${DS_URL}/user/balance`, { headers: { authorization: `Bearer ${dsKey}`, accept: "application/json" }, signal: ctl.signal });
+        clearTimeout(t);
+        if (r.ok) balance = (await r.json()) as Json;
+      } catch {
+        /* shown as unavailable */
+      }
+    }
+    let history: Json[] = [];
+    try {
+      const r = await f(`${SUPA_URL}/rest/v1/place_states?trip_id=eq.${USAGE_TRIP}&select=place_id,data,updated_at&order=updated_at.desc&limit=300`, {
+        headers: { apikey: SUPA_KEY, authorization: `Bearer ${token}` },
+      });
+      if (r.ok) history = ((await r.json()) as { data: Json }[]).map((x) => x.data);
+    } catch {
+      /* empty history */
+    }
+    return json({ provider, balance, history }, 200, origin);
   }
 
   let job: Job;
@@ -429,8 +500,20 @@ export async function handle(req: Request, deps: Deps = {}): Promise<Response> {
   try {
     // always answer (with CORS headers) before Vercel cuts the function at 300 s
     const deadline = Date.now() + (job.task === "place" ? 270_000 : 90_000);
-    const out = provider === "deepseek" ? await runDeepSeek(dsKey, job, deps.fetch || fetch, deadline) : await runClaude(deps.client || new Anthropic({ apiKey: claudeKey, maxRetries: 1 }), job, deadline);
-    return json(out, 200, origin);
+    const usage = newUsage();
+    const started = Date.now();
+    const log = (ok: boolean) =>
+      provider === "deepseek" && usage.hit + usage.miss + usage.out + usage.search + usage.fetch > 0
+        ? logUsage(token, { at: started, task: job.task, by, model: DS_MODEL, ...usage, usd: Math.round(costUsd(usage, new Date(started)) * 1e6) / 1e6, ok, ms: Date.now() - started }, f)
+        : Promise.resolve();
+    try {
+      const out = provider === "deepseek" ? await runDeepSeek(dsKey, job, f, deadline, usage) : await runClaude(deps.client || new Anthropic({ apiKey: claudeKey, maxRetries: 1 }), job, deadline);
+      await log(true);
+      return json(out, 200, origin);
+    } catch (e) {
+      await log(false);
+      throw e;
+    }
   } catch (e) {
     const k = e instanceof Upstream ? e.kind : "upstream";
     if (k === "busy") return json({ error: "busy", message: "Trop de demandes en même temps, réessayez dans une minute." }, 429, origin);

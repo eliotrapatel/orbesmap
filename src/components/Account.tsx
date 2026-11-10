@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { sendLoginEmail, signInWithPassword, signOut, useStore, verifyLoginCode, type SyncState } from "../lib/store";
 import { supabaseConfigured } from "../lib/supabase";
+import AiCredit from "./AiCredit";
 
 const SYNC_TEXT: Record<SyncState, string> = {
   local: "Enregistré sur cet appareil",
@@ -64,6 +65,7 @@ export default function Account() {
           ) : (
             <p style={{ marginTop: 14 }}>Vos données sont sauvegardées en ligne et partagées en direct avec les autres membres. Elles restent aussi sur cet appareil pour fonctionner sans réseau.</p>
           )}
+          {member !== false && <AiCredit />}
           <button
             className="btn danger block"
             style={{ marginTop: 16 }}
