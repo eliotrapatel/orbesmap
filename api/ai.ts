@@ -55,8 +55,7 @@ const PHOTO_SCHEMA = obj({
   contact: obj({ name: str, company: str, role: str, phone: str, wechat: str, email: str, address: str, addressCn: str }),
 });
 const INTERPRET_SCHEMA = obj({ translation: str, pinyin: str, note: str });
-const PLACE_SCHEMA = obj({
-  found: { type: "boolean" },
+const PLACE_ITEM = obj({
   name: str,
   nameCn: str,
   address: str,
@@ -66,10 +65,17 @@ const PLACE_SCHEMA = obj({
   coordSystem: { type: "string", enum: ["WGS84", "GCJ02", "BD09", "none"] },
   type: { type: "string", enum: ["concept", "mode", "luxe", "montres", "cuir", "textile", "bijoux", "musee", "galerie", "jardin", "landmark", "design", "tech", "restaurant", "cafe", "bar", "club", "mall", "lifestyle"] },
   desc: str,
+  why: str, // suggestions: why it matches the request
   hours: str,
+  price: str, // price level / typical spend if known
   source: str,
   confidence: { type: "string", enum: ["haute", "moyenne", "faible"] },
-  message: str, // what to tell the user if not found / ambiguous
+});
+// "precise": one specific place (link, name) · "suggestions": 3–5 real places matching a description · "not_found"
+const PLACES_SCHEMA = obj({
+  kind: { type: "string", enum: ["precise", "suggestions", "not_found"] },
+  message: str,
+  places: arr(PLACE_ITEM),
 });
 
 const PHOTO_SYSTEM = `Tu aides Eliot, fondateur français de la marque ORBES (maroquinerie et mode premium, minimaliste), en voyage à Shanghai avec son père.
@@ -87,12 +93,18 @@ Traduis fidèlement le message, sans rien ajouter ni commenter.
 - note : seulement si un point culturel ou un risque de malentendu mérite d'être signalé (sinon "").
 Latency-sensitive; begin your visible answer immediately.`;
 
-const PLACE_SYSTEM = `Tu retrouves un lieu à Shanghai (ou en Chine) à partir d'un lien (Xiaohongshu, Dianping, Instagram, article, Google Maps…), d'un texte ou d'une capture d'écran, pour l'ajouter à la carte de voyage d'Eliot.
-- Utilise la recherche web et la lecture de pages pour confirmer le nom, le nom chinois, l'adresse exacte en chinois et en anglais/pinyin, et les coordonnées.
-- Coordonnées : de préférence WGS-84 (OpenStreetMap, Wikipedia, site officiel). Si elles viennent d'Amap/Gaode, de Dianping ou de Tencent, c'est du GCJ02 ; de Baidu, c'est du BD09 : indique-le dans coordSystem sans convertir. Si tu n'as aucune coordonnée fiable, lat = 0, lng = 0, coordSystem = "none".
-- desc : une phrase en français sur ce que c'est et pourquoi c'est intéressant. hours : horaires si trouvés, sinon "".
-- source : l'URL la plus fiable consultée.
-- Si le lien ne s'ouvre pas (ex. xhslink demande l'app) et qu'il n'y a pas d'autre indice, found = false et message explique quoi envoyer à la place (une capture d'écran du post).`;
+const PLACE_SYSTEM = `Tu ajoutes des lieux à la carte de voyage d'Eliot (fondateur français de la marque ORBES, maroquinerie et mode premium et minimaliste ; aime le design, l'art, les concept stores, la bonne cuisine, les beaux bars, les montres, le cuir et le textile ; attentif aux prix). Il est à Shanghai du 24 au 29 novembre 2026, avec son père.
+On t'envoie un lien (Xiaohongshu, Dianping, Instagram, article, Google Maps…), un texte et/ou une capture d'écran.
+Décide d'abord :
+- kind = "precise" si la demande désigne UN lieu précis (un lien vers un lieu, un nom de lieu, une capture d'un lieu) : retrouve-le et renvoie 1 lieu.
+- kind = "suggestions" si c'est une description ou une envie (« un bar à cocktails calme près du Bund », « où acheter du beau cuir », « dim sum ouvert tard ») : renvoie 3 à 5 VRAIS lieux qui y répondent, choisis pour les goûts d'Eliot, ouverts fin 2026 (vérifie qu'ils n'ont pas fermé), du meilleur au moins bon ; why = en une phrase pourquoi ce lieu répond à la demande. Évite les lieux déjà dans son programme (liste fournie) sauf si la demande les vise.
+- kind = "not_found" si rien de fiable ; message explique quoi envoyer à la place (ex. une capture d'écran du post si le lien xhslink ne s'ouvre pas).
+Pour chaque lieu :
+- confirme par la recherche web et la lecture de pages : nom, nom chinois, adresse exacte en chinois et en anglais/pinyin, coordonnées.
+- Coordonnées : de préférence WGS-84 (OpenStreetMap, Wikipedia, site officiel). Si elles viennent d'Amap/Gaode, de Dianping ou de Tencent, c'est du GCJ02 ; de Baidu, c'est du BD09 : indique-le dans coordSystem sans convertir. Sans coordonnée fiable : lat = 0, lng = 0, coordSystem = "none".
+- desc : une phrase en français sur ce que c'est. hours : horaires si trouvés. price : niveau de prix ou dépense typique si trouvé. source : l'URL la plus fiable consultée.
+- Si un lieu « près de » est donné, privilégie ce qui est à distance raisonnable (à pied ou 15 min de taxi).
+message : une phrase courte pour Eliot (ex. « 4 propositions autour du Bund »).`;
 
 type Job = {
   task: "photo" | "interpret" | "place";
@@ -233,14 +245,14 @@ async function runDeepSeek(key: string, job: Job, f: typeof fetch, deadline: num
     : job.text;
   let notes = "";
   if (job.research) {
-    // phase 1: research with tools (search / fetch), max 6 rounds
+    // phase 1: research with tools (search / fetch), max 8 rounds
     const msgs: DsMsg[] = [
-      { role: "system", content: `${job.system}\nÉtape 1 : fais tes recherches avec les outils web_search et web_fetch, puis écris un résumé de ce que tu as trouvé (nom, nom chinois, adresses, coordonnées et leur source, horaires, URL de la meilleure source).` },
+      { role: "system", content: `${job.system}\nÉtape 1 : fais tes recherches avec les outils web_search et web_fetch (requêtes en chinois et en anglais), puis écris un résumé de ce que tu as trouvé pour chaque lieu retenu (nom, nom chinois, adresses, coordonnées et leur source, horaires, prix, URL de la meilleure source).` },
       { role: "user", content: userContent },
     ];
     // fast mode first; if the API refuses tools without thinking, switch to thinking mode (low effort)
     let thinking = false;
-    for (let round = 0; round < 6 && left() > 60_000; round++) {
+    for (let round = 0; round < 8 && left() > 60_000; round++) {
       const req = (th: boolean) => dsPost("/chat/completions", { model: DS_MODEL, messages: msgs, tools: DS_TOOLS, max_tokens: 4000, ...(th ? { thinking: { type: "enabled" }, reasoning_effort: "low" } : { thinking: { type: "disabled" } }) }, key, f, ms(50_000));
       let r: Json;
       try {
@@ -335,8 +347,20 @@ export async function handle(req: Request, deps: Deps = {}): Promise<Response> {
     const url = typeof body.url === "string" ? body.url.slice(0, 1000) : "";
     const text = typeof body.text === "string" ? body.text.slice(0, 3000) : "";
     const image = b64ok(body.image) ? body.image : undefined;
-    if (!url && !text && !image) return json({ error: "bad", message: "Collez un lien, un texte ou ajoutez une capture." }, 400, origin);
-    job = { task: "place", system: PLACE_SYSTEM, text: `Retrouve ce lieu.${url ? `\nLien : ${url}` : ""}${text ? `\nTexte : ${text}` : ""}${image ? "\n(Capture d'écran jointe.)" : ""}`, image, schema: PLACE_SCHEMA, effort: "medium", research: true, maxTokens: 6000 };
+    if (!url && !text && !image) return json({ error: "bad", message: "Collez un lien, décrivez ce que vous cherchez ou ajoutez une capture." }, 400, origin);
+    const near = body.near && typeof body.near === "object" ? (body.near as Json) : null;
+    const nearTxt = near && Number.isFinite(Number(near.lat)) && Number.isFinite(Number(near.lng)) ? `\nPrès de : ${String(near.label || "ma position").slice(0, 80)} (WGS-84 ${Number(near.lat).toFixed(5)}, ${Number(near.lng).toFixed(5)})` : "";
+    const known = Array.isArray(body.known) ? (body.known as unknown[]).slice(0, 120).map((x) => String(x).slice(0, 60)).join(", ") : "";
+    job = {
+      task: "place",
+      system: PLACE_SYSTEM,
+      text: `Demande d'Eliot :${url ? `\nLien : ${url}` : ""}${text ? `\nTexte : ${text}` : ""}${image ? "\n(Capture d'écran jointe.)" : ""}${nearTxt}${known ? `\nDéjà dans son programme : ${known}` : ""}`,
+      image,
+      schema: PLACES_SCHEMA,
+      effort: "medium",
+      research: true,
+      maxTokens: 8000,
+    };
   } else return json({ error: "bad", message: "Tâche inconnue." }, 400, origin);
 
   try {

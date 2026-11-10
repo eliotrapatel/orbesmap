@@ -20,8 +20,7 @@ export type PhotoResult = {
   contact: { name: string; company: string; role: string; phone: string; wechat: string; email: string; address: string; addressCn: string };
 };
 export type InterpretResult = { translation: string; pinyin: string; note: string };
-export type PlaceResult = {
-  found: boolean;
+export type PlaceItem = {
   name: string;
   nameCn: string;
   address: string;
@@ -31,11 +30,13 @@ export type PlaceResult = {
   coordSystem: "WGS84" | "GCJ02" | "BD09" | "none";
   type: string;
   desc: string;
+  why: string;
   hours: string;
+  price: string;
   source: string;
   confidence: "haute" | "moyenne" | "faible";
-  message: string;
 };
+export type PlacesResult = { kind: "precise" | "suggestions" | "not_found"; message: string; places: PlaceItem[] };
 
 export async function ai<T>(task: "photo" | "interpret" | "place", payload: Record<string, unknown>, timeoutMs = 60_000): Promise<T> {
   if (!navigator.onLine) throw new AiError("Pas de réseau : cette fonction a besoin d'Internet.");

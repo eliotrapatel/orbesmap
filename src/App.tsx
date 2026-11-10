@@ -270,15 +270,45 @@ export default function App() {
 
   // a place found from a link / screenshot becomes one of "my places", with its Chinese address
   const saveFound = useCallback(
-    (f: Found, ll: LL) => {
+    (f: Found, ll: LL, quiet = false) => {
       const pin = addPin({ name: f.name || f.nameCn || "Lieu", lng: ll[0], lat: ll[1] });
-      updateRecord(`_pin:${pin.id}`, { nameCn: f.nameCn, address: f.address, addressCn: f.addressCn, desc: f.desc, hours: f.hours, source: f.source, day: f.day, type: f.type });
-      setSel({ kind: "pin", id: pin.id });
-      setTool(null);
-      fly({ center: ll, zoom: 15.5 });
-      toast(`« ${f.name || f.nameCn} » ajouté sur la carte`);
+      updateRecord(`_pin:${pin.id}`, { nameCn: f.nameCn, address: f.address, addressCn: f.addressCn, desc: [f.why, f.desc].filter(Boolean).join(" "), hours: f.hours, price: f.price, source: f.source, day: f.day, type: f.type });
+      if (!quiet) {
+        setSel({ kind: "pin", id: pin.id });
+        setTool(null);
+        fly({ center: ll, zoom: 15.5 });
+        toast(`« ${f.name || f.nameCn} » ajouté sur la carte`);
+      }
+      return pin;
     },
     [fly],
+  );
+  // several suggestions picked at once: add those with a position, show them all; one without position: place it by hand
+  const addFound = useCallback(
+    (list: Found[]) => {
+      setAddLink(false);
+      if (list.length === 1 && !list[0].ll) {
+        setPendingFound(list[0]);
+        setSel(null);
+        setTool(null);
+        setPinMode(true);
+        return;
+      }
+      if (list.length === 1) {
+        saveFound(list[0], list[0].ll!);
+        return;
+      }
+      const ok = list.filter((f) => f.ll);
+      const pins = ok.map((f) => saveFound(f, f.ll!, true));
+      setTool(null);
+      if (pins.length) {
+        setSel({ kind: "pin", id: pins[pins.length - 1].id });
+        fly(pins.length === 1 ? { center: [pins[0].lng, pins[0].lat], zoom: 15 } : { bounds: boundsOf(pins) });
+      }
+      const skipped = list.length - ok.length;
+      toast(`${ok.length} lieu${ok.length > 1 ? "x" : ""} ajouté${ok.length > 1 ? "s" : ""} sur la carte${skipped ? ` · ${skipped} sans position, à ajouter seul` : ""}`);
+    },
+    [saveFound, fly],
   );
 
   const openTool = (k: ToolKey) => {
@@ -514,7 +544,7 @@ export default function App() {
               <button className={"ctl" + (pinMode ? " on" : "")} onClick={() => { setPendingFound(null); setPinMode((v) => !v); }} aria-pressed={pinMode} aria-label="Ajouter un lieu sur la carte" title="Ajouter un lieu">
                 <IPinPlus />
               </button>
-              <button className="ctl" onClick={() => setAddLink(true)} aria-label="Ajouter un lieu depuis un lien ou une capture" title="Depuis un lien ou une capture">
+              <button className="ctl" onClick={() => setAddLink(true)} aria-label="Ajouter un lieu : lien, nom ou description" title="Ajouter un lieu (lien, nom ou description)">
                 <ILink />
               </button>
               <button className={"ctl" + (threeD ? " on" : "")} onClick={() => setThreeD((v) => !v)} aria-pressed={threeD} aria-label="Bâtiments en 3D" title="Vue 3D">
@@ -585,16 +615,7 @@ export default function App() {
         <AddPlace
           trip={trip}
           onClose={() => setAddLink(false)}
-          onAdd={(f) => {
-            setAddLink(false);
-            if (f.ll) saveFound(f, f.ll);
-            else {
-              setPendingFound(f);
-              setSel(null);
-              setTool(null);
-              setPinMode(true);
-            }
-          }}
+          onAdd={addFound}
         />
       )}
       {pendingPin && (
