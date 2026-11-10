@@ -137,9 +137,11 @@ export default function MapView(p: Props) {
 
     let styled = false;
     let failed = false;
+    let tilesFailed = false; // style loaded but the tile index / tiles did not (slow network): reload later
     let retry: number | undefined;
     const tryAgain = () => {
-      if (!failed) return;
+      if (!failed && !tilesFailed) return;
+      tilesFailed = false;
       map.setStyle(STYLE_URL);
     };
     const fallBack = () => {
@@ -208,9 +210,20 @@ export default function MapView(p: Props) {
       addLayers();
       setReady((r) => r + 1);
     });
-    map.on("error", (e: maplibregl.ErrorEvent) => {
+    map.on("error", (e: maplibregl.ErrorEvent & { sourceId?: string }) => {
       const msg = String(e.error?.message || "");
-      if (!styled && /style|Failed to fetch|NetworkError|Load failed/i.test(msg)) fallBack();
+      if (!styled) {
+        fallBack();
+        return;
+      }
+      // basemap source lost after the style loaded: retry when the network comes back (or in 30 s)
+      // (only when the tile index itself is missing: one missing tile offline is normal)
+      const src = map.getSource("openmaptiles") as { tiles?: string[] } | undefined;
+      if (e.sourceId === "openmaptiles" && !src?.tiles?.length && /Failed to fetch|NetworkError|Load failed|timeout|HTTP/i.test(msg) && !tilesFailed) {
+        tilesFailed = true;
+        window.clearInterval(retry);
+        retry = window.setInterval(() => navigator.onLine && tryAgain(), 30_000);
+      }
     });
     let longAt = 0; // the click that follows a long press must not close what it opened
     map.on("click", (e: maplibregl.MapMouseEvent) => {
@@ -238,7 +251,7 @@ export default function MapView(p: Props) {
       start = null;
     };
     const tStart = (e: TouchEvent) => {
-      if (e.touches.length !== 1 || map.isMoving() || (e.target as HTMLElement).closest?.(".mk, .me, .pt-mark")) return cancel();
+      if (e.touches.length !== 1 || map.isMoving() || (e.target as HTMLElement).closest?.(".mk, .me-pos, .pt-mark")) return cancel();
       const t = e.touches[0];
       const r = canvas.getBoundingClientRect();
       start = { x: t.clientX, y: t.clientY };
@@ -394,7 +407,7 @@ export default function MapView(p: Props) {
     }
     if (!meMarker.current) {
       const wrap = document.createElement("div");
-      wrap.className = "me";
+      wrap.className = "me-pos";
       wrap.innerHTML = '<div class="me-cone"></div><div class="me-dot"></div>';
       meMarker.current = new maplibregl.Marker({ element: wrap }).setLngLat([me.lng, me.lat]).addTo(map);
     } else meMarker.current.setLngLat([me.lng, me.lat]);

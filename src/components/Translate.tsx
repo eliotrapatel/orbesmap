@@ -20,6 +20,20 @@ type SR = {
 const SRClass = (window as unknown as { SpeechRecognition?: new () => SR; webkitSpeechRecognition?: new () => SR }).SpeechRecognition || (window as unknown as { webkitSpeechRecognition?: new () => SR }).webkitSpeechRecognition;
 export const canListen = !!SRClass;
 
+/** iPhone only plays speech started from a tap: play a silent utterance during the tap, later ones then work. */
+let ttsUnlocked = false;
+function unlockTts() {
+  if (ttsUnlocked || !window.speechSynthesis) return;
+  ttsUnlocked = true;
+  try {
+    const u = new SpeechSynthesisUtterance(" ");
+    u.volume = 0;
+    window.speechSynthesis.speak(u);
+  } catch {
+    /* ignore */
+  }
+}
+
 const HIST_KEY = "orbes.photo.history";
 type Saved = { at: number; r: PhotoResult };
 const readHist = (): Saved[] => {
@@ -197,8 +211,9 @@ function TalkTab() {
   const rec = useRef<SR | null>(null);
   const finalText = useRef("");
   const n = useRef(0);
-  const interimRef = useRef("");
-  interimRef.current = interim;
+  const heard = useRef(""); // latest words heard (final + in progress), read when dictation ends
+  const active = useRef(false);
+  const safety = useRef<number | undefined>(undefined);
 
   useEffect(() => () => rec.current?.abort(), []);
 
@@ -220,12 +235,19 @@ function TalkTab() {
   };
 
   const listen = (lang: "fr" | "zh") => {
+    unlockTts();
     if (!SRClass) {
       setErr("La dictée vocale n'est pas disponible sur ce navigateur : tapez le texte. (iPhone : Réglages › Siri, activer « Dictée ».)");
       return;
     }
-    if (listening) {
+    if (active.current) {
+      // stop: translate what was heard; if the browser never fires "end", finish it ourselves
       rec.current?.stop();
+      window.clearTimeout(safety.current);
+      safety.current = window.setTimeout(() => {
+        if (!active.current) return;
+        rec.current?.abort();
+      }, 1500);
       return;
     }
     window.speechSynthesis?.cancel();
@@ -234,6 +256,7 @@ function TalkTab() {
     r.interimResults = true;
     r.continuous = false;
     finalText.current = "";
+    heard.current = "";
     r.onresult = (e) => {
       let fin = "";
       let mid = "";
@@ -243,24 +266,31 @@ function TalkTab() {
         else mid += res[0].transcript;
       }
       finalText.current = fin || finalText.current;
+      heard.current = fin + mid;
       setInterim(fin + mid);
     };
     r.onerror = (e) => {
-      if (e.error === "not-allowed" || e.error === "service-not-allowed") setErr("Micro refusé : autorisez-le pour ce site dans les réglages du navigateur.");
+      if (e.error === "not-allowed") setErr("Micro refusé : autorisez-le pour ce site (iPhone : Réglages › Safari › Microphone).");
+      else if (e.error === "service-not-allowed") setErr("Dictée désactivée : iPhone › Réglages › Général › Clavier › Activer Dictée. En attendant, tapez le texte.");
       else if (e.error !== "no-speech" && e.error !== "aborted") setErr("Je n'ai pas compris, réessayez ou tapez le texte.");
     };
     r.onend = () => {
+      if (!active.current) return;
+      active.current = false;
+      window.clearTimeout(safety.current);
       setListening(null);
-      const t = (finalText.current || "").trim() || interimRef.current.trim();
+      const t = (heard.current || finalText.current || "").trim();
       setInterim("");
       if (t) translate(lang, t);
     };
     rec.current = r;
     setErr(null);
     setListening(lang);
+    active.current = true;
     try {
       r.start();
     } catch {
+      active.current = false;
       setListening(null);
     }
   };
@@ -283,7 +313,7 @@ function TalkTab() {
           </button>
           {last?.from === "fr" && <button className="btn-sm" onClick={() => speak(last.translation, "zh-CN")}>🔊 再听一次</button>}
         </div>
-        <form className="talk-type" onSubmit={(e) => { e.preventDefault(); translate("zh", zhText); setZhText(""); }}>
+        <form className="talk-type" onSubmit={(e) => { e.preventDefault(); unlockTts(); translate("zh", zhText); setZhText(""); }}>
           <input className="input" value={zhText} onChange={(e) => setZhText(e.target.value)} placeholder="或者在这里打字…" />
         </form>
       </div>
@@ -301,7 +331,7 @@ function TalkTab() {
           </button>
           {last?.from === "zh" && <button className="btn-sm" onClick={() => speak(last.translation, "fr-FR")}>🔊 Réécouter</button>}
         </div>
-        <form className="talk-type" onSubmit={(e) => { e.preventDefault(); translate("fr", frText); setFrText(""); }}>
+        <form className="talk-type" onSubmit={(e) => { e.preventDefault(); unlockTts(); translate("fr", frText); setFrText(""); }}>
           <input className="input" value={frText} onChange={(e) => setFrText(e.target.value)} placeholder="Ou tapez en français…" />
         </form>
       </div>

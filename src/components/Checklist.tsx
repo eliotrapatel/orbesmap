@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { Trip } from "../data/types";
 import { uid } from "../lib/model";
 import { toast, updateRecord, useStore } from "../lib/store";
+import { localDate } from "../lib/time";
 import { ICheck, IPlus, ITrash } from "./Icons";
 
 type Item = { id: string; text: string; due?: string; group?: string; owner?: string; done?: boolean; deleted?: boolean; custom?: boolean; order?: number };
@@ -29,7 +30,9 @@ export default function Checklist({ trip }: { trip: Trip }) {
   const items = useChecklist(trip);
   const [text, setText] = useState("");
   const [who, setWho] = useState<string>("all");
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDate(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  const places = useStore((s) => s.data.places) as Record<string, Record<string, unknown>>;
+  const removed = Object.entries(places).filter(([k, v]) => k.startsWith("_check:") && v.deleted);
   const left = items.filter((i) => !i.done);
   const shown = items.filter((i) => who === "all" || i.owner === who || (who !== "all" && i.owner === "both"));
   const groups = [...new Set(shown.map((i) => i.group || "Ajouts"))];
@@ -37,7 +40,7 @@ export default function Checklist({ trip }: { trip: Trip }) {
   const add = () => {
     const t = text.trim();
     if (!t) return;
-    updateRecord(`_check:${uid()}`, { text: t, custom: true, order: 1000 + items.length });
+    updateRecord(`_check:${uid()}`, { text: t, custom: true, order: 1000 + items.length, ...(who !== "all" ? { owner: who } : {}) });
     setText("");
     toast("Ajouté à la check-list");
   };
@@ -83,12 +86,27 @@ export default function Checklist({ trip }: { trip: Trip }) {
                       </select>
                     </span>
                   </div>
-                  <button className="icon-btn" aria-label="Retirer" onClick={() => updateRecord(`_check:${i.id}`, { deleted: true })}><ITrash /></button>
+                  <button
+                    className="icon-btn"
+                    aria-label="Retirer"
+                    onClick={() => {
+                      if (!i.custom && !confirm(`Retirer « ${i.text} » de la check-list (pour vous deux) ?`)) return;
+                      updateRecord(`_check:${i.id}`, { deleted: true });
+                      toast("Tâche retirée (restaurable en bas de la liste)");
+                    }}
+                  >
+                    <ITrash />
+                  </button>
                 </div>
               );
             })}
         </section>
       ))}
+      {removed.length > 0 && (
+        <button className="btn-sm" style={{ marginTop: 14 }} onClick={() => removed.forEach(([k]) => updateRecord(k, { deleted: false }))}>
+          {removed.length === 1 ? "1 tâche retirée · restaurer" : `${removed.length} tâches retirées · tout restaurer`}
+        </button>
+      )}
       <form className="ck-add" onSubmit={(e) => { e.preventDefault(); add(); }}>
         <input className="input" value={text} onChange={(e) => setText(e.target.value)} placeholder="Ajouter une tâche…" aria-label="Nouvelle tâche" />
         <button className="btn primary" disabled={!text.trim()}><IPlus /> Ajouter</button>

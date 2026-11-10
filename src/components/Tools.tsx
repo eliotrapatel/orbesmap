@@ -147,16 +147,25 @@ export function Flights({ trip }: { trip: Trip }) {
 
 function OfflineCard({ trip }: { trip: Trip }) {
   const st = useOffline();
+  const pins = useStore((s) => s.data.pins);
   const mb = (b: number) => `${Math.max(1, Math.round(b / 1e6))} Mo`;
-  const points = [...trip.places, trip.hotel, ...trip.zones.map((z) => ({ lng: z.center[0], lat: z.center[1] }))];
-  const shellOk = location.hostname.endsWith(".vercel.app");
+  const points = [...trip.places, trip.hotel, ...trip.zones.map((z) => ({ lng: z.center[0], lat: z.center[1] })), ...pins];
+  const shellHost = location.hostname.endsWith(".vercel.app");
+  const standalone = window.matchMedia?.("(display-mode: standalone)").matches || (navigator as unknown as { standalone?: boolean }).standalone === true;
+  const ios = /iP(hone|ad|od)/.test(navigator.userAgent);
+  const newPins = st.state === "ready" && st.points != null && points.length > st.points;
   if (!offlineSupported) return null;
   return (
     <div className="card off-card">
       <h4><IOffline width={18} height={18} /> Carte hors ligne</h4>
       {st.state === "ready" && (
-        <p>Prête ({mb(st.bytes)}{st.at ? `, préparée le ${new Date(st.at).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}` : ""}). La carte, les lieux et votre position marchent sans réseau, même dans le métro.</p>
+        <p>
+          Prête ({mb(st.bytes)}{st.at ? `, préparée le ${new Date(st.at).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}` : ""}). La carte, les lieux et votre position marchent sans réseau, même dans le métro
+          {shellHost && standalone ? "." : ", tant que cette page reste ouverte."}
+        </p>
       )}
+      {newPins && <p className="em-small">Des lieux ont été ajoutés depuis : touchez « Mettre à jour » pour les inclure.</p>}
+      {st.state === "ready" && st.error && <p className="tr-err">{st.error}</p>}
       {st.state === "none" && <p>Téléchargez une fois, en Wi-Fi, les quartiers du programme (environ 40 Mo). Ensuite la carte s'affiche sans réseau et ne consomme plus de données mobiles.</p>}
       {st.state === "running" && (
         <>
@@ -174,9 +183,13 @@ function OfflineCard({ trip }: { trip: Trip }) {
         {st.state === "ready" && <button className="btn-sm" onClick={() => { if (confirm("Supprimer la carte hors ligne de ce téléphone ?")) deleteOffline(); }}>Supprimer</button>}
       </div>
       <p className="em-small">
-        {shellOk
-          ? "Cette adresse s'ouvre aussi sans réseau une fois ajoutée à l'écran d'accueil (Partager › Sur l'écran d'accueil)."
-          : "Pour ouvrir l'app elle-même sans aucun réseau, utilisez orbesmap.vercel.app ajoutée à l'écran d'accueil, et préparez la carte depuis cette adresse."}
+        {shellHost && standalone
+          ? "Cette icône s'ouvre aussi sans réseau."
+          : shellHost && ios
+            ? "Pour rouvrir l'app sans aucun réseau : ajoutez d'abord cette page à l'écran d'accueil (Partager › Sur l'écran d'accueil), ouvrez l'icône une fois avec réseau, puis préparez la carte depuis l'icône (sur iPhone, l'icône garde ses propres données)."
+            : shellHost
+              ? "Ajoutez cette page à l'écran d'accueil pour la rouvrir sans réseau."
+              : "Pour rouvrir l'app sans aucun réseau, utilisez orbesmap.vercel.app ajoutée à l'écran d'accueil, et préparez la carte depuis cette icône."}
       </p>
     </div>
   );

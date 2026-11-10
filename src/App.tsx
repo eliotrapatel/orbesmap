@@ -271,7 +271,7 @@ export default function App() {
   // a place found from a link / screenshot becomes one of "my places", with its Chinese address
   const saveFound = useCallback(
     (f: Found, ll: LL) => {
-      const pin = addPin({ name: f.name || f.nameCn || "Lieu", note: f.desc || undefined, lng: ll[0], lat: ll[1] });
+      const pin = addPin({ name: f.name || f.nameCn || "Lieu", lng: ll[0], lat: ll[1] });
       updateRecord(`_pin:${pin.id}`, { nameCn: f.nameCn, address: f.address, addressCn: f.addressCn, desc: f.desc, hours: f.hours, source: f.source, day: f.day, type: f.type });
       setSel({ kind: "pin", id: pin.id });
       setTool(null);
@@ -467,7 +467,13 @@ export default function App() {
                 <Agenda
                   trip={trip}
                   states={data.places}
+                  pins={data.pins}
                   onOpen={openPlace}
+                  onOpenPin={(p) => {
+                    setSel({ kind: "pin", id: p.id });
+                    setTool(null);
+                    fly({ center: [p.lng, p.lat], zoom: 15 });
+                  }}
                   onShowDay={(d) => {
                     setTool(null);
                     showDay(d);
@@ -519,7 +525,7 @@ export default function App() {
 
           {pinMode && (
             <div className="banner glass" role="status">
-              {pendingFound ? `Touchez la carte à l'endroit de « ${pendingFound.name} »` : "Touchez la carte pour placer le lieu"}
+              {pendingFound ? `Touchez la carte à l'endroit de « ${pendingFound.name || pendingFound.nameCn} »` : "Touchez la carte pour placer le lieu"}
               <button onClick={() => { setPinMode(false); setPendingFound(null); }}>Annuler</button>
             </div>
           )}

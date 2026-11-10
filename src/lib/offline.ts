@@ -22,13 +22,22 @@ function keyOf(url: string): string {
 }
 const immutable = (url: string) => /\/planet\/[^/]+\/\d+\/\d+\/\d+\.pbf|\/fonts\/|\/sprites\/|\/natural_earth\//.test(url);
 
+/** A timeout must look like a network failure (not a cancel), or MapLibre silently gives up on the source. */
 async function fetchWithTimeout(url: string, ms: number, signal?: AbortSignal): Promise<Response> {
+  if (!ms) return fetch(url, { signal });
   const ctl = new AbortController();
-  const t = window.setTimeout(() => ctl.abort(), ms);
+  let timedOut = false;
+  const t = window.setTimeout(() => {
+    timedOut = true;
+    ctl.abort();
+  }, ms);
   const onAbort = () => ctl.abort();
   signal?.addEventListener("abort", onAbort, { once: true });
   try {
     return await fetch(url, { signal: ctl.signal });
+  } catch (e) {
+    if (timedOut && !signal?.aborted) throw new TypeError(`Failed to fetch (timeout) ${url}`);
+    throw e;
   } finally {
     window.clearTimeout(t);
     signal?.removeEventListener("abort", onAbort);
@@ -49,7 +58,8 @@ async function cachedFetch(url: string, signal?: AbortSignal): Promise<Response>
   // style and tile index: fresh when the network answers quickly, else the stored copy
   const hit = await cache.match(key);
   try {
-    const res = await fetchWithTimeout(url, hit ? 5000 : 20000, signal);
+    // with a stored copy: give the network 5 s; without one: no time limit (a slow eSIM must not leave the map empty)
+    const res = await fetchWithTimeout(url, hit ? 5000 : 0, signal);
     if (res.ok) {
       cache.put(key, res.clone()).catch(() => {});
       return res;
@@ -69,7 +79,7 @@ export function registerOfflineProtocol() {
   maplibregl.addProtocol(PROTO, async (params, abort) => {
     const url = "https://" + params.url.slice(PROTO.length + 3);
     const res = await cachedFetch(url, abort.signal);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) throw new Error(`Failed to fetch ${url} (HTTP ${res.status})`);
     if (params.type === "json") return { data: await res.json() };
     if (params.type === "string") return { data: await res.text() };
     return { data: await res.arrayBuffer() };
@@ -83,7 +93,7 @@ export function transformRequest(url: string): { url: string } | undefined {
 
 // ---------- pre-download ----------
 type LL = { lat: number; lng: number };
-export type OfflineStatus = { state: "none" | "running" | "ready" | "error"; done: number; total: number; bytes: number; at?: number; error?: string };
+export type OfflineStatus = { state: "none" | "running" | "ready" | "error"; done: number; total: number; bytes: number; at?: number; error?: string; points?: number };
 let status: OfflineStatus = (() => {
   try {
     const s = JSON.parse(localStorage.getItem(STATUS_KEY) || "null");
@@ -131,6 +141,8 @@ export function tilesFor(points: LL[]): string[] {
   const lats = points.map((p) => p.lat);
   const lngs = points.map((p) => p.lng);
   const [s, n, w, e] = [Math.min(...lats), Math.max(...lats), Math.min(...lngs), Math.max(...lngs)];
+  // whole world at z0–3 (the globe on the home screen) and the region at z4–9
+  for (let z = 0; z <= 3; z++) bboxTiles(out, z, -60, -180, 75, 180);
   for (let z = 4; z <= 9; z++) bboxTiles(out, z, s - 0.4, w - 0.4, n + 0.4, e + 0.4);
   // mid zoom: only around the dense part (points within ~60 km of the median), so a far day trip does not blow up the count
   const med = (v: number[]) => v.slice().sort((x, y) => x - y)[v.length >> 1];
@@ -154,10 +166,19 @@ export async function prepareOffline(points: LL[]): Promise<void> {
     return;
   }
   if (running) return;
+  const prev = status.state === "ready" ? { ...status, error: undefined } : null;
   running = new AbortController();
   const signal = running.signal;
+  let lock: { release: () => Promise<void> } | null = null;
   try {
+    const est = await navigator.storage?.estimate?.().catch(() => undefined);
+    if (est?.quota && est.quota - (est.usage || 0) < 80e6) {
+      setStatus({ state: "error", error: "Plus assez de place sur le téléphone (il faut environ 80 Mo libres)." });
+      return;
+    }
     await navigator.storage?.persist?.().catch(() => false);
+    // keep the screen on during the download (a locked screen stops it)
+    lock = await (navigator as unknown as { wakeLock?: { request: (t: string) => Promise<{ release: () => Promise<void> }> } }).wakeLock?.request("screen").catch(() => null) ?? null;
     const cache = await caches.open(CACHE);
     // style, sprite, tile index, fonts
     const style = await (await cachedFetch(STYLE_URL, signal)).json();
@@ -173,44 +194,56 @@ export async function prepareOffline(points: LL[]): Promise<void> {
     const all = [...extras, ...tiles];
     let done = 0;
     let bytes = 0;
-    let failed = 0;
+    let quota = false;
     setStatus({ state: "running", done: 0, total: all.length, bytes: 0, error: undefined });
-    let i = 0;
-    const worker = async () => {
-      while (i < all.length && !signal.aborted) {
-        const url = all[i++];
-        try {
-          const hit = await cache.match(keyOf(url));
-          if (hit) {
-            bytes += Number(hit.headers.get("content-length")) || 40_000;
-          } else {
-            const res = await fetchWithTimeout(url, 20000, signal);
-            if (res.ok) {
-              const buf = await res.clone().arrayBuffer();
-              bytes += buf.byteLength;
-              await cache.put(keyOf(url), res);
-            } else if (res.status !== 404 && res.status !== 204) failed++;
+    const pass = async (list: string[]) => {
+      const failed: string[] = [];
+      let i = 0;
+      const worker = async () => {
+        while (i < list.length && !signal.aborted && !quota) {
+          const url = list[i++];
+          try {
+            const hit = await cache.match(keyOf(url));
+            if (hit) {
+              bytes += Number(hit.headers.get("content-length")) || 40_000;
+              done++;
+            } else {
+              const res = await fetchWithTimeout(url, 20000, signal);
+              if (res.ok) {
+                const buf = await res.clone().arrayBuffer();
+                await cache.put(keyOf(url), res);
+                bytes += buf.byteLength;
+                done++;
+              } else if (res.status === 404 || res.status === 204) done++; // empty sea tiles
+              else failed.push(url);
+            }
+          } catch (e) {
+            if ((e as Error)?.name === "QuotaExceededError") quota = true;
+            else if (!signal.aborted) failed.push(url);
           }
-        } catch {
-          if (signal.aborted) return;
-          failed++;
+          if (done % 8 === 0) setStatus({ done, bytes });
         }
-        done++;
-        if (done % 8 === 0 || done === all.length) setStatus({ done, bytes });
-      }
+      };
+      await Promise.all(Array.from({ length: 6 }, worker));
+      return failed;
     };
-    await Promise.all(Array.from({ length: 6 }, worker));
-    if (signal.aborted) {
-      setStatus({ state: "none", done: 0, total: 0, bytes: 0 });
-    } else if (failed > all.length * 0.05) {
-      setStatus({ state: "error", done, bytes, error: `${failed} morceaux de carte n'ont pas pu être téléchargés. Réessayez en Wi-Fi.` });
-    } else {
-      setStatus({ state: "ready", done, total: all.length, bytes, at: Date.now() });
+    let failed = await pass(all);
+    for (let retry = 0; retry < 2 && failed.length && !signal.aborted && !quota; retry++) {
+      await new Promise((r) => setTimeout(r, 1500));
+      failed = await pass(failed);
     }
+    if (signal.aborted) setStatus(prev || { state: "none", done: 0, total: 0, bytes: 0 });
+    else if (quota) setStatus(prev ? { ...prev, error: "Plus assez de place : la carte précédente reste disponible." } : { state: "error", error: "Plus assez de place sur le téléphone." });
+    else if (failed.length) {
+      const msg = `${failed.length} morceaux de carte manquent (réseau). Touchez « Mettre à jour » en Wi-Fi pour les récupérer.`;
+      setStatus({ state: "ready", done, total: all.length, bytes, at: Date.now(), points: points.length, error: msg });
+    } else setStatus({ state: "ready", done, total: all.length, bytes, at: Date.now(), points: points.length, error: undefined });
   } catch (e) {
-    setStatus({ state: "error", error: (e as Error)?.name === "QuotaExceededError" ? "Plus assez de place sur le téléphone." : "Téléchargement interrompu. Réessayez en Wi-Fi." });
+    const msg = (e as Error)?.name === "QuotaExceededError" ? "Plus assez de place sur le téléphone." : "Téléchargement interrompu. Réessayez en Wi-Fi.";
+    setStatus(prev ? { ...prev, error: `${msg} La carte précédente reste disponible.` } : { state: "error", error: msg });
   } finally {
     running = null;
+    lock?.release().catch(() => {});
   }
 }
 

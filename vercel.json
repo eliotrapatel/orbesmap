@@ -2,5 +2,5 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "functions": { "api/ai.ts": { "maxDuration": 60 } }
+  "functions": { "api/ai.ts": { "maxDuration": 300 } }
 }

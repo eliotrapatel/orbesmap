@@ -353,13 +353,33 @@ export const SHA2026: Trip = {
     "tip": "Sois là à 9h pile (fermé le lundi, d'où le mardi). Demi-tarif pour ton père avec son passeport. Traverse le bazar sans t'arrêter."
   },
   {
+    "id": "lao-zheng-xing",
+    "name": "Lao Zheng Xing",
+    "day": "d2",
+    "type": "restaurant",
+    "lat": 31.23513,
+    "lng": 121.47564,
+    "time": "Déjeuner 13h05 (service du midi jusqu'à 14h)",
+    "address": "556 Fuzhou Road, Huangpu",
+    "cn": "上海市黄浦区福州路556号",
+    "metro": "People's Square (L1/L2/L8), ~8 min à pied",
+    "desc": "Une des plus vieilles maisons benbang de la ville, une étoile Michelin en 2026. Le cadre est daté, mais c'est le versant institutionnel du benbang, complémentaire du bistrot Old Jesse.",
+    "highlights": [
+      "Horaires : midi et soir tous les jours (horaires précis non publiés)",
+      "1 étoile Michelin 2026",
+      "Crevettes de rivière sautées, poisson jaune à la lie de vin",
+      "À deux pas de Fuzhou Lu et du Bund"
+    ],
+    "tip": "Réserve au +86 21 6322 2624 ou par l'hôtel. Crabe chevelu et poisson jaune à la lie de vin. DiDi de 5 min depuis Fosun."
+  },
+  {
     "id": "fosun-foundation",
     "name": "Fosun Foundation Shanghai",
     "day": "d2",
     "type": "musee",
     "lat": 31.22887,
     "lng": 121.49357,
-    "time": "13h05–13h45",
+    "time": "14h15–15h",
     "address": "Bund Finance Center, 600 Zhongshan East 2nd Road, Huangpu District",
     "cn": "上海市黄浦区中山东二路600号 外滩金融中心 复星艺术中心",
     "metro": "Ligne 10 ou 14, Yuyuan Garden (豫园), environ 10 min à pied",
@@ -374,33 +394,13 @@ export const SHA2026: Trip = {
     "tip": "À 10 min à pied du jardin Yu. Demande à l'accueil à quelle heure la façade de Heatherwick s'anime, et monte à la terrasse pour la vue sur Pudong."
   },
   {
-    "id": "lao-zheng-xing",
-    "name": "Lao Zheng Xing",
-    "day": "d2",
-    "type": "restaurant",
-    "lat": 31.23513,
-    "lng": 121.47564,
-    "time": "Déjeuner 14h (arriver avant la fin du service ; sinon Da Hu Chun, ouvert en continu, à 1 km)",
-    "address": "556 Fuzhou Road, Huangpu",
-    "cn": "上海市黄浦区福州路556号",
-    "metro": "People's Square (L1/L2/L8), ~8 min à pied",
-    "desc": "Une des plus vieilles maisons benbang de la ville, une étoile Michelin en 2026. Le cadre est daté, mais c'est le versant institutionnel du benbang, complémentaire du bistrot Old Jesse.",
-    "highlights": [
-      "Horaires : midi et soir tous les jours (horaires précis non publiés)",
-      "1 étoile Michelin 2026",
-      "Crevettes de rivière sautées, poisson jaune à la lie de vin",
-      "À deux pas de Fuzhou Lu et du Bund"
-    ],
-    "tip": "Réserve au +86 21 6322 2624 ou par l'hôtel. Crabe chevelu et poisson jaune à la lie de vin. DiDi de 5 min depuis Fosun."
-  },
-  {
     "id": "rockbund-art-museum",
     "name": "Rockbund Art Museum (RAM)",
     "day": "d2",
     "type": "musee",
     "lat": 31.24318,
     "lng": 121.48302,
-    "time": "15h10–15h55",
+    "time": "15h15–16h",
     "address": "20 Huqiu Road, Huangpu District",
     "cn": "上海市黄浦区虎丘路20号 上海外滩美术馆",
     "metro": "Lignes 2/10, East Nanjing Road (南京东路), environ 8 min à pied",
@@ -420,7 +420,7 @@ export const SHA2026: Trip = {
     "type": "galerie",
     "lat": 31.243,
     "lng": 121.4834,
-    "time": "15h55–16h25",
+    "time": "16h–16h25",
     "address": "3F, 27 Huqiu Road, Huangpu District",
     "cn": "上海市黄浦区虎丘路27号3楼 贝浩登画廊",
     "metro": "Lignes 2/10, East Nanjing Road (南京东路), environ 8 min à pied",

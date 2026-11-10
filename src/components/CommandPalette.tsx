@@ -4,6 +4,13 @@ import type { Place, Trip } from "../data/types";
 import type { Pin } from "../lib/model";
 import { ICube, ILocate, IPin, IPinPlus, ISearch, ISpeaker } from "./Icons";
 import { TOOLS, type ToolKey } from "./TopBar";
+
+const TOOL_WORDS: Partial<Record<ToolKey, string>> = {
+  emergency: "urgence sos hopital consulat police ambulance assurance 110 120 medecin",
+  translate: "traduire traduction photo menu interprete conversation parler chinois",
+  checklist: "check-list liste depart taches reservations valise",
+  practical: "infos hors ligne offline carte telecharger",
+};
 import { Portal, speak, useEscape } from "./ui";
 
 type Item = { id: string; section: string; title: string; sub?: string; icon: React.ReactNode; run: () => void; text: string };
@@ -39,7 +46,7 @@ export default function CommandPalette(p: {
     for (const pin of p.pins) out.push({ id: "pin:" + pin.id, section: "Mes lieux", title: pin.name, sub: pin.note, icon: <span className="ic"><IPin /></span>, run: () => p.onPin(pin), text: norm(pin.name + " " + (pin.note || "")) });
     for (const d of p.trip.days) out.push({ id: "d:" + d.key, section: "Jours", title: d.title, sub: d.theme, icon: <span className="ic dot" style={{ ["--c" as string]: d.color }}>{d.glyph}</span>, run: () => p.onDay(d.key), text: norm(d.title + " " + d.short + " " + (d.theme || "")) });
     for (const z of p.trip.zones) out.push({ id: "z:" + z.label, section: "Zones", title: z.label, sub: "Centrer la carte", icon: <span className="ic"><ILocate /></span>, run: () => p.onZone(z.center, z.zoom), text: norm("zone quartier ville " + z.label) });
-    for (const t of TOOLS) out.push({ id: "t:" + t.key, section: "Outils", title: t.label, icon: <span className="ic">{t.icon}</span>, run: () => p.onTool(t.key), text: norm(t.label + " " + t.key) });
+    for (const t of TOOLS) out.push({ id: "t:" + t.key, section: "Outils", title: t.label, icon: <span className="ic">{t.icon}</span>, run: () => p.onTool(t.key), text: norm(t.label + " " + t.key + " " + (TOOL_WORDS[t.key] || "")) });
     out.push({ id: "a:3d", section: "Actions", title: "Bâtiments en 3D", sub: "Activer ou couper la vue 3D", icon: <span className="ic"><ICube /></span>, run: p.onToggle3D, text: norm("3d batiments relief vue") });
     out.push({ id: "a:loc", section: "Actions", title: "Ma position", icon: <span className="ic"><ILocate /></span>, run: p.onLocate, text: norm("ma position localisation gps ou suis je") });
     out.push({ id: "a:pin", section: "Actions", title: "Ajouter un lieu sur la carte", icon: <span className="ic"><IPinPlus /></span>, run: p.onAddPin, text: norm("ajouter lieu epingle pin") });

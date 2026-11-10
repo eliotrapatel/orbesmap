@@ -15,14 +15,18 @@ export default function Emergency({ trip }: { trip: Trip }) {
   const fix = useLoc((s) => s.fix);
   const ins = (useStore((s) => s.data.places["_info:insurance"]) || {}) as Record<string, string>;
   const [show, setShow] = useState<{ zh: string; sub: string } | null>(null);
-  if (!em) return <div className="empty"><b>Pas de fiche d'urgence</b>Ce voyage n'en a pas.</div>;
   const from = fix || trip.hotel;
-  const hospitals = em.hospitals.slice().sort((a, b) => km(from, a) - km(from, b));
+  const hospitals = (em?.hospitals || []).slice().sort((a, b) => km(from, a) - km(from, b));
   const setIns = (k: string) => (v: string) => updateRecord("_info:insurance", { [k]: v });
+  const shell = location.hostname.endsWith(".vercel.app");
 
   return (
     <div className="em">
-      <p className="em-intro">Tout ici s'affiche sans réseau. Touchez un numéro pour appeler.</p>
+      <p className="em-intro">
+        Touchez un numéro pour appeler. Cette fiche reste lisible sans réseau tant que l'app est ouverte
+        {shell ? " (et depuis l'icône d'écran d'accueil)" : " ; pour l'ouvrir sans réseau, utilisez orbesmap.vercel.app sur l'écran d'accueil, ou faites une capture d'écran"}.
+      </p>
+      {em && (<>
 
       <section className="em-sec">
         <span className="label">Numéros d'urgence en Chine</span>
@@ -75,6 +79,7 @@ export default function Emergency({ trip }: { trip: Trip }) {
         ))}
       </section>
 
+      </>)}
       <section className="em-sec">
         <span className="label">Assurance voyage · partagée avec votre père</span>
         <div className="card em-card">

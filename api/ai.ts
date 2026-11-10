@@ -114,13 +114,13 @@ class Upstream extends Error {
 }
 
 // ---------------- Claude ----------------
-async function runClaude(client: Anthropic, job: Job): Promise<Json> {
+async function runClaude(client: Anthropic, job: Job, deadline: number): Promise<Json> {
   const content: Anthropic.Beta.BetaContentBlockParam[] = [];
   if (job.image) content.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: job.image } });
   content.push({ type: "text", text: job.text });
   const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content }];
   // server tools can pause a long turn: send it back so the server continues (max 3 times)
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 4 && deadline - Date.now() > 10_000; i++) {
     let res: Anthropic.Beta.BetaMessage;
     try {
       res = await client.beta.messages.create({
@@ -134,7 +134,7 @@ async function runClaude(client: Anthropic, job: Job): Promise<Json> {
         messages,
         betas: ["server-side-fallback-2026-07-01"],
         fallbacks: "default",
-      } as Anthropic.Beta.MessageCreateParamsNonStreaming);
+      } as Anthropic.Beta.MessageCreateParamsNonStreaming, { timeout: Math.max(5_000, deadline - Date.now()), maxRetries: 0 });
     } catch (e) {
       if (e instanceof Anthropic.RateLimitError) throw new Upstream("busy");
       throw new Upstream("upstream");
@@ -209,14 +209,14 @@ async function dsTool(name: string, args: Json, key: string, f: typeof fetch): P
     if (name === "web_search") {
       const q = String(args.query || "").slice(0, 128).trim();
       if (!q) return "requête vide";
-      const r = await dsPost("/v1/tools/search", { query: q, count: 6 }, key, f, 20_000);
+      const r = await dsPost("/v1/tools/search", { query: q, count: 6 }, key, f, 15_000);
       const list = (r.results as Json[] | undefined) || [];
       return JSON.stringify(list.map((x) => ({ title: x.title, url: x.url, summary: String(x.summary || x.snippet || "").slice(0, 700) })));
     }
     if (name === "web_fetch") {
       const url = String(args.url || "");
       if (!/^https?:\/\//.test(url)) return "URL invalide";
-      const r = await dsPost("/v1/tools/fetch", { url }, key, f, 25_000);
+      const r = await dsPost("/v1/tools/fetch", { url }, key, f, 20_000);
       return `${r.title || ""}\n${String(r.content || "").slice(0, 12_000)}`;
     }
   } catch {
@@ -225,7 +225,9 @@ async function dsTool(name: string, args: Json, key: string, f: typeof fetch): P
   return "outil inconnu";
 }
 
-async function runDeepSeek(key: string, job: Job, f: typeof fetch): Promise<Json> {
+async function runDeepSeek(key: string, job: Job, f: typeof fetch, deadline: number): Promise<Json> {
+  const left = () => deadline - Date.now();
+  const ms = (cap: number) => Math.max(3_000, Math.min(cap, left()));
   const userContent: unknown = job.image
     ? [{ type: "image_url", image_url: { url: `data:image/jpeg;base64,${job.image}` } }, { type: "text", text: job.text }]
     : job.text;
@@ -238,8 +240,8 @@ async function runDeepSeek(key: string, job: Job, f: typeof fetch): Promise<Json
     ];
     // fast mode first; if the API refuses tools without thinking, switch to thinking mode (low effort)
     let thinking = false;
-    for (let round = 0; round < 6; round++) {
-      const req = (th: boolean) => dsPost("/chat/completions", { model: DS_MODEL, messages: msgs, tools: DS_TOOLS, max_tokens: 4000, ...(th ? { thinking: { type: "enabled" }, reasoning_effort: "low" } : { thinking: { type: "disabled" } }) }, key, f);
+    for (let round = 0; round < 6 && left() > 60_000; round++) {
+      const req = (th: boolean) => dsPost("/chat/completions", { model: DS_MODEL, messages: msgs, tools: DS_TOOLS, max_tokens: 4000, ...(th ? { thinking: { type: "enabled" }, reasoning_effort: "low" } : { thinking: { type: "disabled" } }) }, key, f, ms(50_000));
       let r: Json;
       try {
         r = await req(thinking);
@@ -278,8 +280,8 @@ async function runDeepSeek(key: string, job: Job, f: typeof fetch): Promise<Json
     { role: "system", content: system },
     { role: "user", content: notes ? (job.image ? [{ type: "image_url", image_url: { url: `data:image/jpeg;base64,${job.image}` } }, { type: "text", text: `${job.text}\n\nRésultats de recherche :\n${notes}` }] : `${job.text}\n\nRésultats de recherche :\n${notes}`) : userContent },
   ];
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const r = await dsPost("/chat/completions", { model: DS_MODEL, messages, response_format: { type: "json_object" }, thinking: { type: "disabled" }, max_tokens: job.maxTokens }, key, f);
+  for (let attempt = 0; attempt < 2 && left() > 5_000; attempt++) {
+    const r = await dsPost("/chat/completions", { model: DS_MODEL, messages, response_format: { type: "json_object" }, thinking: { type: "disabled" }, max_tokens: job.maxTokens }, key, f, ms(60_000));
     const text = String(((r.choices as Json[] | undefined)?.[0]?.message as Json | undefined)?.content || "").trim();
     if (!text) continue;
     try {
@@ -338,7 +340,9 @@ export async function handle(req: Request, deps: Deps = {}): Promise<Response> {
   } else return json({ error: "bad", message: "Tâche inconnue." }, 400, origin);
 
   try {
-    const out = provider === "deepseek" ? await runDeepSeek(dsKey, job, deps.fetch || fetch) : await runClaude(deps.client || new Anthropic({ apiKey: claudeKey, maxRetries: 1, timeout: 55_000 }), job);
+    // always answer (with CORS headers) before Vercel cuts the function at 300 s
+    const deadline = Date.now() + (job.task === "place" ? 270_000 : 90_000);
+    const out = provider === "deepseek" ? await runDeepSeek(dsKey, job, deps.fetch || fetch, deadline) : await runClaude(deps.client || new Anthropic({ apiKey: claudeKey, maxRetries: 1 }), job, deadline);
     return json(out, 200, origin);
   } catch (e) {
     const k = e instanceof Upstream ? e.kind : "upstream";

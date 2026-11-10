@@ -1,19 +1,21 @@
 import type { Place, Trip } from "../data/types";
 import { formatMinutes, km, travelMinutes } from "../lib/geo";
 import { exportIcs } from "../lib/ics";
-import type { PlaceState } from "../lib/model";
+import type { Pin, PlaceState } from "../lib/model";
 import { dayStops, isHotel, stopTime } from "../lib/plan";
 import { plural } from "../lib/fmt";
 import { fmtDay, fmtMin, localDate } from "../lib/time";
 import { checkVisit } from "../lib/hours";
 import { ICalPlus, IMap, IRoute } from "./Icons";
 
-export default function Agenda({ trip, states, onOpen, onShowDay, onOptimize }: { trip: Trip; states: Record<string, PlaceState>; onOpen: (p: Place) => void; onShowDay: (d: string) => void; onOptimize: (d: string) => void }) {
+export default function Agenda({ trip, states, pins = [], onOpen, onOpenPin, onShowDay, onOptimize }: { trip: Trip; states: Record<string, PlaceState>; pins?: Pin[]; onOpen: (p: Place) => void; onOpenPin?: (p: Pin) => void; onShowDay: (d: string) => void; onOptimize: (d: string) => void }) {
+  // places added from a link / on the map, with the day chosen for them
+  const pinDay = (p: Pin) => ((states as Record<string, Record<string, unknown>>)[`_pin:${p.id}`]?.day as string | undefined) || "";
   const today = localDate(trip.timezone);
   // alerts across the whole programme (closed days, last entry passed, opening later than planned)
   const alerts = trip.days
-    .filter((d) => d.scheduled)
-    .flatMap((d) => dayStops(trip, d.key, states).map((p) => ({ d, p, x: checkVisit(trip.hours?.[p.id], d.dates?.[0], stopTime(p, states)).filter((i) => i.tone !== "info") })))
+    .filter((d) => d.scheduled && (d.dates?.[d.dates.length - 1] ?? "") >= today)
+    .flatMap((d) => dayStops(trip, d.key, states).filter((p) => !states[p.id]?.visited).map((p) => ({ d, p, x: checkVisit(trip.hours?.[p.id], d.dates?.[0], stopTime(p, states)).filter((i) => i.tone !== "info") })))
     .filter((a) => a.x.length);
   return (
     <div>
@@ -21,7 +23,7 @@ export default function Agenda({ trip, states, onOpen, onShowDay, onOptimize }: 
         <div className="ag-alerts">
           <b>{alerts.length === 1 ? "1 visite à vérifier" : `${alerts.length} visites à vérifier`}</b>
           {alerts.map((a) => (
-            <button key={a.p.id} onClick={() => onOpen(a.p)}>
+            <button key={a.d.key + ":" + a.p.id} onClick={() => onOpen(a.p)}>
               <span>{a.d.short} · {a.p.name}</span>
               <em className={a.x[0].tone}>{a.x[0].text}</em>
             </button>
@@ -96,11 +98,23 @@ export default function Agenda({ trip, states, onOpen, onShowDay, onOptimize }: 
                       <span className="ag-leg">
                         {i === 0 ? "Depuis l'hôtel" : "Trajet"} : ~{formatMinutes(legs[i])}
                       </span>
-                      {issues.map((x, k) => <span key={k} className={"ag-issue " + x.tone}>{x.tone === "bad" ? "⚠ " : x.tone === "warn" ? "! " : ""}{x.text}</span>)}
+                      {issues.map((x, k) => {
+                        // reservation details are long: short label here, full text in the place sheet
+                        const short = x.tone === "info" && x.text.length > 70 ? x.text.slice(0, 66).replace(/\s+\S*$/, "") + "…" : x.text;
+                        return <span key={k} className={"ag-issue " + x.tone} title={x.text}>{x.tone === "bad" ? "⚠ " : x.tone === "warn" ? "! " : ""}{short}</span>;
+                      })}
                     </span>
                   </button>
                 );
               })}
+              {pins.filter((p) => pinDay(p) === d.key).length > 0 && (
+                <div className="ag-pins">
+                  <span className="label">Ajoutés ce jour</span>
+                  {pins.filter((p) => pinDay(p) === d.key).map((p) => (
+                    <button key={p.id} className="btn-sm" onClick={() => onOpenPin?.(p)}>● {p.name}</button>
+                  ))}
+                </div>
+              )}
             </section>
           );
         })}

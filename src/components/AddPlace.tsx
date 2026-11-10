@@ -8,14 +8,22 @@ import { Modal } from "./ui";
 export type Found = PlaceResult & { ll: [number, number] | null; day: string };
 
 /** Free geocoder (OpenStreetMap) for when the AI found an address but no reliable coordinates. */
-async function geocode(q: string): Promise<[number, number] | null> {
-  if (!q) return null;
+async function geocode(q: string, center: [number, number]): Promise<[number, number] | null> {
+  if (q.trim().length < 2) return null;
+  const ctl = new AbortController();
+  const t = window.setTimeout(() => ctl.abort(), 6000);
   try {
-    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=zh,en&q=${encodeURIComponent(q)}`);
+    const vb = `${center[0] - 0.7},${center[1] + 0.7},${center[0] + 0.7},${center[1] - 0.7}`;
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&accept-language=zh,en&countrycodes=cn&viewbox=${vb}&bounded=1&q=${encodeURIComponent(q)}`, { signal: ctl.signal });
     const j = await r.json();
-    return j[0] ? [+j[0].lon, +j[0].lat] : null;
+    const hit = j[0];
+    // a whole city / district is not a place: let the user put the pin instead
+    if (!hit || ["city", "state", "county", "district", "suburb", "province", "region", "country"].includes(hit.addresstype)) return null;
+    return [+hit.lon, +hit.lat];
   } catch {
     return null;
+  } finally {
+    window.clearTimeout(t);
   }
 }
 
@@ -36,7 +44,7 @@ export default function AddPlace({ trip, onClose, onAdd }: { trip: Trip; onClose
       const url = text.match(/https?:\/\/\S+/)?.[0] || "";
       const rest = url ? text.replace(url, "").trim() : text.trim();
       const image = shot ? await imageToBase64(shot, 1600, 0.8) : undefined;
-      const r = await ai<PlaceResult>("place", { url, text: rest, image }, 90_000);
+      const r = await ai<PlaceResult>("place", { url, text: rest, image }, 200_000);
       if (!r.found) {
         setErr(r.message || "Lieu introuvable. Essayez avec une capture d'écran du post.");
         return;
@@ -48,7 +56,7 @@ export default function AddPlace({ trip, onClose, onAdd }: { trip: Trip; onClose
       }
       // sanity: inside China and near the trip, else try the address on OpenStreetMap
       const far = (p: [number, number]) => Math.abs(p[1] - trip.center[1]) > 3 || Math.abs(p[0] - trip.center[0]) > 3;
-      if (!ll || far(ll)) ll = (await geocode(r.addressCn)) || (await geocode(`${r.nameCn} ${trip.title}`)) || (ll && !far(ll) ? ll : null);
+      if (!ll || far(ll)) ll = (await geocode(r.addressCn, trip.center)) || (r.nameCn ? await geocode(r.nameCn, trip.center) : null);
       setRes({ ...r, ll, day });
     } catch (e) {
       setErr(e instanceof AiError ? e.message : "La recherche a échoué. Réessayez.");
@@ -72,7 +80,7 @@ export default function AddPlace({ trip, onClose, onAdd }: { trip: Trip; onClose
           </div>
           <input ref={file} type="file" accept="image/*" hidden onChange={(e) => { setShot(e.target.files?.[0] || null); e.target.value = ""; }} />
           <p className="tr-hint" style={{ marginTop: 10 }}>Les liens Xiaohongshu ne s'ouvrent souvent qu'avec l'app : une capture du post marche mieux.</p>
-          {busy && <div className="tr-loading"><span className="spin" /> Recherche du lieu (jusqu'à 30 s)…</div>}
+          {busy && <div className="tr-loading"><span className="spin" /> Recherche du lieu sur le web (souvent 20 à 60 s)…</div>}
           {err && <p className="tr-err">{err}</p>}
           <div className="btn-row">
             <button type="button" className="btn" onClick={onClose}>Annuler</button>
