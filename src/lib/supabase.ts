@@ -1,8 +1,11 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-// The anon key is public by design: access is protected by Row Level Security (see supabase/schema.sql).
-const RAW_URL = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim();
-const KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim();
+// The publishable (anon) key is public by design: it ships in the page anyway, and access is
+// protected by Row Level Security (see supabase/schema.sql). Env vars override these defaults.
+const DEFAULT_URL = "https://ifugaqjneprbtigvegeb.supabase.co";
+const DEFAULT_KEY = "sb_publishable_0qPu_8XZTLk-l68k2kPUvQ_7UXk-fCu";
+const RAW_URL = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim() || DEFAULT_URL;
+const KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim() || DEFAULT_KEY;
 
 function validUrl(u?: string): string | null {
   if (!u) return null;
