@@ -14,7 +14,7 @@ import type { Mode } from "../lib/route";
 export default function PlaceDetail({ trip, place, onBack, onGo, sheetH }: { trip: Trip; place: Place; onBack: () => void; onGo: (m: Mode) => void; sheetH?: string }) {
   const state = useStore((s) => s.data.places[place.id]) || {};
   useEscape(onBack);
-  const sheet = useSheetDrag(onBack);
+  const sheet = useSheetDrag(onBack, sheetH);
   const allContacts = useStore((s) => s.data.contacts);
   const allPhotos = useStore((s) => s.data.photos);
   useStore((s) => s.photoUrls);
@@ -45,7 +45,7 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH }: { tri
   };
 
   return (
-    <section ref={sheet.ref} className={"detail glass" + (sheet.full ? " sheet-full" : "")} style={{ ["--c" as string]: color, ...(sheetH ? { ["--sheet-h" as string]: sheetH } : {}) }} aria-label={place.name}>
+    <section ref={sheet.ref} className="detail glass" style={{ ["--c" as string]: color, ...(sheetH ? { ["--sheet-h" as string]: sheetH } : {}) }} aria-label={place.name}>
       <div className="sheet-grip" data-grip {...sheet.handlers} role="button" aria-label="Glisser vers le bas pour fermer, vers le haut pour agrandir" />
       <div className="detail-scroll scroll" style={{ flex: 1, minHeight: 0, paddingBottom: 28 }}>
         <header className="detail-hero">

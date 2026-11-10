@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import OrbitMark from "./OrbitMark";
 import { TRIPS } from "../data/trip";
 import type { Trip } from "../data/types";
 import { countable } from "../lib/plan";
@@ -45,21 +46,41 @@ export default function Landing({ trip, onPick, onEnter }: { trip: Trip; onPick:
     setOut(true);
     onEnter();
   };
+  // every line holds on one line: a line too long for the screen (narrow phone, folded Z Fold) is set smaller
+  const root = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const fit = () => {
+      root.current?.querySelectorAll<HTMLElement>("[data-fit]").forEach((el) => {
+        el.style.fontSize = "";
+        const avail = el.clientWidth;
+        const probe = el.cloneNode(true) as HTMLElement;
+        Object.assign(probe.style, { position: "absolute", left: "0", top: "0", visibility: "hidden", display: "inline-block", width: "max-content", maxWidth: "none", animation: "none", whiteSpace: "nowrap", pointerEvents: "none" });
+        el.parentElement?.appendChild(probe);
+        const need = probe.getBoundingClientRect().width;
+        probe.remove();
+        if (avail > 0 && need > avail) el.style.fontSize = `${(parseFloat(getComputedStyle(el).fontSize) * avail * 0.985) / need}px`;
+      });
+    };
+    fit();
+    document.fonts?.ready.then(fit);
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, [trip.id]);
   const days = trip.days.filter((d) => d.scheduled).reduce((n, d) => n + (d.dates?.length || 0), 0);
   const ordered = [...TRIPS].sort((a, b) => b.start.localeCompare(a.start));
 
   return (
-    <div className={"landing" + (out ? " out" : "")} role="dialog" aria-label="Accueil">
+    <div ref={root} className={"landing" + (out ? " out" : "")} role="dialog" aria-label="Accueil">
       <div className="l-top">
-        <span className="wordmark">ORBES</span>
+        <span className="brand-mark"><OrbitMark size={26} title="ORBES Trips" /></span>
         <div className="l-clocks">
           <span>Paris<b>{clock("Europe/Paris", new Date(now))}</b></span>
           <span>{trip.title}<b>{clock(trip.timezone, new Date(now))}</b></span>
         </div>
       </div>
       <div className="l-hero">
-        <span className="label l-kicker">{trip.subtitle} · {trip.dateLabel}</span>
-        <h1 className="l-title" key={trip.id}>{trip.title}</h1>
+        <span className="label l-kicker" data-fit>{trip.subtitle} · {trip.dateLabel}</span>
+        <h1 className="l-title" key={trip.id} data-fit>{trip.title}</h1>
         <div className="l-sub">
           <span><b>{trip.places.length}</b> lieux</span>
           <span><b>{days}</b> {days <= 1 ? "jour" : "jours"} sur place</span>
@@ -84,7 +105,7 @@ export default function Landing({ trip, onPick, onEnter }: { trip: Trip; onPick:
             const v = visitedOf(t);
             return (
               <button key={t.id} className={"trip-card glass" + (t.id === trip.id ? " sel" : "")} onClick={() => onPick(t.id)} aria-pressed={t.id === trip.id}>
-                <span className="label">{t.code} · {t.dateLabel}</span>
+                <span className="label" data-fit>{t.code} · {t.dateLabel}</span>
                 <span className={"pill tc-state" + (tp === "after" ? " done" : tp === "during" ? " live" : "")}>{tp === "before" ? `J-${countdownParts(tripStartMs(t), now).d}` : tp === "during" ? "En cours" : "Terminé"}</span>
                 <h3>{t.title}</h3>
                 <p>{t.subtitle}</p>
@@ -100,7 +121,7 @@ export default function Landing({ trip, onPick, onEnter }: { trip: Trip; onPick:
         </div>
         <div className="l-enter">
           <button ref={enterBtn} className="btn primary" onClick={enter}>Entrer</button>
-          <small>Carte, programme jour par jour, phrases, convertisseur, vols, carnet partagé.</small>
+          <small data-fit>Carte, programme, phrases, vols, carnet partagé.</small>
         </div>
       </div>
     </div>

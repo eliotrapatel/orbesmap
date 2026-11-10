@@ -26,7 +26,7 @@ const places = P.places
 const hotel = places.find((p) => p.type === "hotel" && p.day === "base") || places.find((p) => p.type === "hotel");
 if (hotel) hotel.day = "base";
 const trip = {
-  id: "sha-2026", code: "SHA 2026", title: P.trip.title || "Shanghai", subtitle: P.trip.subtitle || "Voyage d'inspiration",
+  id: "sha-2026", code: "SHA 2026", title: P.trip.title || "Shanghai", subtitle: P.trip.subtitle || "Voyage",
   dateLabel: "24 – 29 novembre 2026", start: P.trip.start, end: P.trip.end, timezone: "Asia/Shanghai",
   hotel: { name: P.trip.hotel.name, lat: hotel?.lat ?? P.trip.hotel.lat, lng: hotel?.lng ?? P.trip.hotel.lng, placeId: hotel?.id },
   center: P.trip.center, days, flights: P.flights.map((f) => ({ airline: "Air France", ...f })),

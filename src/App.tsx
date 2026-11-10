@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSheetGesture } from "./lib/sheetDrag";
 import Account from "./components/Account";
 import Agenda from "./components/Agenda";
 import CommandPalette from "./components/CommandPalette";
@@ -161,7 +162,9 @@ export default function App() {
   const toolWide = TOOLS.find((t) => t.key === tool)?.wide;
   const rightW = !rightOpen ? 0 : tool ? Math.min(toolWide ? 860 : 560, vw - 372 - 48) : 440;
   const peekPx = 172;
-  const sheetFull = vh - 72; // mobile sheet height (viewport minus top bar)
+  // mobile sheet height: viewport minus top bar and the notch (measured: safe areas differ per phone)
+  const sideRef = useRef<HTMLElement>(null);
+  const sheetFull = (!desktop && sideRef.current?.offsetHeight) || vh - 72;
   const snapPx: Record<Snap, number> = { peek: peekPx, half: Math.round(vh * 0.52), full: sheetFull };
   const DETAIL_VH = 0.64;
   const rawPad = desktop
@@ -348,43 +351,15 @@ export default function App() {
     setSel(null);
   };
 
-  // ---- mobile list sheet drag ----
-  const sideRef = useRef<HTMLElement>(null);
-  const drag = useRef<{ y0: number; h0: number; t0: number; moved: boolean } | null>(null);
-  const onDown = (e: React.PointerEvent) => {
-    if (desktop || (e.target as HTMLElement).closest("button:not(.sheet-grip),a,input")) return;
-    drag.current = { y0: e.clientY, h0: snapPx[snap], t0: performance.now(), moved: false };
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-  };
-  const onMove = (e: React.PointerEvent) => {
-    const d = drag.current;
-    if (!d || !sideRef.current) return;
-    const dy = e.clientY - d.y0;
-    if (Math.abs(dy) > 4) d.moved = true;
-    sideRef.current.classList.add("dragging");
-    sideRef.current.style.setProperty("--sheet-h", `${Math.max(peekPx - 40, Math.min(snapPx.full, d.h0 - dy))}px`);
-  };
-  const endDrag = (e: React.PointerEvent, cancelled: boolean) => {
-    const d = drag.current;
-    drag.current = null;
-    const el = sideRef.current;
-    if (!d || !el) return;
-    el.classList.remove("dragging");
-    el.style.setProperty("--sheet-h", `${snapPx[snap]}px`);
-    if (cancelled) return;
-    const dy = e.clientY - d.y0;
-    if (!d.moved) {
-      setSnap((s) => (s === "peek" ? "half" : s === "half" ? "full" : "half"));
-      return;
-    }
-    const v = dy / Math.max(1, performance.now() - d.t0);
-    const h = d.h0 - dy;
-    let next: Snap;
-    if (v > 0.6) next = d.h0 >= snapPx.full - 5 ? "half" : "peek";
-    else if (v < -0.6) next = d.h0 <= snapPx.peek + 5 ? "half" : "full";
-    else next = (Object.entries(snapPx) as [Snap, number][]).reduce((a, b) => (Math.abs(b[1] - h) < Math.abs(a[1] - h) ? b : a))[0];
-    setSnap(next);
-  };
+  // ---- mobile list sheet drag (follows the finger from the grip, the header or the list) ----
+  const SNAPS: Snap[] = ["peek", "half", "full"];
+  const side = useSheetGesture(sideRef, {
+    snaps: () => SNAPS.map((k) => snapPx[k]),
+    onSnap: (i) => setSnap(SNAPS[i]),
+    onTap: () => setSnap((s) => (s === "peek" ? "half" : s === "half" ? "full" : "half")),
+    controlled: true,
+    body: ".side-body",
+  });
 
   const selectedPlace = sel?.kind === "place" ? trip.places.find((p) => p.id === sel.id) : undefined;
   const selectedPin = sel?.kind === "pin" ? data.pins.find((p) => p.id === sel.id) : undefined;
@@ -488,8 +463,8 @@ export default function App() {
           )}
 
           <aside ref={sideRef} className="side glass" style={desktop ? undefined : ({ ["--sheet-h" as string]: `${snapPx[snap]}px` } as React.CSSProperties)} aria-label="Lieux du voyage">
-            <div className="sheet-grip" onPointerDown={onDown} onPointerMove={onMove} onPointerUp={(e) => endDrag(e, false)} onPointerCancel={(e) => endDrag(e, true)} role="button" aria-label="Agrandir ou réduire la liste" />
-            <div className="side-head" onPointerDown={onDown} onPointerMove={onMove} onPointerUp={(e) => endDrag(e, false)} onPointerCancel={(e) => endDrag(e, true)}>
+            <div className="sheet-grip" {...side.handlers} role="button" aria-label="Agrandir ou réduire la liste" />
+            <div className="side-head" {...side.handlers}>
               <span className="label">{trip.subtitle}</span>
               <div style={{ fontSize: 22, fontWeight: 500, letterSpacing: "-0.02em", marginTop: 4 }}>{trip.title}</div>
               <div style={{ fontSize: 12.5, color: "var(--soft)" }}>
@@ -520,7 +495,7 @@ export default function App() {
           {selectedPin && !tool && <PinDetail key={selectedPin.id} trip={trip} pin={selectedPin} onBack={() => setSel(null)} onGo={(m) => startNav(selectedPin, m)} sheetH={detailSheet} />}
 
           {toolDef && (
-            <Drawer kicker={trip.code} title={toolDef.key === "converter" ? "Convertisseur" : toolDef.label} wide={toolDef.wide} onClose={() => setTool(null)} sheetH={toolSheet}>
+            <Drawer key={toolDef.key} kicker={trip.code} title={toolDef.key === "converter" ? "Convertisseur" : toolDef.label} wide={toolDef.wide} onClose={() => setTool(null)} sheetH={toolSheet}>
               {tool === "overview" && (
                 <Overview
                   trip={trip}

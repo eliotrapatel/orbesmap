@@ -12,13 +12,13 @@ import type { Mode } from "../lib/route";
 export default function PinDetail({ trip, pin, onBack, onGo, sheetH }: { trip: Trip; pin: Pin; onBack: () => void; onGo: (m: Mode) => void; sheetH?: string }) {
   const coords = `${pin.lat.toFixed(5)}, ${pin.lng.toFixed(5)}`;
   useEscape(onBack);
-  const sheet = useSheetDrag(onBack);
+  const sheet = useSheetDrag(onBack, sheetH);
   const x = (useStore((s) => s.data.places[`_pin:${pin.id}`]) || {}) as Record<string, string>;
   const [show, setShow] = useState(false);
   const zh = [x.nameCn, x.addressCn].filter(Boolean).join("\n");
   const days = trip.days.filter((d) => d.key !== "base");
   return (
-    <section ref={sheet.ref} className={"detail glass" + (sheet.full ? " sheet-full" : "")} style={{ ["--c" as string]: "#f6f2ea", ...(sheetH ? { ["--sheet-h" as string]: sheetH } : {}) }} aria-label={pin.name}>
+    <section ref={sheet.ref} className="detail glass" style={{ ["--c" as string]: "#f6f2ea", ...(sheetH ? { ["--sheet-h" as string]: sheetH } : {}) }} aria-label={pin.name}>
       <div className="sheet-grip" data-grip {...sheet.handlers} role="button" aria-label="Glisser vers le bas pour fermer, vers le haut pour agrandir" />
       <div className="detail-scroll scroll" style={{ flex: 1, minHeight: 0, paddingBottom: 28 }}>
         <header className="detail-hero">

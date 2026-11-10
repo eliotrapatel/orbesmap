@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import OrbitMark from "./OrbitMark";
 import { TRIPS } from "../data/trip";
 import type { Trip } from "../data/types";
 import { clock, phase } from "../lib/time";
@@ -113,8 +114,8 @@ export default function TopBar({ trip, tool, onTool, onSearch, onTrip, onHome }:
     <>
       <header className="topbar glass">
         <div className="tb-brand">
-          <button className="wordmark" onClick={onHome} aria-label="ORBES, retour à l'accueil" style={{ fontSize: "inherit" }}>
-            ORBES
+          <button className="brand-mark" onClick={onHome} aria-label="ORBES Trips, retour à l'accueil">
+            <OrbitMark size={22} />
           </button>
           <span className="tb-sep" aria-hidden="true" />
           <button className="trip-btn" aria-haspopup="menu" aria-expanded={!!menu} onClick={(e) => setMenu(menu ? null : e.currentTarget.getBoundingClientRect())}>

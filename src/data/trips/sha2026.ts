@@ -6,7 +6,7 @@ const BASE = {
   "id": "sha-2026",
   "code": "SHA 2026",
   "title": "Shanghai",
-  "subtitle": "Voyage d'inspiration",
+  "subtitle": "Voyage",
   "dateLabel": "24 – 29 novembre 2026",
   "start": "2026-11-24",
   "end": "2026-11-29",

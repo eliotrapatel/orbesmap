@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { isMobileSheet, useSheetGesture } from "../lib/sheetDrag";
 import { onToast } from "../lib/store";
 import { IClose, ISpeaker } from "./Icons";
 
@@ -227,65 +228,52 @@ export function EscGuard({ on }: { on: () => void }) {
   return null;
 }
 
-/** Mobile bottom sheets: drag the grip (or a tool's header) down to close, up to open full height. */
-export function useSheetDrag(onClose: () => void) {
+/**
+ * Mobile place sheets and tool drawers: two resting heights (normal, full) and a close gesture.
+ * The sheet follows the finger from the grip, the header, or the content (see lib/sheetDrag).
+ */
+export function useSheetDrag(onClose: () => void, normal?: string) {
   const ref = useRef<HTMLElement>(null);
-  const [full, setFull] = useState(false);
-  const drag = useRef<{ y0: number; t0: number; dy: number } | null>(null);
-  const mobile = () => window.matchMedia("(max-width: 899px)").matches;
-  const handlers = {
-    onPointerDown: (e: React.PointerEvent) => {
-      if (!mobile() || (e.target as HTMLElement).closest("button,a,input,textarea,select")) return;
-      drag.current = { y0: e.clientY, t0: performance.now(), dy: 0 };
-      try {
-        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-      } catch {
-        /* pointer already gone */
-      }
-      if (ref.current) ref.current.style.transition = "none";
-    },
-    onPointerMove: (e: React.PointerEvent) => {
-      const d = drag.current;
-      if (!d || !ref.current) return;
-      d.dy = e.clientY - d.y0;
-      // follows the finger downwards; upwards only a hint (it snaps to full height on release)
-      ref.current.style.transform = `translateY(${d.dy > 0 ? d.dy : Math.max(d.dy / 4, full ? 0 : -14)}px)`;
-    },
-    onPointerUp: () => {
-      const d = drag.current;
-      drag.current = null;
-      const el = ref.current;
-      if (!d || !el) return;
-      const v = d.dy / Math.max(1, performance.now() - d.t0);
-      el.style.transition = "transform 0.22s var(--ease)";
-      if (d.dy > 90 || (d.dy > 24 && v > 0.6)) {
-        el.style.transform = "translateY(100%)";
-        window.setTimeout(onClose, 180);
-        return;
-      }
-      el.style.transform = "";
-      if (d.dy < -50) setFull(true);
-      else if (d.dy > 40 && full) setFull(false);
-    },
-    onPointerCancel: () => {
-      drag.current = null;
-      if (ref.current) {
-        ref.current.style.transition = "transform 0.22s var(--ease)";
-        ref.current.style.transform = "";
-      }
-    },
+  const len = (v: string | undefined, full: number) => {
+    const m = /^([\d.]+)(vh|px|%)?$/.exec((v || "64vh").trim());
+    const n = m ? parseFloat(m[1]) : 64;
+    const px = !m || m[2] === "vh" ? (n * window.innerHeight) / 100 : m[2] === "%" ? (n * full) / 100 : n;
+    return Math.min(px, full);
   };
-  return { ref, full, handlers };
+  const snaps = () => {
+    const full = ref.current?.getBoundingClientRect().height || window.innerHeight;
+    const n = Math.round(len(normal, full));
+    return n < full - 24 ? [n, Math.round(full)] : [Math.round(full)];
+  };
+  const hidden = (h: number) => ref.current?.style.setProperty("--sheet-hidden", `${Math.max(0, Math.round(snaps().slice(-1)[0] - h))}px`);
+  const { handlers, gesture } = useSheetGesture(ref, { snaps, onSnap: (_i, h) => hidden(h), onClose, body: ".detail-scroll, .drawer-body" });
+  // content hidden below the screen at the normal height stays reachable by scrolling;
+  // after a rotation / unfolding the sheet settles again on the matching height
+  useEffect(() => {
+    const set = () => {
+      if (!ref.current || !isMobileSheet()) return;
+      const g = gesture();
+      const dh = parseFloat(ref.current.style.getPropertyValue("--drag-h"));
+      if (g && !g.dragging && Number.isFinite(dh) && dh > 0) {
+        const s = g.snaps();
+        g.snapTo(dh >= s[s.length - 1] - 24 ? s.length - 1 : 0);
+      } else hidden(snaps()[0]);
+    };
+    set();
+    window.addEventListener("resize", set);
+    return () => window.removeEventListener("resize", set);
+  }, [normal]); // eslint-disable-line react-hooks/exhaustive-deps
+  return { ref, handlers };
 }
 
 /** Glass drawer used by every tool (desktop: right column, mobile: bottom sheet) */
 export function Drawer({ kicker, title, onClose, wide, children, sheetH, actions }: { kicker?: string; title: string; onClose: () => void; wide?: boolean; children: ReactNode; sheetH?: string; actions?: ReactNode }) {
   useEscape(onClose);
-  const sheet = useSheetDrag(onClose);
+  const sheet = useSheetDrag(onClose, sheetH);
   return (
     <section
       ref={sheet.ref}
-      className={"drawer glass" + (wide ? " wide" : "") + (sheet.full ? " sheet-full" : "")}
+      className={"drawer glass" + (wide ? " wide" : "")}
       style={sheetH ? ({ ["--sheet-h" as string]: sheetH } as React.CSSProperties) : undefined}
       aria-label={title}
     >
