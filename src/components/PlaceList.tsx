@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { STATUSES, TYPE_LABEL } from "../data/trip";
 import type { Place, PlaceType, Trip } from "../data/types";
 import type { Pin, PlaceState } from "../lib/model";
@@ -27,7 +28,12 @@ export default function PlaceList({ trip, places, states, pins, selectedId, quer
   const all = countable(trip);
   const visited = all.filter((p) => states[p.id]?.visited).length;
   const fix = useLoc((s) => s.fix);
-  const dist = (p: { lat: number; lng: number }) => (fix ? km(fix, p) * 1000 : null);
+  // sort and distances use an anchor that only moves every ~25 m, so rows don't jump under the finger
+  const anchor = useRef<{ lat: number; lng: number } | null>(null);
+  if (!fix) anchor.current = null;
+  else if (!anchor.current || km(anchor.current, fix) * 1000 > 25) anchor.current = { lat: fix.lat, lng: fix.lng };
+  const a = anchor.current;
+  const dist = (p: { lat: number; lng: number }) => (a ? km(a, p) * 1000 : null);
   const near = !!(filter.near && fix);
   const dayOf = (k: string) => trip.days.find((d) => d.key === k)!;
   const groups = near

@@ -66,46 +66,61 @@ function decode(str: string, precision = 6): [number, number][] {
   return out;
 }
 
-export async function fetchRoute(from: LL, to: LL, mode: Mode, signal?: AbortSignal): Promise<Route> {
+/** fresh: skip the cache read (used when recomputing after leaving the route) */
+export async function fetchRoute(from: LL, to: LL, mode: Mode, signal?: AbortSignal, fresh = false): Promise<Route> {
   const k = keyOf(from, to, mode);
   const cache = readCache();
-  const hit = cache.find((c) => c.k === k);
+  const hit = fresh ? undefined : cache.find((c) => c.k === k);
   if (hit && Date.now() - hit.t < 7 * 864e5) return hit.r;
   if (!navigator.onLine) return estimate(from, to, mode);
   const url = `${BASE[mode]}${from.lng.toFixed(6)},${from.lat.toFixed(6)};${to.lng.toFixed(6)},${to.lat.toFixed(6)}?overview=full&geometries=polyline6&steps=false&alternatives=false`;
-  const timeout = AbortSignal.timeout ? AbortSignal.timeout(9000) : undefined;
-  const sig = signal && timeout && "any" in AbortSignal ? (AbortSignal as unknown as { any: (s: AbortSignal[]) => AbortSignal }).any([signal, timeout]) : signal || timeout;
+  // hand-made timeout (AbortSignal.timeout / any are missing on older iPhones)
+  const ctl = new AbortController();
+  const timer = window.setTimeout(() => ctl.abort(), 7000);
+  const onAbort = () => ctl.abort();
+  signal?.addEventListener("abort", onAbort, { once: true });
   try {
-    const res = await fetch(url, { signal: sig });
+    const res = await fetch(url, { signal: ctl.signal });
     if (!res.ok) throw new Error(String(res.status));
     const j = await res.json();
     const r0 = j?.routes?.[0];
     if (!r0?.geometry) throw new Error("no route");
-    const coords = decode(r0.geometry);
-    const route: Route = { coords, distance: r0.distance, duration: mode === "car" ? carSeconds(r0.duration, r0.distance) : Math.max(r0.duration, walkSeconds(r0.distance)), estimate: false, raw: r0.duration };
+    // OSRM starts/ends on the nearest road: add the walk from/to the exact points
+    const w0 = j.waypoints?.[0]?.distance || 0;
+    const w1 = j.waypoints?.[1]?.distance || 0;
+    const coords: [number, number][] = [[from.lng, from.lat], ...decode(r0.geometry), [to.lng, to.lat]];
+    const dist = r0.distance + w0 + w1;
+    const route: Route = { coords, distance: dist, duration: mode === "car" ? carSeconds(r0.duration, dist) : Math.max(r0.duration, walkSeconds(dist)), estimate: false, raw: r0.duration + (w0 + w1) / 1.3 };
     writeCache([...cache.filter((c) => c.k !== k), { k, r: route, t: Date.now() }]);
     return route;
   } catch (e) {
-    if ((e as Error)?.name === "AbortError" && signal?.aborted) throw e;
+    if (signal?.aborted) throw e;
     return estimate(from, to, mode);
+  } finally {
+    window.clearTimeout(timer);
+    signal?.removeEventListener("abort", onAbort);
   }
 }
 
 /** Where am I on the route: distance left along it (m) and how far I am from the line (m). Local, no network. */
-export function progress(route: Route, pos: LL): { left: number; off: number } {
+export function progress(route: Route, pos: LL, hint?: number): { left: number; off: number; i: number; last: boolean } {
   const c = route.coords;
-  if (c.length < 2) return { left: km(pos, { lat: c[0][1], lng: c[0][0] }) * 1000, off: 0 };
+  if (c.length < 2) return { left: km(pos, { lat: c[0][1], lng: c[0][0] }) * 1000, off: 0, i: 0, last: true };
   const kx = 111320 * Math.cos((pos.lat * Math.PI) / 180);
   const ky = 110540;
   const P = (p: [number, number]) => [(p[0] - pos.lng) * kx, (p[1] - pos.lat) * ky];
   let best = Infinity, bestI = 0, bestT = 0;
   const seg: number[] = [];
+  // search near the last known segment first (routes that double back would otherwise jump)
+  const lo = hint != null ? Math.max(0, hint - 3) : 0;
+  const hi = hint != null ? Math.min(c.length - 2, hint + 40) : c.length - 2;
   for (let i = 0; i < c.length - 1; i++) {
     const [ax, ay] = P(c[i]);
     const [bx, by] = P(c[i + 1]);
     const dx = bx - ax, dy = by - ay;
     const L2 = dx * dx + dy * dy;
     seg.push(Math.sqrt(L2));
+    if (i < lo || i > hi) continue;
     const t = L2 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / L2)) : 0;
     const px = ax + t * dx, py = ay + t * dy;
     const d = Math.sqrt(px * px + py * py);
@@ -117,7 +132,7 @@ export function progress(route: Route, pos: LL): { left: number; off: number } {
   }
   let left = seg[bestI] * (1 - bestT);
   for (let i = bestI + 1; i < seg.length; i++) left += seg[i];
-  return { left: left + best, off: best };
+  return { left: left + best, off: best, i: bestI, last: bestI >= c.length - 2 };
 }
 
 /** Time left for the distance left on a route */

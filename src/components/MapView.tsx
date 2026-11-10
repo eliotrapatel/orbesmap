@@ -7,6 +7,7 @@ import workerSource from "maplibre-gl/dist/maplibre-gl-worker.mjs?raw";
 import { STATUSES } from "../data/trip";
 import type { Place, Trip } from "../data/types";
 import type { Pin, PlaceState } from "../lib/model";
+import { useLoc } from "../lib/locate";
 
 maplibregl.setWorkerUrl(URL.createObjectURL(new Blob([workerSource], { type: "text/javascript" })));
 
@@ -36,7 +37,7 @@ interface Props {
   focus: FocusRequest | null;
   padding: { top: number; bottom: number; left: number; right: number };
   pinMode: boolean;
-  me: { lng: number; lat: number; acc: number; heading: number | null } | null;
+  me: { lng: number; lat: number; acc: number; course: number | null; stale: boolean } | null;
   follow: boolean;
   navLine: [number, number][] | null;
   navMode: "walk" | "car" | null;
@@ -207,9 +208,11 @@ export default function MapView(p: Props) {
       const msg = String(e.error?.message || "");
       if (!styled && /style|Failed to fetch|NetworkError|Load failed/i.test(msg)) fallBack();
     });
+    let longAt = 0; // the click that follows a long press must not close what it opened
     map.on("click", (e: maplibregl.MapMouseEvent) => {
       const t = e.originalEvent.target as HTMLElement;
       if (t.closest(".mk")) return;
+      if (performance.now() - longAt < 800) return;
       cb.current.onMapClick([e.lngLat.lng, e.lngLat.lat]);
     });
     // the user moving the map stops "follow me"
@@ -219,6 +222,8 @@ export default function MapView(p: Props) {
     // long press (touch) or right click (mouse) picks a point to measure the distance to
     map.on("contextmenu", (e: maplibregl.MapMouseEvent) => {
       e.preventDefault();
+      if (performance.now() - longAt < 800) return; // already handled by the touch timer (Android)
+      longAt = performance.now();
       cb.current.onLongPress([e.lngLat.lng, e.lngLat.lat]);
     });
     let press: number | undefined;
@@ -229,7 +234,7 @@ export default function MapView(p: Props) {
       start = null;
     };
     const tStart = (e: TouchEvent) => {
-      if (e.touches.length !== 1) return cancel();
+      if (e.touches.length !== 1 || map.isMoving() || (e.target as HTMLElement).closest?.(".mk, .me, .pt-mark")) return cancel();
       const t = e.touches[0];
       const r = canvas.getBoundingClientRect();
       start = { x: t.clientX, y: t.clientY };
@@ -238,6 +243,7 @@ export default function MapView(p: Props) {
         if (!start) return;
         const ll = map.unproject([start.x - r.left, start.y - r.top]);
         start = null;
+        longAt = performance.now();
         navigator.vibrate?.(15);
         cb.current.onLongPress([ll.lng, ll.lat]);
       }, 550);
@@ -250,6 +256,7 @@ export default function MapView(p: Props) {
     canvas.addEventListener("touchmove", tMove, { passive: true });
     canvas.addEventListener("touchend", cancel);
     canvas.addEventListener("touchcancel", cancel);
+    map.on("movestart", cancel);
     const online = () => tryAgain();
     const vis = () => document.visibilityState === "visible" && tryAgain();
     window.addEventListener("online", online);
@@ -387,14 +394,9 @@ export default function MapView(p: Props) {
       wrap.innerHTML = '<div class="me-cone"></div><div class="me-dot"></div>';
       meMarker.current = new maplibregl.Marker({ element: wrap }).setLngLat([me.lng, me.lat]).addTo(map);
     } else meMarker.current.setLngLat([me.lng, me.lat]);
-    const el2 = meMarker.current.getElement();
-    const cone = el2.querySelector<HTMLElement>(".me-cone");
-    if (cone) {
-      cone.style.display = me.heading == null ? "none" : "";
-      if (me.heading != null) cone.style.transform = `rotate(${me.heading}deg)`;
-    }
+    meMarker.current.getElement().classList.toggle("stale", me.stale);
     // accuracy circle (only worth drawing when it is larger than the dot)
-    if (acc) {
+    if (acc && !me.stale) {
       const r = Math.min(me.acc || 0, 2000);
       const pts: [number, number][] = [];
       const kx = 111320 * Math.cos((me.lat * Math.PI) / 180);
@@ -403,8 +405,27 @@ export default function MapView(p: Props) {
         pts.push([me.lng + (Math.cos(a) * r) / kx, me.lat + (Math.sin(a) * r) / 110540]);
       }
       acc.setData(r > 15 ? { type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [pts] } } : { type: "FeatureCollection", features: [] });
+    } else acc?.setData({ type: "FeatureCollection", features: [] });
+  }, [me?.lng, me?.lat, me?.acc, me?.stale, p.landing, ready]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // direction cone: car course when driving, else the compass. Only the cone's CSS changes (cheap).
+  const compass = useLoc((s) => s.compass);
+  const heading = me ? (me.course ?? compass) : null;
+  const shown = useRef<number | null>(null);
+  useEffect(() => {
+    const cone = meMarker.current?.getElement().querySelector<HTMLElement>(".me-cone");
+    if (!cone) return;
+    if (heading == null || me?.stale) {
+      cone.style.display = "none";
+      return;
     }
-  }, [me?.lng, me?.lat, me?.acc, me?.heading, p.landing, ready]); // eslint-disable-line react-hooks/exhaustive-deps
+    cone.style.display = "";
+    // shortest turn (359° → 1° turns 2°, not 358°)
+    const last = shown.current ?? heading;
+    const d = ((((heading - last) % 360) + 540) % 360) - 180;
+    shown.current = last + d;
+    cone.style.transform = `rotate(${shown.current}deg)`;
+  }, [heading, me?.stale, !!me]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- follow me: keep my position in view as I move (zoom level untouched, little data) ---
   const followed = useRef(false);

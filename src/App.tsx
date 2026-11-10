@@ -17,7 +17,7 @@ import type { Place } from "./data/types";
 import { km, optimizeOrder } from "./lib/geo";
 import { dayStops } from "./lib/plan";
 import { addPin, switchTrip, toast, useStore, useTrip } from "./lib/store";
-import { getLoc, onLocateError, resumeLocate, setFollow, startLocate, stopLocate, useLoc } from "./lib/locate";
+import { ensureCompass, getLoc, onLocateError, resumeLocate, setFollow, startLocate, stopLocate, useLoc } from "./lib/locate";
 import type { Mode } from "./lib/route";
 import { NavCard, PointCard, useNavigation, type NavState, type NavTarget } from "./components/Nav";
 
@@ -70,7 +70,6 @@ export default function App() {
   const fix = useLoc((s) => s.fix);
   const follow = useLoc((s) => s.follow);
   const locStatus = useLoc((s) => s.status);
-  const compass = useLoc((s) => s.compass);
   const [nav, setNav] = useState<NavState>(null);
   const [point, setPoint] = useState<LL | null>(null);
   const navInfo = useNavigation(nav);
@@ -80,7 +79,11 @@ export default function App() {
   const [snap, setSnap] = useState<Snap>("peek");
   const [vh, setVh] = useState(window.innerHeight);
   const n = useRef(0);
-  const fly = useCallback((f: Omit<FocusRequest, "n">) => setFocus({ ...f, n: ++n.current }), []);
+  // any camera move asked by the app (open a place, a day, a zone…) stops "follow me"
+  const fly = useCallback((f: Omit<FocusRequest, "n">) => {
+    setFollow(false);
+    setFocus({ ...f, n: ++n.current });
+  }, []);
 
   useEffect(() => {
     const f = () => setVh(window.innerHeight);
@@ -147,8 +150,8 @@ export default function App() {
   const snapPx: Record<Snap, number> = { peek: peekPx, half: Math.round(vh * 0.52), full: sheetFull };
   const DETAIL_VH = 0.64;
   const rawPad = desktop
-    ? { top: 130, bottom: 30, left: 372 + 36, right: rightOpen ? rightW + 36 : 70 }
-    : { top: 170, bottom: rightOpen ? Math.round(vh * DETAIL_VH) : snapPx[snap], left: 20, right: 20 };
+    ? { top: nav || point ? 260 : 130, bottom: 30, left: 372 + 36, right: rightOpen ? rightW + 36 : 70 }
+    : { top: nav || point ? 300 : 170, bottom: rightOpen ? Math.round(vh * DETAIL_VH) : snapPx[snap], left: 20, right: 20 };
   // insets can never eat the whole map (fitBounds would do nothing)
   const fitAxis = (a: number, b: number, size: number) => {
     const max = Math.max(0, size - 150);
@@ -214,16 +217,24 @@ export default function App() {
   }, []);
   const toggleLocate = useCallback(() => {
     const st = getLoc();
+    ensureCompass(true);
     if (st.status === "off" || st.status === "denied" || st.status === "unavailable") {
       toast("Recherche de votre position…");
       startLocate(true);
-    } else if (!st.follow) setFollow(true);
+    } else if (st.status === "searching") {
+      setFollow(true);
+      toast("Recherche de votre position…");
+    } else if (!st.follow || Date.now() - st.followSince < 1500) setFollow(true);
     else if (nav) setFollow(false);
     else {
       stopLocate();
       toast("Localisation arrêtée");
     }
   }, [nav]);
+  // "Autour de moi" goes away with the location
+  useEffect(() => {
+    if (locStatus === "off") setFilter((f) => (f.near ? { ...f, near: false } : f));
+  }, [locStatus]);
 
   const startNav = useCallback(
     (target: NavTarget, mode: Mode) => {
@@ -232,16 +243,24 @@ export default function App() {
       setSel(null);
       setTool(null);
       if (!desktop) setSnap("peek");
+      ensureCompass(true);
       const f = getLoc().fix;
-      if (f) {
-        setFollow(false);
-        fly({ bounds: boundsOf([f, target]) });
-      } else startLocate(true);
+      if (f) fly({ bounds: boundsOf([f, target]) });
+      else startLocate(true);
     },
     [desktop, fly],
   );
-  const me = fix ? { lng: fix.lng, lat: fix.lat, acc: fix.acc, heading: compass ?? (fix.speed != null && fix.speed > 1 ? fix.heading : null) } : null;
-  const navLine = navInfo?.route?.coords ?? (nav && fix ? ([[fix.lng, fix.lat], [nav.target.lng, nav.target.lat]] as LL[]) : null);
+  const stale = useLoc((s) => s.stale);
+  // in a car (> ~15 km/h) the GPS course is the direction; on foot the compass (read inside the map)
+  const me = useMemo(
+    () => (fix ? { lng: fix.lng, lat: fix.lat, acc: fix.acc, course: fix.speed != null && fix.speed > 4 ? fix.heading : null, stale } : null),
+    [fix, stale],
+  );
+  const navCoords = navInfo?.coords;
+  const navLine = useMemo(
+    () => navCoords ?? (nav && fix ? ([[fix.lng, fix.lat], [nav.target.lng, nav.target.lat]] as LL[]) : null),
+    [navCoords, nav, fix],
+  );
 
   const openTool = (k: ToolKey) => {
     setTool((t) => (t === k ? null : k));
@@ -316,7 +335,7 @@ export default function App() {
         point={point}
         onUserPan={() => setFollow(false)}
         onLongPress={(ll) => {
-          if (landing || pinMode) return;
+          if (landing || pinMode || nav) return;
           setPoint(ll);
         }}
         threeD={threeD}

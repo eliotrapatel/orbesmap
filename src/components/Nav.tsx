@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { km } from "../lib/geo";
 import { amapDirections } from "../lib/geo";
-import { setFollow, startLocate, useLoc } from "../lib/locate";
+import { DENIED_HELP, ensureCompass, setFollow, startLocate, useLoc } from "../lib/locate";
 import { estimate, fetchRoute, fmtDistance, fmtDuration, progress, secondsLeft, type LL, type Mode, type Route } from "../lib/route";
 import { IClose, ILocate, INav, IPinPlus } from "./Icons";
 
@@ -27,53 +28,88 @@ export const ICar = (p: React.SVGProps<SVGSVGElement>) => (
 /** Live route to a target: fetched once, then distance/time left are updated locally from the GPS. */
 export function useNavigation(nav: NavState) {
   const fix = useLoc((s) => s.fix);
-  const [route, setRoute] = useState<Route | null>(null);
+  const stale = useLoc((s) => s.stale);
+  const [route, setRoute] = useState<Route | null>(null); // real routes only (never the offline estimate)
   const [loading, setLoading] = useState(false);
-  const lastFetch = useRef<{ t: number; key: string } | null>(null);
+  const [tick, setTick] = useState(0);
+  const inflight = useRef<AbortController | null>(null);
+  const lastTry = useRef(0);
+  const idx = useRef<number | undefined>(undefined);
   const key = nav ? `${nav.mode}:${nav.target.lat},${nav.target.lng}` : "";
-  const hasFix = !!fix;
 
-  // new target or mode: drop the old route
+  // new target or mode: drop the old route and any request in flight
   useEffect(() => {
     setRoute(null);
-    lastFetch.current = null;
+    idx.current = undefined;
+    lastTry.current = 0;
+    return () => {
+      inflight.current?.abort();
+      inflight.current = null;
+      setLoading(false);
+    };
   }, [key]);
+  // network back: try again right away
+  useEffect(() => {
+    const f = () => {
+      lastTry.current = 0;
+      setTick((t) => t + 1);
+    };
+    window.addEventListener("online", f);
+    return () => window.removeEventListener("online", f);
+  }, []);
 
-  const prog = route && fix ? progress(route, fix) : null;
-  const off = prog?.off ?? 0;
-  const needFetch = !!nav && hasFix && (!route || (off > Math.max(60, (fix?.acc || 0) * 1.5) && Date.now() - (lastFetch.current?.t || 0) > 20_000));
+  const prog = route && fix ? progress(route, fix, idx.current) : null;
+  if (prog) idx.current = prog.i;
+  const toTarget = fix && nav ? km(fix, nav.target) * 1000 : Infinity;
+  const now = Date.now();
+  const offRoute = !!(route && prog && fix && toTarget > 150 && !prog.last && prog.off > Math.max(60, fix.acc * 1.5));
+  const wantFetch =
+    !!nav && !!fix && !stale && !inflight.current && ((!route && now - lastTry.current > (lastTry.current ? 30_000 : 0)) || (offRoute && now - lastTry.current > 20_000));
 
   useEffect(() => {
-    if (!nav || !fix || !needFetch) return;
+    if (!wantFetch || !nav || !fix) return;
     const ctl = new AbortController();
-    lastFetch.current = { t: Date.now(), key };
+    inflight.current = ctl;
+    lastTry.current = Date.now();
     setLoading(true);
-    fetchRoute(fix, nav.target, nav.mode, ctl.signal)
-      .then((r) => !ctl.signal.aborted && setRoute(r))
+    fetchRoute(fix, nav.target, nav.mode, ctl.signal, !!route)
+      .then((r) => {
+        if (inflight.current === ctl && !r.estimate) {
+          idx.current = undefined;
+          setRoute(r);
+        }
+      })
       .catch(() => {})
-      .finally(() => !ctl.signal.aborted && setLoading(false));
-    return () => ctl.abort();
-  }, [needFetch, key]); // eslint-disable-line react-hooks/exhaustive-deps
+      .finally(() => {
+        if (inflight.current === ctl) {
+          inflight.current = null;
+          setLoading(false);
+        }
+      });
+    // no cleanup here on purpose: the request is only cancelled when the target changes (effect above)
+  }, [wantFetch, key, tick]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // waiting for the 20 s / 30 s pause to end while standing still: re-check when it ends
+  const waiting = !!nav && !!fix && !stale && !wantFetch && !inflight.current && (offRoute || !route);
+  useEffect(() => {
+    if (!waiting) return;
+    const ms = Math.max(500, lastTry.current + (route ? 20_000 : 30_000) - Date.now() + 50);
+    const t = window.setTimeout(() => setTick((x) => x + 1), ms);
+    return () => window.clearTimeout(t);
+  }, [waiting, route, tick]);
+
+  const pi = prog?.i;
+  const coords = useMemo<[number, number][] | null>(
+    () => (route && fix && pi != null ? [[fix.lng, fix.lat], ...route.coords.slice(pi + 1)] : null),
+    [route, fix?.lng, fix?.lat, pi], // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
   if (!nav) return null;
-  const r = route || (fix ? estimate(fix, nav.target, nav.mode) : null);
-  if (!r || !fix) return { route: null, left: null, secs: null, loading, arrived: false };
-  const left = route ? (prog?.left ?? r.distance) : r.distance;
-  const secs = secondsLeft(r, left, nav.mode);
-  return { route: route ? { ...r, coords: [[fix.lng, fix.lat] as [number, number], ...trimFrom(r.coords, fix)] } : null, left, secs, loading, arrived: left < 35, estimate: r.estimate };
-}
-
-/** Drop the part of the line already walked (nearest vertex onwards). */
-function trimFrom(c: [number, number][], p: LL): [number, number][] {
-  let bi = 0, bd = Infinity;
-  c.forEach(([x, y], i) => {
-    const d = (x - p.lng) ** 2 + (y - p.lat) ** 2;
-    if (d < bd) {
-      bd = d;
-      bi = i;
-    }
-  });
-  return c.slice(Math.min(bi + 1, c.length - 1));
+  if (!fix) return { coords: null, left: null, secs: null, loading, arrived: false, estimate: true, stale };
+  const est = !route || !prog;
+  const left = est ? estimate(fix, nav.target, nav.mode).distance : prog!.left;
+  const secs = est ? estimate(fix, nav.target, nav.mode).duration : secondsLeft(route!, left, nav.mode);
+  return { coords, left, secs, loading, arrived: !stale && (left < 35 || toTarget < 25), estimate: est, stale };
 }
 
 export function NavCard({ nav, info, onMode, onClose }: { nav: NonNullable<NavState>; info: ReturnType<typeof useNavigation>; onMode: (m: Mode) => void; onClose: () => void }) {
@@ -98,19 +134,24 @@ export function NavCard({ nav, info, onMode, onClose }: { nav: NonNullable<NavSt
               {fmtDuration(info.secs)} <em>· {fmtDistance(info.left)}</em>
             </b>
             <span>
-              {nav.target.name} · arrivée {clockIn(info.secs)}
-              {info.loading ? " · calcul…" : info.estimate ? " · estimation (hors ligne)" : nav.mode === "car" ? " · avec trafic moyen" : ""}
+              {info.stale
+                ? `${nav.target.name} · position perdue (métro, tunnel ?), dernière position connue`
+                : `${nav.target.name} · arrivée ${clockIn(info.secs)}${info.loading ? " · calcul…" : info.estimate ? " · estimation" : nav.mode === "car" ? " · avec trafic moyen" : ""}`}
             </span>
           </div>
         )
       ) : (
         <div className="nav-main">
           <b>{status === "denied" ? "Position refusée" : "Recherche de votre position…"}</b>
-          <span>{status === "denied" ? "Autorisez la localisation pour ce site dans les réglages" : `Vers ${nav.target.name}`}</span>
+          <span style={status === "denied" ? { whiteSpace: "normal" } : undefined}>{status === "denied" ? DENIED_HELP : `Vers ${nav.target.name}`}</span>
         </div>
       )}
       <div className="nav-btns">
-        <button className={"btn-sm" + (follow ? " on" : "")} aria-pressed={follow} onClick={() => (status === "on" ? setFollow(!follow) : startLocate(true))}>
+        <button className={"btn-sm" + (follow ? " on" : "")} aria-pressed={follow} onClick={() => {
+            ensureCompass(true);
+            if (status === "on") setFollow(!follow);
+            else startLocate(true);
+          }}>
           <ILocate /> {follow ? "Je suis suivi" : "Me suivre"}
         </button>
         <a className="btn-sm" href={amapDirections(nav.target, nav.mode)} target="_blank" rel="noopener"><INav /> Guidage Amap</a>
@@ -135,6 +176,13 @@ export function GoBlock({ target, onGo }: { target: NavTarget; onGo: (m: Mode) =
   }
   const w = estimate(fix, target, "walk");
   const c = estimate(fix, target, "car");
+  if (w.distance / 1.25 > 80_000) {
+    return (
+      <div className="sec go">
+        <span className="label">Y aller · à {fmtDistance(w.distance / 1.25)} de vous</span>
+      </div>
+    );
+  }
   return (
     <div className="sec go">
       <span className="label">Y aller · à {fmtDistance(w.distance / 1.25)} à vol d'oiseau</span>
@@ -160,13 +208,13 @@ export function PointCard({ point, onGo, onPin, onClose }: { point: LL; onGo: (m
         </div>
         <button className="icon-btn" onClick={onClose} aria-label="Fermer"><IClose /></button>
       </div>
-      {fix && w && c ? (
+      {fix && w && c && w.distance / 1.25 <= 80_000 ? (
         <div className="go-row">
           <button className="go-btn" onClick={() => onGo("walk")}><IWalk /><b>~{fmtDuration(w.duration)}</b><small>à pied</small></button>
           <button className="go-btn" onClick={() => onGo("car")}><ICar /><b>~{fmtDuration(c.duration)}</b><small>en voiture</small></button>
         </div>
       ) : (
-        <button className="btn-sm" onClick={() => startLocate(false)}><ILocate /> Voir la distance depuis ma position</button>
+        !fix && <button className="btn-sm" onClick={() => startLocate(false)}><ILocate /> Voir la distance depuis ma position</button>
       )}
       <div className="nav-btns">
         <button className="btn-sm" onClick={onPin}><IPinPlus /> Ajouter à mes lieux</button>
