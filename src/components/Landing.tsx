@@ -23,6 +23,11 @@ export default function Landing({ trip, onPick, onEnter }: { trip: Trip; onPick:
     return () => window.clearInterval(t);
   }, []);
   const entered = useRef(false);
+  const enterBtn = useRef<HTMLButtonElement>(null);
+  // keyboard focus on "Entrer" without scrolling the page down to it on small screens
+  useEffect(() => {
+    enterBtn.current?.focus({ preventScroll: true });
+  }, []);
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
       if (e.key !== "Enter" || (e.target as HTMLElement).closest?.("button,input,textarea,a")) return;
@@ -94,7 +99,7 @@ export default function Landing({ trip, onPick, onEnter }: { trip: Trip; onPick:
           })}
         </div>
         <div className="l-enter">
-          <button className="btn primary" onClick={enter} autoFocus>Entrer</button>
+          <button ref={enterBtn} className="btn primary" onClick={enter}>Entrer</button>
           <small>Carte, programme jour par jour, phrases, convertisseur, vols, carnet partagé.</small>
         </div>
       </div>
