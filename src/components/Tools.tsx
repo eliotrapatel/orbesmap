@@ -1,5 +1,5 @@
 // Phrases, converter, flights, practical info, export.
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Trip } from "../data/types";
 import { exportCsv, exportPdf } from "../lib/export";
 import { exportIcs } from "../lib/ics";
@@ -7,7 +7,7 @@ import { useLiveRate } from "../lib/rates";
 import { getState, setEurRate, toast, useStore } from "../lib/store";
 import { phase } from "../lib/time";
 import { ICalPlus, ICopy, IDownload, IOffline, IPlane, ISpeaker } from "./Icons";
-import { cancelOffline, deleteOffline, offlineSupported, prepareOffline, useOffline } from "../lib/offline";
+import { cancelOffline, deleteOffline, offlineSupported, prepareOffline, useOffline, verifyOffline } from "../lib/offline";
 import { ShowScreen, copy, speak } from "./ui";
 
 const fmt = (n: number) => (Number.isFinite(n) ? (Math.round(n * 100) / 100).toLocaleString("fr-FR", { maximumFractionDigits: 2 }) : "");
@@ -153,20 +153,38 @@ function OfflineCard({ trip }: { trip: Trip }) {
   const shellHost = location.hostname.endsWith(".vercel.app");
   const standalone = window.matchMedia?.("(display-mode: standalone)").matches || (navigator as unknown as { standalone?: boolean }).standalone === true;
   const ios = /iP(hone|ad|od)/.test(navigator.userAgent);
-  const newPins = st.state === "ready" && st.points != null && points.length > st.points;
+  // real check of what is on the phone (Safari may clear storage; places may have been added since)
+  const [check, setCheck] = useState<{ expected: number; missing: number } | null | "busy">(null);
+  const key = points.map((p) => `${p.lat.toFixed(4)},${p.lng.toFixed(4)}`).join("|");
+  useEffect(() => {
+    if (st.state !== "ready") return setCheck(null);
+    let alive = true;
+    setCheck("busy");
+    verifyOffline(points).then((r) => alive && setCheck(r));
+    return () => {
+      alive = false;
+    };
+  }, [st.state, st.at, key]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!offlineSupported) return null;
   return (
     <div className="card off-card">
       <h4><IOffline width={18} height={18} /> Carte hors ligne</h4>
       {st.state === "ready" && (
         <p>
-          Prête ({mb(st.bytes)}{st.at ? `, préparée le ${new Date(st.at).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}` : ""}). La carte, les lieux et votre position marchent sans réseau, même dans le métro
+          Prête ({mb(st.bytes)} sur le téléphone{st.at ? `, préparée le ${new Date(st.at).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}` : ""}). La carte, les lieux et votre position marchent sans réseau, même dans le métro
           {shellHost && standalone ? "." : ", tant que cette page reste ouverte."}
         </p>
       )}
-      {newPins && <p className="em-small">Des lieux ont été ajoutés depuis : touchez « Mettre à jour » pour les inclure.</p>}
+      {st.state === "ready" && check === "busy" && <p className="em-small">Vérification du contenu…</p>}
+      {st.state === "ready" && check && check !== "busy" && (
+        check.missing === 0 ? (
+          <p className="off-ok">✓ Complète : les {check.expected.toLocaleString("fr-FR")} éléments sont sur ce téléphone (programme, lieux ajoutés, Suzhou, globe).</p>
+        ) : (
+          <p className="tr-err">{check.missing.toLocaleString("fr-FR")} élément{check.missing > 1 ? "s" : ""} manquant{check.missing > 1 ? "s" : ""} (lieux ajoutés depuis, ou stockage effacé) : touchez « Mettre à jour » en Wi-Fi.</p>
+        )
+      )}
       {st.state === "ready" && st.error && <p className="tr-err">{st.error}</p>}
-      {st.state === "none" && <p>Téléchargez une fois, en Wi-Fi, les quartiers du programme (environ 40 Mo). Ensuite la carte s'affiche sans réseau et ne consomme plus de données mobiles.</p>}
+      {st.state === "none" && <p>Téléchargez une fois, en Wi-Fi, les quartiers du programme, Suzhou et vos lieux ajoutés (environ 45 Mo à télécharger, 75 Mo sur le téléphone). Ensuite la carte s'affiche sans réseau et ne consomme plus de données mobiles.</p>}
       {st.state === "running" && (
         <>
           <p>Téléchargement… {st.done} / {st.total} · {mb(st.bytes)}</p>
@@ -182,6 +200,19 @@ function OfflineCard({ trip }: { trip: Trip }) {
         )}
         {st.state === "ready" && <button className="btn-sm" onClick={() => { if (confirm("Supprimer la carte hors ligne de ce téléphone ?")) deleteOffline(); }}>Supprimer</button>}
       </div>
+      <details className="off-more">
+        <summary>Ce qui est inclus</summary>
+        <p>
+          Inclus : la carte autour de chaque lieu du programme et de vos lieux ajoutés (rues jusqu'au détail), toute la région (Suzhou compris), le globe de l'accueil. Vos notes, statuts, check-list, horaires, fiche d'urgence et phrases sont toujours sur le téléphone, sans téléchargement.
+        </p>
+        <p>
+          Pas inclus : les itinéraires jamais calculés (l'app affiche une estimation), les photos de l'autre téléphone pas encore ouvertes, et les fonctions IA (Traduire, Demander, Ajouter un lieu) qui ont besoin du réseau.
+        </p>
+        <p>
+          Les mises à jour de l'app ne touchent pas à la carte téléchargée. Après un ajout de lieu, la vérification ci-dessus le signale : « Mettre à jour » ne télécharge que ce qui manque.
+          {ios && !standalone ? " Sur iPhone, Safari peut effacer les données d'un site non ouvert pendant 7 jours : préparez la carte 2 ou 3 jours avant le départ et ouvrez l'app régulièrement (ou utilisez l'icône d'écran d'accueil, non concernée)." : ""}
+        </p>
+      </details>
       <p className="em-small">
         {shellHost && standalone
           ? "Cette icône s'ouvre aussi sans réseau."

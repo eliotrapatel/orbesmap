@@ -149,11 +149,67 @@ export function tilesFor(points: LL[]): string[] {
   const cl = core.map((p) => p.lat), cg = core.map((p) => p.lng);
   for (let z = 10; z <= 12; z++) bboxTiles(out, z, Math.min(...cl) - 0.05, Math.min(...cg) - 0.05, Math.max(...cl) + 0.05, Math.max(...cg) + 0.05);
   for (const p of points) {
-    const dLat = 2.5 / 110.5;
-    const dLng = 2.5 / (111.3 * Math.cos((p.lat * Math.PI) / 180));
-    for (let z = 13; z <= 14; z++) bboxTiles(out, z, p.lat - dLat, p.lng - dLng, p.lat + dLat, p.lng + dLng);
+    const k = 1 / (111.3 * Math.cos((p.lat * Math.PI) / 180));
+    // ~12 km around each place at mid zoom (Suzhou and other places outside the city stay sharp when zooming out)
+    for (let z = 10; z <= 12; z++) bboxTiles(out, z, p.lat - 12 / 110.5, p.lng - 12 * k, p.lat + 12 / 110.5, p.lng + 12 * k);
+    // ~2.5 km around each place at street level
+    for (let z = 13; z <= 14; z++) bboxTiles(out, z, p.lat - 2.5 / 110.5, p.lng - 2.5 * k, p.lat + 2.5 / 110.5, p.lng + 2.5 * k);
   }
   return [...out];
+}
+
+/** Every file the offline map needs: style extras, relief images for the globe, vector tiles. */
+function urlsFor(points: LL[], style: { sprite?: unknown }, template: string): string[] {
+  const extras: string[] = [];
+  if (typeof style.sprite === "string") for (const sfx of [".json", ".png", "@2x.json", "@2x.png"]) extras.push(style.sprite + sfx);
+  for (const r of GLYPH_RANGES) extras.push(`${HOST}/fonts/${encodeURIComponent(FONT)}/${r}-${r + 255}.pbf`);
+  // shaded relief of the home-screen globe (zoom 0–3, whole world)
+  const relief: string[] = [];
+  for (let z = 0; z <= 3; z++) for (let x = 0; x < 2 ** z; x++) for (let y = 0; y < 2 ** z; y++) relief.push(`${HOST}/natural_earth/ne2sr/${z}/${x}/${y}.png`);
+  const tiles = tilesFor(points).map((t) => {
+    const [z, x, y] = t.split("/");
+    return template.replace("{z}", z).replace("{x}", x).replace("{y}", y);
+  });
+  return [...extras, ...relief, ...tiles];
+}
+
+/** Fresh copy from the network (stored), else the stored one: the download must use the current tile version. */
+async function freshJson(url: string, signal: AbortSignal): Promise<{ sprite?: unknown; tiles?: string[] }> {
+  const cache = await caches.open(CACHE);
+  try {
+    const res = await fetchWithTimeout(url, 20000, signal);
+    if (res.ok) {
+      await cache.put(keyOf(url), res.clone());
+      return await res.json();
+    }
+  } catch {
+    if (signal.aborted) throw new Error("aborted");
+  }
+  const hit = await cache.match(keyOf(url));
+  if (!hit) throw new Error("no copy");
+  return hit.json();
+}
+
+/** Checks what is really on the phone right now (Safari can clear storage; places may have been added). */
+export async function verifyOffline(points: LL[]): Promise<{ expected: number; missing: number } | null> {
+  if (!hasCache) return null;
+  try {
+    const cache = await caches.open(CACHE);
+    const styleRes = await cache.match(keyOf(STYLE_URL));
+    const tjRes = await cache.match(keyOf(`${HOST}/planet`));
+    if (!styleRes || !tjRes) return { expected: 1, missing: 1 };
+    const style = await styleRes.json();
+    const template: string = (await tjRes.json()).tiles[0];
+    const urls = urlsFor(points, style, template);
+    let missing = 0;
+    for (let i = 0; i < urls.length; i += 50) {
+      const found = await Promise.all(urls.slice(i, i + 50).map((u) => cache.match(keyOf(u))));
+      missing += found.filter((f) => !f).length;
+    }
+    return { expected: urls.length + 2, missing };
+  } catch {
+    return null;
+  }
 }
 
 let running: AbortController | null = null;
@@ -178,18 +234,12 @@ export async function prepareOffline(points: LL[]): Promise<void> {
     // keep the screen on during the download (a locked screen stops it)
     lock = await (navigator as unknown as { wakeLock?: { request: (t: string) => Promise<{ release: () => Promise<void> }> } }).wakeLock?.request("screen").catch(() => null) ?? null;
     const cache = await caches.open(CACHE);
-    // style, sprite, tile index, fonts
-    const style = await (await cachedFetch(STYLE_URL, signal)).json();
-    const tj = await (await cachedFetch(`${HOST}/planet`, signal)).json();
-    const template: string = tj.tiles[0];
-    const extras: string[] = [];
-    if (typeof style.sprite === "string") for (const sfx of [".json", ".png", "@2x.json", "@2x.png"]) extras.push(style.sprite + sfx);
-    for (const r of GLYPH_RANGES) extras.push(`${HOST}/fonts/${encodeURIComponent(FONT)}/${r}-${r + 255}.pbf`);
-    const tiles = tilesFor(points).map((t) => {
-      const [z, x, y] = t.split("/");
-      return template.replace("{z}", z).replace("{x}", x).replace("{y}", y);
-    });
-    const all = [...extras, ...tiles];
+    // style and tile index fetched fresh (current tile version), then sprite, fonts, relief, tiles
+    const style = await freshJson(STYLE_URL, signal);
+    const tj = await freshJson(`${HOST}/planet`, signal);
+    const template = String(tj.tiles?.[0] || "");
+    if (!template) throw new Error("no template");
+    const all = urlsFor(points, style, template);
     let done = 0;
     let bytes = 0;
     let quota = false;
@@ -203,7 +253,8 @@ export async function prepareOffline(points: LL[]): Promise<void> {
           try {
             const hit = await cache.match(keyOf(url));
             if (hit) {
-              bytes += Number(hit.headers.get("content-length")) || 40_000;
+              // real size of what is already stored (stored responses often have no length header)
+              bytes += (await hit.blob()).size; // space used on the phone (same measure as new downloads)
               done++;
             } else {
               const res = await fetchWithTimeout(url, 20000, signal);
@@ -212,8 +263,8 @@ export async function prepareOffline(points: LL[]): Promise<void> {
                 await cache.put(keyOf(url), res);
                 bytes += buf.byteLength;
                 done++;
-              } else if (res.status === 404 || res.status === 204) done++; // empty sea tiles
-              else failed.push(url);
+              } else if (res.status === 204) done++; // nothing to draw there
+              else failed.push(url); // 404 included: a real empty tile answers 200 with a tiny file
             }
           } catch (e) {
             if ((e as Error)?.name === "QuotaExceededError") quota = true;
