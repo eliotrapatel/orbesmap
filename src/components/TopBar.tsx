@@ -80,7 +80,7 @@ function SyncPill({ onOpen }: { onOpen: () => void }) {
       : sync === "denied"
         ? { tone: "bad", short: "Accès refusé", long: "Ce compte n'a pas accès à l'espace partagé" }
         : sync === "syncing"
-          ? { tone: "busy", short: "Synchro…", long: "Synchronisation en cours…" }
+          ? { tone: "busy", short: pending ? `Envoi (${pending})…` : "Synchro…", long: pending ? `${pending} modification${pending > 1 ? "s" : ""} en cours d'envoi` : "Synchronisation en cours…" }
           : sync === "pending" || sync === "error" || pending > 0
             ? { tone: "warn", short: pending ? `En attente (${pending})` : "Nouvel essai…", long: pending ? `${pending} modification${pending > 1 ? "s" : ""} en attente d'envoi (réseau)` : "Envoi en attente, nouvel essai automatique" }
             : { tone: "ok", short: "À jour", long: `Synchronisé${agoTxt ? ` ${agoTxt}` : ""}` };

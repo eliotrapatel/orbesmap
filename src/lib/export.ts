@@ -16,7 +16,7 @@ export function exportCsv(trip: Trip, d: Data) {
       rows.push([day.title, p.name, TYPE_LABEL[p.type] || p.type, statusLabel(s.status), s.rating || "", s.moq || "", s.price || "", s.lead || "", s.sample || "", s.appt || "", p.time, p.address, p.cn, p.metro || "", p.website || "", notesText(s as Record<string, unknown>).replace(/\n/g, " "), contacts, s.visited ? "Oui" : "", s.favorite ? "Oui" : "", p.lat, p.lng]);
     }
   }
-  for (const pin of d.pins) rows.push(["Mes lieux", pin.name, "Lieu ajouté", "", "", "", "", "", "", "", "", "", "", "", "", pin.note || "", "", "", "", pin.lat, pin.lng]);
+  for (const pin of d.pins) rows.push(["Mes lieux", pin.name, "Lieu ajouté", "", "", "", "", "", "", "", "", "", "", "", "", notesText(d.places[`_pin:${pin.id}`] as Record<string, unknown>, pin.note).replace(/\n/g, " "), "", "", "", pin.lat, pin.lng]);
   const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
   const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
   const a = document.createElement("a");
@@ -58,7 +58,10 @@ export function exportPdf(trip: Trip, d: Data): boolean {
   }
   if (d.pins.length) {
     h += `<h2>Mes lieux</h2>`;
-    for (const pin of d.pins) h += `<div class="p"><div class="n">${esc(pin.name)}</div>${pin.note ? `<div>${esc(pin.note)}</div>` : ""}<div class="m">${pin.lat.toFixed(5)}, ${pin.lng.toFixed(5)}</div></div>`;
+    for (const pin of d.pins) {
+      const nt = notesText(d.places[`_pin:${pin.id}`] as Record<string, unknown>, pin.note, "\n");
+      h += `<div class="p"><div class="n">${esc(pin.name)}</div>${nt ? `<div>${esc(nt).replace(/\n/g, "<br>")}</div>` : ""}<div class="m">${pin.lat.toFixed(5)}, ${pin.lng.toFixed(5)}</div></div>`;
+    }
   }
   h += `</body></html>`;
   const w = window.open("", "_blank");

@@ -4,6 +4,7 @@ import { amapDirections } from "../lib/geo";
 import { DENIED_HELP, ensureCompass, setFollow, startLocate, useLoc } from "../lib/locate";
 import { estimate, fetchRoute, fmtDistance, fmtDuration, progress, secondsLeft, type LL, type Mode, type Route } from "../lib/route";
 import { IClose, ILocate, INav, IPinPlus } from "./Icons";
+import { useEscape } from "./ui";
 
 export type NavTarget = LL & { name: string };
 export type NavState = { target: NavTarget; mode: Mode } | null;
@@ -113,6 +114,7 @@ export function useNavigation(nav: NavState) {
 }
 
 export function NavCard({ nav, info, onMode, onClose }: { nav: NonNullable<NavState>; info: ReturnType<typeof useNavigation>; onMode: (m: Mode) => void; onClose: () => void }) {
+  useEscape(onClose); // "back" stops the route instead of leaving the app
   const status = useLoc((s) => s.status);
   const follow = useLoc((s) => s.follow);
   return (
@@ -196,6 +198,7 @@ export function GoBlock({ target, onGo }: { target: NavTarget; onGo: (m: Mode) =
 
 /** Card for a point chosen by a long press on the map. */
 export function PointCard({ point, onGo, onPin, onClose }: { point: LL; onGo: (m: Mode) => void; onPin: () => void; onClose: () => void }) {
+  useEscape(onClose);
   const fix = useLoc((s) => s.fix);
   const w = fix ? estimate(fix, point, "walk") : null;
   const c = fix ? estimate(fix, point, "car") : null;

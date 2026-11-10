@@ -220,7 +220,7 @@ export function switchTrip(tripId: string) {
     /* ignore */
   }
   try {
-    history.replaceState(null, "", "#" + tripId);
+    history.replaceState(history.state, "", "#" + tripId);
   } catch {
     /* ignore */
   }
@@ -677,6 +677,20 @@ function onStorage(e: StorageEvent) {
     const s = readJSON<Settings>(SETTINGS_KEY);
     if (s) set({ settings: s });
   }
+}
+
+// coming back to an earlier history entry (closing an overlay with "back") must keep the current trip in the URL
+if (typeof window !== "undefined") {
+  window.addEventListener("popstate", () => {
+    const h = "#" + state.tripId;
+    if (location.hash !== h) {
+      try {
+        history.replaceState(history.state, "", h);
+      } catch {
+        /* ignore */
+      }
+    }
+  });
 }
 
 export async function sendLoginEmail(email: string) {

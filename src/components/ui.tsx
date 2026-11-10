@@ -32,6 +32,11 @@ if (typeof window !== "undefined") {
     e.preventDefault();
     escStack[escStack.length - 1]();
   });
+  // reloaded while an overlay was open: adopt that history entry so the first "back" is not a dead swipe
+  if (history.state?.orbesOverlay) {
+    hasEntry = true;
+    syncHistory();
+  }
   window.addEventListener("popstate", () => {
     if (swallow) {
       swallow--;
@@ -216,6 +221,12 @@ export function compressImage(file: File, max = 1600, quality = 0.8): Promise<Bl
   });
 }
 
+/** Puts any on-screen state (banner, card, reopened globe) in the Escape / "back" stack. */
+export function EscGuard({ on }: { on: () => void }) {
+  useEscape(on);
+  return null;
+}
+
 /** Mobile bottom sheets: drag the grip (or a tool's header) down to close, up to open full height. */
 export function useSheetDrag(onClose: () => void) {
   const ref = useRef<HTMLElement>(null);
@@ -238,7 +249,7 @@ export function useSheetDrag(onClose: () => void) {
       if (!d || !ref.current) return;
       d.dy = e.clientY - d.y0;
       // follows the finger downwards; upwards only a hint (it snaps to full height on release)
-      ref.current.style.transform = `translateY(${d.dy > 0 ? d.dy : d.dy / 4}px)`;
+      ref.current.style.transform = `translateY(${d.dy > 0 ? d.dy : Math.max(d.dy / 4, full ? 0 : -14)}px)`;
     },
     onPointerUp: () => {
       const d = drag.current;

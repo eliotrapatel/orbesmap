@@ -4,6 +4,8 @@ import type { Place, Trip } from "../data/types";
 import type { Pin } from "../lib/model";
 import { ICube, ILocate, IPin, IPinPlus, ISearch, ISpeaker } from "./Icons";
 import { TOOLS, type ToolKey } from "./TopBar";
+import { getState } from "../lib/store";
+import { notesText } from "../lib/notes";
 
 const TOOL_WORDS: Partial<Record<ToolKey, string>> = {
   emergency: "urgence sos hopital consulat police ambulance assurance 110 120 medecin",
@@ -44,7 +46,11 @@ export default function CommandPalette(p: {
       const d = day(pl.day);
       out.push({ id: "p:" + pl.id, section: "Lieux", title: pl.name, sub: `${d?.title || ""} · ${TYPE_LABEL[pl.type] || pl.type} · ${pl.address}`, icon: <span className="ic dot" style={{ ["--c" as string]: d?.color }}>{pl.type === "hotel" ? "H" : d?.glyph}</span>, run: () => p.onPlace(pl), text: norm([pl.name, pl.cn, pl.address, pl.desc, TYPE_LABEL[pl.type], ...pl.highlights].join(" ")) });
     }
-    for (const pin of p.pins) out.push({ id: "pin:" + pin.id, section: "Mes lieux", title: pin.name, sub: pin.note, icon: <span className="ic"><IPin /></span>, run: () => p.onPin(pin), text: norm(pin.name + " " + (pin.note || "")) });
+    const states = getState().data.places as Record<string, Record<string, unknown>>;
+    for (const pin of p.pins) {
+      const nt = notesText(states[`_pin:${pin.id}`], pin.note);
+      out.push({ id: "pin:" + pin.id, section: "Mes lieux", title: pin.name, sub: nt || undefined, icon: <span className="ic"><IPin /></span>, run: () => p.onPin(pin), text: norm(pin.name + " " + nt) });
+    }
     for (const d of p.trip.days) out.push({ id: "d:" + d.key, section: "Jours", title: d.title, sub: d.theme, icon: <span className="ic dot" style={{ ["--c" as string]: d.color }}>{d.glyph}</span>, run: () => p.onDay(d.key), text: norm(d.title + " " + d.short + " " + (d.theme || "")) });
     for (const z of p.trip.zones) out.push({ id: "z:" + z.label, section: "Zones", title: z.label, sub: "Centrer la carte", icon: <span className="ic"><ILocate /></span>, run: () => p.onZone(z.center, z.zoom), text: norm("zone quartier ville " + z.label) });
     for (const t of TOOLS) out.push({ id: "t:" + t.key, section: "Outils", title: t.label, icon: <span className="ic">{t.icon}</span>, run: () => p.onTool(t.key), text: norm(t.label + " " + t.key + " " + (TOOL_WORDS[t.key] || "")) });

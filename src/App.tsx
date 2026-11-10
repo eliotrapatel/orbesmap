@@ -18,11 +18,12 @@ import PlaceDetail from "./components/PlaceDetail";
 import PlaceList, { type Filter } from "./components/PlaceList";
 import TopBar, { TOOLS, type ToolKey } from "./components/TopBar";
 import { Converter, ExportPanel, Flights, Phrases, Practical } from "./components/Tools";
-import { Drawer, Toaster } from "./components/ui";
+import { Drawer, EscGuard, Toaster } from "./components/ui";
 import type { Place } from "./data/types";
 import { km, optimizeOrder } from "./lib/geo";
 import { dayStops } from "./lib/plan";
-import { addPin, switchTrip, toast, updateRecord, useStore, useTrip } from "./lib/store";
+import { addPin, currentAuthor, switchTrip, toast, updatePin, updateRecord, useStore, useTrip } from "./lib/store";
+import { noteKey } from "./lib/notes";
 import { ensureCompass, getLoc, onLocateError, resumeLocate, setFollow, startLocate, stopLocate, useLoc } from "./lib/locate";
 import type { Mode } from "./lib/route";
 import { NavCard, PointCard, useNavigation, type NavState, type NavTarget } from "./components/Nav";
@@ -330,6 +331,18 @@ export default function App() {
     [saveFound, fly, startQueue],
   );
 
+  const enterMap = () => {
+    setLanding(false);
+    try {
+      sessionStorage.setItem("orbes.entered", "1");
+    } catch {
+      /* ignore */
+    }
+    window.clearTimeout(overlayTimer.current);
+    overlayTimer.current = window.setTimeout(() => setLandingOverlay(false), 900);
+    fly({ bounds: tripBounds(), pitch: 0, duration: 2600 });
+  };
+
   const openTool = (k: ToolKey) => {
     setTool((t) => (t === k ? null : k));
     setSel(null);
@@ -590,6 +603,7 @@ export default function App() {
             </div>
           </div>
 
+          {pinMode && <EscGuard on={() => { setPinMode(false); setPlaceQueue([]); }} />}
           {pinMode && (
             <div className="banner glass" role="status">
               {pendingFound
@@ -612,19 +626,11 @@ export default function App() {
           key={landingKey}
           trip={trip}
           onPick={switchTrip}
-          onEnter={() => {
-            setLanding(false);
-            try {
-              sessionStorage.setItem("orbes.entered", "1");
-            } catch {
-              /* ignore */
-            }
-            window.clearTimeout(overlayTimer.current);
-            overlayTimer.current = window.setTimeout(() => setLandingOverlay(false), 900);
-            fly({ bounds: tripBounds(), pitch: 0, duration: 2600 });
-          }}
+          onEnter={enterMap}
         />
       )}
+      {/* globe reopened from the logo: "back" returns to the map instead of leaving the app */}
+      {landing && landingKey > 0 && <EscGuard on={enterMap} />}
 
       {cmdk && (
         <CommandPalette
@@ -676,7 +682,13 @@ export default function App() {
         <PinForm
           onClose={() => setPendingPin(null)}
           onSave={(name, note) => {
-            const pin = addPin({ name, note: note || undefined, lng: pendingPin[0], lat: pendingPin[1] });
+            const pin = addPin({ name, lng: pendingPin[0], lat: pendingPin[1] });
+            // the note goes into my own note (signed in) or the shared one (signed out)
+            if (note) {
+              const k = noteKey(currentAuthor());
+              if (k) updateRecord(`_pin:${pin.id}`, { [k]: note });
+              else updatePin(pin.id, { note });
+            }
             setPendingPin(null);
             setSel({ kind: "pin", id: pin.id });
             toast(`« ${name} » ajouté`);

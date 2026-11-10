@@ -17,13 +17,11 @@ export default function Notes({ rec, legacyText, placeholder, onSave }: { rec: R
   return (
     <div className="sec">
       <span className="label">Notes</span>
-      {mineKey ? (
+      {mineKey && (
         <label className="field">
           <span>Ma note{mine?.at ? ` · ${ago(mine.at)}` : ""}</span>
           <SavedInput multiline value={mine?.text || ""} placeholder={placeholder} onSave={(v) => onSave(mineKey, v)} />
         </label>
-      ) : (
-        !legacy && <SavedInput multiline value="" placeholder={`${placeholder} (connectez-vous pour signer vos notes)`} onSave={(v) => onSave("note", v)} />
       )}
       {others.map((n) => (
         <div key={n.key} className="note-other">
@@ -31,10 +29,13 @@ export default function Notes({ rec, legacyText, placeholder, onSave }: { rec: R
           <p>{n.text}</p>
         </div>
       ))}
-      {legacy && (
+      {/* signed out: always the same single field (the shared note), so the keyboard never closes mid-typing */}
+      {(legacy || !mineKey) && (
         <label className="field">
-          <span>Note commune{legacy.name ? ` (dernière modif. : ${legacy.name})` : ""}{legacy.at ? ` · ${ago(legacy.at)}` : ""}</span>
-          <SavedInput multiline value={legacy.text} placeholder={placeholder} onSave={(v) => onSave("note", v)} />
+          <span>
+            {legacy ? `Note commune${legacy.name ? ` (dernière modif. : ${legacy.name})` : ""}${legacy.at ? ` · ${ago(legacy.at)}` : ""}` : "Note (connectez-vous pour signer vos notes)"}
+          </span>
+          <SavedInput multiline value={legacy?.text || ""} placeholder={placeholder} onSave={(v) => onSave("note", v)} />
         </label>
       )}
     </div>
