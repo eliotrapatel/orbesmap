@@ -39,6 +39,23 @@ Mise en place (déjà faite le 10/11/2026) :
 
 Sans réseau, l'app fonctionne sur l'appareil et envoie les changements au retour de la connexion.
 
+## Fonctions IA (traduction photo, interprète, lieu depuis un lien)
+
+Elles passent par `api/ai.ts`, une fonction Vercel du projet orbesmap (`https://orbesmap.vercel.app/api/ai`).
+La clé reste sur le serveur ; seuls les membres connectés (table `members`) peuvent l'utiliser.
+
+- **DeepSeek V4.1 Flash** (`deepseek-flash`) par défaut : variable Vercel `DEEPSEEK_API_KEY` (ajoutée le 10/11/2026).
+  Images, réponses JSON, recherche et lecture de pages via l'API Search/Fetch de DeepSeek.
+- **Claude** en secours : variable `ANTHROPIC_API_KEY` ; `AI_PROVIDER=claude` pour l'utiliser en priorité.
+
+Sans aucune clé, l'app marche normalement ; ces trois fonctions affichent un message.
+
+## Hors ligne
+
+- Carte : onglet Infos → « Préparer hors ligne » (en Wi-Fi, ~25–40 Mo). Les tuiles restent sur le téléphone.
+- App entière sans réseau : seulement sur `orbesmap.vercel.app` ajoutée à l'écran d'accueil (service worker `public/sw.js`) ;
+  theorbes.com/maps ne sert qu'un fichier, il faut du réseau pour ouvrir la page.
+
 ## Données de la version de juin
 
 Au premier lancement, l'app reprend automatiquement ce qui avait été saisi dans l'ancienne version

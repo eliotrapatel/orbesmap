@@ -1,11 +1,14 @@
-// ORBES AI relay (Vercel function). Keeps the Anthropic key on the server and only answers
+// ORBES AI relay (Vercel function). Keeps the AI key on the server and only answers
 // members of the shared space (Supabase session + public.members check).
+// Provider: DeepSeek (DEEPSEEK_API_KEY, default when set) or Claude (ANTHROPIC_API_KEY). AI_PROVIDER forces one.
 // Tasks: "photo" (translate a photo), "interpret" (live interpreter), "place" (find a place from a link / text / screenshot).
 import Anthropic from "@anthropic-ai/sdk";
 
 const SUPA_URL = process.env.SUPABASE_URL || "https://ifugaqjneprbtigvegeb.supabase.co";
 const SUPA_KEY = process.env.SUPABASE_ANON_KEY || "sb_publishable_0qPu_8XZTLk-l68k2kPUvQ_7UXk-fCu";
 const MODEL = "claude-opus-5-5";
+const DS_URL = "https://api.deepseek.com";
+const DS_MODEL = "deepseek-flash"; // DeepSeek V4.1 Flash: text + images, JSON output, tool calls
 const ORIGINS = [/^https:\/\/(www\.)?theorbes\.com$/, /^https:\/\/orbesmap(-[a-z0-9-]+)?\.vercel\.app$/, /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/];
 
 type Json = Record<string, unknown>;
@@ -91,39 +94,222 @@ const PLACE_SYSTEM = `Tu retrouves un lieu à Shanghai (ou en Chine) à partir d
 - source : l'URL la plus fiable consultée.
 - Si le lien ne s'ouvre pas (ex. xhslink demande l'app) et qu'il n'y a pas d'autre indice, found = false et message explique quoi envoyer à la place (une capture d'écran du post).`;
 
-async function run(client: Anthropic, params: Json): Promise<Json> {
-  const messages = params.messages as Anthropic.Beta.BetaMessageParam[];
+type Job = {
+  task: "photo" | "interpret" | "place";
+  system: string;
+  text: string;
+  image?: string;
+  schema: Json;
+  effort: "low" | "medium";
+  research?: boolean;
+  maxTokens: number;
+};
+
+class Upstream extends Error {
+  kind: "busy" | "upstream" | "refusal" | "bad_output" | "bad_request";
+  constructor(kind: "busy" | "upstream" | "refusal" | "bad_output" | "bad_request") {
+    super(kind);
+    this.kind = kind;
+  }
+}
+
+// ---------------- Claude ----------------
+async function runClaude(client: Anthropic, job: Job): Promise<Json> {
+  const content: Anthropic.Beta.BetaContentBlockParam[] = [];
+  if (job.image) content.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: job.image } });
+  content.push({ type: "text", text: job.text });
+  const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content }];
   // server tools can pause a long turn: send it back so the server continues (max 3 times)
   for (let i = 0; i < 4; i++) {
-    const res = await client.beta.messages.create({
-      ...(params as object),
-      messages,
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
-    } as Anthropic.Beta.MessageCreateParamsNonStreaming);
+    let res: Anthropic.Beta.BetaMessage;
+    try {
+      res = await client.beta.messages.create({
+        model: MODEL,
+        max_tokens: job.maxTokens,
+        system: job.system,
+        output_config: { effort: job.effort, format: { type: "json_schema", schema: job.schema } },
+        ...(job.research
+          ? { tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 5 }, { type: "web_fetch_20260209", name: "web_fetch", max_uses: 4 }] }
+          : {}),
+        messages,
+        betas: ["server-side-fallback-2026-07-01"],
+        fallbacks: "default",
+      } as Anthropic.Beta.MessageCreateParamsNonStreaming);
+    } catch (e) {
+      if (e instanceof Anthropic.RateLimitError) throw new Upstream("busy");
+      throw new Upstream("upstream");
+    }
     if (res.stop_reason === "pause_turn") {
       messages.push({ role: "assistant", content: res.content });
       continue;
     }
-    if (res.stop_reason === "refusal") throw new Error("refusal");
-    if (res.stop_reason === "max_tokens") throw new Error("too_long");
+    if (res.stop_reason === "refusal") throw new Upstream("refusal");
     const text = res.content.filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text").map((b) => b.text).join("");
-    return JSON.parse(text);
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Upstream("bad_output");
+    }
   }
-  throw new Error("paused");
+  throw new Upstream("upstream");
+}
+
+// ---------------- DeepSeek (OpenAI-compatible chat completions) ----------------
+type DsMsg = { role: "system" | "user" | "assistant" | "tool"; content: unknown; tool_calls?: unknown; tool_call_id?: string; reasoning_content?: unknown };
+
+async function dsPost(path: string, body: unknown, key: string, f: typeof fetch, ms = 50_000): Promise<Json> {
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), ms);
+  try {
+    const r = await f(`${DS_URL}${path}`, { method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/json" }, body: JSON.stringify(body), signal: ctl.signal });
+    if (r.status === 429) throw new Upstream("busy");
+    if (r.status === 400) throw new Upstream("bad_request");
+    if (!r.ok) throw new Upstream("upstream");
+    return (await r.json()) as Json;
+  } catch (e) {
+    if (e instanceof Upstream) throw e;
+    throw new Upstream("upstream");
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+/** Example JSON built from the schema, shown to the model (DeepSeek JSON mode wants a format example). */
+function skeleton(s: Json): unknown {
+  if (s.enum) return (s.enum as unknown[])[0];
+  if (s.type === "object") return Object.fromEntries(Object.entries(s.properties as Record<string, Json>).map(([k, v]) => [k, skeleton(v)]));
+  if (s.type === "array") return [skeleton(s.items as Json)];
+  if (s.type === "number") return 0;
+  if (s.type === "boolean") return false;
+  return "";
+}
+/** Force the model's JSON into the exact shape the app expects (missing fields → empty values). */
+function coerce(s: Json, v: unknown): unknown {
+  if (s.enum) return (s.enum as unknown[]).includes(v) ? v : (s.enum as unknown[])[(s.enum as unknown[]).length - 1];
+  if (s.type === "object") {
+    const o = v && typeof v === "object" && !Array.isArray(v) ? (v as Json) : {};
+    return Object.fromEntries(Object.entries(s.properties as Record<string, Json>).map(([k, sub]) => [k, coerce(sub, o[k])]));
+  }
+  if (s.type === "array") return Array.isArray(v) ? v.slice(0, 80).map((x) => coerce(s.items as Json, x)) : [];
+  if (s.type === "number") {
+    const n = typeof v === "number" ? v : parseFloat(String(v ?? "").replace(",", "."));
+    return Number.isFinite(n) ? n : 0;
+  }
+  if (s.type === "boolean") return v === true || v === "true";
+  return v == null ? "" : String(v);
+}
+
+const DS_TOOLS = [
+  { type: "function", function: { name: "web_search", description: "Recherche web (moteur DeepSeek). Renvoie titres, liens et résumés.", parameters: { type: "object", properties: { query: { type: "string", description: "Requête, 128 caractères max ; opérateurs site: et lang: possibles" } }, required: ["query"] } } },
+  { type: "function", function: { name: "web_fetch", description: "Lit une page web et renvoie son texte en Markdown.", parameters: { type: "object", properties: { url: { type: "string" } }, required: ["url"] } } },
+];
+
+async function dsTool(name: string, args: Json, key: string, f: typeof fetch): Promise<string> {
+  try {
+    if (name === "web_search") {
+      const q = String(args.query || "").slice(0, 128).trim();
+      if (!q) return "requête vide";
+      const r = await dsPost("/v1/tools/search", { query: q, count: 6 }, key, f, 20_000);
+      const list = (r.results as Json[] | undefined) || [];
+      return JSON.stringify(list.map((x) => ({ title: x.title, url: x.url, summary: String(x.summary || x.snippet || "").slice(0, 700) })));
+    }
+    if (name === "web_fetch") {
+      const url = String(args.url || "");
+      if (!/^https?:\/\//.test(url)) return "URL invalide";
+      const r = await dsPost("/v1/tools/fetch", { url }, key, f, 25_000);
+      return `${r.title || ""}\n${String(r.content || "").slice(0, 12_000)}`;
+    }
+  } catch {
+    return "Échec de l'outil (page inaccessible ou limite atteinte).";
+  }
+  return "outil inconnu";
+}
+
+async function runDeepSeek(key: string, job: Job, f: typeof fetch): Promise<Json> {
+  const userContent: unknown = job.image
+    ? [{ type: "image_url", image_url: { url: `data:image/jpeg;base64,${job.image}` } }, { type: "text", text: job.text }]
+    : job.text;
+  let notes = "";
+  if (job.research) {
+    // phase 1: research with tools (search / fetch), max 6 rounds
+    const msgs: DsMsg[] = [
+      { role: "system", content: `${job.system}\nÉtape 1 : fais tes recherches avec les outils web_search et web_fetch, puis écris un résumé de ce que tu as trouvé (nom, nom chinois, adresses, coordonnées et leur source, horaires, URL de la meilleure source).` },
+      { role: "user", content: userContent },
+    ];
+    // fast mode first; if the API refuses tools without thinking, switch to thinking mode (low effort)
+    let thinking = false;
+    for (let round = 0; round < 6; round++) {
+      const req = (th: boolean) => dsPost("/chat/completions", { model: DS_MODEL, messages: msgs, tools: DS_TOOLS, max_tokens: 4000, ...(th ? { thinking: { type: "enabled" }, reasoning_effort: "low" } : { thinking: { type: "disabled" } }) }, key, f);
+      let r: Json;
+      try {
+        r = await req(thinking);
+      } catch (e) {
+        if (!(e instanceof Upstream && e.kind === "bad_request") || thinking || round > 0) throw e;
+        thinking = true;
+        r = await req(true);
+      }
+      const m = ((r.choices as Json[] | undefined)?.[0]?.message || {}) as Json;
+      const calls = (m.tool_calls as { id: string; function: { name: string; arguments: string } }[] | undefined) || [];
+      if (!calls.length) {
+        notes = String(m.content || "");
+        break;
+      }
+      // in thinking mode the reasoning must be sent back with the tool results
+      msgs.push({ role: "assistant", content: m.content ?? "", tool_calls: calls, ...(thinking && m.reasoning_content ? { reasoning_content: m.reasoning_content } : {}) });
+      const results = await Promise.all(
+        calls.slice(0, 4).map(async (c) => {
+          let args: Json = {};
+          try {
+            args = JSON.parse(c.function.arguments || "{}");
+          } catch {
+            /* bad arguments */
+          }
+          return { role: "tool" as const, tool_call_id: c.id, content: await dsTool(c.function.name, args, key, f) };
+        }),
+      );
+      // every tool call needs an answer, even the ones we skipped
+      for (const c of calls.slice(4)) results.push({ role: "tool", tool_call_id: c.id, content: "ignoré (trop d'appels)" });
+      msgs.push(...results);
+    }
+  }
+  // final answer in JSON mode (retry once: an unrecognised JSON comes back as blank text)
+  const system = `${job.system}\n\nRéponds UNIQUEMENT avec un objet json valide, exactement de cette forme (mêmes clés, mêmes types) :\n${JSON.stringify(skeleton(job.schema))}`;
+  const messages: DsMsg[] = [
+    { role: "system", content: system },
+    { role: "user", content: notes ? (job.image ? [{ type: "image_url", image_url: { url: `data:image/jpeg;base64,${job.image}` } }, { type: "text", text: `${job.text}\n\nRésultats de recherche :\n${notes}` }] : `${job.text}\n\nRésultats de recherche :\n${notes}`) : userContent },
+  ];
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const r = await dsPost("/chat/completions", { model: DS_MODEL, messages, response_format: { type: "json_object" }, thinking: { type: "disabled" }, max_tokens: job.maxTokens }, key, f);
+    const text = String(((r.choices as Json[] | undefined)?.[0]?.message as Json | undefined)?.content || "").trim();
+    if (!text) continue;
+    try {
+      return coerce(job.schema, JSON.parse(text)) as Json;
+    } catch {
+      /* retry */
+    }
+  }
+  throw new Upstream("bad_output");
 }
 
 const b64ok = (s: unknown): s is string => typeof s === "string" && s.length > 100 && s.length < 6_000_000 && /^[A-Za-z0-9+/=]+$/.test(s);
 
-export async function handle(req: Request, deps: { client?: Anthropic; member?: (t: string) => Promise<boolean> } = {}): Promise<Response> {
+type Deps = { client?: Anthropic; member?: (t: string) => Promise<boolean>; fetch?: typeof fetch; env?: Record<string, string | undefined> };
+
+export async function handle(req: Request, deps: Deps = {}): Promise<Response> {
   const origin = req.headers.get("origin");
+  const env = deps.env || process.env;
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(origin) });
   if (req.method !== "POST") return json({ error: "method" }, 405, origin);
   const token = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
   if (!token) return json({ error: "auth", message: "Connectez-vous dans l'onglet Compte pour utiliser cette fonction." }, 401, origin);
   if (!(await (deps.member || isMember)(token).catch(() => false)))
     return json({ error: "auth", message: "Ce compte n'a pas accès à l'espace partagé." }, 403, origin);
-  if (!deps.client && !process.env.ANTHROPIC_API_KEY) return json({ error: "config", message: "La clé Claude n'est pas encore configurée sur Vercel (ANTHROPIC_API_KEY)." }, 503, origin);
+
+  const dsKey = (env.DEEPSEEK_API_KEY || env.DEEPSEEK_KEY || "").trim();
+  const claudeKey = (env.ANTHROPIC_API_KEY || "").trim();
+  const forced = (env.AI_PROVIDER || "").toLowerCase();
+  const provider = forced === "claude" && (claudeKey || deps.client) ? "claude" : dsKey ? "deepseek" : claudeKey || deps.client ? "claude" : null;
+  if (!provider) return json({ error: "config", message: "La clé IA n'est pas configurée sur Vercel (DEEPSEEK_API_KEY)." }, 503, origin);
 
   let body: Json;
   try {
@@ -131,62 +317,35 @@ export async function handle(req: Request, deps: { client?: Anthropic; member?: 
   } catch {
     return json({ error: "bad", message: "Requête illisible." }, 400, origin);
   }
-  const client = deps.client || new Anthropic({ maxRetries: 1, timeout: 55_000 });
-  const fmt = (schema: unknown) => ({ type: "json_schema", schema });
+
+  let job: Job;
+  if (body.task === "photo") {
+    if (!b64ok(body.image)) return json({ error: "bad", message: "Image manquante ou trop lourde." }, 400, origin);
+    job = { task: "photo", system: PHOTO_SYSTEM, text: "Traduis et explique cette photo.", image: body.image, schema: PHOTO_SCHEMA, effort: "medium", maxTokens: 8000 };
+  } else if (body.task === "interpret") {
+    const text = String(body.text || "").slice(0, 2000).trim();
+    const from = body.from === "zh" ? "zh" : "fr";
+    if (!text) return json({ error: "bad", message: "Rien à traduire." }, 400, origin);
+    const history = Array.isArray(body.history) ? (body.history as { from: string; text: string; translation: string }[]).slice(-6) : [];
+    const ctx = history.length ? `Échanges précédents (contexte) :\n${history.map((h) => `${h.from === "zh" ? "Chinois" : "Français"} : ${String(h.text).slice(0, 300)} → ${String(h.translation).slice(0, 300)}`).join("\n")}\n\n` : "";
+    job = { task: "interpret", system: INTERPRET_SYSTEM, text: `${ctx}Traduis ${from === "fr" ? "du français vers le chinois" : "du chinois vers le français"} :\n${text}`, schema: INTERPRET_SCHEMA, effort: "low", maxTokens: 2000 };
+  } else if (body.task === "place") {
+    const url = typeof body.url === "string" ? body.url.slice(0, 1000) : "";
+    const text = typeof body.text === "string" ? body.text.slice(0, 3000) : "";
+    const image = b64ok(body.image) ? body.image : undefined;
+    if (!url && !text && !image) return json({ error: "bad", message: "Collez un lien, un texte ou ajoutez une capture." }, 400, origin);
+    job = { task: "place", system: PLACE_SYSTEM, text: `Retrouve ce lieu.${url ? `\nLien : ${url}` : ""}${text ? `\nTexte : ${text}` : ""}${image ? "\n(Capture d'écran jointe.)" : ""}`, image, schema: PLACE_SCHEMA, effort: "medium", research: true, maxTokens: 6000 };
+  } else return json({ error: "bad", message: "Tâche inconnue." }, 400, origin);
+
   try {
-    if (body.task === "photo") {
-      if (!b64ok(body.image)) return json({ error: "bad", message: "Image manquante ou trop lourde." }, 400, origin);
-      const out = await run(client, {
-        model: MODEL,
-        max_tokens: 8000,
-        system: PHOTO_SYSTEM,
-        output_config: { effort: "medium", format: fmt(PHOTO_SCHEMA) },
-        messages: [{ role: "user", content: [{ type: "image", source: { type: "base64", media_type: "image/jpeg", data: body.image } }, { type: "text", text: "Traduis et explique cette photo." }] }],
-      });
-      return json(out, 200, origin);
-    }
-    if (body.task === "interpret") {
-      const text = String(body.text || "").slice(0, 2000).trim();
-      const from = body.from === "zh" ? "zh" : "fr";
-      if (!text) return json({ error: "bad", message: "Rien à traduire." }, 400, origin);
-      const history = Array.isArray(body.history) ? (body.history as { from: string; text: string; translation: string }[]).slice(-6) : [];
-      const ctx = history.length ? `Échanges précédents (contexte) :\n${history.map((h) => `${h.from === "zh" ? "Chinois" : "Français"} : ${h.text} → ${h.translation}`).join("\n")}\n\n` : "";
-      const out = await run(client, {
-        model: MODEL,
-        max_tokens: 2000,
-        system: INTERPRET_SYSTEM,
-        output_config: { effort: "low", format: fmt(INTERPRET_SCHEMA) },
-        messages: [{ role: "user", content: `${ctx}Traduis ${from === "fr" ? "du français vers le chinois" : "du chinois vers le français"} :\n${text}` }],
-      });
-      return json(out, 200, origin);
-    }
-    if (body.task === "place") {
-      const url = typeof body.url === "string" ? body.url.slice(0, 1000) : "";
-      const text = typeof body.text === "string" ? body.text.slice(0, 3000) : "";
-      const content: Anthropic.Beta.BetaContentBlockParam[] = [];
-      if (b64ok(body.image)) content.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: body.image } });
-      content.push({ type: "text", text: `Retrouve ce lieu.${url ? `\nLien : ${url}` : ""}${text ? `\nTexte : ${text}` : ""}${content.length ? "\n(Capture d'écran jointe.)" : ""}` });
-      if (!url && !text && content.length < 2) return json({ error: "bad", message: "Collez un lien, un texte ou ajoutez une capture." }, 400, origin);
-      const out = await run(client, {
-        model: MODEL,
-        max_tokens: 8000,
-        system: PLACE_SYSTEM,
-        output_config: { effort: "medium", format: fmt(PLACE_SCHEMA) },
-        tools: [
-          { type: "web_search_20260209", name: "web_search", max_uses: 5 },
-          { type: "web_fetch_20260209", name: "web_fetch", max_uses: 4 },
-        ],
-        messages: [{ role: "user", content }],
-      });
-      return json(out, 200, origin);
-    }
-    return json({ error: "bad", message: "Tâche inconnue." }, 400, origin);
+    const out = provider === "deepseek" ? await runDeepSeek(dsKey, job, deps.fetch || fetch) : await runClaude(deps.client || new Anthropic({ apiKey: claudeKey, maxRetries: 1, timeout: 55_000 }), job);
+    return json(out, 200, origin);
   } catch (e) {
-    if (e instanceof Anthropic.RateLimitError) return json({ error: "busy", message: "Trop de demandes en même temps, réessayez dans une minute." }, 429, origin);
-    if (e instanceof Anthropic.APIError) return json({ error: "upstream", message: "Le service IA ne répond pas, réessayez." }, 502, origin);
-    const m = (e as Error)?.message;
-    if (m === "refusal") return json({ error: "refusal", message: "Cette demande n'a pas pu être traitée." }, 422, origin);
-    return json({ error: "server", message: "Réponse illisible, réessayez." }, 500, origin);
+    const k = e instanceof Upstream ? e.kind : "upstream";
+    if (k === "busy") return json({ error: "busy", message: "Trop de demandes en même temps, réessayez dans une minute." }, 429, origin);
+    if (k === "refusal") return json({ error: "refusal", message: "Cette demande n'a pas pu être traitée." }, 422, origin);
+    if (k === "bad_output") return json({ error: "server", message: "Réponse illisible, réessayez." }, 502, origin);
+    return json({ error: "upstream", message: "Le service IA ne répond pas, réessayez." }, 502, origin);
   }
 }
 
