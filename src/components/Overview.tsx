@@ -36,7 +36,7 @@ export default function Overview({ trip, states, onShowDay }: { trip: Trip; stat
         <div className="stat">
           <span className="label">Lieux</span>
           <b>{all.length}</b>
-          <small>{scheduledDays.length} jours programmés</small>
+          <small>{(all.length / nights).toFixed(1).replace(".", ",")} par jour en moyenne</small>
         </div>
         <div className="stat">
           <span className="label">Visités</span>
@@ -46,7 +46,7 @@ export default function Overview({ trip, states, onShowDay }: { trip: Trip; stat
         <div className="stat">
           <span className="label">Favoris</span>
           <b>{favs}</b>
-          <small>{(all.length / nights).toFixed(1)} lieux par jour</small>
+          <small>{favs ? `${favs - all.filter((p) => states[p.id]?.favorite && states[p.id]?.visited).length} encore à voir` : "Touchez l'étoile d'une fiche"}</small>
         </div>
       </div>
 

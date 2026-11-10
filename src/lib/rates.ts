@@ -1,4 +1,4 @@
-// Live EUR → CNY reference rate (European Central Bank via frankfurter.app), cached 6 h.
+// Live EUR → CNY reference rate (European Central Bank via frankfurter.dev), cached 6 h.
 import { useEffect, useState } from "react";
 
 const KEY = "orbes.rate.eurcny";
@@ -19,11 +19,12 @@ export function useLiveRate(): LiveRate | null {
     } catch {
       /* ignore */
     }
-    fetch("https://api.frankfurter.app/latest?from=EUR&to=CNY")
+    fetch("https://api.frankfurter.dev/v2/rates?base=EUR&quotes=CNY")
       .then((x) => (x.ok ? x.json() : Promise.reject(x.status)))
       .then((j) => {
-        if (!j?.rates?.CNY) return;
-        const data = { rate: j.rates.CNY as number, date: j.date as string };
+        const row = Array.isArray(j) ? j[0] : j?.rates?.CNY ? { rate: j.rates.CNY, date: j.date } : null;
+        if (!row?.rate) return;
+        const data = { rate: Number(row.rate), date: String(row.date) };
         setR(data);
         try {
           localStorage.setItem(KEY, JSON.stringify({ at: Date.now(), data }));

@@ -4,7 +4,7 @@ import type { Place, Trip } from "../data/types";
 import type { Pin } from "../lib/model";
 import { ICube, ILocate, IPin, IPinPlus, ISearch, ISpeaker } from "./Icons";
 import { TOOLS, type ToolKey } from "./TopBar";
-import { Portal, speak } from "./ui";
+import { Portal, speak, useEscape } from "./ui";
 
 type Item = { id: string; section: string; title: string; sub?: string; icon: React.ReactNode; run: () => void; text: string };
 
@@ -22,7 +22,9 @@ export default function CommandPalette(p: {
   onToggle3D: () => void;
   onLocate: () => void;
   onAddPin: () => void;
+  onZone: (center: [number, number], zoom: number) => void;
 }) {
+  useEscape(p.onClose);
   const [q, setQ] = useState("");
   const [i, setI] = useState(0);
   const list = useRef<HTMLDivElement>(null);
@@ -35,6 +37,7 @@ export default function CommandPalette(p: {
     }
     for (const pin of p.pins) out.push({ id: "pin:" + pin.id, section: "Mes lieux", title: pin.name, sub: pin.note, icon: <span className="ic"><IPin /></span>, run: () => p.onPin(pin), text: norm(pin.name + " " + (pin.note || "")) });
     for (const d of p.trip.days) out.push({ id: "d:" + d.key, section: "Jours", title: d.title, sub: d.theme, icon: <span className="ic dot" style={{ ["--c" as string]: d.color }}>{d.glyph}</span>, run: () => p.onDay(d.key), text: norm(d.title + " " + d.short + " " + (d.theme || "")) });
+    for (const z of p.trip.zones) out.push({ id: "z:" + z.label, section: "Zones", title: z.label, sub: "Centrer la carte", icon: <span className="ic"><ILocate /></span>, run: () => p.onZone(z.center, z.zoom), text: norm("zone quartier ville " + z.label) });
     for (const t of TOOLS) out.push({ id: "t:" + t.key, section: "Outils", title: t.label, icon: <span className="ic">{t.icon}</span>, run: () => p.onTool(t.key), text: norm(t.label + " " + t.key) });
     out.push({ id: "a:3d", section: "Actions", title: "Bâtiments en 3D", sub: "Activer ou couper la vue 3D", icon: <span className="ic"><ICube /></span>, run: p.onToggle3D, text: norm("3d batiments relief vue") });
     out.push({ id: "a:loc", section: "Actions", title: "Ma position", icon: <span className="ic"><ILocate /></span>, run: p.onLocate, text: norm("ma position localisation gps ou suis je") });
@@ -46,7 +49,7 @@ export default function CommandPalette(p: {
 
   const qq = norm(q.trim());
   const shown = useMemo(() => {
-    if (!qq) return items.filter((x) => x.section === "Outils" || x.section === "Jours" || x.section === "Actions" || x.section === "Voyages");
+    if (!qq) return items.filter((x) => x.section === "Outils" || x.section === "Jours" || x.section === "Zones" || x.section === "Actions" || x.section === "Voyages");
     const words = qq.split(/\s+/);
     return items
       .map((x) => ({ x, score: words.every((w) => x.text.includes(w) || norm(x.title).includes(w)) ? (norm(x.title).startsWith(words[0]) ? 2 : 1) : 0 }))
@@ -83,7 +86,6 @@ export default function CommandPalette(p: {
                 if (e.key === "ArrowDown") { e.preventDefault(); setI((x) => Math.min(shown.length - 1, x + 1)); }
                 else if (e.key === "ArrowUp") { e.preventDefault(); setI((x) => Math.max(0, x - 1)); }
                 else if (e.key === "Enter") { e.preventDefault(); run(shown[i]); }
-                else if (e.key === "Escape") p.onClose();
               }}
               aria-activedescendant={shown[i] ? "cmdk-" + i : undefined}
             />

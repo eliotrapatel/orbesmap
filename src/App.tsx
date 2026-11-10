@@ -43,9 +43,19 @@ export default function App() {
   const desktop = useDesktop();
   const trip = useTrip();
   const data = useStore((s) => s.data);
-  const [landing, setLanding] = useState(true);
+  // landing shown when the app is opened (not on every reload of the same session)
+  const firstOpen = (() => {
+    try {
+      return !sessionStorage.getItem("orbes.entered");
+    } catch {
+      return true;
+    }
+  })();
+  const [landing, setLanding] = useState(firstOpen);
   // the landing overlay stays mounted a little longer than the landing map mode, for its fade-out
-  const [landingOverlay, setLandingOverlay] = useState(true);
+  const [landingOverlay, setLandingOverlay] = useState(firstOpen);
+  const [landingKey, setLandingKey] = useState(0);
+  const overlayTimer = useRef<number | undefined>(undefined);
   const [day, setDay] = useState("all");
   const [filter, setFilter] = useState<Filter>({ types: new Set(), fav: false, todo: false });
   const [sel, setSel] = useState<Sel>(null);
@@ -88,8 +98,13 @@ export default function App() {
     return boundsOf(core.length ? core : trip.places);
   }, [trip]);
 
+  useEffect(() => {
+    if (!firstOpen) fly({ bounds: tripBounds(), pitch: 0, duration: 0 });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // reset view state when the trip changes
   useEffect(() => {
+    setSnap("peek");
     setDay("all");
     setSel(null);
     setRoute(null);
@@ -117,11 +132,24 @@ export default function App() {
 
   // ---- layout ----
   const rightOpen = Boolean(sel || tool);
+  const vw = typeof window !== "undefined" ? window.innerWidth : 1200;
+  const toolWide = TOOLS.find((t) => t.key === tool)?.wide;
+  const rightW = !rightOpen ? 0 : tool ? Math.min(toolWide ? 860 : 560, vw - 372 - 48) : 440;
   const peekPx = 172;
-  const snapPx: Record<Snap, number> = { peek: peekPx, half: Math.round(vh * 0.52), full: vh - 140 };
-  const padding = desktop
-    ? { top: 130, bottom: 30, left: 372 + 36, right: rightOpen ? 440 + 36 : 70 }
-    : { top: 170, bottom: rightOpen ? Math.round(vh * 0.55) : snapPx[snap], left: 20, right: 20 };
+  const sheetFull = vh - 72; // mobile sheet height (viewport minus top bar)
+  const snapPx: Record<Snap, number> = { peek: peekPx, half: Math.round(vh * 0.52), full: sheetFull };
+  const DETAIL_VH = 0.64;
+  const rawPad = desktop
+    ? { top: 130, bottom: 30, left: 372 + 36, right: rightOpen ? rightW + 36 : 70 }
+    : { top: 170, bottom: rightOpen ? Math.round(vh * DETAIL_VH) : snapPx[snap], left: 20, right: 20 };
+  // insets can never eat the whole map (fitBounds would do nothing)
+  const fitAxis = (a: number, b: number, size: number) => {
+    const max = Math.max(0, size - 150);
+    return a + b <= max ? [a, b] : [Math.round((a * max) / (a + b)), Math.round((b * max) / (a + b))];
+  };
+  const [pt, pb] = fitAxis(rawPad.top, rawPad.bottom, vh);
+  const [pl, pr] = fitAxis(rawPad.left, rawPad.right, vw);
+  const padding = { top: pt, bottom: pb, left: pl, right: pr };
 
   // ---- actions ----
   const openPlace = useCallback(
@@ -139,6 +167,7 @@ export default function App() {
       setSel(null);
       if (d === "all") {
         setRoute(null);
+        if (!desktop) setSnap("peek");
         fly({ bounds: tripBounds() });
         return;
       }
@@ -252,10 +281,14 @@ export default function App() {
   const selectedPlace = sel?.kind === "place" ? trip.places.find((p) => p.id === sel.id) : undefined;
   const selectedPin = sel?.kind === "pin" ? data.pins.find((p) => p.id === sel.id) : undefined;
   const toolDef = TOOLS.find((t) => t.key === tool);
-  const mobileSheet = desktop ? undefined : "88%";
+  const detailSheet = desktop ? undefined : `${Math.round(DETAIL_VH * 100)}vh`;
+  const toolSheet = desktop ? undefined : `${sheetFull}px`;
 
   return (
-    <div className={"app" + (desktop && rightOpen ? " desk-right" : "")} style={{ ["--sheet-peek" as string]: `${desktop ? 0 : snapPx[snap]}px` }}>
+    <div
+      className={"app" + (desktop && rightOpen ? " desk-right" : "")}
+      style={{ ["--sheet-peek" as string]: `${desktop ? 0 : snapPx[snap]}px`, ["--right-w" as string]: `${rightW}px`, ["--sheet-hidden" as string]: `${desktop ? 0 : Math.max(0, sheetFull - snapPx[snap])}px` } as React.CSSProperties}
+    >
       <MapView
         trip={trip}
         places={trip.places}
@@ -308,6 +341,8 @@ export default function App() {
               setSel(null);
               setTool(null);
               setThreeD(false);
+              window.clearTimeout(overlayTimer.current);
+              setLandingKey((k) => k + 1);
               setLanding(true);
               setLandingOverlay(true);
             }}
@@ -343,11 +378,11 @@ export default function App() {
             </div>
           </aside>
 
-          {selectedPlace && !tool && <PlaceDetail key={selectedPlace.id} trip={trip} place={selectedPlace} onBack={() => setSel(null)} sheetH={mobileSheet} />}
-          {selectedPin && !tool && <PinDetail key={selectedPin.id} pin={selectedPin} onBack={() => setSel(null)} sheetH={mobileSheet} />}
+          {selectedPlace && !tool && <PlaceDetail key={selectedPlace.id} trip={trip} place={selectedPlace} onBack={() => setSel(null)} sheetH={detailSheet} />}
+          {selectedPin && !tool && <PinDetail key={selectedPin.id} pin={selectedPin} onBack={() => setSel(null)} sheetH={detailSheet} />}
 
           {toolDef && (
-            <Drawer kicker={trip.code} title={toolDef.key === "converter" ? "Convertisseur" : toolDef.label} wide={toolDef.wide} onClose={() => setTool(null)} sheetH={mobileSheet}>
+            <Drawer kicker={trip.code} title={toolDef.key === "converter" ? "Convertisseur" : toolDef.label} wide={toolDef.wide} onClose={() => setTool(null)} sheetH={toolSheet}>
               {tool === "overview" && (
                 <Overview
                   trip={trip}
@@ -416,11 +451,18 @@ export default function App() {
 
       {landingOverlay && (
         <Landing
+          key={landingKey}
           trip={trip}
           onPick={switchTrip}
           onEnter={() => {
             setLanding(false);
-            window.setTimeout(() => setLandingOverlay(false), 900);
+            try {
+              sessionStorage.setItem("orbes.entered", "1");
+            } catch {
+              /* ignore */
+            }
+            window.clearTimeout(overlayTimer.current);
+            overlayTimer.current = window.setTimeout(() => setLandingOverlay(false), 900);
             fly({ bounds: tripBounds(), pitch: 0, duration: 2600 });
           }}
         />
@@ -437,9 +479,13 @@ export default function App() {
             setTool(null);
             fly({ center: [p.lng, p.lat], zoom: 15 });
           }}
-          onTool={openTool}
+          onTool={(k) => {
+            setTool(k);
+            setSel(null);
+          }}
           onTrip={switchTrip}
           onDay={showDay}
+          onZone={(center, zoom) => fly({ center, zoom })}
           onToggle3D={() => setThreeD((v) => !v)}
           onLocate={toggleLocate}
           onAddPin={() => setPinMode(true)}

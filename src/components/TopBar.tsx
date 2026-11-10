@@ -6,6 +6,7 @@ import { useWeather } from "../lib/weather";
 import { useSyncState } from "./Account";
 import { ICal, IChat, IChevron, IDownload, IGrid, IInfo, IPlane, ISearch, IUser, ICheck } from "./Icons";
 import { WxIcon } from "./WxIcon";
+import { useEscape } from "./ui";
 
 export type ToolKey = "overview" | "agenda" | "phrases" | "converter" | "flights" | "practical" | "export" | "account";
 
@@ -31,15 +32,11 @@ function useNow(ms = 30_000) {
 
 export function TripMenu({ trip, onPick, onClose, anchor }: { trip: Trip; onPick: (id: string) => void; onClose: () => void; anchor: DOMRect | null }) {
   const ref = useRef<HTMLDivElement>(null);
+  useEscape(onClose);
   useEffect(() => {
     const f = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && onClose();
-    const k = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     setTimeout(() => document.addEventListener("mousedown", f), 0);
-    window.addEventListener("keydown", k);
-    return () => {
-      document.removeEventListener("mousedown", f);
-      window.removeEventListener("keydown", k);
-    };
+    return () => document.removeEventListener("mousedown", f);
   }, [onClose]);
   return (
     <div ref={ref} className="menu glass" role="menu" style={{ top: (anchor?.bottom ?? 60) + 8, left: Math.max(8, Math.min(anchor?.left ?? 12, window.innerWidth - 316)) }}>

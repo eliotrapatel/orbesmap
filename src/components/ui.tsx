@@ -6,12 +6,26 @@ import { IClose, ISpeaker } from "./Icons";
 /** Overlays are rendered in <body> so they are never trapped inside a transformed panel */
 export const Portal = ({ children }: { children: ReactNode }) => createPortal(children, document.body);
 
-function useEscape(onClose: () => void) {
+// Escape closes only the topmost overlay
+const escStack: (() => void)[] = [];
+if (typeof window !== "undefined") {
+  window.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || e.defaultPrevented || !escStack.length) return;
+    e.preventDefault();
+    escStack[escStack.length - 1]();
+  });
+}
+export function useEscape(onClose: () => void) {
+  const ref = useRef(onClose);
+  ref.current = onClose;
   useEffect(() => {
-    const k = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", k);
-    return () => window.removeEventListener("keydown", k);
-  }, [onClose]);
+    const h = () => ref.current();
+    escStack.push(h);
+    return () => {
+      const i = escStack.lastIndexOf(h);
+      if (i >= 0) escStack.splice(i, 1);
+    };
+  }, []);
 }
 
 export function Modal({ title, intro, onClose, children }: { title: string; intro?: string; onClose: () => void; children: ReactNode }) {
@@ -125,7 +139,12 @@ export function SavedInput({ value, onSave, multiline, ...rest }: { value: strin
     onFocus: () => (focused.current = true),
     onBlur: () => {
       focused.current = false;
-      commit(v);
+      if (v !== last.current) commit(v);
+      else if (value !== last.current) {
+        // a newer value arrived from another device while typing nothing new: show it
+        setV(value);
+        last.current = value;
+      }
     },
     ...rest,
   };

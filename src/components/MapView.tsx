@@ -138,8 +138,8 @@ export default function MapView(p: Props) {
       window.clearInterval(retry);
       retry = window.setInterval(() => navigator.onLine && tryAgain(), 30_000);
     };
-    // slow networks: tell the user after 12 s but keep loading
-    const slow = window.setTimeout(() => !styled && cb.current.onBasemapError(true), 12_000);
+    // a style request that hangs: switch to the plain background after 15 s; retries bring the real map back
+    const slow = window.setTimeout(() => !styled && fallBack(), 15_000);
 
     const addLayers = () => {
       if (!map.getSource("route")) {
@@ -214,18 +214,23 @@ export default function MapView(p: Props) {
 
   // --- camera insets: keep markers centred in the visible part of the map ---
   useEffect(() => {
-    mapRef.current?.setPadding(p.padding);
+    const map = mapRef.current;
+    if (!map) return;
+    // never stop a running flight: apply the new insets once it ends
+    if (map.isMoving()) map.once("moveend", () => map.setPadding(cb.current.padding));
+    else map.easeTo({ padding: p.padding, duration: 300 });
   }, [p.padding.top, p.padding.bottom, p.padding.left, p.padding.right]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- place markers (rebuilt when the trip changes) ---
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const keep = new Set(p.places.map((x) => x.id));
+    const key = (id: string) => `${p.trip.id}:${id}`;
+    const keep = new Set(p.places.map((x) => key(x.id)));
     for (const [id, e] of markers.current) if (!keep.has(id)) { e.m.remove(); markers.current.delete(id); }
     const seq = new Map((p.route || []).map((x, i) => [x.id, i + 1]));
     p.places.forEach((place, i) => {
-      let entry = markers.current.get(place.id);
+      let entry = markers.current.get(key(place.id));
       if (!entry) {
         // MapLibre moves the outer element with a CSS transform; the visual lives in an inner node.
         const wrap = document.createElement("div");
@@ -246,8 +251,9 @@ export default function MapView(p: Props) {
         });
         const m = new maplibregl.Marker({ element: wrap }).setLngLat([place.lng, place.lat]).addTo(map);
         entry = { m, node };
-        markers.current.set(place.id, entry);
+        markers.current.set(key(place.id), entry);
       }
+      entry.m.setLngLat([place.lng, place.lat]);
       const s = p.states[place.id] || {};
       const hotel = place.type === "hotel";
       const sel = p.selected?.kind === "place" && p.selected.id === place.id;
@@ -329,7 +335,7 @@ export default function MapView(p: Props) {
     const src = map.getSource("route") as GeoJSONSource | undefined;
     if (!src) return;
     const h = p.trip.hotel;
-    const coords = p.route && p.route.length > 1 && !p.landing ? [[h.lng, h.lat], ...p.route.map((x) => [x.lng, x.lat])] : [];
+    const coords = p.route && p.route.length >= 1 && !p.landing ? [[h.lng, h.lat], ...p.route.map((x) => [x.lng, x.lat])] : [];
     src.setData({ type: "FeatureCollection", features: coords.length ? [{ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: coords } }] : [] });
     try {
       map.setPaintProperty("route", "line-color", p.routeColor);
@@ -363,29 +369,44 @@ export default function MapView(p: Props) {
     arcSrc.setData({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: line } });
     const mid = line[Math.floor(line.length / 2)];
     map.jumpTo({ center: [mid[0] + 8, mid[1] - 6], zoom: window.innerWidth < 700 ? 1.25 : 1.9, pitch: 0 });
+    const handlers = [map.dragPan, map.scrollZoom, map.touchZoomRotate, map.doubleClickZoom, map.keyboard];
+    handlers.forEach((h) => h.disable());
     let raf = 0;
     const t0 = performance.now();
+    let last = t0;
+    let lastPlane = 0;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const tick = (t: number) => {
-      const f = ((t - t0) / 6000) % 1;
-      const pt = line[Math.floor(f * (line.length - 1))];
-      planeSrc.setData({ type: "Feature", properties: {}, geometry: { type: "Point", coordinates: pt } });
-      if (!reduce) {
-        const c = map.getCenter();
-        map.setCenter([c.lng + 0.012, c.lat]);
+      if (t - lastPlane > 40) {
+        lastPlane = t;
+        const f = ((t - t0) / 6000) % 1;
+        planeSrc.setData({ type: "Feature", properties: {}, geometry: { type: "Point", coordinates: line[Math.floor(f * (line.length - 1))] } });
       }
+      if (!reduce && !map.isMoving()) {
+        const c = map.getCenter();
+        map.setCenter([c.lng + ((t - last) / 1000) * 0.7, c.lat]); // 0.7° per second
+      }
+      last = t;
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      handlers.forEach((h) => h.enable());
+      map.touchZoomRotate.disableRotation();
+    };
   }, [p.landing, p.trip, ready]);
 
   // --- 3D buildings ---
+  const prev3D = useRef(false);
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready || !map.getLayer("orbes-3d")) return;
     map.setLayoutProperty("orbes-3d", "visibility", p.threeD ? "visible" : "none");
-    map.easeTo({ pitch: p.threeD ? 58 : 0, zoom: p.threeD ? Math.max(map.getZoom(), 15) : map.getZoom(), duration: 900 });
+    if (p.threeD !== prev3D.current) {
+      prev3D.current = p.threeD;
+      map.easeTo({ pitch: p.threeD ? 58 : 0, zoom: p.threeD ? Math.max(map.getZoom(), 15) : map.getZoom(), duration: 900 });
+    }
   }, [p.threeD, ready]);
 
   // --- camera requests ---
@@ -394,6 +415,7 @@ export default function MapView(p: Props) {
     if (!map || !p.focus) return;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const duration = reduce ? 0 : p.focus.duration ?? 1100;
+    map.setPadding(p.padding); // final insets, even if a padding animation was running
     if (p.focus.bounds) map.fitBounds(p.focus.bounds, { padding: 48, maxZoom: 14.5, duration, pitch: p.focus.pitch ?? map.getPitch() });
     else if (p.focus.center) map.flyTo({ center: p.focus.center, zoom: p.focus.zoom ?? Math.max(map.getZoom(), 14), duration, essential: true, pitch: p.focus.pitch ?? map.getPitch() });
   }, [p.focus?.n]); // eslint-disable-line react-hooks/exhaustive-deps

@@ -3,6 +3,7 @@ import { formatMinutes, km, travelMinutes } from "../lib/geo";
 import { exportIcs } from "../lib/ics";
 import type { PlaceState } from "../lib/model";
 import { dayStops, isHotel, stopTime } from "../lib/plan";
+import { plural } from "../lib/fmt";
 import { fmtDay, fmtMin, localDate } from "../lib/time";
 import { ICalPlus, IMap, IRoute } from "./Icons";
 
@@ -48,7 +49,7 @@ export default function Agenda({ trip, states, onOpen, onShowDay, onOptimize }: 
                     {isToday && <span className="pill live">Aujourd'hui</span>}
                   </h4>
                   <p>
-                    {d.theme}. {stops.length} lieux · {v}/{stops.length} visités · ~{formatMinutes(total)} de trajet ({Math.round(dist)} km)
+                    {d.theme}. {plural(stops.length, "lieu", "lieux")} · {v}/{stops.length} {v <= 1 ? "visité" : "visités"} · ~{formatMinutes(total)} de trajet ({Math.round(dist)} km)
                   </p>
                 </div>
               </div>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { TRIPS } from "../data/trip";
 import type { Trip } from "../data/types";
 import { countable } from "../lib/plan";
@@ -22,8 +22,12 @@ export default function Landing({ trip, onPick, onEnter }: { trip: Trip; onPick:
     const t = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(t);
   }, []);
+  const entered = useRef(false);
   useEffect(() => {
-    const k = (e: KeyboardEvent) => e.key === "Enter" && !out && enter();
+    const k = (e: KeyboardEvent) => {
+      if (e.key !== "Enter" || (e.target as HTMLElement).closest?.("button,input,textarea,a")) return;
+      enter();
+    };
     window.addEventListener("keydown", k);
     return () => window.removeEventListener("keydown", k);
   });
@@ -31,6 +35,8 @@ export default function Landing({ trip, onPick, onEnter }: { trip: Trip; onPick:
   const target = ph === "before" ? tripStartMs(trip) : tripEndMs(trip);
   const cd = countdownParts(target, now);
   const enter = () => {
+    if (entered.current) return;
+    entered.current = true;
     setOut(true);
     onEnter();
   };
@@ -51,7 +57,7 @@ export default function Landing({ trip, onPick, onEnter }: { trip: Trip; onPick:
         <h1 className="l-title" key={trip.id}>{trip.title}</h1>
         <div className="l-sub">
           <span><b>{trip.places.length}</b> lieux</span>
-          <span><b>{days}</b> jours sur place</span>
+          <span><b>{days}</b> {days <= 1 ? "jour" : "jours"} sur place</span>
           <span>Hôtel <b>{trip.hotel.name}</b></span>
           {trip.flights.map((f) => <span key={f.code}><b>{f.code}</b> {f.from} → {f.to}</span>)}
         </div>

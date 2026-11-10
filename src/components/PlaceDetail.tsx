@@ -102,6 +102,16 @@ export default function PlaceDetail({ trip, place, onBack, sheetH }: { trip: Tri
           </div>
         )}
 
+        {hotel && (
+          <div className="sec">
+            <span className="label">Séjour</span>
+            <label className="field">
+              <span>Rendez-vous, navette, check-in</span>
+              <SavedInput value={state.appt || ""} placeholder="ex. voiture 8h45 devant l'hôtel" onSave={(v) => updatePlace(place.id, { appt: v })} />
+            </label>
+          </div>
+        )}
+
         {supplier && (
           <div className="sec">
             <span className="label">Fiche fournisseur</span>
