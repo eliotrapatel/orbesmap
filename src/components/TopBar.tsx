@@ -7,6 +7,8 @@ import { useSyncState } from "./Account";
 import { ICal, IChat, IChevron, IDownload, IGrid, IInfo, IPlane, ISearch, IUser, ICheck, ITranslate, IChecklist, ISos, IAsk } from "./Icons";
 import { WxIcon } from "./WxIcon";
 import { useChecklist } from "./Checklist";
+import { useStore } from "../lib/store";
+import { supabaseConfigured } from "../lib/supabase";
 import { useEscape } from "./ui";
 
 export type ToolKey = "overview" | "agenda" | "ask" | "translate" | "phrases" | "converter" | "checklist" | "flights" | "practical" | "emergency" | "export" | "account";
@@ -63,6 +65,34 @@ export function TripMenu({ trip, onPick, onClose, anchor }: { trip: Trip; onPick
   );
 }
 
+/** Always-visible sync state: is everything saved and shared? Tap opens Compte. */
+function SyncPill({ onOpen }: { onOpen: () => void }) {
+  const sync = useSyncState();
+  const pending = useStore((s) => s.pending);
+  const syncedAt = useStore((s) => s.syncedAt);
+  const now = useNow(30_000).getTime();
+  if (!supabaseConfigured) return null;
+  const ago = syncedAt ? Math.max(0, Math.round((now - syncedAt) / 60000)) : null;
+  const agoTxt = ago == null ? "" : ago < 1 ? "à l'instant" : ago < 60 ? `il y a ${ago} min` : `il y a ${Math.round(ago / 60)} h`;
+  const s =
+    sync === "local"
+      ? { tone: "off", short: "Local", long: "Sur ce téléphone seulement (pas connecté)" }
+      : sync === "denied"
+        ? { tone: "bad", short: "Accès refusé", long: "Ce compte n'a pas accès à l'espace partagé" }
+        : sync === "syncing"
+          ? { tone: "busy", short: "Synchro…", long: "Synchronisation en cours…" }
+          : sync === "pending" || sync === "error" || pending > 0
+            ? { tone: "warn", short: pending ? `En attente (${pending})` : "Nouvel essai…", long: pending ? `${pending} modification${pending > 1 ? "s" : ""} en attente d'envoi (réseau)` : "Envoi en attente, nouvel essai automatique" }
+            : { tone: "ok", short: "À jour", long: `Synchronisé${agoTxt ? ` ${agoTxt}` : ""}` };
+  return (
+    <button className={"sync-pill " + s.tone} onClick={onOpen} title={s.long} aria-label={`${s.long}. Ouvrir Compte`}>
+      <i />
+      <span className="sp-short">{s.short}</span>
+      <span className="sp-long">{s.long}</span>
+    </button>
+  );
+}
+
 export default function TopBar({ trip, tool, onTool, onSearch, onTrip, onHome }: { trip: Trip; tool: ToolKey | null; onTool: (k: ToolKey) => void; onSearch: () => void; onTrip: (id: string) => void; onHome: () => void }) {
   const [menu, setMenu] = useState<DOMRect | null>(null);
   const now = useNow();
@@ -91,6 +121,7 @@ export default function TopBar({ trip, tool, onTool, onSearch, onTrip, onHome }:
             <span className="label">{trip.code}</span>
             <IChevron />
           </button>
+          <SyncPill onOpen={() => onTool("account")} />
         </div>
         <button className="tb-search" onClick={onSearch} aria-label="Rechercher">
           <ISearch />

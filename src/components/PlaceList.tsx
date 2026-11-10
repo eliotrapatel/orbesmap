@@ -6,6 +6,7 @@ import { countable, isHotel, nextStop } from "../lib/plan";
 import { fmtMin, phase } from "../lib/time";
 import { km } from "../lib/geo";
 import { liveStatus } from "../lib/hours";
+import { notesText } from "../lib/notes";
 import { fmtDistance } from "../lib/route";
 import { useLoc } from "../lib/locate";
 import { IStar, IStarFill } from "./Icons";
@@ -41,7 +42,7 @@ export default function PlaceList({ trip, places, states, pins, selectedId, quer
     ? [{ day: { key: "near", title: "Autour de moi", theme: "Du plus proche au plus loin", color: "#5aa7ff", glyph: "•" } as Trip["days"][number], items: places.filter((p) => !isHotel(trip, p)).sort((a, b) => dist(a)! - dist(b)!) }]
     : trip.days.map((d) => ({ day: d, items: places.filter((p) => p.day === d.key) })).filter((g) => g.items.length);
   const q = query.trim().toLowerCase();
-  const pinItems = pins.filter((p) => !q || p.name.toLowerCase().includes(q) || (p.note || "").toLowerCase().includes(q));
+  const pinItems = pins.filter((p) => !q || p.name.toLowerCase().includes(q) || notesText((states as Record<string, Record<string, unknown>>)[`_pin:${p.id}`], p.note).toLowerCase().includes(q));
   const types = [...new Set(trip.places.map((p) => p.type))].filter((t) => t !== "hotel" && t !== "transport");
   const ph = phase(trip);
   const nx = ph !== "after" ? nextStop(trip, states) : null;

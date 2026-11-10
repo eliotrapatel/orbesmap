@@ -1,3 +1,4 @@
+import { notesText } from "./notes";
 // Calendar export (.ics) of the day-by-day programme, readable by Apple/Google Calendar.
 import type { Trip } from "../data/types";
 import type { PlaceState } from "./model";
@@ -16,7 +17,7 @@ export function exportIcs(trip: Trip, states: Record<string, PlaceState>) {
     for (const p of dayStops(trip, day.key, states)) {
       const t = stopTime(p, states);
       const s = states[p.id] || {};
-      const desc = [p.cn, p.address, p.metro, s.appt ? `RDV : ${s.appt}` : "", p.tip || "", s.note || ""].filter(Boolean).join("\n");
+      const desc = [p.cn, p.address, p.metro, s.appt ? `RDV : ${s.appt}` : "", p.tip || "", notesText(s as Record<string, unknown>, undefined, "\n")].filter(Boolean).join("\n");
       lines.push("BEGIN:VEVENT", `UID:${trip.id}-${p.id}@orbes`, `DTSTAMP:${stamp}`);
       if (t != null) {
         const end = t + 90;

@@ -43,6 +43,8 @@ interface State {
   photoUrls: Record<string, string>;
   /** number of changes waiting to be sent */
   pending: number;
+  /** last time everything was sent and received (ms) */
+  syncedAt: number | null;
 }
 
 // ---------- toasts (queued until the UI subscribes) ----------
@@ -171,6 +173,7 @@ let state: State = {
   sync: supabase ? "idle" : "local",
   photoUrls: {},
   pending: 0,
+  syncedAt: null,
 };
 let outbox: Op[] = readJSON<Op[]>(OUTBOX_KEY) || [];
 state.pending = outbox.length;
@@ -325,7 +328,7 @@ function flush(fromPull = false): Promise<void> {
   if (flushing) return flushing;
   flushing = (async () => {
     if (!outbox.length) {
-      if (state.sync !== "idle") set({ sync: "idle" });
+      if (state.sync !== "idle") set({ sync: "idle", syncedAt: Date.now() });
       return;
     }
     set({ sync: "syncing" });
@@ -337,7 +340,7 @@ function flush(fromPull = false): Promise<void> {
         doneDuringPull?.add(opKey(op) + (op.t.endsWith("-del") ? ":del" : ""));
         persistOutbox();
       }
-      set({ sync: "idle" });
+      set({ sync: "idle", syncedAt: Date.now() });
     } catch (e) {
       console.warn("[orbes] sync failed, will retry", e);
       set({ sync: navigator.onLine ? "error" : "pending" });
@@ -520,7 +523,7 @@ export async function pull() {
 
     toPush.forEach(enqueue);
     await loadPhotoUrls();
-    if (!outbox.length) set({ sync: "idle" });
+    if (!outbox.length) set({ sync: "idle", syncedAt: Date.now() });
   } catch (e) {
     console.warn("[orbes] pull failed", e);
     set({ sync: navigator.onLine ? "error" : "pending" });

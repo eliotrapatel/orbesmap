@@ -8,6 +8,7 @@ import { checkVisit, hoursLine, liveStatus } from "./hours";
 import type { Data, Settings } from "./model";
 import { stopTime } from "./plan";
 import type { Wx } from "./weather";
+import { notesOf } from "./notes";
 
 const MAX_STABLE = 350_000; // the relay accepts 400 000 characters; long texts are shortened only beyond this
 
@@ -26,6 +27,16 @@ function readJSON<T>(key: string): T | null {
   } catch {
     return null;
   }
+}
+
+/** { "Eliot": "…", "Papa": "…", "commune (Papa)": "…" } — one entry per author */
+function noteMap(rec: Record<string, unknown>, legacyText: string | undefined, cap: number): Record<string, string> | undefined {
+  const out: Record<string, string> = {};
+  for (const n of notesOf(rec, null, legacyText)) {
+    if (!n.text.trim()) continue;
+    out[n.legacy ? (n.name ? `commune (dernière modif. ${n.name})` : "commune (auteur inconnu)") : n.name] = txt(n.text, cap);
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 
 function tripBlock(trip: Trip, data: Data, detailed: boolean, cap: number) {
@@ -47,8 +58,7 @@ function tripBlock(trip: Trip, data: Data, detailed: boolean, cap: number) {
       note_sur_5: s.rating || undefined,
       favori: s.favorite || undefined,
       visite: s.visited || undefined,
-      notes: s.note ? txt(s.note, cap) : undefined,
-      notes_ecrites_par: s.note ? (s.noteBy as string) || "auteur non enregistré" : undefined,
+      notes: noteMap(s, undefined, cap),
       fournisseur: drop({ moq: s.moq, prix: s.price, delai: s.lead, echantillon: s.sample }),
       contacts: contacts.filter((c) => c.placeId === p.id).map((c) => drop({ nom: c.name, appli: c.kind === "wc" ? "WeChat" : "WhatsApp", id: c.value, message: c.message })),
       photos: photos.filter((x) => x.placeId === p.id).length || undefined,
@@ -84,8 +94,7 @@ function tripBlock(trip: Trip, data: Data, detailed: boolean, cap: number) {
       horaires: x.hours,
       prix: x.price,
       source: x.source,
-      notes: p.note ? txt(p.note, cap) : undefined,
-      notes_ecrites_par: p.note ? (x.noteBy as string) || "auteur non enregistré" : undefined,
+      notes: noteMap(x, p.note, cap),
       contacts: contacts.filter((c) => c.placeId === p.id).map((c) => drop({ nom: c.name, appli: c.kind === "wc" ? "WeChat" : "WhatsApp", id: c.value })),
     });
   });

@@ -4,19 +4,22 @@ import { amapDirections, googleDirections } from "../lib/geo";
 import type { Pin } from "../lib/model";
 import { currentAuthor, deletePin, toast, updatePin, updateRecord, useStore } from "../lib/store";
 import { IBack, ICopy, IExpand, INav, IPin, ISpeaker, ITrash } from "./Icons";
-import { Modal, SavedInput, ShowScreen, copy, speak } from "./ui";
+import { Modal, SavedInput, ShowScreen, copy, speak, useEscape, useSheetDrag } from "./ui";
+import Notes from "./Notes";
 import { GoBlock } from "./Nav";
 import type { Mode } from "../lib/route";
 
 export default function PinDetail({ trip, pin, onBack, onGo, sheetH }: { trip: Trip; pin: Pin; onBack: () => void; onGo: (m: Mode) => void; sheetH?: string }) {
   const coords = `${pin.lat.toFixed(5)}, ${pin.lng.toFixed(5)}`;
+  useEscape(onBack);
+  const sheet = useSheetDrag(onBack);
   const x = (useStore((s) => s.data.places[`_pin:${pin.id}`]) || {}) as Record<string, string>;
   const [show, setShow] = useState(false);
   const zh = [x.nameCn, x.addressCn].filter(Boolean).join("\n");
   const days = trip.days.filter((d) => d.key !== "base");
   return (
-    <section className="detail glass" style={{ ["--c" as string]: "#f6f2ea", ...(sheetH ? { ["--sheet-h" as string]: sheetH } : {}) }} aria-label={pin.name}>
-      <div className="sheet-grip" data-grip aria-hidden="true" />
+    <section ref={sheet.ref} className={"detail glass" + (sheet.full ? " sheet-full" : "")} style={{ ["--c" as string]: "#f6f2ea", ...(sheetH ? { ["--sheet-h" as string]: sheetH } : {}) }} aria-label={pin.name}>
+      <div className="sheet-grip" data-grip {...sheet.handlers} role="button" aria-label="Glisser vers le bas pour fermer, vers le haut pour agrandir" />
       <div className="detail-scroll scroll" style={{ flex: 1, minHeight: 0, paddingBottom: 28 }}>
         <header className="detail-hero">
           <div className="detail-actions">
@@ -64,10 +67,17 @@ export default function PinDetail({ trip, pin, onBack, onGo, sheetH }: { trip: T
           <span className="label">Nom</span>
           <SavedInput value={pin.name} onSave={(v) => v.trim() && updatePin(pin.id, { name: v.trim() })} />
         </div>
-        <div className="sec">
-          <span className="label">Notes</span>
-          <SavedInput multiline value={pin.note || ""} placeholder="Stand, contact, prix…" onSave={(v) => { updatePin(pin.id, { note: v }); updateRecord(`_pin:${pin.id}`, { noteBy: currentAuthor() }); }} />
-        </div>
+        <Notes
+          rec={x as Record<string, unknown>}
+          legacyText={pin.note}
+          placeholder="Stand, contact, prix…"
+          onSave={(key, v) => {
+            if (key === "note") {
+              updatePin(pin.id, { note: v });
+              updateRecord(`_pin:${pin.id}`, { noteBy: currentAuthor() });
+            } else updateRecord(`_pin:${pin.id}`, { [key]: v });
+          }}
+        />
       </div>
       {show && <ShowScreen zh={zh} sub={x.address || pin.name} onClose={() => setShow(false)} />}
     </section>

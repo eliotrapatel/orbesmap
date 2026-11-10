@@ -55,21 +55,19 @@ async function cachedFetch(url: string, signal?: AbortSignal): Promise<Response>
     if (res.ok) cache.put(key, res.clone()).catch(() => {});
     return res;
   }
-  // style and tile index: fresh when the network answers quickly, else the stored copy
+  // style and tile index: the stored copy right away (no waiting on a filtered hotel Wi-Fi),
+  // refreshed in the background for next time; without a copy, wait for the network (no time limit)
   const hit = await cache.match(key);
-  try {
-    // with a stored copy: give the network 5 s; without one: no time limit (a slow eSIM must not leave the map empty)
-    const res = await fetchWithTimeout(url, hit ? 5000 : 0, signal);
-    if (res.ok) {
-      cache.put(key, res.clone()).catch(() => {});
-      return res;
-    }
-    if (hit) return hit;
-    return res;
-  } catch (e) {
-    if (hit) return hit;
-    throw e;
+  if (hit) {
+    fetchWithTimeout(url, 15000)
+      .then((res) => (res.ok ? cache.put(key, res) : undefined))
+      .catch(() => {});
+    return hit;
   }
+  return fetchWithTimeout(url, 0, signal).then((res) => {
+    if (res.ok) cache.put(key, res.clone()).catch(() => {});
+    return res;
+  });
 }
 
 let registered = false;

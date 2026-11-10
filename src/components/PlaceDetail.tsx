@@ -4,14 +4,17 @@ import type { Place, Trip } from "../data/types";
 import { amapDirections, formatMinutes, googleDirections, travelMinutes } from "../lib/geo";
 import { isHotel, stopTime } from "../lib/plan";
 import { checkVisit, hoursLine, liveStatus } from "../lib/hours";
-import { addContact, addPhoto, currentAuthor, deleteContact, deletePhoto, photoSrc, toast, updatePlace, useStore } from "../lib/store";
+import { addContact, addPhoto, currentAuthor, deleteContact, deletePhoto, photoSrc, toast, updatePlace, updateRecord, useStore } from "../lib/store";
+import Notes from "./Notes";
 import { IBack, ICamera, ICheck, IClock, IClose, ICopy, IExpand, IGlobe, INav, IPin, IPlus, ISpeaker, IStar, ITrain, ITrash } from "./Icons";
-import { Lightbox, Modal, SavedInput, ShowScreen, compressImage, copy, speak } from "./ui";
+import { Lightbox, Modal, SavedInput, ShowScreen, compressImage, copy, speak, useEscape, useSheetDrag } from "./ui";
 import { GoBlock } from "./Nav";
 import type { Mode } from "../lib/route";
 
 export default function PlaceDetail({ trip, place, onBack, onGo, sheetH }: { trip: Trip; place: Place; onBack: () => void; onGo: (m: Mode) => void; sheetH?: string }) {
   const state = useStore((s) => s.data.places[place.id]) || {};
+  useEscape(onBack);
+  const sheet = useSheetDrag(onBack);
   const allContacts = useStore((s) => s.data.contacts);
   const allPhotos = useStore((s) => s.data.photos);
   useStore((s) => s.photoUrls);
@@ -42,8 +45,8 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH }: { tri
   };
 
   return (
-    <section className="detail glass" style={{ ["--c" as string]: color, ...(sheetH ? { ["--sheet-h" as string]: sheetH } : {}) }} aria-label={place.name}>
-      <div className="sheet-grip" data-grip aria-hidden="true" />
+    <section ref={sheet.ref} className={"detail glass" + (sheet.full ? " sheet-full" : "")} style={{ ["--c" as string]: color, ...(sheetH ? { ["--sheet-h" as string]: sheetH } : {}) }} aria-label={place.name}>
+      <div className="sheet-grip" data-grip {...sheet.handlers} role="button" aria-label="Glisser vers le bas pour fermer, vers le haut pour agrandir" />
       <div className="detail-scroll scroll" style={{ flex: 1, minHeight: 0, paddingBottom: 28 }}>
         <header className="detail-hero">
           <div className="detail-actions">
@@ -162,10 +165,11 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH }: { tri
           </div>
         </div>
 
-        <div className="sec">
-          <span className="label">Notes</span>
-          <SavedInput multiline value={state.note || ""} placeholder="Ce que vous avez vu, les prix, les impressions…" onSave={(v) => updatePlace(place.id, { note: v, ...({ noteBy: currentAuthor() } as object) })} />
-        </div>
+        <Notes
+          rec={state as Record<string, unknown>}
+          placeholder="Ce que vous avez vu, les prix, les impressions…"
+          onSave={(key, v) => updateRecord(place.id, key === "note" ? { note: v, noteBy: currentAuthor() } : { [key]: v })}
+        />
 
         <div className="sec">
           <span className="label">Photos</span>

@@ -1,3 +1,4 @@
+import { notesText } from "./notes";
 import { STATUSES, TYPE_LABEL } from "../data/trip";
 import type { Trip } from "../data/types";
 import type { Data } from "./model";
@@ -12,7 +13,7 @@ export function exportCsv(trip: Trip, d: Data) {
     for (const p of trip.places.filter((x) => x.day === day.key)) {
       const s = d.places[p.id] || {};
       const contacts = d.contacts.filter((c) => c.placeId === p.id).map((c) => `${c.name} (${c.kind === "wa" ? "WhatsApp" : "WeChat"} ${c.value})`).join(" | ");
-      rows.push([day.title, p.name, TYPE_LABEL[p.type] || p.type, statusLabel(s.status), s.rating || "", s.moq || "", s.price || "", s.lead || "", s.sample || "", s.appt || "", p.time, p.address, p.cn, p.metro || "", p.website || "", (s.note || "").replace(/\n/g, " "), contacts, s.visited ? "Oui" : "", s.favorite ? "Oui" : "", p.lat, p.lng]);
+      rows.push([day.title, p.name, TYPE_LABEL[p.type] || p.type, statusLabel(s.status), s.rating || "", s.moq || "", s.price || "", s.lead || "", s.sample || "", s.appt || "", p.time, p.address, p.cn, p.metro || "", p.website || "", notesText(s as Record<string, unknown>).replace(/\n/g, " "), contacts, s.visited ? "Oui" : "", s.favorite ? "Oui" : "", p.lat, p.lng]);
     }
   }
   for (const pin of d.pins) rows.push(["Mes lieux", pin.name, "Lieu ajouté", "", "", "", "", "", "", "", "", "", "", "", "", pin.note || "", "", "", "", pin.lat, pin.lng]);
@@ -50,7 +51,8 @@ export function exportPdf(trip: Trip, d: Data): boolean {
       h += `<div class="m">${esc(p.address)} — <span class="cn">${esc(p.cn)}</span></div>`;
       const cs = d.contacts.filter((c) => c.placeId === p.id);
       if (cs.length) h += `<div>Contacts : ${cs.map((c) => esc(`${c.name} (${c.kind === "wa" ? "WhatsApp" : "WeChat"} ${c.value})`)).join(", ")}</div>`;
-      if (s.note) h += `<div><b>Notes :</b> ${esc(s.note).replace(/\n/g, "<br>")}</div>`;
+      const nt = notesText(s as Record<string, unknown>, undefined, "\n");
+      if (nt) h += `<div><b>Notes :</b> ${esc(nt).replace(/\n/g, "<br>")}</div>`;
       h += `</div>`;
     }
   }

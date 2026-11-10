@@ -6,13 +6,41 @@ import { IClose, ISpeaker } from "./Icons";
 /** Overlays are rendered in <body> so they are never trapped inside a transformed panel */
 export const Portal = ({ children }: { children: ReactNode }) => createPortal(children, document.body);
 
-// Escape closes only the topmost overlay
+// Escape — and the browser / iPhone "back" gesture — close only the topmost overlay (sheet, tool, dialog)
 const escStack: (() => void)[] = [];
+// one history entry stands for "an overlay is open": back closes the top overlay instead of leaving the app
+let hasEntry = false;
+let swallow = 0;
+let syncTimer: number | undefined;
+function syncHistory() {
+  window.clearTimeout(syncTimer);
+  // after React has mounted / unmounted (switching from one tool to another must not touch history)
+  syncTimer = window.setTimeout(() => {
+    if (escStack.length && !hasEntry) {
+      history.pushState({ ...(history.state || {}), orbesOverlay: true }, "");
+      hasEntry = true;
+    } else if (!escStack.length && hasEntry) {
+      hasEntry = false;
+      swallow++;
+      history.back();
+    }
+  }, 0);
+}
 if (typeof window !== "undefined") {
   window.addEventListener("keydown", (e) => {
     if (e.key !== "Escape" || e.defaultPrevented || !escStack.length) return;
     e.preventDefault();
     escStack[escStack.length - 1]();
+  });
+  window.addEventListener("popstate", () => {
+    if (swallow) {
+      swallow--;
+      return;
+    }
+    if (!hasEntry) return;
+    hasEntry = false;
+    escStack[escStack.length - 1]?.();
+    syncHistory(); // still another overlay open: a new entry for the next "back"
   });
 }
 export function useEscape(onClose: () => void) {
@@ -21,9 +49,11 @@ export function useEscape(onClose: () => void) {
   useEffect(() => {
     const h = () => ref.current();
     escStack.push(h);
+    syncHistory();
     return () => {
       const i = escStack.lastIndexOf(h);
       if (i >= 0) escStack.splice(i, 1);
+      syncHistory();
     };
   }, []);
 }
@@ -186,12 +216,70 @@ export function compressImage(file: File, max = 1600, quality = 0.8): Promise<Bl
   });
 }
 
+/** Mobile bottom sheets: drag the grip (or a tool's header) down to close, up to open full height. */
+export function useSheetDrag(onClose: () => void) {
+  const ref = useRef<HTMLElement>(null);
+  const [full, setFull] = useState(false);
+  const drag = useRef<{ y0: number; t0: number; dy: number } | null>(null);
+  const mobile = () => window.matchMedia("(max-width: 899px)").matches;
+  const handlers = {
+    onPointerDown: (e: React.PointerEvent) => {
+      if (!mobile() || (e.target as HTMLElement).closest("button,a,input,textarea,select")) return;
+      drag.current = { y0: e.clientY, t0: performance.now(), dy: 0 };
+      try {
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      } catch {
+        /* pointer already gone */
+      }
+      if (ref.current) ref.current.style.transition = "none";
+    },
+    onPointerMove: (e: React.PointerEvent) => {
+      const d = drag.current;
+      if (!d || !ref.current) return;
+      d.dy = e.clientY - d.y0;
+      // follows the finger downwards; upwards only a hint (it snaps to full height on release)
+      ref.current.style.transform = `translateY(${d.dy > 0 ? d.dy : d.dy / 4}px)`;
+    },
+    onPointerUp: () => {
+      const d = drag.current;
+      drag.current = null;
+      const el = ref.current;
+      if (!d || !el) return;
+      const v = d.dy / Math.max(1, performance.now() - d.t0);
+      el.style.transition = "transform 0.22s var(--ease)";
+      if (d.dy > 90 || (d.dy > 24 && v > 0.6)) {
+        el.style.transform = "translateY(100%)";
+        window.setTimeout(onClose, 180);
+        return;
+      }
+      el.style.transform = "";
+      if (d.dy < -50) setFull(true);
+      else if (d.dy > 40 && full) setFull(false);
+    },
+    onPointerCancel: () => {
+      drag.current = null;
+      if (ref.current) {
+        ref.current.style.transition = "transform 0.22s var(--ease)";
+        ref.current.style.transform = "";
+      }
+    },
+  };
+  return { ref, full, handlers };
+}
+
 /** Glass drawer used by every tool (desktop: right column, mobile: bottom sheet) */
 export function Drawer({ kicker, title, onClose, wide, children, sheetH, actions }: { kicker?: string; title: string; onClose: () => void; wide?: boolean; children: ReactNode; sheetH?: string; actions?: ReactNode }) {
   useEscape(onClose);
+  const sheet = useSheetDrag(onClose);
   return (
-    <section className={"drawer glass" + (wide ? " wide" : "")} style={sheetH ? ({ ["--sheet-h" as string]: sheetH } as React.CSSProperties) : undefined} aria-label={title}>
-      <div className="drawer-head">
+    <section
+      ref={sheet.ref}
+      className={"drawer glass" + (wide ? " wide" : "") + (sheet.full ? " sheet-full" : "")}
+      style={sheetH ? ({ ["--sheet-h" as string]: sheetH } as React.CSSProperties) : undefined}
+      aria-label={title}
+    >
+      <div className="sheet-grip" {...sheet.handlers} role="button" aria-label="Glisser vers le bas pour fermer, vers le haut pour agrandir" />
+      <div className="drawer-head" {...sheet.handlers}>
         <div>
           {kicker && <span className="label">{kicker}</span>}
           <h3>{title}</h3>
