@@ -3,9 +3,12 @@ import type { Place, PlaceType, Trip } from "../data/types";
 import type { Pin, PlaceState } from "../lib/model";
 import { countable, isHotel, nextStop } from "../lib/plan";
 import { fmtMin, phase } from "../lib/time";
+import { km } from "../lib/geo";
+import { fmtDistance } from "../lib/route";
+import { useLoc } from "../lib/locate";
 import { IStar, IStarFill } from "./Icons";
 
-export type Filter = { types: Set<PlaceType>; fav: boolean; todo: boolean };
+export type Filter = { types: Set<PlaceType>; fav: boolean; todo: boolean; near?: boolean };
 
 interface Props {
   trip: Trip;
@@ -23,7 +26,13 @@ interface Props {
 export default function PlaceList({ trip, places, states, pins, selectedId, query, filter, onFilter, onOpen, onOpenPin }: Props) {
   const all = countable(trip);
   const visited = all.filter((p) => states[p.id]?.visited).length;
-  const groups = trip.days.map((d) => ({ day: d, items: places.filter((p) => p.day === d.key) })).filter((g) => g.items.length);
+  const fix = useLoc((s) => s.fix);
+  const dist = (p: { lat: number; lng: number }) => (fix ? km(fix, p) * 1000 : null);
+  const near = !!(filter.near && fix);
+  const dayOf = (k: string) => trip.days.find((d) => d.key === k)!;
+  const groups = near
+    ? [{ day: { key: "near", title: "Autour de moi", theme: "Du plus proche au plus loin", color: "#5aa7ff", glyph: "•" } as Trip["days"][number], items: places.filter((p) => !isHotel(trip, p)).sort((a, b) => dist(a)! - dist(b)!) }]
+    : trip.days.map((d) => ({ day: d, items: places.filter((p) => p.day === d.key) })).filter((g) => g.items.length);
   const q = query.trim().toLowerCase();
   const pinItems = pins.filter((p) => !q || p.name.toLowerCase().includes(q) || (p.note || "").toLowerCase().includes(q));
   const types = [...new Set(trip.places.map((p) => p.type))].filter((t) => t !== "hotel" && t !== "transport");
@@ -49,6 +58,11 @@ export default function PlaceList({ trip, places, states, pins, selectedId, quer
         </button>
       )}
       <div className="filters" role="group" aria-label="Filtres">
+        {fix && (
+          <button className={"fchip" + (filter.near ? " on" : "")} aria-pressed={!!filter.near} onClick={() => onFilter({ ...filter, near: !filter.near })}>
+            Autour de moi
+          </button>
+        )}
         <button className={"fchip" + (filter.fav ? " on" : "")} aria-pressed={filter.fav} onClick={() => onFilter({ ...filter, fav: !filter.fav })}>
           <IStar /> Favoris
         </button>
@@ -88,10 +102,12 @@ export default function PlaceList({ trip, places, states, pins, selectedId, quer
             const s = states[p.id];
             const st = s?.status && s.status !== "todo" ? STATUSES.find((x) => x.key === s.status) : null;
             const hotel = isHotel(trip, p);
+            const pd = near ? dayOf(p.day) : day;
+            const d = dist(p);
             return (
               <button key={p.id} className={"row" + (selectedId === p.id ? " on" : "")} onClick={() => onOpen(p)} aria-current={selectedId === p.id || undefined}>
-                <span className={"mk" + (hotel ? " mk-hotel" : "") + (s?.visited && !hotel ? " is-visited" : "")} style={{ ["--c" as string]: day.color, width: hotel ? 28 : 24, height: hotel ? 28 : 24 }}>
-                  {hotel ? "H" : day.glyph}
+                <span className={"mk" + (hotel ? " mk-hotel" : "") + (s?.visited && !hotel ? " is-visited" : "")} style={{ ["--c" as string]: pd.color, width: hotel ? 28 : 24, height: hotel ? 28 : 24 }}>
+                  {hotel ? "H" : pd.glyph}
                 </span>
                 <span className="row-main">
                   <span className="row-name">{p.name}</span>
@@ -100,6 +116,7 @@ export default function PlaceList({ trip, places, states, pins, selectedId, quer
                 <span className="row-tags">
                   {s?.favorite && <IStarFill aria-label="Favori" />}
                   {st && <span className="sdot" title={st.label} style={{ ["--c" as string]: st.color }} />}
+                  {d != null && <span className="row-dist">{fmtDistance(d)}</span>}
                 </span>
               </button>
             );
@@ -123,6 +140,7 @@ export default function PlaceList({ trip, places, states, pins, selectedId, quer
                 <span className="row-name">{pin.name}</span>
                 {pin.note && <span className="row-meta">{pin.note}</span>}
               </span>
+              {fix && <span className="row-tags"><span className="row-dist">{fmtDistance(dist(pin)!)}</span></span>}
             </button>
           ))}
         </section>

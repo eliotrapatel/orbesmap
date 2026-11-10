@@ -1,0 +1,300 @@
+{
+ "days": [
+  {
+   "date": "2026-11-24",
+   "title": "Arrivée",
+   "theme": "Atterrissage à Pudong T1 à 19h, taxi vers Caohejing (Xuhui), check-in vers 21h. Soirée libre.",
+   "stops": [
+    {
+     "id": "pvg-t1",
+     "time": "Mar. 24 : atterrissage 19h00 (AF116), hôtel vers 21h · Dim. 29 : départ de l'hôtel 18h30, vol AF111 à 22h15",
+     "why": "Compter 45 min pour l'immigration et les bagages, puis 50 à 70 min de taxi ou DiDi jusqu'au Renaissance Caohejing. Ensuite, room service ou un verre au bar de l'hôtel, sans plus : à 21h, aucune adresse du programme n'est ouverte ni assez proche. Au retour, l'enregistrement de l'AF111 ferme vers 21h15."
+    }
+   ]
+  },
+  {
+   "date": "2026-11-25",
+   "title": "Tailleur, vieille ville, art du Bund",
+   "theme": "Tout à l'est, sans aller-retour : South Bund → jardin Yu → Fosun → Fuzhou Road → Huqiu Road (Rockbund, Perrotin) → les quais au coucher du soleil. Début à 10h à cause du décalage horaire.",
+   "stops": [
+    {
+     "id": "southbund-fabric",
+     "time": "Mer. 25 10h–11h (commande) · sam. 28 9h30–10h (essayage) · dim. 29 9h30–10h (retrait)",
+     "why": "On commande dès le premier matin pour avoir 4 jours avant le départ. L'essayage du samedi est sur la route de Pudong, le retrait du dimanche sur celle du West Bund. Ouvert tous les jours de 9h à 18h, week-end compris (éviter 12h-14h). Départ de l'hôtel vers 9h20."
+    },
+    {
+     "id": "yu-garden-city-god",
+     "time": "11h15–12h20",
+     "why": "Lieu emblématique, à 10 min du marché. Ouvert du mardi au dimanche de 9h à 16h30 (fermé le lundi) : le mercredi convient."
+    },
+    {
+     "id": "fosun-foundation",
+     "time": "12h25–13h10",
+     "why": "Lieu d'art au Bund Finance Center, à 600 m du jardin Yu. Ouvert du mardi au dimanche de 10h à 18h."
+    },
+    {
+     "id": "lao-zheng-xing",
+     "time": "Déjeuner 13h30–14h40",
+     "why": "Cuisine shanghaïenne classique, sur Fuzhou Road, en route vers le nord du Bund. Ouvert midi et soir tous les jours, mais les horaires précis ne sont pas publiés."
+    },
+    {
+     "id": "rockbund-art-museum",
+     "time": "14h55–15h50",
+     "why": "Priorité art. Ouvert du mercredi au dimanche de 11h à 18h (le mardi est réservé aux membres) : le mercredi est le premier jour possible."
+    },
+    {
+     "id": "perrotin-shanghai",
+     "time": "15h50–16h25",
+     "why": "Galerie au 27 Huqiu Road, à 50 m du Rockbund. Ouverte du mardi au samedi seulement : c'est le seul jour du séjour qui tombe sur le trajet."
+    },
+    {
+     "id": "bund-waitan",
+     "time": "16h25–16h40 à pied · illuminations à partir de 18h",
+     "why": "Courte promenade sur les quais jusqu'au Peace Hotel, juste avant le coucher du soleil (16h50)."
+    },
+    {
+     "id": "terrace-915-peace-hotel",
+     "time": "16h40–17h50 (coucher du soleil 16h50)",
+     "why": "Verre au crépuscule face à Pudong. Ouvert du lundi au jeudi de 15h à 22h : le mercredi convient."
+    },
+    {
+     "id": "canton-table",
+     "time": "Dîner 18h15",
+     "why": "Cantonais au 5e étage de Three on the Bund, à 5 min à pied, avec vue sur Pudong illuminé. Service tous les jours de 17h30 à 21h30. Retour à l'hôtel assez tôt : le TGV part jeudi matin."
+    }
+   ]
+  },
+  {
+   "date": "2026-11-26",
+   "title": "Suzhou",
+   "theme": "TGV depuis Hongqiao (à 20 min de l'hôtel) : jardins classiques et musée d'I.M. Pei. Retour par la gare de Shanghai pour Fotografiska, puis dîner végétarien étoilé.",
+   "stops": [
+    {
+     "id": "hongqiao-hsr",
+     "time": "Départ de l'hôtel 7h10 · TGV aller ~7h45 depuis Hongqiao · retour ~16h30 de Suzhou vers la gare de Shanghai (pas Hongqiao), arrivée ~17h",
+     "why": "Un jour de semaine, comme demandé. Le TGV de 7h45 laisse une heure de sommeil de plus après le premier jour. Le retour vers la gare de Shanghai place le dîner et Fotografiska à 2 km. Billets à acheter avec le passeport."
+    },
+    {
+     "id": "suzhou-humble-administrator",
+     "time": "8h45–10h15",
+     "why": "Ouvert tous les jours de 7h30 à 17h après le 15 novembre. Le matin, on passe avant les groupes."
+    },
+    {
+     "id": "suzhou-museum-pei",
+     "time": "10h30–12h (créneau réservé)",
+     "why": "Grand musée et architecture d'I.M. Pei, à 200 m du jardin. Ouvert du mardi au dimanche de 9h à 17h (fermé le lundi), réservation obligatoire. Déjeuner libre ensuite vers Pingjiang Lu : aucune adresse du programme à Suzhou."
+    },
+    {
+     "id": "lingering-garden",
+     "time": "14h–15h30",
+     "why": "Ouvert tous les jours de 7h30 à 17h (dernière entrée 16h30). Taxi direct vers la gare de Suzhou ensuite."
+    },
+    {
+     "id": "fotografiska-shanghai",
+     "time": "17h30–18h45",
+     "why": "Ouvert tous les jours de 10h30 à 23h, au bord de la Suzhou Creek, à 2 km de la gare de Shanghai. Ce créneau évite une visite en nocturne après une longue journée."
+    },
+    {
+     "id": "fu-he-hui",
+     "time": "Dîner 19h15",
+     "why": "Restaurant végétarien étoilé, à Changning (Yuyuan Road), sur la route de l'hôtel. Service du soir tous les jours de 17h30 à 21h : réserver pour 19h15."
+    }
+   ]
+  },
+  {
+   "date": "2026-11-27",
+   "title": "Concept stores, puis soirée à Fuxing Lu",
+   "theme": "Concession française (Wukang → Anfu → Fumin → Huaihai) puis Jing'an (Zhangyuan, The Louis, rue des montres). Le soir, trois bars à moins de 300 m les uns des autres sur Fuxing Lu.",
+   "stops": [
+    {
+     "id": "wukang-road",
+     "time": "9h45–10h05",
+     "why": "Le point de la Concession le plus proche de l'hôtel. Wukang Mansion se regarde de l'extérieur, donc ça se fait avant l'ouverture des boutiques."
+    },
+    {
+     "id": "ffc-anfu-hengshan-walk",
+     "time": "10h05–11h15",
+     "why": "Balade dans la continuité de Wukang Lu, par Anfu Lu et ses boutiques (ouvertes vers 10h)."
+    },
+    {
+     "id": "labelhood-pillar",
+     "time": "11h30–12h15",
+     "why": "Concept store de designers chinois, la priorité n°1. Ouvert tous les jours de 10h à 22h."
+    },
+    {
+     "id": "lei-garden-xuhui",
+     "time": "Déjeuner 12h30–13h45",
+     "why": "Dim sum à l'iapm (Huaihai), juste à côté de Songmont et de HAUS NOWHERE. Ouvert midi et soir tous les jours."
+    },
+    {
+     "id": "songmont-huaihai",
+     "time": "13h50–14h20",
+     "why": "Maroquinerie chinoise premium. Ouvert tous les jours de 10h à 22h."
+    },
+    {
+     "id": "haus-nowhere",
+     "time": "14h20–14h50",
+     "why": "Concept store et design (Gentle Monster), dans le même pâté de maisons. Ouvert tous les jours de 10h à 22h."
+    },
+    {
+     "id": "zhangyuan",
+     "time": "15h10–16h",
+     "why": "Lilong restauré, boutiques de concept et de luxe. Allées en accès libre, boutiques de 10h à 22h."
+    },
+    {
+     "id": "lv-the-louis",
+     "time": "16h10–16h50 (créneau « My LV »)",
+     "why": "Inspiration luxe à HKRI Taikoo Hui, à 5 min de Zhangyuan. Ouvert tous les jours de 10h à 22h, sur réservation dans le mini-programme My LV. Si c'est fermé, le flagship Shanghai Watch (996 West Nanjing Road) prend le créneau."
+    },
+    {
+     "id": "nanjing-west-watch-row",
+     "time": "16h55–17h45",
+     "why": "Montres : les boutiques sont au 1033–1181 West Nanjing Road, à pied depuis The Louis. Ouvert tous les jours de 10h à 22h. Le flagship Shanghai Watch est au 996, au bout de la rue, à ajouter si on a le temps."
+    },
+    {
+     "id": "coa-shanghai",
+     "time": "Dîner 18h45 (taqueria) · mezcaleria ensuite",
+     "why": "Début de la soirée du vendredi sur Fuxing Lu, à 15 min de taxi de Nanjing West. Ouvert tous les soirs, horaires précis non confirmés."
+    },
+    {
+     "id": "speak-low",
+     "time": "20h30–21h30",
+     "why": "Bar mythique, en face de Coa (579 Fuxing Lu). Ouvert tous les soirs, horaires à vérifier sur @speaklow_shanghai."
+    },
+    {
+     "id": "bar-leone-shanghai",
+     "time": "21h45–23h30",
+     "why": "Bar à cocktails de référence, aux Sinan Mansions. Ouvert tous les jours de 18h à 1h. Pour finir plus tard : Heim ou INS Land (onglet Sorties), qui ouvrent le vendredi."
+    }
+   ]
+  },
+  {
+   "date": "2026-11-28",
+   "title": "Pudong, puis Columbia Circle et Taian Table",
+   "theme": "Essayage à South Bund sur la route du tunnel, musée de Shanghai Est (Huamu), Lujiazui et Shanghai Tower au coucher du soleil, puis Changning pour les concept stores et le dîner.",
+   "stops": [
+    {
+     "id": "shanghai-museum-east",
+     "time": "10h30–12h45 (après l'essayage au tailleur, 9h30–10h)",
+     "why": "Grand musée, ouvert de 10h à 18h (dernière entrée 17h) et fermé le MARDI seulement : le samedi convient. Il est à Huamu (Century Avenue), à 25-30 min de South Bund."
+    },
+    {
+     "id": "ifc-mall-shanghai",
+     "time": "Déjeuner 13h10–14h15",
+     "why": "À 10 min en taxi du musée, au pied du MAP. Choisir une table dans le mall, où sont aussi les boutiques de montres et de luxe. Ouvert tous les jours de 10h à 22h."
+    },
+    {
+     "id": "museum-of-art-pudong",
+     "time": "14h20–15h25",
+     "why": "Lieu d'art au bord du fleuve, à pied depuis l'IFC. Ouvert de 10h à 21h (dernière entrée 20h)."
+    },
+    {
+     "id": "shanghai-tower-118",
+     "time": "15h40–17h (coucher du soleil 16h50)",
+     "why": "Lieu emblématique, ouvert tous les jours de 8h30 à 22h. Partir au plus tard à 17h10 : le trajet vers Changning prend 45 à 60 min un samedi (le métro ligne 2 est plus sûr)."
+    },
+    {
+     "id": "maison-dongliang",
+     "time": "18h15–18h55",
+     "why": "Concept store (WYSH, 168 Wuyi Lu), à 1,5 km de Taian Table. Ouvert tous les jours de 10h à 22h."
+    },
+    {
+     "id": "columbia-circle",
+     "time": "18h55–19h20",
+     "why": "Lieu de design, à deux rues de Maison Dongliang, accessible et éclairé le soir. À sauter si on est en retard."
+    },
+    {
+     "id": "taian-table",
+     "time": "Dîner 19h40 (arrivées entre 18h et 20h)",
+     "why": "Réservation prévue ce soir. Dîner seulement, du mardi au samedi (fermé dimanche et lundi) : samedi 28 est le dernier soir possible. Le repas dure 2 à 3 h, et l'hôtel est à 20 min. Faire les valises en rentrant."
+    }
+   ]
+  },
+  {
+   "date": "2026-11-29",
+   "title": "West Bund, Longhua, jardin botanique, départ",
+   "theme": "Check-out, retrait du costume à South Bund, puis vers le sud le long du fleuve : musées du West Bund, déjeuner à Xuhui, Longhua et jardin botanique près de l'hôtel. Départ à 18h30.",
+   "stops": [
+    {
+     "id": "long-museum-westbund",
+     "time": "10h15–11h20 (après check-out, bagages à la conciergerie, puis retrait au tailleur 9h30–10h)",
+     "why": "Lieu d'art, ouvert du mardi au dimanche d'environ 10h à 17h30. Le check-out est à 12h, donc on laisse les bagages avant de partir vers 9h."
+    },
+    {
+     "id": "westbund-central",
+     "time": "11h25–11h50",
+     "why": "Design : flagship Issey Miyake, sur le même quai. Ouvert d'environ 10h à 22h tous les jours (à vérifier sur Dianping)."
+    },
+    {
+     "id": "westbund-pompidou",
+     "time": "12h–13h",
+     "why": "« Computer Worlds », entre art et tech. Ouvert du mardi au dimanche. Ce créneau marche avec les deux horaires annoncés (10h–17h ou 11h–18h)."
+    },
+    {
+     "id": "old-jesse",
+     "time": "Déjeuner 13h20–14h30 (réserver 13h15)",
+     "why": "Cuisine shanghaïenne de référence, à Tianping Lu. Service tous les jours de 11h à 14h30."
+    },
+    {
+     "id": "longhua-temple",
+     "time": "14h45–15h15",
+     "why": "Lieu emblématique, sur la route du jardin botanique. Ouvert tous les jours de 7h à 16h30. Visite courte."
+    },
+    {
+     "id": "shanghai-botanical-garden",
+     "time": "15h30–16h50 (les serres d'abord)",
+     "why": "Jardin botanique, ouvert tous les jours de 7h à 17h. Les serres et le musée du penjing ferment vers 16h30. À 15 min de l'hôtel : retour vers 17h15 pour les bagages, départ pour PVG à 18h30."
+    }
+   ]
+  }
+ ],
+ "toIdeas": [
+  "shanghai-watch-flagship",
+  "hermes-maison-shanghai",
+  "shangxia-maison",
+  "shanghai-museum-peoples-square",
+  "jingan-temple",
+  "unitree-jiuguang",
+  "huawei-nanjing-east",
+  "china-securities-museum",
+  "arts-crafts-museum",
+  "xintiandi",
+  "hangzhou-lingyin-westlake",
+  "chenshan-botanical-garden",
+  "humsuit",
+  "sstm",
+  "power-station-of-art",
+  "hongqiao-pearl-city",
+  "haining-leather-city"
+ ],
+ "toLifestyle": [
+  "bulgari-hotel-shanghai",
+  "upper-house-shanghai",
+  "flair-ritz-pudong",
+  "pony-up",
+  "jia-jia-tang-bao",
+  "house-of-rong",
+  "captain-george",
+  "da-hu-chun",
+  "cafe-del-volcan",
+  "sir-ellys-terrace",
+  "ins-land",
+  "heim"
+ ],
+ "risks": [
+  "Tailleur (South Bund) : commande le mer. 25 à 10h, essayage le sam. 28 à 9h30, retrait le dim. 29 à 9h30. Confirmer le délai dès la commande, ne verser qu'un acompte avant l'essayage, et prévoir une livraison à l'hôtel le dimanche avant 17h en secours. L'id n'est placé que le 25 : l'essayage et le retrait sont notés dans son horaire et dans les étapes du 28 et du 29.",
+  "pvg-t1 n'est placé que le 24 : son horaire contient aussi le départ du 29 (hôtel à 18h30, AF111 à 22h15, enregistrement fermé vers 21h15). L'hôtel reste en base.",
+  "Suzhou, jeu. 26 : réserver le Suzhou Museum (obligatoire, ouvre environ 7 jours avant, donc vers le 19 nov.). Acheter les billets avec le passeport : aller Hongqiao → Suzhou vers 7h45, retour Suzhou → gare de Shanghai (pas Hongqiao) vers 16h30. Pas d'adresse pour le déjeuner à Suzhou.",
+  "Réservations à faire : Canton Table (mer. 25, 18h15), Fu He Hui (jeu. 26, 19h15, service jusqu'à 21h), Taian Table (sam. 28, arrivée entre 18h et 20h), Old Jesse (dim. 29, 13h15, service jusqu'à 14h30), LV The Louis (créneau dans le mini-programme My LV, ven. 27).",
+  "LV « The Louis » : ouvert en juin 2026, ouverture en novembre non confirmée. Si c'est fermé, prendre le flagship Shanghai Watch (996 West Nanjing Road, dans la même rue). Autre option : Hermès Maison et Shang Xia (Pistes), au 217–233 Huaihai Road, à 1 km de Coa avant le dîner.",
+  "Samedi 28 : quitter la Shanghai Tower à 17h10 au plus tard. Si le trajet vers Changning déborde, sauter Columbia Circle puis Maison Dongliang : l'arrivée chez Taian Table doit se faire avant 20h.",
+  "Dimanche 29 : check-out à 12h (11h selon certains sites, vérifier la confirmation). Valises bouclées samedi soir, bagages à la conciergerie avant de partir vers 9h, retour vers 17h15, départ ferme à 18h30. Les serres du jardin botanique ferment vers 16h30.",
+  "Horaires à confirmer la veille sur Dianping : Lao Zheng Xing (non publiés), Coa et Speak Low (non publiés), Westbund Central, Maison Dongliang. West Bund × Pompidou annonce 10h–17h ou 11h–18h selon les sources : le créneau de 12h tient dans les deux cas.",
+  "Rockbund et Perrotin (mer. 25) : vérifier qu'ils ne sont pas fermés entre deux expositions. Perrotin n'ouvre que du mardi au samedi, le mercredi est donc sa seule chance.",
+  "Vendredi 27 : journée longue (9 arrêts de jour et 3 bars), mais regroupée. Songmont et HAUS NOWHERE sont dans le même pâté de maisons, Zhangyuan, The Louis et la rue des montres dans un rayon de 700 m, et les trois bars à moins de 300 m. Si la fatigue se fait sentir, réduire Wukang Road à un passage en taxi.",
+  "Décalage horaire (+7h) : le mercredi commence à 10h exprès. Le réveil le plus dur est jeudi (départ de l'hôtel à 7h10) : rentrer tôt après Canton Table le mercredi.",
+  "Mardi 24 : arrivée à l'hôtel vers 21h, aucun dîner prévu (room service ou bar de l'hôtel).",
+  "Placés en Pistes faute de temps : le Shanghai Museum de People's Square (à 600 m de Lao Zheng Xing, fermé le lundi ; le musée Est du samedi le remplace), Hermès, Shang Xia, Shanghai Watch, le temple Jing'an, Unitree, Huawei, le China Securities Museum, le musée des arts et métiers et Xintiandi. En Sorties : Bulgari (Il Bar, à côté de Fotografiska), Upper House, Flair, Pony Up, Jia Jia Tang Bao, House of Rong, Captain George. Aucun lieu n'est supprimé.",
+  "Fermetures vérifiées pour chaque jour choisi : Shanghai Museum East (fermé le mardi) le samedi, Rockbund (mer.–dim.) et Perrotin (mar.–sam.) le mercredi, Terrace 915 (lun.–jeu. 15h–22h) le mercredi, Taian Table (mar.–sam.) le samedi, le jardin Yu, le Suzhou Museum, le Long Museum et le Pompidou (fermés le lundi) du mercredi au dimanche."
+ ]
+}

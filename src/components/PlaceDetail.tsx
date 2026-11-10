@@ -6,8 +6,10 @@ import { isHotel } from "../lib/plan";
 import { addContact, addPhoto, deleteContact, deletePhoto, photoSrc, toast, updatePlace, useStore } from "../lib/store";
 import { IBack, ICamera, ICheck, IClock, IClose, ICopy, IExpand, IGlobe, INav, IPin, IPlus, ISpeaker, IStar, ITrain, ITrash } from "./Icons";
 import { Lightbox, Modal, SavedInput, ShowScreen, compressImage, copy, speak } from "./ui";
+import { GoBlock } from "./Nav";
+import type { Mode } from "../lib/route";
 
-export default function PlaceDetail({ trip, place, onBack, sheetH }: { trip: Trip; place: Place; onBack: () => void; sheetH?: string }) {
+export default function PlaceDetail({ trip, place, onBack, onGo, sheetH }: { trip: Trip; place: Place; onBack: () => void; onGo: (m: Mode) => void; sheetH?: string }) {
   const state = useStore((s) => s.data.places[place.id]) || {};
   const allContacts = useStore((s) => s.data.contacts);
   const allPhotos = useStore((s) => s.data.photos);
@@ -78,6 +80,8 @@ export default function PlaceDetail({ trip, place, onBack, sheetH }: { trip: Tri
           <button className="action" onClick={() => copy(place.cn, "Adresse copiée pour DiDi", toast)}><ICopy /> DiDi</button>
           <button className="action" onClick={() => speak(place.cn) || toast("Lecture vocale indisponible")}><ISpeaker /> Écouter</button>
         </div>
+
+        <GoBlock target={place} onGo={onGo} />
 
         {!hotel && (
           <div className="sec">

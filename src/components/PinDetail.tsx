@@ -4,8 +4,10 @@ import type { Pin } from "../lib/model";
 import { deletePin, toast, updatePin } from "../lib/store";
 import { IBack, ICopy, INav, IPin, ITrash } from "./Icons";
 import { Modal, SavedInput, copy } from "./ui";
+import { GoBlock } from "./Nav";
+import type { Mode } from "../lib/route";
 
-export default function PinDetail({ pin, onBack, sheetH }: { pin: Pin; onBack: () => void; sheetH?: string }) {
+export default function PinDetail({ pin, onBack, onGo, sheetH }: { pin: Pin; onBack: () => void; onGo: (m: Mode) => void; sheetH?: string }) {
   const coords = `${pin.lat.toFixed(5)}, ${pin.lng.toFixed(5)}`;
   return (
     <section className="detail glass" style={{ ["--c" as string]: "#f6f2ea", ...(sheetH ? { ["--sheet-h" as string]: sheetH } : {}) }} aria-label={pin.name}>
@@ -25,6 +27,7 @@ export default function PinDetail({ pin, onBack, sheetH }: { pin: Pin; onBack: (
           <a className="action" href={googleDirections(pin)} target="_blank" rel="noopener"><IPin /> Google</a>
           <button className="action" onClick={() => copy(coords, "Coordonnées copiées", toast)}><ICopy /> Copier</button>
         </div>
+        <GoBlock target={pin} onGo={onGo} />
         <div className="sec">
           <span className="label">Nom</span>
           <SavedInput value={pin.name} onSave={(v) => v.trim() && updatePin(pin.id, { name: v.trim() })} />

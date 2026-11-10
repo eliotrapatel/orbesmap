@@ -36,7 +36,13 @@ interface Props {
   focus: FocusRequest | null;
   padding: { top: number; bottom: number; left: number; right: number };
   pinMode: boolean;
-  me: [number, number] | null;
+  me: { lng: number; lat: number; acc: number; heading: number | null } | null;
+  follow: boolean;
+  navLine: [number, number][] | null;
+  navMode: "walk" | "car" | null;
+  point: [number, number] | null;
+  onUserPan: () => void;
+  onLongPress: (lngLat: [number, number]) => void;
   threeD: boolean;
   landing: boolean;
   dayColor: (key: string) => string;
@@ -103,6 +109,7 @@ export default function MapView(p: Props) {
   const markers = useRef(new Map<string, { m: maplibregl.Marker; node: HTMLDivElement }>());
   const pinMarkers = useRef(new Map<string, { m: maplibregl.Marker; node: HTMLDivElement }>());
   const meMarker = useRef<maplibregl.Marker | null>(null);
+  const pointMarker = useRef<maplibregl.Marker | null>(null);
   const cb = useRef(p);
   cb.current = p;
   const [ready, setReady] = useState(0);
@@ -147,6 +154,14 @@ export default function MapView(p: Props) {
         map.addLayer({ id: "route-glow", type: "line", source: "route", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#f6f2ea", "line-width": 8, "line-opacity": 0.08, "line-blur": 4 } });
         map.addLayer({ id: "route", type: "line", source: "route", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#f6f2ea", "line-width": 2, "line-dasharray": [1, 2], "line-opacity": 0.9 } });
       }
+      if (!map.getSource("nav")) {
+        map.addSource("me-acc", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+        map.addLayer({ id: "me-acc", type: "fill", source: "me-acc", paint: { "fill-color": "#5aa7ff", "fill-opacity": 0.1 } });
+        map.addLayer({ id: "me-acc-line", type: "line", source: "me-acc", paint: { "line-color": "#5aa7ff", "line-opacity": 0.35, "line-width": 1 } });
+        map.addSource("nav", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+        map.addLayer({ id: "nav-casing", type: "line", source: "nav", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#0a0a0a", "line-width": 9, "line-opacity": 0.9 } });
+        map.addLayer({ id: "nav", type: "line", source: "nav", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#5aa7ff", "line-width": 5 } });
+      }
       if (!map.getSource("arc")) {
         map.addSource("arc", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
         map.addSource("plane", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
@@ -166,6 +181,8 @@ export default function MapView(p: Props) {
           },
         });
       }
+      // the live route stays above the 3D buildings
+      for (const id of ["me-acc", "me-acc-line", "nav-casing", "nav"]) if (map.getLayer(id)) map.moveLayer(id);
     };
 
     map.on("style.load", () => {
@@ -195,6 +212,44 @@ export default function MapView(p: Props) {
       if (t.closest(".mk")) return;
       cb.current.onMapClick([e.lngLat.lng, e.lngLat.lat]);
     });
+    // the user moving the map stops "follow me"
+    map.on("dragstart", (e: { originalEvent?: Event }) => {
+      if (e.originalEvent) cb.current.onUserPan();
+    });
+    // long press (touch) or right click (mouse) picks a point to measure the distance to
+    map.on("contextmenu", (e: maplibregl.MapMouseEvent) => {
+      e.preventDefault();
+      cb.current.onLongPress([e.lngLat.lng, e.lngLat.lat]);
+    });
+    let press: number | undefined;
+    let start: { x: number; y: number } | null = null;
+    const canvas = map.getCanvasContainer();
+    const cancel = () => {
+      window.clearTimeout(press);
+      start = null;
+    };
+    const tStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return cancel();
+      const t = e.touches[0];
+      const r = canvas.getBoundingClientRect();
+      start = { x: t.clientX, y: t.clientY };
+      window.clearTimeout(press);
+      press = window.setTimeout(() => {
+        if (!start) return;
+        const ll = map.unproject([start.x - r.left, start.y - r.top]);
+        start = null;
+        navigator.vibrate?.(15);
+        cb.current.onLongPress([ll.lng, ll.lat]);
+      }, 550);
+    };
+    const tMove = (e: TouchEvent) => {
+      const t = e.touches[0];
+      if (start && t && Math.hypot(t.clientX - start.x, t.clientY - start.y) > 10) cancel();
+    };
+    canvas.addEventListener("touchstart", tStart, { passive: true });
+    canvas.addEventListener("touchmove", tMove, { passive: true });
+    canvas.addEventListener("touchend", cancel);
+    canvas.addEventListener("touchcancel", cancel);
     const online = () => tryAgain();
     const vis = () => document.visibilityState === "visible" && tryAgain();
     window.addEventListener("online", online);
@@ -204,11 +259,13 @@ export default function MapView(p: Props) {
       document.removeEventListener("visibilitychange", vis);
       window.clearInterval(retry);
       window.clearTimeout(slow);
+      cancel();
       map.remove();
       mapRef.current = null;
       markers.current.clear();
       pinMarkers.current.clear();
       meMarker.current = null;
+      pointMarker.current = null;
     };
   }, []);
 
@@ -312,21 +369,87 @@ export default function MapView(p: Props) {
     }
   }, [p.pins, p.selected, p.landing, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // --- my position ---
+  // --- my position: dot, accuracy circle, direction cone ---
+  const me = p.me;
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    if (!p.me) {
+    const acc = map.getSource("me-acc") as GeoJSONSource | undefined;
+    if (!me || p.landing) {
       meMarker.current?.remove();
       meMarker.current = null;
+      acc?.setData({ type: "FeatureCollection", features: [] });
       return;
     }
     if (!meMarker.current) {
+      const wrap = document.createElement("div");
+      wrap.className = "me";
+      wrap.innerHTML = '<div class="me-cone"></div><div class="me-dot"></div>';
+      meMarker.current = new maplibregl.Marker({ element: wrap }).setLngLat([me.lng, me.lat]).addTo(map);
+    } else meMarker.current.setLngLat([me.lng, me.lat]);
+    const el2 = meMarker.current.getElement();
+    const cone = el2.querySelector<HTMLElement>(".me-cone");
+    if (cone) {
+      cone.style.display = me.heading == null ? "none" : "";
+      if (me.heading != null) cone.style.transform = `rotate(${me.heading}deg)`;
+    }
+    // accuracy circle (only worth drawing when it is larger than the dot)
+    if (acc) {
+      const r = Math.min(me.acc || 0, 2000);
+      const pts: [number, number][] = [];
+      const kx = 111320 * Math.cos((me.lat * Math.PI) / 180);
+      for (let i = 0; i <= 48; i++) {
+        const a = (i / 48) * Math.PI * 2;
+        pts.push([me.lng + (Math.cos(a) * r) / kx, me.lat + (Math.sin(a) * r) / 110540]);
+      }
+      acc.setData(r > 15 ? { type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [pts] } } : { type: "FeatureCollection", features: [] });
+    }
+  }, [me?.lng, me?.lat, me?.acc, me?.heading, p.landing, ready]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // --- follow me: keep my position in view as I move (zoom level untouched, little data) ---
+  const followed = useRef(false);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !me || !p.follow || p.landing) {
+      if (!p.follow) followed.current = false;
+      return;
+    }
+    if (!followed.current) {
+      followed.current = true;
+      map.flyTo({ center: [me.lng, me.lat], zoom: Math.max(map.getZoom(), 15.5), duration: 900, essential: true });
+    } else if (!map.isMoving()) map.easeTo({ center: [me.lng, me.lat], duration: 700 });
+  }, [me?.lng, me?.lat, p.follow, p.landing]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // --- navigation route ---
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    const src = map.getSource("nav") as GeoJSONSource | undefined;
+    if (!src) return;
+    src.setData(p.navLine && p.navLine.length > 1 && !p.landing ? { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: p.navLine } } : { type: "FeatureCollection", features: [] });
+    try {
+      map.setPaintProperty("nav", "line-dasharray", p.navMode === "walk" ? [0.1, 1.8] : [1, 0]);
+      map.setPaintProperty("nav", "line-width", p.navMode === "walk" ? 5 : 4.5);
+    } catch {
+      /* ignore */
+    }
+  }, [p.navLine, p.navMode, p.landing, ready]);
+
+  // --- point picked by a long press ---
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (!p.point || p.landing) {
+      pointMarker.current?.remove();
+      pointMarker.current = null;
+      return;
+    }
+    if (!pointMarker.current) {
       const node = document.createElement("div");
-      node.className = "me-dot";
-      meMarker.current = new maplibregl.Marker({ element: node }).setLngLat(p.me).addTo(map);
-    } else meMarker.current.setLngLat(p.me);
-  }, [p.me, ready]);
+      node.className = "pt-mark";
+      pointMarker.current = new maplibregl.Marker({ element: node, anchor: "bottom" }).setLngLat(p.point).addTo(map);
+    } else pointMarker.current.setLngLat(p.point);
+  }, [p.point, p.landing, ready]);
 
   // --- day route ---
   useEffect(() => {

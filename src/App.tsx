@@ -17,6 +17,9 @@ import type { Place } from "./data/types";
 import { km, optimizeOrder } from "./lib/geo";
 import { dayStops } from "./lib/plan";
 import { addPin, switchTrip, toast, useStore, useTrip } from "./lib/store";
+import { getLoc, onLocateError, resumeLocate, setFollow, startLocate, stopLocate, useLoc } from "./lib/locate";
+import type { Mode } from "./lib/route";
+import { NavCard, PointCard, useNavigation, type NavState, type NavTarget } from "./components/Nav";
 
 type Sel = { kind: "place" | "pin"; id: string } | null;
 type Snap = "peek" | "half" | "full";
@@ -64,14 +67,18 @@ export default function App() {
   const [focus, setFocus] = useState<FocusRequest | null>(null);
   const [pinMode, setPinMode] = useState(false);
   const [pendingPin, setPendingPin] = useState<LL | null>(null);
-  const [me, setMe] = useState<LL | null>(null);
+  const fix = useLoc((s) => s.fix);
+  const follow = useLoc((s) => s.follow);
+  const locStatus = useLoc((s) => s.status);
+  const compass = useLoc((s) => s.compass);
+  const [nav, setNav] = useState<NavState>(null);
+  const [point, setPoint] = useState<LL | null>(null);
+  const navInfo = useNavigation(nav);
   const [basemapFailed, setBasemapFailed] = useState(false);
   const [threeD, setThreeD] = useState(false);
   const [cmdk, setCmdk] = useState(false);
   const [snap, setSnap] = useState<Snap>("peek");
   const [vh, setVh] = useState(window.innerHeight);
-  const watchId = useRef<number | null>(null);
-  const firstFix = useRef(true);
   const n = useRef(0);
   const fly = useCallback((f: Omit<FocusRequest, "n">) => setFocus({ ...f, n: ++n.current }), []);
 
@@ -200,40 +207,41 @@ export default function App() {
     [trip, fly, desktop],
   );
 
+  // live location: off → on and follow me → (map moved by hand) follow again → off
+  useEffect(() => {
+    onLocateError(toast);
+    void resumeLocate();
+  }, []);
   const toggleLocate = useCallback(() => {
-    if (watchId.current != null) {
-      navigator.geolocation.clearWatch(watchId.current);
-      watchId.current = null;
-      setMe(null);
-      return;
+    const st = getLoc();
+    if (st.status === "off" || st.status === "denied" || st.status === "unavailable") {
+      toast("Recherche de votre position…");
+      startLocate(true);
+    } else if (!st.follow) setFollow(true);
+    else if (nav) setFollow(false);
+    else {
+      stopLocate();
+      toast("Localisation arrêtée");
     }
-    if (!("geolocation" in navigator)) return toast("La localisation n'est pas disponible sur cet appareil");
-    toast("Recherche de votre position…");
-    firstFix.current = true;
-    watchId.current = navigator.geolocation.watchPosition(
-      (pos) => {
-        const ll: LL = [pos.coords.longitude, pos.coords.latitude];
-        setMe(ll);
-        if (firstFix.current) {
-          firstFix.current = false;
-          fly({ center: ll, zoom: 15 });
-        }
-      },
-      (err) => {
-        if (watchId.current != null) navigator.geolocation.clearWatch(watchId.current);
-        watchId.current = null;
-        setMe(null);
-        toast(err.code === 1 ? "Localisation refusée : autorisez-la dans les réglages du navigateur" : "Position introuvable, réessayez dehors");
-      },
-      { enableHighAccuracy: true, maximumAge: 10_000, timeout: 20_000 },
-    );
-  }, [fly]);
-  useEffect(
-    () => () => {
-      if (watchId.current != null) navigator.geolocation.clearWatch(watchId.current);
+  }, [nav]);
+
+  const startNav = useCallback(
+    (target: NavTarget, mode: Mode) => {
+      setNav({ target, mode });
+      setPoint(null);
+      setSel(null);
+      setTool(null);
+      if (!desktop) setSnap("peek");
+      const f = getLoc().fix;
+      if (f) {
+        setFollow(false);
+        fly({ bounds: boundsOf([f, target]) });
+      } else startLocate(true);
     },
-    [],
+    [desktop, fly],
   );
+  const me = fix ? { lng: fix.lng, lat: fix.lat, acc: fix.acc, heading: compass ?? (fix.speed != null && fix.speed > 1 ? fix.heading : null) } : null;
+  const navLine = navInfo?.route?.coords ?? (nav && fix ? ([[fix.lng, fix.lat], [nav.target.lng, nav.target.lat]] as LL[]) : null);
 
   const openTool = (k: ToolKey) => {
     setTool((t) => (t === k ? null : k));
@@ -302,6 +310,15 @@ export default function App() {
         padding={landing ? { top: 0, bottom: 0, left: 0, right: 0 } : padding}
         pinMode={pinMode}
         me={me}
+        follow={follow}
+        navLine={navLine}
+        navMode={nav?.mode ?? null}
+        point={point}
+        onUserPan={() => setFollow(false)}
+        onLongPress={(ll) => {
+          if (landing || pinMode) return;
+          setPoint(ll);
+        }}
         threeD={threeD}
         landing={landing}
         dayColor={dayColor}
@@ -323,7 +340,8 @@ export default function App() {
             setPendingPin(ll);
             return;
           }
-          if (sel) setSel(null);
+          if (point) setPoint(null);
+          else if (sel) setSel(null);
           else if (!desktop && snap !== "peek") setSnap("peek");
         }}
         onBasemapError={setBasemapFailed}
@@ -347,7 +365,18 @@ export default function App() {
               setLandingOverlay(true);
             }}
           />
-          <DayBar trip={trip} day={day} onDay={showDay} />
+          {nav ? (
+            <NavCard nav={nav} info={navInfo} onMode={(m) => setNav({ ...nav, mode: m })} onClose={() => { setNav(null); setFollow(false); }} />
+          ) : point ? (
+            <PointCard
+              point={{ lng: point[0], lat: point[1] }}
+              onGo={(m) => startNav({ lng: point[0], lat: point[1], name: "Point choisi" }, m)}
+              onPin={() => { setPendingPin(point); setPoint(null); }}
+              onClose={() => setPoint(null)}
+            />
+          ) : (
+            <DayBar trip={trip} day={day} onDay={showDay} />
+          )}
 
           <aside ref={sideRef} className="side glass" style={desktop ? undefined : ({ ["--sheet-h" as string]: `${snapPx[snap]}px` } as React.CSSProperties)} aria-label="Lieux du voyage">
             <div className="sheet-grip" onPointerDown={onDown} onPointerMove={onMove} onPointerUp={(e) => endDrag(e, false)} onPointerCancel={(e) => endDrag(e, true)} role="button" aria-label="Agrandir ou réduire la liste" />
@@ -378,8 +407,8 @@ export default function App() {
             </div>
           </aside>
 
-          {selectedPlace && !tool && <PlaceDetail key={selectedPlace.id} trip={trip} place={selectedPlace} onBack={() => setSel(null)} sheetH={detailSheet} />}
-          {selectedPin && !tool && <PinDetail key={selectedPin.id} pin={selectedPin} onBack={() => setSel(null)} sheetH={detailSheet} />}
+          {selectedPlace && !tool && <PlaceDetail key={selectedPlace.id} trip={trip} place={selectedPlace} onBack={() => setSel(null)} onGo={(m) => startNav(selectedPlace, m)} sheetH={detailSheet} />}
+          {selectedPin && !tool && <PinDetail key={selectedPin.id} pin={selectedPin} onBack={() => setSel(null)} onGo={(m) => startNav(selectedPin, m)} sheetH={detailSheet} />}
 
           {toolDef && (
             <Drawer kicker={trip.code} title={toolDef.key === "converter" ? "Convertisseur" : toolDef.label} wide={toolDef.wide} onClose={() => setTool(null)} sheetH={toolSheet}>
@@ -423,7 +452,13 @@ export default function App() {
               ))}
             </div>
             <div className="ctl-group glass">
-              <button className={"ctl" + (me ? " on" : "")} onClick={toggleLocate} aria-pressed={!!me} aria-label="Ma position" title="Ma position">
+              <button
+                className={"ctl" + (locStatus === "on" || locStatus === "searching" ? (follow ? " on" : " half") : "")}
+                onClick={toggleLocate}
+                aria-pressed={locStatus === "on"}
+                aria-label={locStatus === "off" ? "Afficher ma position" : follow ? (nav ? "Ne plus me suivre" : "Arrêter la localisation") : "Me suivre"}
+                title={locStatus === "off" ? "Ma position" : follow ? (nav ? "Ne plus me suivre" : "Arrêter la localisation") : "Me suivre"}
+              >
                 <ILocate />
               </button>
               <button className={"ctl" + (pinMode ? " on" : "")} onClick={() => setPinMode((v) => !v)} aria-pressed={pinMode} aria-label="Ajouter un lieu sur la carte" title="Ajouter un lieu">

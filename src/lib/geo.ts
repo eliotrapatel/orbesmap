@@ -45,11 +45,11 @@ export function optimizeOrder(start: LL, places: Place[]): Place[] {
 }
 
 export const googleDirections = (p: LL) => `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}&travelmode=transit`;
-export const amapDirections = (p: LL & { name: string }) =>
+export const amapDirections = (p: LL & { name: string }, mode: "car" | "walk" = "car") =>
   // Amap (Gaode) works in mainland China without VPN. It expects GCJ-02, so convert from WGS-84.
   (() => {
     const g = wgsToGcj(p.lat, p.lng);
-    return `https://uri.amap.com/navigation?to=${g.lng.toFixed(6)},${g.lat.toFixed(6)},${encodeURIComponent(p.name)}&mode=car&coordinate=gaode&callnative=1`;
+    return `https://uri.amap.com/navigation?to=${g.lng.toFixed(6)},${g.lat.toFixed(6)},${encodeURIComponent(p.name)}&mode=${mode}&coordinate=gaode&callnative=1`;
   })();
 
 // WGS-84 → GCJ-02 (standard public algorithm used for maps in mainland China)
