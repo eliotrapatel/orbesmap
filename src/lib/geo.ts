@@ -80,3 +80,35 @@ export function wgsToGcj(lat: number, lng: number): LL {
   dLng = (dLng * 180) / ((a / sq) * Math.cos(radLat) * Math.PI);
   return { lat: lat + dLat, lng: lng + dLng };
 }
+
+/** GCJ-02 (Amap, Dianping, Tencent) → WGS-84, iterative inverse (error < 1 m) */
+export function gcjToWgs(lat: number, lng: number): LL {
+  let wLat = lat;
+  let wLng = lng;
+  for (let i = 0; i < 6; i++) {
+    const g = wgsToGcj(wLat, wLng);
+    wLat -= g.lat - lat;
+    wLng -= g.lng - lng;
+  }
+  return { lat: wLat, lng: wLng };
+}
+
+/** BD-09 (Baidu) → GCJ-02 */
+export function bdToGcj(lat: number, lng: number): LL {
+  const xPi = (Math.PI * 3000) / 180;
+  const x = lng - 0.0065;
+  const y = lat - 0.006;
+  const z = Math.sqrt(x * x + y * y) - 0.00002 * Math.sin(y * xPi);
+  const t = Math.atan2(y, x) - 0.000003 * Math.cos(x * xPi);
+  return { lat: z * Math.sin(t), lng: z * Math.cos(t) };
+}
+
+/** Coordinates from a Chinese map service → WGS-84 (what GPS and our map use) */
+export function toWgs(lat: number, lng: number, system: string): LL {
+  if (system === "GCJ02") return gcjToWgs(lat, lng);
+  if (system === "BD09") {
+    const g = bdToGcj(lat, lng);
+    return gcjToWgs(g.lat, g.lng);
+  }
+  return { lat, lng };
+}

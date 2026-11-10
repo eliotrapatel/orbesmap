@@ -22,6 +22,7 @@ export default function CommandPalette(p: {
   onToggle3D: () => void;
   onLocate: () => void;
   onAddPin: () => void;
+  onAddLink: () => void;
   onZone: (center: [number, number], zoom: number) => void;
 }) {
   useEscape(p.onClose);
@@ -42,6 +43,7 @@ export default function CommandPalette(p: {
     out.push({ id: "a:3d", section: "Actions", title: "Bâtiments en 3D", sub: "Activer ou couper la vue 3D", icon: <span className="ic"><ICube /></span>, run: p.onToggle3D, text: norm("3d batiments relief vue") });
     out.push({ id: "a:loc", section: "Actions", title: "Ma position", icon: <span className="ic"><ILocate /></span>, run: p.onLocate, text: norm("ma position localisation gps ou suis je") });
     out.push({ id: "a:pin", section: "Actions", title: "Ajouter un lieu sur la carte", icon: <span className="ic"><IPinPlus /></span>, run: p.onAddPin, text: norm("ajouter lieu epingle pin") });
+    out.push({ id: "a:link", section: "Actions", title: "Ajouter un lieu depuis un lien ou une capture", icon: <span className="ic"><IPinPlus /></span>, run: p.onAddLink, text: norm("ajouter lien xiaohongshu dianping instagram capture adresse") });
     for (const t of TRIPS) if (t.id !== p.trip.id) out.push({ id: "trip:" + t.id, section: "Voyages", title: `Ouvrir ${t.title}`, sub: t.dateLabel, icon: <span className="ic"><ISearch /></span>, run: () => p.onTrip(t.id), text: norm(`voyage ${t.title} ${t.code}`) });
     for (const g of p.trip.phrases) for (const ph of g.items) out.push({ id: "ph:" + g.title + ph.zh, section: "Phrases", title: ph.fr, sub: `${ph.zh} · ${ph.pinyin}`, icon: <span className="ic"><ISpeaker /></span>, run: () => speak(ph.zh), text: norm(ph.fr + " " + ph.pinyin) + " " + ph.zh });
     return out;

@@ -8,8 +8,11 @@ import { STATUSES } from "../data/trip";
 import type { Place, Trip } from "../data/types";
 import type { Pin, PlaceState } from "../lib/model";
 import { useLoc } from "../lib/locate";
+import { registerOfflineProtocol, transformRequest } from "../lib/offline";
 
 maplibregl.setWorkerUrl(URL.createObjectURL(new Blob([workerSource], { type: "text/javascript" })));
+// basemap served from the device cache first (offline map)
+registerOfflineProtocol();
 
 // Free vector basemap (no key), restyled below to the ORBES "vault" palette.
 const STYLE_URL = "https://tiles.openfreemap.org/styles/dark";
@@ -127,6 +130,7 @@ export default function MapView(p: Props) {
       attributionControl: { compact: true },
       pitchWithRotate: false,
       maxPitch: 70,
+      transformRequest: (url) => transformRequest(url),
     });
     map.touchZoomRotate.disableRotation();
     mapRef.current = map;

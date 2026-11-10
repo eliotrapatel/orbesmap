@@ -5,12 +5,29 @@ import type { PlaceState } from "../lib/model";
 import { dayStops, isHotel, stopTime } from "../lib/plan";
 import { plural } from "../lib/fmt";
 import { fmtDay, fmtMin, localDate } from "../lib/time";
+import { checkVisit } from "../lib/hours";
 import { ICalPlus, IMap, IRoute } from "./Icons";
 
 export default function Agenda({ trip, states, onOpen, onShowDay, onOptimize }: { trip: Trip; states: Record<string, PlaceState>; onOpen: (p: Place) => void; onShowDay: (d: string) => void; onOptimize: (d: string) => void }) {
   const today = localDate(trip.timezone);
+  // alerts across the whole programme (closed days, last entry passed, opening later than planned)
+  const alerts = trip.days
+    .filter((d) => d.scheduled)
+    .flatMap((d) => dayStops(trip, d.key, states).map((p) => ({ d, p, x: checkVisit(trip.hours?.[p.id], d.dates?.[0], stopTime(p, states)).filter((i) => i.tone !== "info") })))
+    .filter((a) => a.x.length);
   return (
     <div>
+      {alerts.length > 0 && (
+        <div className="ag-alerts">
+          <b>{alerts.length === 1 ? "1 visite à vérifier" : `${alerts.length} visites à vérifier`}</b>
+          {alerts.map((a) => (
+            <button key={a.p.id} onClick={() => onOpen(a.p)}>
+              <span>{a.d.short} · {a.p.name}</span>
+              <em className={a.x[0].tone}>{a.x[0].text}</em>
+            </button>
+          ))}
+        </div>
+      )}
       <div style={{ display: "flex", gap: 8, marginBottom: 22, flexWrap: "wrap" }}>
         <button className="btn-sm" onClick={() => exportIcs(trip, states)}>
           <ICalPlus /> Ajouter à mon calendrier (.ics)
@@ -66,6 +83,7 @@ export default function Agenda({ trip, states, onOpen, onShowDay, onOptimize }: 
               {stops.map((p, i) => {
                 const s = states[p.id] || {};
                 const t = stopTime(p, states);
+                const issues = checkVisit(trip.hours?.[p.id], first, t).filter((x) => x.tone !== "info" || x.text.startsWith("Réservation"));
                 return (
                   <button className={"ag-stop" + (i === 0 ? " first" : "") + (i === stops.length - 1 ? " last" : "")} key={p.id} onClick={() => onOpen(p)}>
                     <span className="ag-time">{t != null ? fmtMin(t) : "—"}</span>
@@ -78,6 +96,7 @@ export default function Agenda({ trip, states, onOpen, onShowDay, onOptimize }: 
                       <span className="ag-leg">
                         {i === 0 ? "Depuis l'hôtel" : "Trajet"} : ~{formatMinutes(legs[i])}
                       </span>
+                      {issues.map((x, k) => <span key={k} className={"ag-issue " + x.tone}>{x.tone === "bad" ? "⚠ " : x.tone === "warn" ? "! " : ""}{x.text}</span>)}
                     </span>
                   </button>
                 );

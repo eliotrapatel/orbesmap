@@ -6,7 +6,8 @@ import { exportIcs } from "../lib/ics";
 import { useLiveRate } from "../lib/rates";
 import { getState, setEurRate, toast, useStore } from "../lib/store";
 import { phase } from "../lib/time";
-import { ICalPlus, ICopy, IDownload, IPlane, ISpeaker } from "./Icons";
+import { ICalPlus, ICopy, IDownload, IOffline, IPlane, ISpeaker } from "./Icons";
+import { cancelOffline, deleteOffline, offlineSupported, prepareOffline, useOffline } from "../lib/offline";
 import { ShowScreen, copy, speak } from "./ui";
 
 const fmt = (n: number) => (Number.isFinite(n) ? (Math.round(n * 100) / 100).toLocaleString("fr-FR", { maximumFractionDigits: 2 }) : "");
@@ -144,10 +145,48 @@ export function Flights({ trip }: { trip: Trip }) {
   );
 }
 
+function OfflineCard({ trip }: { trip: Trip }) {
+  const st = useOffline();
+  const mb = (b: number) => `${Math.max(1, Math.round(b / 1e6))} Mo`;
+  const points = [...trip.places, trip.hotel, ...trip.zones.map((z) => ({ lng: z.center[0], lat: z.center[1] }))];
+  const shellOk = location.hostname.endsWith(".vercel.app");
+  if (!offlineSupported) return null;
+  return (
+    <div className="card off-card">
+      <h4><IOffline width={18} height={18} /> Carte hors ligne</h4>
+      {st.state === "ready" && (
+        <p>Prête ({mb(st.bytes)}{st.at ? `, préparée le ${new Date(st.at).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}` : ""}). La carte, les lieux et votre position marchent sans réseau, même dans le métro.</p>
+      )}
+      {st.state === "none" && <p>Téléchargez une fois, en Wi-Fi, les quartiers du programme (environ 40 Mo). Ensuite la carte s'affiche sans réseau et ne consomme plus de données mobiles.</p>}
+      {st.state === "running" && (
+        <>
+          <p>Téléchargement… {st.done} / {st.total} · {mb(st.bytes)}</p>
+          <div className="bar"><span style={{ width: `${st.total ? (st.done / st.total) * 100 : 0}%` }} /></div>
+        </>
+      )}
+      {st.state === "error" && <p className="tr-err">{st.error}</p>}
+      <div className="em-actions">
+        {st.state === "running" ? (
+          <button className="btn-sm" onClick={cancelOffline}>Arrêter</button>
+        ) : (
+          <button className="btn-sm on" onClick={() => prepareOffline(points)}>{st.state === "ready" ? "Mettre à jour" : "Préparer hors ligne"}</button>
+        )}
+        {st.state === "ready" && <button className="btn-sm" onClick={() => { if (confirm("Supprimer la carte hors ligne de ce téléphone ?")) deleteOffline(); }}>Supprimer</button>}
+      </div>
+      <p className="em-small">
+        {shellOk
+          ? "Cette adresse s'ouvre aussi sans réseau une fois ajoutée à l'écran d'accueil (Partager › Sur l'écran d'accueil)."
+          : "Pour ouvrir l'app elle-même sans aucun réseau, utilisez orbesmap.vercel.app ajoutée à l'écran d'accueil, et préparez la carte depuis cette adresse."}
+      </p>
+    </div>
+  );
+}
+
 export function Practical({ trip }: { trip: Trip }) {
-  if (!trip.practical?.length) return <div className="empty"><b>Pas d'infos pratiques</b>Ce voyage n'en a pas encore.</div>;
+  if (!trip.practical?.length) return <div className="cards"><OfflineCard trip={trip} /></div>;
   return (
     <div className="cards">
+      <OfflineCard trip={trip} />
       {trip.practical.map((c) => (
         <div className="card" key={c.title}>
           <h4>{c.title}</h4>

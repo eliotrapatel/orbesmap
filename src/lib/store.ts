@@ -717,6 +717,12 @@ export function updatePlace(id: string, patch: Partial<PlaceState>) {
   enqueue({ t: "place", trip, id });
 }
 
+/** Free-form shared records (checklist items, insurance, extra info on my places), stored like place states:
+ * same offline queue, same field-by-field merge, same live sync. Ids use a prefix ("_check:", "_info:", "_pin:"). */
+export function updateRecord(id: string, patch: Record<string, unknown>) {
+  updatePlace(id, patch as Partial<PlaceState>);
+}
+
 export function addContact(c: Omit<Contact, "id" | "createdAt">) {
   const contact: Contact = { ...c, id: uid(), createdAt: Date.now() };
   setData((d) => ({ ...d, contacts: [...d.contacts, contact] }));

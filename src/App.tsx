@@ -3,7 +3,11 @@ import Account from "./components/Account";
 import Agenda from "./components/Agenda";
 import CommandPalette from "./components/CommandPalette";
 import DayBar from "./components/DayBar";
-import { ICube, ILocate, IPinPlus } from "./components/Icons";
+import { ICube, ILink, ILocate, IPinPlus } from "./components/Icons";
+import AddPlace, { type Found } from "./components/AddPlace";
+import Checklist from "./components/Checklist";
+import Emergency from "./components/Emergency";
+import Translate from "./components/Translate";
 import Landing from "./components/Landing";
 import MapView, { type FocusRequest } from "./components/MapView";
 import Overview from "./components/Overview";
@@ -16,7 +20,7 @@ import { Drawer, Toaster } from "./components/ui";
 import type { Place } from "./data/types";
 import { km, optimizeOrder } from "./lib/geo";
 import { dayStops } from "./lib/plan";
-import { addPin, switchTrip, toast, useStore, useTrip } from "./lib/store";
+import { addPin, switchTrip, toast, updateRecord, useStore, useTrip } from "./lib/store";
 import { ensureCompass, getLoc, onLocateError, resumeLocate, setFollow, startLocate, stopLocate, useLoc } from "./lib/locate";
 import type { Mode } from "./lib/route";
 import { NavCard, PointCard, useNavigation, type NavState, type NavTarget } from "./components/Nav";
@@ -67,6 +71,8 @@ export default function App() {
   const [focus, setFocus] = useState<FocusRequest | null>(null);
   const [pinMode, setPinMode] = useState(false);
   const [pendingPin, setPendingPin] = useState<LL | null>(null);
+  const [addLink, setAddLink] = useState(false);
+  const [pendingFound, setPendingFound] = useState<Found | null>(null);
   const fix = useLoc((s) => s.fix);
   const follow = useLoc((s) => s.follow);
   const locStatus = useLoc((s) => s.status);
@@ -262,6 +268,19 @@ export default function App() {
     [navCoords, nav, fix],
   );
 
+  // a place found from a link / screenshot becomes one of "my places", with its Chinese address
+  const saveFound = useCallback(
+    (f: Found, ll: LL) => {
+      const pin = addPin({ name: f.name || f.nameCn || "Lieu", note: f.desc || undefined, lng: ll[0], lat: ll[1] });
+      updateRecord(`_pin:${pin.id}`, { nameCn: f.nameCn, address: f.address, addressCn: f.addressCn, desc: f.desc, hours: f.hours, source: f.source, day: f.day, type: f.type });
+      setSel({ kind: "pin", id: pin.id });
+      setTool(null);
+      fly({ center: ll, zoom: 15.5 });
+      toast(`« ${f.name || f.nameCn} » ajouté sur la carte`);
+    },
+    [fly],
+  );
+
   const openTool = (k: ToolKey) => {
     setTool((t) => (t === k ? null : k));
     setSel(null);
@@ -356,7 +375,10 @@ export default function App() {
           if (landing) return;
           if (pinMode) {
             setPinMode(false);
-            setPendingPin(ll);
+            if (pendingFound) {
+              saveFound(pendingFound, ll);
+              setPendingFound(null);
+            } else setPendingPin(ll);
             return;
           }
           if (point) setPoint(null);
@@ -427,7 +449,7 @@ export default function App() {
           </aside>
 
           {selectedPlace && !tool && <PlaceDetail key={selectedPlace.id} trip={trip} place={selectedPlace} onBack={() => setSel(null)} onGo={(m) => startNav(selectedPlace, m)} sheetH={detailSheet} />}
-          {selectedPin && !tool && <PinDetail key={selectedPin.id} pin={selectedPin} onBack={() => setSel(null)} onGo={(m) => startNav(selectedPin, m)} sheetH={detailSheet} />}
+          {selectedPin && !tool && <PinDetail key={selectedPin.id} trip={trip} pin={selectedPin} onBack={() => setSel(null)} onGo={(m) => startNav(selectedPin, m)} sheetH={detailSheet} />}
 
           {toolDef && (
             <Drawer kicker={trip.code} title={toolDef.key === "converter" ? "Convertisseur" : toolDef.label} wide={toolDef.wide} onClose={() => setTool(null)} sheetH={toolSheet}>
@@ -453,6 +475,9 @@ export default function App() {
                   onOptimize={optimize}
                 />
               )}
+              {tool === "translate" && <Translate trip={trip} />}
+              {tool === "checklist" && <Checklist trip={trip} />}
+              {tool === "emergency" && <Emergency trip={trip} />}
               {tool === "phrases" && <Phrases trip={trip} />}
               {tool === "converter" && <Converter />}
               {tool === "flights" && <Flights trip={trip} />}
@@ -480,8 +505,11 @@ export default function App() {
               >
                 <ILocate />
               </button>
-              <button className={"ctl" + (pinMode ? " on" : "")} onClick={() => setPinMode((v) => !v)} aria-pressed={pinMode} aria-label="Ajouter un lieu sur la carte" title="Ajouter un lieu">
+              <button className={"ctl" + (pinMode ? " on" : "")} onClick={() => { setPendingFound(null); setPinMode((v) => !v); }} aria-pressed={pinMode} aria-label="Ajouter un lieu sur la carte" title="Ajouter un lieu">
                 <IPinPlus />
+              </button>
+              <button className="ctl" onClick={() => setAddLink(true)} aria-label="Ajouter un lieu depuis un lien ou une capture" title="Depuis un lien ou une capture">
+                <ILink />
               </button>
               <button className={"ctl" + (threeD ? " on" : "")} onClick={() => setThreeD((v) => !v)} aria-pressed={threeD} aria-label="Bâtiments en 3D" title="Vue 3D">
                 <ICube />
@@ -491,8 +519,8 @@ export default function App() {
 
           {pinMode && (
             <div className="banner glass" role="status">
-              Touchez la carte pour placer le lieu
-              <button onClick={() => setPinMode(false)}>Annuler</button>
+              {pendingFound ? `Touchez la carte à l'endroit de « ${pendingFound.name} »` : "Touchez la carte pour placer le lieu"}
+              <button onClick={() => { setPinMode(false); setPendingFound(null); }}>Annuler</button>
             </div>
           )}
           {basemapFailed && !pinMode && (
@@ -543,9 +571,26 @@ export default function App() {
           onToggle3D={() => setThreeD((v) => !v)}
           onLocate={toggleLocate}
           onAddPin={() => setPinMode(true)}
+          onAddLink={() => setAddLink(true)}
         />
       )}
 
+      {addLink && (
+        <AddPlace
+          trip={trip}
+          onClose={() => setAddLink(false)}
+          onAdd={(f) => {
+            setAddLink(false);
+            if (f.ll) saveFound(f, f.ll);
+            else {
+              setPendingFound(f);
+              setSel(null);
+              setTool(null);
+              setPinMode(true);
+            }
+          }}
+        />
+      )}
       {pendingPin && (
         <PinForm
           onClose={() => setPendingPin(null)}

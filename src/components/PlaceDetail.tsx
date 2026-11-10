@@ -2,7 +2,8 @@ import { useRef, useState } from "react";
 import { STATUSES, TYPE_LABEL } from "../data/trip";
 import type { Place, Trip } from "../data/types";
 import { amapDirections, formatMinutes, googleDirections, travelMinutes } from "../lib/geo";
-import { isHotel } from "../lib/plan";
+import { isHotel, stopTime } from "../lib/plan";
+import { checkVisit, hoursLine, liveStatus } from "../lib/hours";
 import { addContact, addPhoto, deleteContact, deletePhoto, photoSrc, toast, updatePlace, useStore } from "../lib/store";
 import { IBack, ICamera, ICheck, IClock, IClose, ICopy, IExpand, IGlobe, INav, IPin, IPlus, ISpeaker, IStar, ITrain, ITrash } from "./Icons";
 import { Lightbox, Modal, SavedInput, ShowScreen, compressImage, copy, speak } from "./ui";
@@ -25,6 +26,11 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH }: { tri
   const supplier = place.type === "fabricant";
   const hotel = isHotel(trip, place);
   const minutes = travelMinutes(trip.hotel, place);
+  const allStates = useStore((s) => s.data.places);
+  const hours = trip.hours?.[place.id];
+  const live = liveStatus(hours, trip.timezone);
+  const issues = checkVisit(hours, day?.dates?.[0], stopTime(place, allStates));
+  const line = hoursLine(hours);
 
   const onFile = async (f?: File) => {
     if (!f) return;
@@ -66,6 +72,14 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH }: { tri
             <span><IClock /> {place.time}</span>
             {!hotel && <span><INav /> {formatMinutes(minutes)} depuis l'hôtel</span>}
           </div>
+          {(live || line || issues.length > 0) && (
+            <div className="hours-box">
+              {live && <span className={"hb-live " + live.tone}><i /> Maintenant à {trip.title} : {live.label}</span>}
+              {line && <span className="hb-line">{line}</span>}
+              {issues.map((x, i) => <span key={i} className={"hb-issue " + x.tone}>{x.tone === "bad" ? "⚠ " : x.tone === "warn" ? "! " : ""}{x.text}</span>)}
+              {hours?.note && <span className="hb-line">{hours.note}</span>}
+            </div>
+          )}
         </header>
 
         <button className="driver" onClick={() => setShow(true)} aria-label="Afficher l'adresse en grand pour le chauffeur">

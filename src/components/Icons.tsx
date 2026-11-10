@@ -50,3 +50,8 @@ export const ISparkle = mk(<path d="M12 3 13.8 9.2 20 11l-6.2 1.8L12 19l-1.8-6.2
 export const IExit = mk(<><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><path d="m10 17-5-5 5-5M5 12h12" /></>);
 export const IHome = mk(<><path d="M3 11 12 3l9 8" /><path d="M5 9.5V21h14V9.5" /></>);
 export const ILayers = mk(<><path d="m12 3 9 5-9 5-9-5 9-5Z" /><path d="m3 13 9 5 9-5" /></>);
+export const ITranslate = mk(<><path d="M4 5h9M8.5 3v2M6 5c.6 3 2.6 5.6 5.5 7M11 5c-.8 3.6-3.4 6.6-7 8" /><path d="m13 21 3.8-9 3.7 9M14.4 18h4.8" /></>);
+export const IChecklist = mk(<><path d="M9 6h11M9 12h11M9 18h11" /><path d="m3.5 6 1.2 1.2L7 5M3.5 12l1.2 1.2L7 11M3.5 18l1.2 1.2L7 17" /></>);
+export const ISos = mk(<><circle cx="12" cy="12" r="9" /><path d="M12 7.5v9M7.5 12h9" /></>);
+export const ILink = mk(<><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1" /><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1" /></>);
+export const IOffline = mk(<><path d="M7 18a4.5 4.5 0 0 1-.6-9 6 6 0 0 1 11.4 1.5A3.8 3.8 0 0 1 17.5 18H7Z" /><path d="M12 10.5v5M9.8 13.5 12 15.7l2.2-2.2" /></>);

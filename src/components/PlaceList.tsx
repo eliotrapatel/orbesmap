@@ -5,6 +5,7 @@ import type { Pin, PlaceState } from "../lib/model";
 import { countable, isHotel, nextStop } from "../lib/plan";
 import { fmtMin, phase } from "../lib/time";
 import { km } from "../lib/geo";
+import { liveStatus } from "../lib/hours";
 import { fmtDistance } from "../lib/route";
 import { useLoc } from "../lib/locate";
 import { IStar, IStarFill } from "./Icons";
@@ -109,6 +110,7 @@ export default function PlaceList({ trip, places, states, pins, selectedId, quer
             const st = s?.status && s.status !== "todo" ? STATUSES.find((x) => x.key === s.status) : null;
             const hotel = isHotel(trip, p);
             const pd = near ? dayOf(p.day) : day;
+            const ls = ph === "during" ? liveStatus(trip.hours?.[p.id], trip.timezone) : null;
             const d = dist(p);
             return (
               <button key={p.id} className={"row" + (selectedId === p.id ? " on" : "")} onClick={() => onOpen(p)} aria-current={selectedId === p.id || undefined}>
@@ -122,6 +124,7 @@ export default function PlaceList({ trip, places, states, pins, selectedId, quer
                 <span className="row-tags">
                   {s?.favorite && <IStarFill aria-label="Favori" />}
                   {st && <span className="sdot" title={st.label} style={{ ["--c" as string]: st.color }} />}
+                  {ls && ls.tone === "bad" && <span className="row-closed">Fermé</span>}
                   {d != null && <span className="row-dist">{fmtDistance(d)}</span>}
                 </span>
               </button>

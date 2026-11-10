@@ -4,19 +4,23 @@ import type { Trip } from "../data/types";
 import { clock, phase } from "../lib/time";
 import { useWeather } from "../lib/weather";
 import { useSyncState } from "./Account";
-import { ICal, IChat, IChevron, IDownload, IGrid, IInfo, IPlane, ISearch, IUser, ICheck } from "./Icons";
+import { ICal, IChat, IChevron, IDownload, IGrid, IInfo, IPlane, ISearch, IUser, ICheck, ITranslate, IChecklist, ISos } from "./Icons";
 import { WxIcon } from "./WxIcon";
+import { useChecklist } from "./Checklist";
 import { useEscape } from "./ui";
 
-export type ToolKey = "overview" | "agenda" | "phrases" | "converter" | "flights" | "practical" | "export" | "account";
+export type ToolKey = "overview" | "agenda" | "translate" | "phrases" | "converter" | "checklist" | "flights" | "practical" | "emergency" | "export" | "account";
 
 export const TOOLS: { key: ToolKey; label: string; icon: React.ReactElement; wide?: boolean }[] = [
   { key: "overview", label: "Aperçu", icon: <IGrid />, wide: true },
   { key: "agenda", label: "Agenda", icon: <ICal /> },
+  { key: "translate", label: "Traduire", icon: <ITranslate /> },
   { key: "phrases", label: "Phrases", icon: <IChat /> },
   { key: "converter", label: "Devises", icon: <span style={{ fontWeight: 600, fontSize: 15, lineHeight: 1 }}>¥</span> },
+  { key: "checklist", label: "Check-list", icon: <IChecklist /> },
   { key: "flights", label: "Vols", icon: <IPlane /> },
   { key: "practical", label: "Infos", icon: <IInfo /> },
+  { key: "emergency", label: "Urgence", icon: <ISos /> },
   { key: "export", label: "Export", icon: <IDownload /> },
   { key: "account", label: "Compte", icon: <IUser /> },
 ];
@@ -63,12 +67,15 @@ export default function TopBar({ trip, tool, onTool, onSearch, onTrip, onHome }:
   const now = useNow();
   const wx = useWeather(trip.center[1], trip.center[0], trip.timezone);
   const sync = useSyncState();
+  const todo = useChecklist(trip).filter((i) => !i.done).length;
+  const ph = phase(trip);
   const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
   const toolBtn = (t: (typeof TOOLS)[number], mobile = false) => (
     <button key={t.key} className={"tool" + (tool === t.key ? " on" : "")} onClick={() => onTool(t.key)} aria-pressed={tool === t.key} title={t.label}>
       {t.icon}
       <span className={mobile ? "tool-txt" : "tool-txt"}>{t.label}</span>
       {t.key === "account" && (sync === "error" || sync === "pending" || sync === "denied") && <span className="badge-dot" />}
+      {t.key === "checklist" && todo > 0 && ph === "before" && <span className="badge-num">{todo}</span>}
     </button>
   );
   return (

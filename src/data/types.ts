@@ -1,3 +1,4 @@
+import type { Hours } from "../lib/hours";
 /** Day keys are per trip: "base" (hotel), "d1".."d9", "lifestyle", "ideas"… */
 export type DayKey = string;
 
@@ -86,6 +87,17 @@ export interface Trip {
   phrases: PhraseGroup[];
   zones: Zone[];
   practical?: { title: string; text: string }[];
+  /** structured opening hours by place id */
+  hours?: Record<string, Hours>;
+  emergency?: Emergency;
+  /** starting items of the shared departure checklist */
+  checklist?: { id: string; text: string; due?: string; group?: string }[];
+}
+
+export interface Emergency {
+  numbers: { label: string; number: string; note: string }[];
+  consulate: { name: string; address: string; cn: string; lat: number; lng: number; phone: string; emergency: string; hours: string; website: string };
+  hospitals: { name: string; cn: string; address: string; addressCn: string; lat: number; lng: number; phone: string; er24: boolean; english: boolean; directBilling: string; note: string }[];
 }
 
 export type Status = "todo" | "scheduled" | "visited" | "sample";
