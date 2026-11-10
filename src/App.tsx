@@ -355,7 +355,8 @@ export default function App() {
   const SNAPS: Snap[] = ["peek", "half", "full"];
   const side = useSheetGesture(sideRef, {
     snaps: () => SNAPS.map((k) => snapPx[k]),
-    onSnap: (i) => setSnap(SNAPS[i]),
+    // by height, not index: the gesture merges heights that are too close (very short screens)
+    onSnap: (_i, h) => setSnap(SNAPS.reduce((a, k) => (Math.abs(snapPx[k] - h) < Math.abs(snapPx[a] - h) ? k : a))),
     onTap: () => setSnap((s) => (s === "peek" ? "half" : s === "half" ? "full" : "half")),
     controlled: true,
     body: ".side-body",
@@ -364,7 +365,8 @@ export default function App() {
   const selectedPlace = sel?.kind === "place" ? trip.places.find((p) => p.id === sel.id) : undefined;
   const selectedPin = sel?.kind === "pin" ? data.pins.find((p) => p.id === sel.id) : undefined;
   const toolDef = TOOLS.find((t) => t.key === tool);
-  const detailSheet = desktop ? undefined : `${Math.round(DETAIL_VH * 100)}vh`;
+  // in px, the same number the drag uses (CSS vh is the larger viewport in a browser tab)
+  const detailSheet = desktop ? undefined : `${Math.round(vh * DETAIL_VH)}px`;
   const toolSheet = desktop ? undefined : `${sheetFull}px`;
 
   return (

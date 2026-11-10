@@ -51,20 +51,35 @@ async function cachedFetch(url: string, signal?: AbortSignal): Promise<Response>
   if (immutable(url)) {
     const hit = await cache.match(key);
     if (hit) return hit;
-    const res = await fetch(url, { signal });
+    // a tile missing from the copy must not hang the map: after 10 s MapLibre draws the stored zoomed-out tile
+    const res = await fetchWithTimeout(url, 10000, signal);
     if (res.ok) cache.put(key, res.clone()).catch(() => {});
     return res;
   }
   // style and tile index: the stored copy right away (no waiting on a filtered hotel Wi-Fi),
-  // refreshed in the background for next time; without a copy, wait for the network (no time limit)
+  // refreshed in the background for next time. A new style is kept only once its sprite (map icons)
+  // is stored too, so a silent refresh can never point the offline map at icons it does not have.
   const hit = await cache.match(key);
   if (hit) {
     fetchWithTimeout(url, 15000)
-      .then((res) => (res.ok ? cache.put(key, res) : undefined))
+      .then(async (res) => {
+        if (!res.ok) return;
+        const j = await res.clone().json().catch(() => null);
+        if (j && typeof j.sprite === "string") {
+          for (const sfx of [".json", ".png", "@2x.json", "@2x.png"]) {
+            const k = keyOf(j.sprite + sfx);
+            if (await cache.match(k)) continue;
+            const r = await fetchWithTimeout(j.sprite + sfx, 15000);
+            if (!r.ok) return; // keep the old style
+            await cache.put(k, r);
+          }
+        }
+        await cache.put(key, res);
+      })
       .catch(() => {});
     return hit;
   }
-  return fetchWithTimeout(url, 0, signal).then((res) => {
+  return fetchWithTimeout(url, 20000, signal).then((res) => {
     if (res.ok) cache.put(key, res.clone()).catch(() => {});
     return res;
   });
@@ -139,9 +154,11 @@ export function tilesFor(points: LL[]): string[] {
   const lats = points.map((p) => p.lat);
   const lngs = points.map((p) => p.lng);
   const [s, n, w, e] = [Math.min(...lats), Math.max(...lats), Math.min(...lngs), Math.max(...lngs)];
-  // whole world at z0–3 (the globe on the home screen) and the region at z4–9
+  // whole world at z0–3 (the globe on the home screen), the region at z4–6 (cheap even if a pin is far away,
+  // e.g. the Paris airport), then ~45 km around each place at z7–9 (a far pin no longer multiplies the download)
   for (let z = 0; z <= 3; z++) bboxTiles(out, z, -60, -180, 75, 180);
-  for (let z = 4; z <= 9; z++) bboxTiles(out, z, s - 0.4, w - 0.4, n + 0.4, e + 0.4);
+  for (let z = 4; z <= 6; z++) bboxTiles(out, z, s - 0.4, w - 0.4, n + 0.4, e + 0.4);
+  for (const p of points) for (let z = 7; z <= 9; z++) bboxTiles(out, z, p.lat - 0.4, p.lng - 0.4, p.lat + 0.4, p.lng + 0.4);
   // mid zoom: only around the dense part (points within ~60 km of the median), so a far day trip does not blow up the count
   const med = (v: number[]) => v.slice().sort((x, y) => x - y)[v.length >> 1];
   const mid = { lat: med(lats), lng: med(lngs) };
@@ -158,19 +175,17 @@ export function tilesFor(points: LL[]): string[] {
   return [...out];
 }
 
-/** Every file the offline map needs: style extras, relief images for the globe, vector tiles. */
+/** Every file the offline map needs: sprite (map icons), label font, vector tiles.
+ * (The style declares a shaded-relief source but no layer draws it, so the map never asks for it.) */
 function urlsFor(points: LL[], style: { sprite?: unknown }, template: string): string[] {
   const extras: string[] = [];
   if (typeof style.sprite === "string") for (const sfx of [".json", ".png", "@2x.json", "@2x.png"]) extras.push(style.sprite + sfx);
   for (const r of GLYPH_RANGES) extras.push(`${HOST}/fonts/${encodeURIComponent(FONT)}/${r}-${r + 255}.pbf`);
-  // shaded relief of the home-screen globe (zoom 0–3, whole world)
-  const relief: string[] = [];
-  for (let z = 0; z <= 3; z++) for (let x = 0; x < 2 ** z; x++) for (let y = 0; y < 2 ** z; y++) relief.push(`${HOST}/natural_earth/ne2sr/${z}/${x}/${y}.png`);
   const tiles = tilesFor(points).map((t) => {
     const [z, x, y] = t.split("/");
     return template.replace("{z}", z).replace("{x}", x).replace("{y}", y);
   });
-  return [...extras, ...relief, ...tiles];
+  return [...extras, ...tiles];
 }
 
 /** Fresh copy from the network (stored), else the stored one: the download must use the current tile version. */
@@ -234,7 +249,7 @@ export async function prepareOffline(points: LL[]): Promise<void> {
     // keep the screen on during the download (a locked screen stops it)
     lock = await (navigator as unknown as { wakeLock?: { request: (t: string) => Promise<{ release: () => Promise<void> }> } }).wakeLock?.request("screen").catch(() => null) ?? null;
     const cache = await caches.open(CACHE);
-    // style and tile index fetched fresh (current tile version), then sprite, fonts, relief, tiles
+    // style and tile index fetched fresh (current tile version), then sprite, fonts, tiles
     const style = await freshJson(STYLE_URL, signal);
     const tj = await freshJson(`${HOST}/planet`, signal);
     const template = String(tj.tiles?.[0] || "");

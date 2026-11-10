@@ -184,7 +184,7 @@ function OfflineCard({ trip }: { trip: Trip }) {
         )
       )}
       {st.state === "ready" && st.error && <p className="tr-err">{st.error}</p>}
-      {st.state === "none" && <p>Téléchargez une fois, en Wi-Fi, les quartiers du programme, Suzhou et vos lieux ajoutés (environ 45 Mo à télécharger, 75 Mo sur le téléphone). Ensuite la carte s'affiche sans réseau et ne consomme plus de données mobiles.</p>}
+      {st.state === "none" && <p>Téléchargez une fois, en Wi-Fi, les quartiers du programme, Suzhou et vos lieux ajoutés (environ 35 Mo à télécharger, 60 Mo sur le téléphone). Ensuite la carte s'affiche sans réseau et ne consomme plus de données mobiles.</p>}
       {st.state === "running" && (
         <>
           <p>Téléchargement… {st.done} / {st.total} · {mb(st.bytes)}</p>
