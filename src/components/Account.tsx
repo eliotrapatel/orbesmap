@@ -8,21 +8,30 @@ const SYNC_TEXT: Record<SyncState, string> = {
   syncing: "Synchronisation…",
   pending: "Hors connexion : envoi dès le retour du réseau",
   error: "Envoi en attente, nouvel essai automatique",
+  denied: "Ce compte n'a pas accès à l'espace partagé",
 };
 
-export function SyncBadge() {
+export function useSyncState(): SyncState {
   const sync = useStore((s) => s.sync);
   const session = useStore((s) => s.session);
-  const state: SyncState = session ? sync : "local";
+  return session ? sync : "local";
+}
+
+export function SyncBadge() {
+  const state = useSyncState();
+  const pending = useStore((s) => s.pending);
   return (
     <span className={"sync " + state}>
       <i /> {SYNC_TEXT[state]}
+      {pending > 0 && state !== "idle" ? ` · ${pending} en attente` : ""}
     </span>
   );
 }
 
 export default function Account() {
   const session = useStore((s) => s.session);
+  const member = useStore((s) => s.member);
+  const pending = useStore((s) => s.pending);
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [step, setStep] = useState<"email" | "code">("email");
@@ -31,45 +40,50 @@ export default function Account() {
 
   if (!supabaseConfigured) {
     return (
-      <div className="tools">
-        <section className="card">
-          <h3>Sauvegarde</h3>
-          <p style={{ marginTop: 6 }}>Vos notes, statuts, contacts et photos sont enregistrés sur cet appareil.</p>
-          <p style={{ marginTop: 10 }}>La synchronisation en ligne sera disponible dès que le compte Supabase sera relié à l'app.</p>
-          <div style={{ marginTop: 14 }}>
-            <SyncBadge />
-          </div>
-        </section>
+      <div>
+        <div className="card">
+          <h4>Sauvegarde</h4>
+          <p style={{ marginTop: 6 }}>Vos notes, statuts, contacts et photos sont enregistrés sur cet appareil, même hors connexion.</p>
+          <p style={{ marginTop: 10 }}>La sauvegarde en ligne et le partage avec votre père s'activeront dès que le projet Supabase sera relié à l'app.</p>
+          <div style={{ marginTop: 14 }}><SyncBadge /></div>
+        </div>
       </div>
     );
   }
 
   if (session) {
     return (
-      <div className="tools">
-        <section className="card">
-          <h3>Compte</h3>
+      <div>
+        <div className="card">
+          <h4>{member === false ? "Accès non autorisé" : "Espace partagé"}</h4>
           <p style={{ marginTop: 6 }}>Connecté avec {session.user.email}</p>
-          <div style={{ marginTop: 14 }}>
-            <SyncBadge />
-          </div>
-          <p style={{ marginTop: 14 }}>Vos données sont sauvegardées en ligne et sur cet appareil. Vous les retrouvez sur tous vos appareils en vous connectant avec le même e-mail.</p>
-          <button className="btn danger block" style={{ marginTop: 16 }} onClick={() => signOut()}>
+          <div style={{ marginTop: 14 }}><SyncBadge /></div>
+          {member === false ? (
+            <p style={{ marginTop: 14 }}>Cette adresse ne figure pas dans la liste des membres. Ajoutez-la dans Supabase (table « members »), puis reconnectez-vous.</p>
+          ) : (
+            <p style={{ marginTop: 14 }}>Vos données sont sauvegardées en ligne et partagées en direct avec les autres membres. Elles restent aussi sur cet appareil pour fonctionner sans réseau.</p>
+          )}
+          <button
+            className="btn danger block"
+            style={{ marginTop: 16 }}
+            onClick={() => {
+              if (pending > 0 && !confirm(`${pending} modification(s) ne sont pas encore envoyées. Elles resteront sur cet appareil et partiront à la prochaine connexion. Se déconnecter ?`)) return;
+              void signOut();
+            }}
+          >
             Se déconnecter
           </button>
-        </section>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="tools">
-      <section className="card">
-        <h3>Sauvegarder en ligne</h3>
-        <p style={{ marginTop: 6 }}>Connectez-vous pour retrouver vos notes, contacts et photos sur tous vos appareils. Sans connexion, tout reste enregistré sur cet appareil.</p>
-        <div style={{ marginTop: 12 }}>
-          <SyncBadge />
-        </div>
+    <div>
+      <div className="card">
+        <h4>Sauvegarder et partager</h4>
+        <p style={{ marginTop: 6 }}>Connectez-vous pour retrouver vos notes, contacts et photos sur tous vos appareils et les partager avec votre père. Sans connexion, tout reste sur cet appareil.</p>
+        <div style={{ marginTop: 12 }}><SyncBadge /></div>
         {step === "email" ? (
           <form
             onSubmit={async (e) => {
@@ -90,7 +104,7 @@ export default function Account() {
               <span>E-mail</span>
               <input className="input" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="vous@exemple.com" />
             </label>
-            <button className="btn dark block" style={{ marginTop: 12 }} disabled={busy || !email.includes("@")}>
+            <button className="btn primary block" style={{ marginTop: 12 }} disabled={busy || !email.includes("@")}>
               {busy ? "Envoi…" : "Recevoir le lien de connexion"}
             </button>
           </form>
@@ -109,25 +123,21 @@ export default function Account() {
               }
             }}
           >
-            <p style={{ marginTop: 14 }}>
-              E-mail envoyé à <b>{email}</b>. Ouvrez le lien sur cet appareil, ou saisissez le code reçu.
+            <p style={{ marginTop: 14, color: "var(--soft)", fontSize: 13.5 }}>
+              E-mail envoyé à <b style={{ color: "var(--ink)" }}>{email}</b>. Ouvrez le lien sur cet appareil, ou saisissez le code reçu.
             </p>
             <label className="field">
               <span>Code</span>
               <input className="input" inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} placeholder="123456" maxLength={10} />
             </label>
             <div className="btn-row">
-              <button type="button" className="btn" onClick={() => setStep("email")}>
-                Changer d'e-mail
-              </button>
-              <button className="btn dark" disabled={busy || code.length < 6}>
-                Se connecter
-              </button>
+              <button type="button" className="btn" onClick={() => setStep("email")}>Changer d'e-mail</button>
+              <button className="btn primary" disabled={busy || code.length < 6}>Se connecter</button>
             </div>
           </form>
         )}
-        {err && <p style={{ marginTop: 12, color: "#9b1c1c", fontSize: 13.5 }}>{err}</p>}
-      </section>
+        {err && <p style={{ marginTop: 12, color: "var(--bad)", fontSize: 13.5 }}>{err}</p>}
+      </div>
     </div>
   );
 }

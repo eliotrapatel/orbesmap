@@ -1,31 +1,31 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Account from "./components/Account";
-import Agenda, { dayStops } from "./components/Agenda";
-import { ICal, IList, ILocate, IPinPlus, ISearch, ITools, IUser, IClose } from "./components/Icons";
-import Intro from "./components/Intro";
+import Agenda from "./components/Agenda";
+import CommandPalette from "./components/CommandPalette";
+import DayBar from "./components/DayBar";
+import { ICube, ILocate, IPinPlus } from "./components/Icons";
+import Landing from "./components/Landing";
 import MapView, { type FocusRequest } from "./components/MapView";
+import Overview from "./components/Overview";
 import PinDetail, { PinForm } from "./components/PinDetail";
 import PlaceDetail from "./components/PlaceDetail";
-import PlaceList from "./components/PlaceList";
-import Tools from "./components/Tools";
-import { Toaster } from "./components/ui";
-import { DAYS, DAY_BY_KEY, PLACES, QUICK_ZONES, TRIP } from "./data/trip";
-import type { DayKey, Place } from "./data/types";
+import PlaceList, { type Filter } from "./components/PlaceList";
+import TopBar, { TOOLS, type ToolKey } from "./components/TopBar";
+import { Converter, ExportPanel, Flights, Phrases, Practical } from "./components/Tools";
+import { Drawer, Toaster } from "./components/ui";
+import type { Place } from "./data/types";
 import { km, optimizeOrder } from "./lib/geo";
-import { addPin, toast, useStore } from "./lib/store";
-import monogram from "./assets/monogram.png";
+import { dayStops } from "./lib/plan";
+import { addPin, switchTrip, toast, useStore, useTrip } from "./lib/store";
 
-type Tab = "places" | "agenda" | "tools" | "account";
 type Sel = { kind: "place" | "pin"; id: string } | null;
 type Snap = "peek" | "half" | "full";
-
-const INTRO_KEY = "orbes.v2.intro";
-const isDesktop = () => window.matchMedia("(min-width: 900px)").matches;
+const DESKTOP = "(min-width: 900px)";
 
 function useDesktop() {
-  const [d, setD] = useState(isDesktop);
+  const [d, setD] = useState(() => window.matchMedia(DESKTOP).matches);
   useEffect(() => {
-    const m = window.matchMedia("(min-width: 900px)");
+    const m = window.matchMedia(DESKTOP);
     const f = () => setD(m.matches);
     m.addEventListener("change", f);
     return () => m.removeEventListener("change", f);
@@ -33,56 +33,35 @@ function useDesktop() {
   return d;
 }
 
-function safeBottom(): number {
-  const probe = document.createElement("div");
-  probe.style.cssText = "position:fixed;bottom:0;height:env(safe-area-inset-bottom,0px);visibility:hidden";
-  document.body.appendChild(probe);
-  const h = probe.getBoundingClientRect().height;
-  probe.remove();
-  return h;
-}
-
-function countdown(): { big: string; small: string } {
-  const now = Date.now();
-  const start = new Date(TRIP.start + "T00:00:00+08:00").getTime();
-  const end = new Date(TRIP.end + "T23:59:00+08:00").getTime();
-  if (now < start) return { big: `J-${Math.ceil((start - now) / 864e5)}`, small: "avant le départ" };
-  if (now <= end) return { big: `Jour ${Math.floor((now - start) / 864e5) + 1}`, small: "sur place" };
-  return { big: "Juin 2026", small: "voyage terminé" };
-}
+type LL = [number, number];
+const boundsOf = (pts: { lat: number; lng: number }[]): [LL, LL] => [
+  [Math.min(...pts.map((p) => p.lng)), Math.min(...pts.map((p) => p.lat))],
+  [Math.max(...pts.map((p) => p.lng)), Math.max(...pts.map((p) => p.lat))],
+];
 
 export default function App() {
   const desktop = useDesktop();
+  const trip = useTrip();
   const data = useStore((s) => s.data);
-  const [intro, setIntro] = useState(() => {
-    try {
-      return !localStorage.getItem(INTRO_KEY);
-    } catch {
-      return false;
-    }
-  });
-  const [tab, setTab] = useState<Tab>("places");
-  const [day, setDay] = useState<"all" | DayKey>("all");
-  const [query, setQuery] = useState("");
+  const [landing, setLanding] = useState(true);
+  const [day, setDay] = useState("all");
+  const [filter, setFilter] = useState<Filter>({ types: new Set(), fav: false, todo: false });
   const [sel, setSel] = useState<Sel>(null);
-  const [route, setRoute] = useState<{ day: DayKey; order: Place[] } | null>(null);
-  // Start framed on the Guangzhou places (Dongguan and Shenzhen are one tap away).
-  const [focus, setFocus] = useState<FocusRequest | null>(() => {
-    const gz = PLACES.filter((p) => p.lat > 23.05);
-    const lngs = gz.map((p) => p.lng);
-    const lats = gz.map((p) => p.lat);
-    return { n: 0, bounds: [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]] };
-  });
+  const [tool, setTool] = useState<ToolKey | null>(null);
+  const [route, setRoute] = useState<{ day: string; order: Place[] } | null>(null);
+  const [focus, setFocus] = useState<FocusRequest | null>(null);
   const [pinMode, setPinMode] = useState(false);
-  const [pendingPin, setPendingPin] = useState<[number, number] | null>(null);
-  const [me, setMe] = useState<[number, number] | null>(null);
+  const [pendingPin, setPendingPin] = useState<LL | null>(null);
+  const [me, setMe] = useState<LL | null>(null);
   const [basemapFailed, setBasemapFailed] = useState(false);
+  const [threeD, setThreeD] = useState(false);
+  const [cmdk, setCmdk] = useState(false);
   const [snap, setSnap] = useState<Snap>("peek");
   const [vh, setVh] = useState(window.innerHeight);
   const watchId = useRef<number | null>(null);
   const firstFix = useRef(true);
-  const bodyRef = useRef<HTMLDivElement>(null);
-  const sb = useMemo(safeBottom, []);
+  const n = useRef(0);
+  const fly = useCallback((f: Omit<FocusRequest, "n">) => setFocus({ ...f, n: ++n.current }), []);
 
   useEffect(() => {
     const f = () => setVh(window.innerHeight);
@@ -90,80 +69,107 @@ export default function App() {
     return () => window.removeEventListener("resize", f);
   }, []);
 
+  // ⌘K / Ctrl K
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        if (!landing) setCmdk((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", k);
+    return () => window.removeEventListener("keydown", k);
+  }, [landing]);
+
+  const tripBounds = useCallback(() => {
+    const core = trip.places.filter((p) => Math.abs(p.lat - trip.center[1]) < 0.35 && Math.abs(p.lng - trip.center[0]) < 0.45);
+    return boundsOf(core.length ? core : trip.places);
+  }, [trip]);
+
+  // reset view state when the trip changes
+  useEffect(() => {
+    setDay("all");
+    setSel(null);
+    setRoute(null);
+    setFilter({ types: new Set(), fav: false, todo: false });
+    if (!landing) fly({ bounds: tripBounds(), pitch: 0, duration: 1600 });
+  }, [trip.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // a deleted pin (e.g. removed on another device) closes its panel
+  useEffect(() => {
+    if (sel?.kind === "pin" && !data.pins.some((p) => p.id === sel.id)) setSel(null);
+  }, [data.pins, sel]);
+
   // ---- filtering ----
-  const q = query.trim().toLowerCase();
-  const filtered = useMemo(
+  const visible = useMemo(
     () =>
-      PLACES.filter(
-        (p) =>
-          (day === "all" || p.day === day) &&
-          (!q || [p.name, p.desc, p.address, p.cn, p.type, ...(p.highlights || []), data.places[p.id]?.note || ""].some((t) => t.toLowerCase().includes(q))),
-      ),
-    [day, q, data.places],
+      trip.places.filter((p) => {
+        const s = data.places[p.id];
+        return (day === "all" || p.day === day) && (!filter.fav || s?.favorite) && (!filter.todo || !s?.visited) && (!filter.types.size || filter.types.has(p.type));
+      }),
+    [trip, day, filter, data.places],
   );
-  const visibleIds = useMemo(() => new Set(filtered.map((p) => p.id)), [filtered]);
+  const visibleIds = useMemo(() => new Set(visible.map((p) => p.id)), [visible]);
+  const dayColor = useCallback((k: string) => trip.days.find((d) => d.key === k)?.color || "#f6f2ea", [trip]);
+  const dayGlyph = useCallback((k: string) => trip.days.find((d) => d.key === k)?.glyph || "•", [trip]);
 
-  // ---- sheet geometry (mobile) ----
-  const panelH = vh - 56 - (desktop ? 0 : 0);
-  const snapPx: Record<Snap, number> = { peek: 180 + sb, half: Math.round(vh * 0.56), full: panelH };
-  const sheetH = desktop ? 0 : snapPx[snap];
-  const padding = desktop ? { top: 0, bottom: 0, left: 408 + 12, right: 60 } : { top: 0, bottom: Math.min(sheetH, snapPx.half), left: 0, right: 0 };
+  // ---- layout ----
+  const rightOpen = Boolean(sel || tool);
+  const peekPx = 172;
+  const snapPx: Record<Snap, number> = { peek: peekPx, half: Math.round(vh * 0.52), full: vh - 140 };
+  const padding = desktop
+    ? { top: 130, bottom: 30, left: 372 + 36, right: rightOpen ? 440 + 36 : 70 }
+    : { top: 170, bottom: rightOpen ? Math.round(vh * 0.55) : snapPx[snap], left: 20, right: 20 };
 
-  const n = useRef(0);
-  const fly = useCallback((f: Omit<FocusRequest, "n">) => setFocus({ ...f, n: ++n.current }), []);
-
+  // ---- actions ----
   const openPlace = useCallback(
     (p: Place) => {
       setSel({ kind: "place", id: p.id });
-      setTab("places");
-      if (!desktop) setSnap((s) => (s === "full" ? "full" : "half"));
-      fly({ center: [p.lng, p.lat], zoom: 14 });
-      bodyRef.current?.scrollTo({ top: 0 });
+      setTool(null);
+      fly({ center: [p.lng, p.lat], zoom: threeD ? 16 : 14.6 });
     },
-    [desktop, fly],
+    [fly, threeD],
   );
 
   const showDay = useCallback(
-    (d: "all" | DayKey) => {
+    (d: string) => {
       setDay(d);
       setSel(null);
       if (d === "all") {
         setRoute(null);
+        fly({ bounds: tripBounds() });
         return;
       }
-      const stops = PLACES.filter((p) => p.day === d);
-      setRoute(DAY_BY_KEY[d].scheduled ? { day: d, order: dayStops(d, data.places) } : null);
-      if (stops.length) {
-        const lngs = stops.map((p) => p.lng);
-        const lats = stops.map((p) => p.lat);
-        fly(stops.length === 1 ? { center: [stops[0].lng, stops[0].lat], zoom: 14 } : { bounds: [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]] });
-      }
+      const dd = trip.days.find((x) => x.key === d);
+      const stops = trip.places.filter((p) => p.day === d);
+      setRoute(dd?.scheduled ? { day: d, order: dayStops(trip, d, data.places).filter((p) => p.type !== "hotel") } : null);
+      if (stops.length) fly(stops.length === 1 ? { center: [stops[0].lng, stops[0].lat], zoom: 14 } : { bounds: boundsOf(stops) });
+      if (!desktop) setSnap("peek");
     },
-    [data.places, fly],
+    [trip, data.places, fly, tripBounds, desktop],
   );
 
   const optimize = useCallback(
-    (d: DayKey) => {
-      const order = optimizeOrder(TRIP.hotel, PLACES.filter((p) => p.day === d));
+    (d: string) => {
+      const order = optimizeOrder(trip.hotel, trip.places.filter((p) => p.day === d && p.type !== "hotel"));
       let total = 0;
-      let prev: { lat: number; lng: number } = TRIP.hotel;
+      let prev: { lat: number; lng: number } = trip.hotel;
       order.forEach((p) => {
         total += km(prev, p);
         prev = p;
       });
       setDay(d);
       setSel(null);
+      setTool(null);
       setRoute({ day: d, order });
-      const lngs = order.map((p) => p.lng);
-      const lats = order.map((p) => p.lat);
-      fly({ bounds: [[Math.min(...lngs, TRIP.hotel.lng), Math.min(...lats, TRIP.hotel.lat)], [Math.max(...lngs, TRIP.hotel.lng), Math.max(...lats, TRIP.hotel.lat)]] });
+      fly({ bounds: boundsOf([...order, trip.hotel]) });
       if (!desktop) setSnap("peek");
-      toast(`Ordre conseillé : ${order.map((p) => p.name.split(/ [—-] /)[0]).join(", ")} (${Math.round(total)} km)`);
+      toast(`Meilleur ordre : ${order.length} arrêts, ${Math.round(total)} km depuis l'hôtel (numéros sur la carte)`);
     },
-    [desktop, fly],
+    [trip, fly, desktop],
   );
 
-  const toggleLocate = () => {
+  const toggleLocate = useCallback(() => {
     if (watchId.current != null) {
       navigator.geolocation.clearWatch(watchId.current);
       watchId.current = null;
@@ -175,7 +181,7 @@ export default function App() {
     firstFix.current = true;
     watchId.current = navigator.geolocation.watchPosition(
       (pos) => {
-        const ll: [number, number] = [pos.coords.longitude, pos.coords.latitude];
+        const ll: LL = [pos.coords.longitude, pos.coords.latitude];
         setMe(ll);
         if (firstFix.current) {
           firstFix.current = false;
@@ -190,217 +196,251 @@ export default function App() {
       },
       { enableHighAccuracy: true, maximumAge: 10_000, timeout: 20_000 },
     );
-  };
-  useEffect(() => () => { if (watchId.current != null) navigator.geolocation.clearWatch(watchId.current); }, []);
+  }, [fly]);
+  useEffect(
+    () => () => {
+      if (watchId.current != null) navigator.geolocation.clearWatch(watchId.current);
+    },
+    [],
+  );
 
-  // ---- sheet drag (mobile) ----
+  const openTool = (k: ToolKey) => {
+    setTool((t) => (t === k ? null : k));
+    setSel(null);
+  };
+
+  // ---- mobile list sheet drag ----
+  const sideRef = useRef<HTMLElement>(null);
   const drag = useRef<{ y0: number; h0: number; t0: number; moved: boolean } | null>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
   const onDown = (e: React.PointerEvent) => {
-    if (desktop) return;
-    if ((e.target as HTMLElement).closest("input,button:not(.sheet-grip),a")) return;
-    drag.current = { y0: e.clientY, h0: sheetH, t0: performance.now(), moved: false };
+    if (desktop || (e.target as HTMLElement).closest("button:not(.sheet-grip),a,input")) return;
+    drag.current = { y0: e.clientY, h0: snapPx[snap], t0: performance.now(), moved: false };
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
   const onMove = (e: React.PointerEvent) => {
     const d = drag.current;
-    if (!d || !panelRef.current) return;
+    if (!d || !sideRef.current) return;
     const dy = e.clientY - d.y0;
     if (Math.abs(dy) > 4) d.moved = true;
-    const h = Math.max(snapPx.peek - 40, Math.min(panelH, d.h0 - dy));
-    panelRef.current.classList.add("dragging");
-    panelRef.current.style.setProperty("--sheet-h", `${h}px`);
+    sideRef.current.classList.add("dragging");
+    sideRef.current.style.setProperty("--sheet-h", `${Math.max(peekPx - 40, Math.min(snapPx.full, d.h0 - dy))}px`);
   };
-  const onUp = (e: React.PointerEvent) => {
+  const endDrag = (e: React.PointerEvent, cancelled: boolean) => {
     const d = drag.current;
     drag.current = null;
-    if (!d || !panelRef.current) return;
-    panelRef.current.classList.remove("dragging");
+    const el = sideRef.current;
+    if (!d || !el) return;
+    el.classList.remove("dragging");
+    el.style.setProperty("--sheet-h", `${snapPx[snap]}px`);
+    if (cancelled) return;
     const dy = e.clientY - d.y0;
     if (!d.moved) {
       setSnap((s) => (s === "peek" ? "half" : s === "half" ? "full" : "half"));
-      panelRef.current.style.setProperty("--sheet-h", `${sheetH}px`);
       return;
     }
-    const v = dy / Math.max(1, performance.now() - d.t0); // px/ms, positive = down
+    const v = dy / Math.max(1, performance.now() - d.t0);
     const h = d.h0 - dy;
     let next: Snap;
     if (v > 0.6) next = d.h0 >= snapPx.full - 5 ? "half" : "peek";
     else if (v < -0.6) next = d.h0 <= snapPx.peek + 5 ? "half" : "full";
     else next = (Object.entries(snapPx) as [Snap, number][]).reduce((a, b) => (Math.abs(b[1] - h) < Math.abs(a[1] - h) ? b : a))[0];
     setSnap(next);
-    panelRef.current.style.setProperty("--sheet-h", `${snapPx[next]}px`);
   };
 
-  const selectedPlace = sel?.kind === "place" ? PLACES.find((p) => p.id === sel.id) : undefined;
+  const selectedPlace = sel?.kind === "place" ? trip.places.find((p) => p.id === sel.id) : undefined;
   const selectedPin = sel?.kind === "pin" ? data.pins.find((p) => p.id === sel.id) : undefined;
-  const cd = countdown();
-
-  const tabs: { key: Tab; label: string; icon: React.ReactElement }[] = [
-    { key: "places", label: "Lieux", icon: <IList /> },
-    { key: "agenda", label: "Agenda", icon: <ICal /> },
-    { key: "tools", label: "Outils", icon: <ITools /> },
-    { key: "account", label: "Compte", icon: <IUser /> },
-  ];
+  const toolDef = TOOLS.find((t) => t.key === tool);
+  const mobileSheet = desktop ? undefined : "88%";
 
   return (
-    <div className="app" style={{ ["--sheet-peek" as string]: desktop ? "0px" : `${snapPx.peek}px` }}>
+    <div className={"app" + (desktop && rightOpen ? " desk-right" : "")} style={{ ["--sheet-peek" as string]: `${desktop ? 0 : snapPx[snap]}px` }}>
       <MapView
-        places={PLACES}
+        trip={trip}
+        places={trip.places}
         states={data.places}
         visibleIds={visibleIds}
         pins={data.pins}
         selected={sel}
         route={route?.order ?? null}
-        routeColor={route ? DAY_BY_KEY[route.day].color : "#000"}
+        routeColor={route ? dayColor(route.day) : "#f6f2ea"}
         focus={focus}
-        padding={padding}
+        padding={landing ? { top: 0, bottom: 0, left: 0, right: 0 } : padding}
         pinMode={pinMode}
         me={me}
+        threeD={threeD}
+        landing={landing}
+        dayColor={dayColor}
+        dayGlyph={dayGlyph}
         onSelect={(kind, id) => {
-          if (pinMode) return;
+          if (pinMode || landing) return;
           if (kind === "place") {
-            const p = PLACES.find((x) => x.id === id);
+            const p = trip.places.find((x) => x.id === id);
             if (p) openPlace(p);
           } else {
             setSel({ kind, id });
-            setTab("places");
-            if (!desktop) setSnap((s) => (s === "full" ? "full" : "half"));
+            setTool(null);
           }
         }}
         onMapClick={(ll) => {
+          if (landing) return;
           if (pinMode) {
             setPinMode(false);
             setPendingPin(ll);
             return;
           }
           if (sel) setSel(null);
-          if (!desktop && snap !== "peek") setSnap("peek");
+          else if (!desktop && snap !== "peek") setSnap("peek");
         }}
         onBasemapError={setBasemapFailed}
       />
 
-      <div className="mapctl">
-        <button className={"ctl" + (me ? " on" : "")} onClick={toggleLocate} aria-pressed={!!me} aria-label="Ma position" title="Ma position">
-          <ILocate />
-        </button>
-        <button className={"ctl" + (pinMode ? " on" : "")} onClick={() => setPinMode((v) => !v)} aria-pressed={pinMode} aria-label="Ajouter un lieu sur la carte" title="Ajouter un lieu">
-          <IPinPlus />
-        </button>
-        <div className="zones">
-          {QUICK_ZONES.map((z) => (
-            <button key={z.label} className="zone" onClick={() => fly({ center: z.center, zoom: z.zoom })}>
-              {z.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      {!landing && (
+        <>
+          <TopBar
+            trip={trip}
+            tool={tool}
+            onTool={openTool}
+            onSearch={() => setCmdk(true)}
+            onTrip={switchTrip}
+            onHome={() => {
+              setSel(null);
+              setTool(null);
+              setThreeD(false);
+              setLanding(true);
+            }}
+          />
+          <DayBar trip={trip} day={day} onDay={showDay} />
 
-      {pinMode && (
-        <div className="banner" role="status">
-          Touchez la carte pour placer le lieu
-          <button onClick={() => setPinMode(false)}>Annuler</button>
-        </div>
-      )}
-      {basemapFailed && !pinMode && (
-        <div className="banner" role="status" style={{ background: "#fff", color: "var(--ink)" }}>
-          Fond de carte indisponible sans réseau. Les lieux restent affichés.
-        </div>
-      )}
-
-      <aside
-        ref={panelRef}
-        className="panel"
-        style={{ ["--sheet-h" as string]: `${sheetH}px` }}
-        aria-label="Panneau du voyage"
-      >
-        <div className="sheet-grip" onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} role="button" aria-label="Agrandir ou réduire le panneau" />
-        <div className="panel-head" onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
-          {desktop && (
-            <div className="brand">
-              <img src={monogram} alt="ORBES" />
-              <div className="brand-txt">
-                <div className="brand-title">{TRIP.title}</div>
-                <div className="brand-sub">{TRIP.subtitle}, 7 au 13 juin 2026</div>
-              </div>
-              <div className="countdown">
-                <b>{cd.big}</b>
-                {cd.small}
+          <aside ref={sideRef} className="side glass" style={desktop ? undefined : ({ ["--sheet-h" as string]: `${snapPx[snap]}px` } as React.CSSProperties)} aria-label="Lieux du voyage">
+            <div className="sheet-grip" onPointerDown={onDown} onPointerMove={onMove} onPointerUp={(e) => endDrag(e, false)} onPointerCancel={(e) => endDrag(e, true)} role="button" aria-label="Agrandir ou réduire la liste" />
+            <div className="side-head" onPointerDown={onDown} onPointerMove={onMove} onPointerUp={(e) => endDrag(e, false)} onPointerCancel={(e) => endDrag(e, true)}>
+              <span className="label">{trip.subtitle}</span>
+              <div style={{ fontSize: 22, fontWeight: 500, letterSpacing: "-0.02em", marginTop: 4 }}>{trip.title}</div>
+              <div style={{ fontSize: 12.5, color: "var(--soft)" }}>
+                {trip.dateLabel} · {trip.hotel.name}
               </div>
             </div>
-          )}
-          {(tab === "places" && !sel) && (
-            <>
-              <label className="search" style={desktop ? undefined : { marginTop: 0 }}>
-                <ISearch />
-                <span className="sr">Rechercher un lieu</span>
-                <input
-                  type="search"
-                  value={query}
-                  placeholder="Rechercher un lieu, une matière, une note…"
-                  onChange={(e) => setQuery(e.target.value)}
-                  onFocus={() => !desktop && setSnap("full")}
+            <div className="side-body scroll">
+              <PlaceList
+                trip={trip}
+                places={visible}
+                states={data.places}
+                pins={data.pins}
+                selectedId={sel?.id ?? null}
+                query=""
+                filter={filter}
+                onFilter={setFilter}
+                onOpen={openPlace}
+                onOpenPin={(p) => {
+                  setSel({ kind: "pin", id: p.id });
+                  setTool(null);
+                  fly({ center: [p.lng, p.lat], zoom: 15 });
+                }}
+              />
+            </div>
+          </aside>
+
+          {selectedPlace && !tool && <PlaceDetail key={selectedPlace.id} trip={trip} place={selectedPlace} onBack={() => setSel(null)} sheetH={mobileSheet} />}
+          {selectedPin && !tool && <PinDetail key={selectedPin.id} pin={selectedPin} onBack={() => setSel(null)} sheetH={mobileSheet} />}
+
+          {toolDef && (
+            <Drawer kicker={trip.code} title={toolDef.key === "converter" ? "Convertisseur" : toolDef.label} wide={toolDef.wide} onClose={() => setTool(null)} sheetH={mobileSheet}>
+              {tool === "overview" && (
+                <Overview
+                  trip={trip}
+                  states={data.places}
+                  onShowDay={(d) => {
+                    setTool(null);
+                    showDay(d);
+                  }}
                 />
-                {query && (
-                  <button className="icon-btn" style={{ width: 28, height: 28 }} aria-label="Effacer" onClick={() => setQuery("")}>
-                    <IClose />
-                  </button>
-                )}
-              </label>
-              <div className="chips" role="group" aria-label="Filtrer par jour">
-                <button className={"chip" + (day === "all" ? " on" : "")} aria-pressed={day === "all"} onClick={() => showDay("all")}>
-                  Tout
+              )}
+              {tool === "agenda" && (
+                <Agenda
+                  trip={trip}
+                  states={data.places}
+                  onOpen={openPlace}
+                  onShowDay={(d) => {
+                    setTool(null);
+                    showDay(d);
+                  }}
+                  onOptimize={optimize}
+                />
+              )}
+              {tool === "phrases" && <Phrases trip={trip} />}
+              {tool === "converter" && <Converter />}
+              {tool === "flights" && <Flights trip={trip} />}
+              {tool === "practical" && <Practical trip={trip} />}
+              {tool === "export" && <ExportPanel trip={trip} />}
+              {tool === "account" && <Account />}
+            </Drawer>
+          )}
+
+          <div className="mapctl">
+            <div className="zones">
+              {trip.zones.map((z) => (
+                <button key={z.label} className="zone glass" onClick={() => fly({ center: z.center, zoom: z.zoom })}>
+                  {z.label}
                 </button>
-                {DAYS.map((d) => (
-                  <button key={d.key} className={"chip" + (day === d.key ? " on" : "")} aria-pressed={day === d.key} style={{ ["--c" as string]: d.color }} onClick={() => showDay(day === d.key ? "all" : d.key)}>
-                    <i />
-                    {d.short}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-          {!(tab === "places" && !sel) && !desktop && <div style={{ height: 4 }} />}
-          {tab !== "places" && (
-            <h2 style={{ fontFamily: "var(--serif)", fontWeight: 500, fontSize: 28, marginTop: desktop ? 18 : 0 }}>{tabs.find((t) => t.key === tab)!.label}</h2>
-          )}
-        </div>
+              ))}
+            </div>
+            <div className="ctl-group glass">
+              <button className={"ctl" + (me ? " on" : "")} onClick={toggleLocate} aria-pressed={!!me} aria-label="Ma position" title="Ma position">
+                <ILocate />
+              </button>
+              <button className={"ctl" + (pinMode ? " on" : "")} onClick={() => setPinMode((v) => !v)} aria-pressed={pinMode} aria-label="Ajouter un lieu sur la carte" title="Ajouter un lieu">
+                <IPinPlus />
+              </button>
+              <button className={"ctl" + (threeD ? " on" : "")} onClick={() => setThreeD((v) => !v)} aria-pressed={threeD} aria-label="Bâtiments en 3D" title="Vue 3D">
+                <ICube />
+              </button>
+            </div>
+          </div>
 
-        <div className="panel-body" ref={bodyRef}>
-          {tab === "places" && selectedPlace && <PlaceDetail key={selectedPlace.id} place={selectedPlace} onBack={() => setSel(null)} />}
-          {tab === "places" && selectedPin && <PinDetail key={selectedPin.id} pin={selectedPin} onBack={() => setSel(null)} />}
-          {tab === "places" && !sel && (
-            <PlaceList places={filtered} states={data.places} pins={data.pins} selectedId={null} query={query} total={PLACES.filter((p) => p.id !== "hotel").length} onOpen={openPlace} onOpenPin={(p) => { setSel({ kind: "pin", id: p.id }); fly({ center: [p.lng, p.lat], zoom: 15 }); }} />
+          {pinMode && (
+            <div className="banner glass" role="status">
+              Touchez la carte pour placer le lieu
+              <button onClick={() => setPinMode(false)}>Annuler</button>
+            </div>
           )}
-          {tab === "agenda" && <Agenda states={data.places} onOpen={openPlace} onShowDay={(d) => { showDay(d); setTab("places"); if (!desktop) setSnap("peek"); }} onOptimize={optimize} />}
-          {tab === "tools" && <Tools />}
-          {tab === "account" && <Account />}
-        </div>
+          {basemapFailed && !pinMode && (
+            <div className="banner glass" role="status" style={{ pointerEvents: "none" }}>
+              Fond de carte lent ou indisponible. Les lieux restent affichés.
+            </div>
+          )}
+        </>
+      )}
 
-      </aside>
+      {landing && (
+        <Landing
+          trip={trip}
+          onPick={switchTrip}
+          onEnter={() => {
+            window.setTimeout(() => setLanding(false), 450);
+            fly({ bounds: tripBounds(), pitch: 0, duration: 2600 });
+          }}
+        />
+      )}
 
-      <nav className="tabbar" aria-label="Sections">
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            className={"tab" + (tab === t.key ? " on" : "")}
-            aria-current={tab === t.key ? "page" : undefined}
-            onClick={() => {
-              if (tab === t.key) {
-                if (t.key === "places" && sel) setSel(null);
-                else if (!desktop) setSnap((s) => (s === "peek" ? "half" : "peek"));
-                return;
-              }
-              setTab(t.key);
-              if (!desktop && snap === "peek" && t.key !== "places") setSnap("full");
-              bodyRef.current?.scrollTo({ top: 0 });
-            }}
-          >
-            {t.icon}
-            {t.label}
-          </button>
-        ))}
-      </nav>
+      {cmdk && (
+        <CommandPalette
+          trip={trip}
+          pins={data.pins}
+          onClose={() => setCmdk(false)}
+          onPlace={openPlace}
+          onPin={(p) => {
+            setSel({ kind: "pin", id: p.id });
+            setTool(null);
+            fly({ center: [p.lng, p.lat], zoom: 15 });
+          }}
+          onTool={openTool}
+          onTrip={switchTrip}
+          onDay={showDay}
+          onToggle3D={() => setThreeD((v) => !v)}
+          onLocate={toggleLocate}
+          onAddPin={() => setPinMode(true)}
+        />
+      )}
 
       {pendingPin && (
         <PinForm
@@ -409,24 +449,11 @@ export default function App() {
             const pin = addPin({ name, note: note || undefined, lng: pendingPin[0], lat: pendingPin[1] });
             setPendingPin(null);
             setSel({ kind: "pin", id: pin.id });
-            setTab("places");
             toast(`« ${name} » ajouté`);
           }}
         />
       )}
       <Toaster />
-      {intro && (
-        <Intro
-          onDone={() => {
-            setIntro(false);
-            try {
-              localStorage.setItem(INTRO_KEY, "1");
-            } catch {
-              /* ignore */
-            }
-          }}
-        />
-      )}
     </div>
   );
 }
