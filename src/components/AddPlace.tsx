@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Trip } from "../data/types";
 import { km } from "../lib/geo";
 import { useLoc } from "../lib/locate";
-import { placeSearch, runPlaceSearch, stopPlaceSearch, usePlaceSearch, type Found } from "../lib/placeSearch";
+import { findExisting, placeSearch, runPlaceSearch, stopPlaceSearch, usePlaceSearch, type Found } from "../lib/placeSearch";
 import { fmtDistance } from "../lib/route";
 import { useStore } from "../lib/store";
 import { ICamera, ICheck } from "./Icons";
@@ -15,6 +15,7 @@ const EXAMPLES = ["Un bar à cocktails calme près du Bund", "Où acheter du bea
 export default function AddPlace({ trip, onClose, onAdd, onOpenExisting }: { trip: Trip; onClose: () => void; onAdd: (list: Found[]) => void; onOpenExisting: (e: NonNullable<Found["existing"]>) => void }) {
   const fix = useLoc((s) => s.fix);
   const pins = useStore((s) => s.data.pins);
+  const states = useStore((s) => s.data.places);
   const st = usePlaceSearch();
   const [text, setText] = useState("");
   const [shot, setShot] = useState<File | null>(null);
@@ -27,6 +28,11 @@ export default function AddPlace({ trip, onClose, onAdd, onOpenExisting }: { tri
     placeSearch.setOpen(true);
     return () => placeSearch.setOpen(false);
   }, []);
+  // results of another trip (switched meanwhile) are dropped; a day key of another trip falls back to "Pistes"
+  useEffect(() => {
+    if (st.res && st.tripId && st.tripId !== trip.id) placeSearch.reset();
+    if (!trip.days.some((d) => d.key === st.day)) placeSearch.setDay(trip.days.some((d) => d.key === "ideas") ? "ideas" : trip.days[trip.days.length - 1].key);
+  }, [trip.id]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!st.busy) return;
     const t = window.setInterval(() => setNow(Date.now()), 1000);
@@ -39,7 +45,11 @@ export default function AddPlace({ trip, onClose, onAdd, onOpenExisting }: { tri
   };
   const secs = Math.max(0, Math.round((now - st.startedAt) / 1000));
   const days = trip.days.filter((d) => d.key !== "base");
-  const res = st.res;
+  // "already on the map" is recomputed live (my father may have added it meanwhile)
+  const res = useMemo(
+    () => (st.res ? { ...st.res, items: st.res.items.map((f) => ({ ...f, existing: findExisting(f, trip, pins, states) })) } : null),
+    [st.res, trip, pins, states],
+  );
   const chosen = res ? res.items.filter((_, i) => st.picked.includes(i)) : [];
   const from = fix || trip.hotel;
   const xhs = /xhslink|xiaohongshu/i.test(text);
@@ -85,7 +95,7 @@ export default function AddPlace({ trip, onClose, onAdd, onOpenExisting }: { tri
           {st.busy && (
             <div className="tr-loading">
               <span className="spin" /> {secs < 45 ? "Recherche sur le web" : "Vérification des adresses"}… {secs} s
-              <small>Vous pouvez fermer : vous serez prévenu quand c'est prêt.</small>
+              <small>Vous pouvez fermer cette fenêtre (gardez l'app ouverte) : vous serez prévenu quand c'est prêt.</small>
             </div>
           )}
           {st.err && !st.busy && <p className="tr-err">{st.err}</p>}
@@ -104,7 +114,7 @@ export default function AddPlace({ trip, onClose, onAdd, onOpenExisting }: { tri
           <div className="ap-list">
             {res.items.map((p, i) => {
               const on = st.picked.includes(i);
-              const canPick = res.kind !== "precise" && !p.existing;
+              const canPick = res.kind !== "precise";
               const dist = p.ll ? fmtDistance(km(from, { lat: p.ll[1], lng: p.ll[0] }) * 1000) : null;
               return (
                 <div
@@ -130,11 +140,15 @@ export default function AddPlace({ trip, onClose, onAdd, onOpenExisting }: { tri
                     </span>
                     {(p.why || p.desc) && <span className="ap-why">{p.why || p.desc}</span>}
                     <span className="ap-meta">
-                      {p.existing ? `Déjà sur la carte (${p.existing.name})` : dist ? `${dist} ${fix ? "de vous" : "de l'hôtel"}` : p.hint ? "Position approximative : à placer à la main" : "Position à placer à la main"}
+                      {p.existing && <em className="ap-dup">Peut-être déjà sur la carte : {p.existing.name} · </em>}
+                      {dist ? `${dist} ${fix ? "de vous" : "de l'hôtel"}` : p.hint ? "Position approximative : à placer à la main" : "Position à placer à la main"}
                       {p.price ? ` · ${p.price}` : ""}
                     </span>
                     {p.existing && (
-                      <button type="button" className="btn-sm" onClick={(e) => { e.stopPropagation(); onOpenExisting(p.existing!); }}>Voir sur la carte</button>
+                      <span className="em-actions" style={{ marginTop: 4 }}>
+                        <button type="button" className="btn-sm" onClick={(e) => { e.stopPropagation(); onOpenExisting(p.existing!); }}>Voir {p.existing.name}</button>
+                        {res.kind === "precise" && !on && <button type="button" className="btn-sm" onClick={(e) => { e.stopPropagation(); placeSearch.toggle(i); }}>Ajouter quand même</button>}
+                      </span>
                     )}
                     {p.source && (
                       <a className="ap-src" href={p.source} target="_blank" rel="noopener" onClick={(e) => e.stopPropagation()}>
@@ -161,11 +175,12 @@ export default function AddPlace({ trip, onClose, onAdd, onOpenExisting }: { tri
                 disabled={!chosen.length}
                 onClick={() => {
                   onAdd(chosen.map((c) => ({ ...c, day: st.day })));
-                  placeSearch.reset();
+                  // places saved now leave the list; those to place by hand stay until placed
+                  placeSearch.removeItems(chosen.filter((c) => c.ll).map((c) => c.name));
                 }}
               >
                 {!chosen.length
-                  ? res.kind === "precise" ? "Déjà sur la carte" : "Cochez des lieux"
+                  ? res.kind === "precise" ? "Déjà sur la carte ?" : "Cochez des lieux"
                   : chosen.length === 1 ? (chosen[0].ll ? "Ajouter sur la carte" : "Placer sur la carte") : `Ajouter les ${chosen.length} lieux`}
               </button>
             </div>

@@ -147,7 +147,12 @@ export default function PlaceList({ trip, places, states, pins, selectedId, quer
               </span>
               <span className="row-main">
                 <span className="row-name">{pin.name}</span>
-                {pin.note && <span className="row-meta">{pin.note}</span>}
+                {(() => {
+                  const x = (states as Record<string, Record<string, unknown>>)[`_pin:${pin.id}`] || {};
+                  const dd = trip.days.find((d) => d.key === x.day);
+                  const meta = [dd?.dates?.[0] ? dd.short : dd?.title, (x.why as string) || (x.desc as string) || pin.note].filter(Boolean).join(" · ");
+                  return meta ? <span className="row-meta">{meta}</span> : null;
+                })()}
               </span>
               {fix && <span className="row-tags"><span className="row-dist">{fmtDistance(dist(pin)!)}</span></span>}
             </button>

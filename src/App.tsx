@@ -5,6 +5,7 @@ import CommandPalette from "./components/CommandPalette";
 import DayBar from "./components/DayBar";
 import { ICube, ILink, ILocate, IPinPlus } from "./components/Icons";
 import AddPlace, { type Found } from "./components/AddPlace";
+import { placeSearch } from "./lib/placeSearch";
 import Checklist from "./components/Checklist";
 import Emergency from "./components/Emergency";
 import Translate from "./components/Translate";
@@ -124,6 +125,9 @@ export default function App() {
 
   // reset view state when the trip changes
   useEffect(() => {
+    setPinMode(false);
+    setPlaceQueue([]);
+    setPendingPin(null);
     setSnap("peek");
     setDay("all");
     setSel(null);
@@ -193,11 +197,14 @@ export default function App() {
       }
       const dd = trip.days.find((x) => x.key === d);
       const stops = trip.places.filter((p) => p.day === d);
+      // my places added to this day are framed too
+      const dayPins = data.pins.filter((p) => (data.places[`_pin:${p.id}`] as Record<string, unknown> | undefined)?.day === d);
       setRoute(dd?.scheduled ? { day: d, order: dayStops(trip, d, data.places).filter((p) => p.type !== "hotel") } : null);
-      if (stops.length) fly(stops.length === 1 ? { center: [stops[0].lng, stops[0].lat], zoom: 14 } : { bounds: boundsOf(stops) });
+      const framed = [...stops, ...dayPins];
+      if (framed.length) fly(framed.length === 1 ? { center: [framed[0].lng, framed[0].lat], zoom: 14 } : { bounds: boundsOf(framed) });
       if (!desktop) setSnap("peek");
     },
-    [trip, data.places, fly, tripBounds, desktop],
+    [trip, data.places, data.pins, fly, tripBounds, desktop],
   );
 
   const optimize = useCallback(
@@ -276,7 +283,7 @@ export default function App() {
   const saveFound = useCallback(
     (f: Found, ll: LL, quiet = false) => {
       const pin = addPin({ name: f.name || f.nameCn || "Lieu", lng: ll[0], lat: ll[1] });
-      updateRecord(`_pin:${pin.id}`, { nameCn: f.nameCn, address: f.address, addressCn: f.addressCn, desc: [f.why, f.desc].filter(Boolean).join(" "), hours: f.hours, price: f.price, source: f.source, day: f.day, type: f.type });
+      updateRecord(`_pin:${pin.id}`, { nameCn: f.nameCn, address: f.address, addressCn: f.addressCn, desc: f.desc, why: f.why, hours: f.hours, price: f.price, source: f.source, day: f.day, type: f.type });
       if (!quiet) {
         setSel({ kind: "pin", id: pin.id });
         setTool(null);
@@ -290,14 +297,15 @@ export default function App() {
   // places picked in "Ajouter un lieu": those with a position go on the map now, the others are placed by hand one by one
   const startQueue = useCallback(
     (q: Found[]) => {
-      setPlaceQueue(q);
-      setQueueTotal(q.length);
+      // a new batch while placing: add it to the queue instead of dropping the current one
+      setPlaceQueue((cur) => [...cur, ...q.filter((f) => !cur.some((c) => c.name === f.name))]);
+      setQueueTotal((t) => (placeQueue.length ? t + q.length : q.length));
       setSel(null);
       setTool(null);
       setPinMode(true);
       if (q[0]?.hint) fly({ center: q[0].hint, zoom: 15 });
     },
-    [fly],
+    [fly, placeQueue.length],
   );
   const addFound = useCallback(
     (list: Found[]) => {
@@ -418,6 +426,7 @@ export default function App() {
             setPinMode(false);
             if (pendingFound) {
               saveFound(pendingFound, ll, placeQueue.length > 1);
+              placeSearch.removeItems([pendingFound.name]);
               const rest = placeQueue.slice(1);
               setPlaceQueue(rest);
               if (rest.length) {

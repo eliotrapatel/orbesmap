@@ -50,6 +50,11 @@ export async function ai<T>(task: "photo" | "interpret" | "place" | "ask", paylo
   }, timeoutMs);
   const onAbort = () => ctl.abort();
   signal?.addEventListener("abort", onAbort, { once: true });
+  // stopped while the session / image was being prepared: do not send the request
+  if (signal?.aborted) {
+    window.clearTimeout(t);
+    throw new AiError("Recherche arrêtée.");
+  }
   try {
     const res = await fetch(ENDPOINT, {
       method: "POST",

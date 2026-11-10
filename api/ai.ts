@@ -114,7 +114,7 @@ Décide d'abord :
 - kind = "not_found" si rien de fiable ; message explique quoi envoyer à la place (ex. une capture d'écran du post si le lien xhslink ne s'ouvre pas).
 Pour chaque lieu :
 - confirme par la recherche web et la lecture de pages : nom, nom chinois, adresse exacte en chinois et en anglais/pinyin, coordonnées.
-- Coordonnées : de préférence WGS-84 (OpenStreetMap, Wikipedia, site officiel). Si elles viennent d'Amap/Gaode, de Dianping ou de Tencent, c'est du GCJ02 ; de Baidu, c'est du BD09 : indique-le dans coordSystem sans convertir. Sans coordonnée fiable : lat = 0, lng = 0, coordSystem = "none".
+- Coordonnées : indique leur système dans coordSystem, sans convertir. En Chine continentale : Google Maps, Apple Maps, Amap/Gaode, Dianping, Tencent, les cartes de Xiaohongshu ou WeChat = GCJ02 ; Baidu = BD09 ; WGS84 seulement pour OpenStreetMap, Wikipedia/Wikidata ou un GPS brut. Sans coordonnée fiable : lat = 0, lng = 0, coordSystem = "none". L'adresse chinoise exacte (avec numéro) est plus importante que les coordonnées.
 - desc : une phrase en français sur ce que c'est. hours : horaires si trouvés. price : niveau de prix ou dépense typique si trouvé. source : l'URL la plus fiable consultée.
 - Si un lieu « près de » est donné, privilégie ce qui est à distance raisonnable (à pied ou 15 min de taxi).
 message : une phrase courte pour Eliot (ex. « 4 propositions autour du Bund »).`;
@@ -267,7 +267,7 @@ async function runDeepSeek(key: string, job: Job, f: typeof fetch, deadline: num
     let thinking = false;
     // keep ~130 s for the last research round + the summary + the JSON answer
     const toolResults: string[] = [];
-    for (let round = 0; round < 8 && left() > 130_000; round++) {
+    for (let round = 0; round < 8 && left() > 155_000; round++) {
       const req = (th: boolean) => dsPost("/chat/completions", { model: DS_MODEL, messages: msgs, tools: DS_TOOLS, max_tokens: 4000, ...(th ? { thinking: { type: "enabled" }, reasoning_effort: "low" } : { thinking: { type: "disabled" } }) }, key, f, ms(50_000));
       let r: Json;
       try {
@@ -285,6 +285,11 @@ async function runDeepSeek(key: string, job: Job, f: typeof fetch, deadline: num
       }
       // in thinking mode the reasoning must be sent back with the tool results
       msgs.push({ role: "assistant", content: m.content ?? "", tool_calls: calls, ...(thinking && m.reasoning_content ? { reasoning_content: m.reasoning_content } : {}) });
+      // not enough time left to run the tools usefully: answer them "not run" and go to the summary
+      if (left() - 90_000 < 8_000) {
+        for (const c of calls) msgs.push({ role: "tool", tool_call_id: c.id, content: "non exécuté (temps écoulé)" });
+        break;
+      }
       const results = await Promise.all(
         calls.slice(0, 4).map(async (c) => {
           let args: Json = {};
@@ -322,7 +327,15 @@ async function runDeepSeek(key: string, job: Job, f: typeof fetch, deadline: num
     { role: "user", content: notes ? (job.image ? [{ type: "image_url", image_url: { url: `data:image/jpeg;base64,${job.image}` } }, { type: "text", text: `${job.text}\n\nRésultats de recherche :\n${notes}` }] : `${job.text}\n\nRésultats de recherche :\n${notes}`) : userContent },
   ];
   for (let attempt = 0; attempt < 2 && left() > 5_000; attempt++) {
-    const r = await dsPost("/chat/completions", { model: DS_MODEL, messages, response_format: { type: "json_object" }, thinking: { type: "disabled" }, max_tokens: job.maxTokens }, key, f, ms(60_000));
+    let r: Json;
+    try {
+      r = await dsPost("/chat/completions", { model: DS_MODEL, messages, response_format: { type: "json_object" }, thinking: { type: "disabled" }, max_tokens: job.maxTokens }, key, f, ms(60_000));
+    } catch (e) {
+      // a passing network / server error must not throw away minutes of research: one more try
+      if (e instanceof Upstream && (e.kind === "busy" || e.kind === "bad_request")) throw e;
+      if (attempt === 1) throw e;
+      continue;
+    }
     const text = String(((r.choices as Json[] | undefined)?.[0]?.message as Json | undefined)?.content || "").trim();
     if (!text) continue;
     try {

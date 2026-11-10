@@ -44,10 +44,11 @@ export default function PinDetail({ trip, pin, onBack, onGo, sheetH }: { trip: T
           )}
         </div>
         <GoBlock target={pin} onGo={onGo} />
-        {(x.desc || x.hours || x.source || x.price) && (
+        {(x.desc || x.why || x.hours || x.source || x.price) && (
           <div className="sec">
             <span className="label">Le lieu</span>
             {x.desc && <p className="desc">{x.desc}</p>}
+            {x.why && <p className="em-small">Pourquoi : {x.why}</p>}
             {x.hours && <p className="em-small">Horaires : {x.hours}</p>}
             {x.price && <p className="em-small">Prix : {x.price}</p>}
             {x.source && <p className="em-small"><a href={x.source} target="_blank" rel="noopener">Source</a></p>}
