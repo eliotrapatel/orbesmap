@@ -1,8 +1,9 @@
 import type { Trip } from "../types";
 import { GZ2026 } from "./gz2026";
+import { SHA2026 } from "./sha2026";
 
 /** All trips, newest first. */
-export const TRIPS: Trip[] = [GZ2026];
+export const TRIPS: Trip[] = [SHA2026, GZ2026];
 
 export const TRIP_BY_ID: Record<string, Trip> = Object.fromEntries(TRIPS.map((t) => [t.id, t]));
 

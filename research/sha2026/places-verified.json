@@ -1,0 +1,2703 @@
+[
+ {
+  "id": "renaissance-caohejing",
+  "theme": "logistics",
+  "name": "Renaissance Shanghai Caohejing Hotel",
+  "nameCn": "上海漕河泾万丽酒店",
+  "category": "hotel",
+  "city": "Shanghai",
+  "lat": 31.16705,
+  "lng": 121.39224,
+  "coordSource": "OpenStreetMap (Overpass, nœud tourism=hotel « 上海漕河泾万丽酒店 », addr 田林路397号), WGS-84, revérifié le 10/11/2026",
+  "address": "No. 397 Tianlin Road, Caohejing Hi-Tech Park, Xuhui District, Shanghai 200233",
+  "cn": "上海市徐汇区田林路397号 上海漕河泾万丽酒店",
+  "metro": "Ligne 9 – Caohejing Hi-Tech Park (漕河泾开发区), ~600 m ; ligne 12 – Hongmei Road (虹梅路), ~550 m",
+  "hours": "Réception 24h/24. Check-in en général à partir de 15h, check-out à 12h (les sites divergent entre 11h et 12h : vérifie ta confirmation).",
+  "desc": "Ton hôtel, réservé : un Renaissance (Marriott) de 373 chambres au cœur du parc technologique de Caohejing, quartier de bureaux tech, semi-conducteurs et R&D. Calme le soir, à 7-8 min à pied de la ligne 9 et à 20-30 min de la gare TGV de Hongqiao. Piscine couverte, salle de sport, spa et trois restaurants.",
+  "highlights": [
+   "Métro ligne 9, station Caohejing Hi-Tech Park (漕河泾开发区), ~600 m au nord, 7-8 min à pied",
+   "Métro ligne 12, station Hongmei Road (虹梅路), ~550 m au sud",
+   "Jardin botanique de Shanghai (ginkgos et érables fin novembre) à ~5 km, environ 15 min en DiDi",
+   "Xujiahui et Longhua à ~5 km ; musées du West Bund à ~7-9 km",
+   "Gare de Hongqiao à ~13 km (20-30 min) ; PVG à ~48 km (50-70 min)"
+  ],
+  "tip": "Garde une capture de l'adresse en chinois (上海市徐汇区田林路397号 万丽酒店) pour les chauffeurs DiDi, et le numéro de l'hôtel (+86 21 3325 8888) au cas où le chauffeur se perd. Le quartier est mort le soir : dîne et sors à Xuhui, dans l'ancienne Concession française ou au Bund.",
+  "website": "https://www.marriott.com/en-us/hotels/shaca-renaissance-shanghai-caohejing-hotel/overview/",
+  "priority": "must",
+  "sources": [
+   "https://www.marriott.com/en-us/hotels/shaca-renaissance-shanghai-caohejing-hotel/overview/",
+   "https://www.cvent.com/venues/shanghai/hotel/renaissance-shanghai-caohejing-hotel/venue-27473a11-0850-4795-a35c-10081bdc90ef"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "pvg-t1",
+  "theme": "logistics",
+  "name": "Aéroport de Pudong (PVG) – Terminal 1",
+  "nameCn": "上海浦东国际机场 T1航站楼",
+  "category": "transport",
+  "city": "Shanghai",
+  "lat": 31.15127,
+  "lng": 121.79769,
+  "coordSource": "OpenStreetMap (Overpass, aeroway=terminal « 1号航站楼 », centroïde du bâtiment), WGS-84, revérifié le 10/11/2026",
+  "address": "Pudong International Airport Terminal 1, 900 Qihang Road, Pudong New Area, Shanghai",
+  "cn": "上海市浦东新区启航路900号 浦东国际机场T1航站楼（国际出发）",
+  "metro": "Ligne 2 / Airport Link / Maglev – Pudong Airport Terminal 1&2 (浦东1号2号航站楼)",
+  "hours": "Aéroport ouvert 24h/24. AF116 arrive au T1 à 19h00 le samedi 21/11. AF111 part du T1 à 22h15 ; l'enregistrement ferme en principe 60 min avant (vers 21h15).",
+  "desc": "Air France opère au Terminal 1, avec China Eastern et SkyTeam, à l'aller comme au retour. À l'arrivée, compte 30 à 60 min pour l'immigration (photo et empreintes), puis file de taxis officielle ou point de prise en charge VTC.",
+  "highlights": [
+   "Taxi officiel ou DiDi jusqu'à l'hôtel : ~48 km, 50-70 min ; ~180-210 ¥ en taxi, ~150-190 ¥ en DiDi Express",
+   "Métro ligne 2 puis ligne 9 à Century Avenue : ~1h40, ~8-9 ¥",
+   "Airport Link jusqu'à Hongqiao T2 : ~40 min, dernier départ de PVG à 22h15 ; puis 20 min de DiDi",
+   "Maglev : dernier départ vers 21h40, peu utile vers Caohejing"
+  ],
+  "tip": "À l'arrivée, ignore les rabatteurs « taxi » dans le hall : va à la file officielle ou suis les panneaux « 网约车 » (VTC) pour ton DiDi. Au retour, quitte l'hôtel vers 18h30 pour être au comptoir vers 19h30-19h45.",
+  "website": "https://www.shanghaiairport.com",
+  "priority": "must",
+  "sources": [
+   "https://www.flightstats.com/v2/flight-tracker/af/116",
+   "https://www.flightstats.com/v2/flight-tracker/AF/111",
+   "https://regional.chinadaily.com.cn/shhongqiaocbd/2026-03/31/c_1172849.htm"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "hongqiao-hsr",
+  "theme": "logistics",
+  "name": "Gare de Shanghai Hongqiao (TGV)",
+  "nameCn": "上海虹桥站",
+  "category": "transport",
+  "city": "Shanghai",
+  "lat": 31.19603,
+  "lng": 121.3162,
+  "coordSource": "OpenStreetMap (Overpass, way « 上海虹桥站 », centroïde du bâtiment), WGS-84, revérifié le 10/11/2026",
+  "address": "1500 Shengui Road, Minhang District, Shanghai (Hongqiao Transport Hub)",
+  "cn": "上海市闵行区申贵路1500号 上海虹桥站（高铁站）",
+  "metro": "Lignes 2, 10, 17 – Hongqiao Railway Station (虹桥火车站)",
+  "hours": "Gare ouverte de ~5h30 à minuit ; trains d'environ 6h à 23h, tous les jours. Le contrôle des billets ferme 3 à 5 min avant le départ.",
+  "desc": "La principale gare TGV de Shanghai, intégrée au hub de Hongqiao (aéroport T2, Airport Link, métros 2, 10 et 17). C'est d'ici que partent les trains rapides pour Suzhou, Hangzhou et Nanjing. Elle est immense : compte 10-15 min de marche entre l'entrée et le quai.",
+  "highlights": [
+   "Depuis l'hôtel : ~13 km, 20-30 min en DiDi, ~45-60 ¥",
+   "Suzhou en ~25-30 min (~35-40 ¥ en 2e classe) ; Hangzhou Est en ~45-60 min (~75 ¥)",
+   "Ton passeport sert de billet : sécurité à l'entrée, puis portique automatique ou couloir manuel « 人工通道 »"
+  ],
+  "tip": "Achète tes billets sur 12306 (appli en anglais, Visa/Mastercard acceptées) ou sur Trip.com. Les ventes ouvrent 15 jours avant. Prends la 1re classe (一等座) pour ton père : l'écart de prix est faible.",
+  "website": "https://www.12306.cn/en/index.html",
+  "priority": "high",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Shanghai_Hongqiao_railway_station",
+   "https://www.12306.cn/en/index.html"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "westbund-pompidou",
+  "theme": "museums",
+  "name": "West Bund Museum × Centre Pompidou – « Computer Worlds »",
+  "nameCn": "西岸美术馆（与蓬皮杜中心合作）",
+  "category": "musee",
+  "city": "Shanghai",
+  "lat": 31.16962,
+  "lng": 121.45929,
+  "coordSource": "OpenStreetMap (Overpass, way 745277168 « 西岸美术馆x蓬皮杜中心 »), WGS-84, revérifié le 10/11/2026",
+  "address": "2600 Longteng Avenue, Xuhui District",
+  "cn": "上海市徐汇区龙腾大道2600号 西岸美术馆",
+  "metro": "Ligne 11, Yunjin Road (云锦路), environ 10 min à pied",
+  "hours": "Mar.–dim. 10h–17h selon OSM et les billetteries (le Centre Pompidou indique 11h–18h : vérifie sur le mini-programme), fermé le lundi.",
+  "desc": "Bâtiment de David Chipperfield au bord du Huangpu, partenaire du Centre Pompidou depuis 2019. Du 24 sept. 2026 au 14 févr. 2027 : « Computer Worlds », près de 180 œuvres, installations, maquettes d'architecture, objets de design et archives de la collection Pompidou, qui retracent la création numérique des années 1950 à aujourd'hui. Pile dans ton axe IA, tech et design.",
+  "highlights": [
+   "Expo « Computer Worlds » : art algorithmique, génératif, IA, design industriel",
+   "Architecture minimaliste de Chipperfield, trois volumes en verre",
+   "Berge du West Bund juste devant, ginkgos et platanes dorés fin novembre",
+   "Parc de TANK Shanghai (anciens réservoirs reconvertis par OPEN Architecture) juste au sud"
+  ],
+  "tip": "Réserve ton billet sur le mini-programme WeChat « 上海西岸美术馆预约 » avec ton passeport, puis remonte la berge à pied jusqu'au Long Museum.",
+  "website": "https://www.centrepompidou.fr/fr/lieu/west-bund-museum",
+  "priority": "must",
+  "sources": [
+   "https://www.centrepompidou.fr/en/offer-to-professionals/press-area/computer-worlds",
+   "https://www.smartshanghai.com/events/exhibitions/"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "shanghai-museum-east",
+  "theme": "museums",
+  "name": "Shanghai Museum East (Pudong)",
+  "nameCn": "上海博物馆东馆",
+  "category": "musee",
+  "city": "Shanghai",
+  "lat": 31.22212,
+  "lng": 121.53436,
+  "coordSource": "OpenStreetMap (Overpass, way 1034667864 « 上海博物馆东馆 »), WGS-84, revérifié le 10/11/2026",
+  "address": "1952 Century Avenue, Pudong New Area (entrée B1 côté est, près de Dingxiang Road)",
+  "cn": "上海市浦东新区世纪大道1952号 上海博物馆东馆",
+  "metro": "Ligne 2, Shanghai Science and Technology Museum (上海科技馆), à côté",
+  "hours": "10h–18h (dernière entrée 17h), fermé le MARDI ; ouvert le lundi.",
+  "desc": "Le nouveau vaisseau amiral du musée de Shanghai, ouvert en entier depuis fin juin 2024 : bronzes, céramiques, jades, peinture et calligraphie, sur une échelle énorme. Confirmé pendant ton séjour : « Beneath the Golden Crown », environ 260 pièces de l'art de Silla avec le musée national de Gyeongju, dont une couronne en or d'un kilo (23 sept. 2026–18 janv. 2027, entrée gratuite). Annoncée de novembre 2026 à mai 2027 : « Jewels Across the World », 192 bijoux du Metropolitan Museum, sans date d'ouverture publiée.",
+  "highlights": [
+   "Couronnes et parures en or de Silla, orfèvrerie ancienne de très haut niveau",
+   "Expo bijoux du Met (si elle a ouvert) : histoire mondiale de la parure",
+   "Galeries permanentes de bronzes et de jades, précision d'atelier"
+  ],
+  "tip": "Pas de réservation pour les visiteurs individuels, ton passeport suffit. La veille, vérifie sur le compte WeChat « 上海博物馆 » si l'expo du Met a ouvert et si elle demande un créneau. Prévois 2h30-3h.",
+  "website": "https://www.shanghaimuseum.net",
+  "priority": "must",
+  "sources": [
+   "https://english.shanghai.gov.cn/en-EditorsPick-travelinshanghai/20250828/e77b240fab254a3db8fbadec14645a9d.html",
+   "https://www.yicai.com/news/103365157.html",
+   "https://english.shanghai.gov.cn/en-Events/20260213/b8a89d4b97c84962ab1424476e38e1fa.html"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "long-museum-westbund",
+  "theme": "museums",
+  "name": "Long Museum West Bund",
+  "nameCn": "龙美术馆（西岸馆）",
+  "category": "musee",
+  "city": "Shanghai",
+  "lat": 31.18592,
+  "lng": 121.46019,
+  "coordSource": "OpenStreetMap (Overpass, node 3126004579 « 龙美术馆（西岸馆） »), WGS-84, revérifié le 10/11/2026",
+  "address": "3398 Longteng Avenue, Xuhui District",
+  "cn": "上海市徐汇区龙腾大道3398号 龙美术馆西岸馆",
+  "metro": "Lignes 7/12, Longhua Middle Road (龙华中路), environ 20 min à pied ; ou 25 min le long de la berge depuis Yunjin Road (ligne 11) ; sinon DiDi",
+  "hours": "Mar.–dim. environ 10h–17h30, fermé le lundi. Les nocturnes d'été se sont arrêtées le 25 oct.",
+  "desc": "Musée privé des collectionneurs Liu Yiqian et Wang Wei. Les voûtes en béton brut d'Atelier Deshaus, posées autour d'une ancienne trémie à charbon, valent la visite à elles seules. Le programme de fin novembre 2026 n'est pas publié en ligne.",
+  "highlights": [
+   "Voûtes « parapluie » en béton d'Atelier Deshaus, référence de l'architecture chinoise contemporaine",
+   "Collection allant de l'art ancien chinois à l'art contemporain international",
+   "Berge du West Bund : ginkgos et lumière rasante en fin d'après-midi"
+  ],
+  "tip": "Vérifie l'expo en cours et le prix du billet sur le compte WeChat « 龙美术馆 » avant d'y aller. La fermeture est tôt en novembre.",
+  "website": "https://www.thelongmuseum.org",
+  "priority": "high",
+  "sources": [
+   "https://english.shanghai.gov.cn/en-ArtExhibitions/20260724/707611bdee9046e9af73f0cc0d328e93.html",
+   "https://www.citynewsservice.cn/events/exhibition/a-century-of-creativity-on-display-at-long-museum-gno8womp"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "shanghai-museum-peoples-square",
+  "theme": "museums",
+  "name": "Shanghai Museum (People's Square)",
+  "nameCn": "上海博物馆（人民广场馆）",
+  "category": "musee",
+  "city": "Shanghai",
+  "lat": 31.23019,
+  "lng": 121.47103,
+  "coordSource": "OpenStreetMap (Overpass, way 161090899 « 上海博物馆 »), WGS-84, revérifié le 10/11/2026",
+  "address": "201 Renmin Avenue, Huangpu District",
+  "cn": "上海市黄浦区人民大道201号 上海博物馆",
+  "metro": "Lignes 1, 2, 8, People's Square (人民广场), sortie 1",
+  "hours": "9h–17h (dernière entrée 16h), fermé le LUNDI.",
+  "desc": "Le bâtiment historique en forme de « ding » (chaudron de bronze), désormais dédié aux grandes expositions temporaires. Pendant ton séjour : « On Top of the World Tree », grande expo sur les civilisations anciennes des Amériques (Olmèques, Mayas, Aztèques, Incas), avec 1 129 lots prêtés par le Mexique, le Pérou et la Chine (9 juil. 2026–14 nov. 2027). S'y ajoutent « Pearls Returned Home » (phase 2) et « A Momentary Joy » (porcelaines Ming et Qing de la collection Zande Lou).",
+  "highlights": [
+   "Expo Amériques anciennes : or et jade précolombiens",
+   "Expériences immersives « Flying Over Machu Picchu » et VR « Secrets of the Rainforest »",
+   "Porcelaines de la collection Zande Lou au 4e étage"
+  ],
+  "tip": "Pas de réservation pour les individuels depuis sept. 2025, mais elle peut être exigée les jours d'affluence : vérifie sur WeChat la veille. Arrive à l'ouverture.",
+  "website": "https://www.shanghaimuseum.net",
+  "priority": "high",
+  "sources": [
+   "https://english.shanghai.gov.cn/en-EditorsPick-travelinshanghai/20250828/e77b240fab254a3db8fbadec14645a9d.html",
+   "https://www.chinaservicesinfo.com/s/202605/11/WS6a0135d3498e23165e06f50e/meet-ancient-americas-in-shanghai.html"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "museum-of-art-pudong",
+  "theme": "museums",
+  "name": "Museum of Art Pudong (MAP)",
+  "nameCn": "浦东美术馆",
+  "category": "musee",
+  "city": "Shanghai",
+  "lat": 31.24024,
+  "lng": 121.49203,
+  "coordSource": "OpenStreetMap (Overpass, way 803292747 « 浦东美术馆 »), WGS-84, revérifié le 10/11/2026",
+  "address": "2777 Binjiang Avenue, Lujiazui, Pudong",
+  "cn": "上海市浦东新区滨江大道2777号 浦东美术馆",
+  "metro": "Ligne 2, Lujiazui (陆家嘴), environ 10 min à pied",
+  "hours": "10h–21h (dernière entrée 20h) selon le site officiel ; jours de fermeture non précisés.",
+  "desc": "Bâtiment blanc de Jean Nouvel face au Bund, conçu pour des expos blockbuster avec la Tate, Orsay, etc. Confirmé pendant ton séjour : « Salute of the Whales » de Carolina Caycedo, baleines à bosse grandeur nature dans le Hall X haut de 34 m, commande avec la Tate (jusqu'au 21 févr. 2027). Les expos d'automne ferment les 14 et 15 nov. et Damien Hirst n'ouvre qu'en décembre : d'autres salles risquent d'être en montage.",
+  "highlights": [
+   "Installation monumentale de Carolina Caycedo dans le Hall X",
+   "« Mirror Hall » : vue cadrée sur les façades du Bund",
+   "Architecture de Jean Nouvel, terrasse sur le fleuve"
+  ],
+  "tip": "Regarde sur le site quelles salles sont ouvertes du 21 au 29 nov. Achète ton billet en ligne avec ton passeport et viens en fin d'après-midi pour la lumière sur le Bund.",
+  "website": "https://www.museumofartpd.org.cn/en",
+  "priority": "high",
+  "sources": [
+   "https://museumofartpd.org.cn/en/index",
+   "https://www.chinaservicesinfo.com/s/202603/02/WS69a54183498e23165e06dc50/whale-themed-art-installations-shine-at-map-in-shanghai.html"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "fotografiska-shanghai",
+  "theme": "museums",
+  "name": "Fotografiska Shanghai",
+  "nameCn": "Fotografiska影像艺术中心",
+  "category": "musee",
+  "city": "Shanghai",
+  "lat": 31.24166,
+  "lng": 121.46527,
+  "coordSource": "OpenStreetMap (Overpass, way 1209450920, 光复路127), WGS-84, revérifié le 10/11/2026",
+  "address": "127 Guangfu Road, Jing'an District (bord de Suzhou Creek)",
+  "cn": "上海市静安区光复路127号 Fotografiska影像艺术中心",
+  "metro": "Lignes 8/12, Qufu Road (曲阜路), environ 10 min à pied",
+  "hours": "Tous les jours 10h30–23h (dernière entrée 22h), lundi compris ; café-bar 10h–22h ; restaurant MONA 11h30–14h30.",
+  "desc": "Antenne du musée de photo suédois, dans un entrepôt de 1930 sur Suzhou Creek, rénové par AIM Architecture. Ouvert tard, avec bar et restaurant. À l'affiche : Candida Höfer « Rehearsing Assembly » et « Hong Kong Reframed : Fan Ho and the Salon Generation » (jusqu'au 21 févr. 2027), Tan Yingjie « Nocturnal Reflections » (jusqu'au 10 janv.), Liu Shuwei et Huang Jingyao (jusqu'au 6 déc.).",
+  "highlights": [
+   "Candida Höfer : grands intérieurs architecturaux, rigueur et symétrie",
+   "Fan Ho : le Hong Kong des années 1950–60 en noir et blanc",
+   "Ouvert jusqu'à 23h tous les jours, y compris le lundi",
+   "Bar et terrasse sur Suzhou Creek"
+  ],
+  "tip": "Parfait le lundi soir, quand presque tous les musées sont fermés. Réserve ton billet en ligne avec ton passeport.",
+  "website": "https://shanghai.fotografiska.com/en",
+  "priority": "high",
+  "sources": [
+   "https://shanghai.fotografiska.com/en/whats-on",
+   "https://english.shanghai.gov.cn/en-ArtExhibitions/20260724/707611bdee9046e9af73f0cc0d328e93.html"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "fosun-foundation",
+  "theme": "museums",
+  "name": "Fosun Foundation Shanghai",
+  "nameCn": "复星艺术中心",
+  "category": "musee",
+  "city": "Shanghai",
+  "lat": 31.22887,
+  "lng": 121.49357,
+  "coordSource": "OpenStreetMap (Overpass, way 520214798 « 复星艺术中心 », 中山东二路600), WGS-84, revérifié le 10/11/2026",
+  "address": "Bund Finance Center, 600 Zhongshan East 2nd Road, Huangpu District",
+  "cn": "上海市黄浦区中山东二路600号 外滩金融中心 复星艺术中心",
+  "metro": "Ligne 10 ou 14, Yuyuan Garden (豫园), environ 10 min à pied",
+  "hours": "Mar.–dim. 10h–18h (dernière entrée 17h30), jusqu'à 20h le jeudi et le samedi ; fermé le lundi.",
+  "desc": "Centre d'art du groupe Fosun dans le Bund Finance Center (Foster + Heatherwick). Sa façade est un rideau de tubes dorés qui bougent comme un voile de scène. Expo en cours : « Gumshoe » (10 nov. 2026–3 janv. 2027), contenu pas encore détaillé en ligne.",
+  "highlights": [
+   "Façade cinétique de Thomas Heatherwick, voile de tubes mobiles",
+   "Point de vue sur le Bund et Pudong depuis la terrasse",
+   "À 10 min de Yuyuan et du Bund sud"
+  ],
+  "tip": "Demande à l'accueil à quelle heure la façade s'anime, et vérifie le contenu de « Gumshoe » sur le compte WeChat « 复星艺术中心 ».",
+  "website": "https://www.fosunfoundation.com/en",
+  "priority": "high",
+  "sources": [
+   "https://www.fosunfoundation.com/en/visiting",
+   "https://www.fosunfoundation.com/en/current-exhibitions"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "power-station-of-art",
+  "theme": "museums",
+  "name": "Power Station of Art (PSA)",
+  "nameCn": "上海当代艺术博物馆",
+  "category": "musee",
+  "city": "Shanghai",
+  "lat": 31.20306,
+  "lng": 121.4939,
+  "coordSource": "OpenStreetMap (Overpass, way 298132744, 花园港路200号), WGS-84, revérifié le 10/11/2026",
+  "address": "200 Huayuangang Road, Huangpu District",
+  "cn": "上海市黄浦区花园港路200号 上海当代艺术博物馆",
+  "metro": "Lignes 4/8, South Xizang Road (西藏南路), environ 15 min à pied",
+  "hours": "Mar.–dim. 11h–19h, fermé le lundi.",
+  "desc": "Premier musée public d'art contemporain de Chine continentale, dans une ancienne centrale électrique avec sa cheminée de 165 m, maison de la Biennale de Shanghai. L'expo Bvlgari « Kaleidos » a fermé le 31 oct. et le programme de fin novembre n'est pas publié.",
+  "highlights": [
+   "Bâtiment industriel reconverti, cheminée-thermomètre emblématique",
+   "Biennale suivante en novembre 2027, pas pendant ton séjour",
+   "Expos souvent gratuites ou très peu chères"
+  ],
+  "tip": "Regarde le site ou le compte WeChat du PSA la semaine avant ton départ. Si rien ne t'accroche, saute-le.",
+  "website": "https://www.powerstationofart.com",
+  "priority": "option",
+  "sources": [
+   "https://www.e-flux.com/announcements/6787823/ferran-barenblit-appointed-chief-curator-of-the-16th-shanghai-biennale",
+   "https://www.lvmh.com/en/news-lvmh/bvlgari-brings-kaleidos-to-shanghai"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "rockbund-art-museum",
+  "theme": "museums",
+  "name": "Rockbund Art Museum (RAM)",
+  "nameCn": "上海外滩美术馆",
+  "category": "musee",
+  "city": "Shanghai",
+  "lat": 31.24318,
+  "lng": 121.48302,
+  "coordSource": "OpenStreetMap (Overpass, node 3750123105, 虎丘路20), WGS-84, revérifié le 10/11/2026",
+  "address": "20 Huqiu Road, Huangpu District",
+  "cn": "上海市黄浦区虎丘路20号 上海外滩美术馆",
+  "metro": "Lignes 2/10, East Nanjing Road (南京东路), environ 8 min à pied",
+  "hours": "Mer.–dim. 11h–18h (dernière entrée 17h30), mardi réservé aux membres, fermé le lundi.",
+  "desc": "Petit musée d'art contemporain pointu, dans l'ancien bâtiment Art déco de la Royal Asiatic Society (1932), juste derrière le Bund. Aucune expo n'est affichée pour fin novembre 2026 : il est peut-être en accrochage.",
+  "highlights": [
+   "Façade et escaliers Art déco restaurés",
+   "Expos de recherche, loin du blockbuster",
+   "Perrotin et Lisson au 27 Huqiu Road, en face"
+  ],
+  "tip": "Vérifie sur le site ou le WeChat du RAM qu'une expo est ouverte. Sinon, regarde juste la façade en passant.",
+  "website": "https://www.rockbundartmuseum.org/en",
+  "priority": "option",
+  "sources": [
+   "https://www.rockbundartmuseum.org/en",
+   "https://ocula.com/museums-spaces/rockbund-art-museum/"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "perrotin-shanghai",
+  "theme": "museums",
+  "name": "Perrotin Shanghai – Lynn Chadwick (Huqiu Road)",
+  "nameCn": "贝浩登（上海）",
+  "category": "galerie",
+  "city": "Shanghai",
+  "lat": 31.243,
+  "lng": 121.4834,
+  "coordSource": "Approximation : bâtiment du 27 Huqiu Road, en face du Rockbund Art Museum (node OSM 3750123105) ; position exacte absente d'OSM, écart estimé < 80 m",
+  "address": "3F, 27 Huqiu Road, Huangpu District",
+  "cn": "上海市黄浦区虎丘路27号3楼 贝浩登画廊",
+  "metro": "Lignes 2/10, East Nanjing Road (南京东路), environ 8 min à pied",
+  "hours": "Mar.–sam. 11h–19h, fermé dimanche et lundi.",
+  "desc": "Galerie française historique installée dans le quartier Rockbund. Le chapitre III de « Hypercycle », consacré aux bronzes tardifs de Lynn Chadwick (« Vigilants »), est annoncé à Perrotin Shanghai en 2026, après Paris et New York. Dates (9 nov.–23 déc.) non confirmées. Entrée gratuite.",
+  "highlights": [
+   "Sculptures en bronze de Lynn Chadwick, géométrie et patines",
+   "À 30 m du Rockbund Art Museum",
+   "Lisson Gallery dans le même bâtiment"
+  ],
+  "tip": "Vérifie l'expo sur le site ou l'Instagram de Perrotin avant d'y aller. À caler un mardi-samedi près du Bund.",
+  "website": "https://www.perrotin.com",
+  "priority": "option",
+  "sources": [
+   "https://ocula.com/art-galleries/perrotin/exhibitions/lynn-chadwick-hypercycle-chapter-iii-vigilant/"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "tank-shanghai",
+  "theme": "museums",
+  "name": "TANK Shanghai",
+  "nameCn": "油罐艺术中心",
+  "category": "musee",
+  "city": "Shanghai",
+  "lat": 31.16653,
+  "lng": 121.4594,
+  "coordSource": "OpenStreetMap (Overpass, node 6796216885, 龙腾大道2350), WGS-84, revérifié le 10/11/2026",
+  "address": "2350 Longteng Avenue, Xuhui District",
+  "cn": "上海市徐汇区龙腾大道2350号 油罐艺术中心",
+  "metro": "Ligne 11, Yunjin Road (云锦路), environ 8 min à pied",
+  "hours": "Parc en accès libre ; salles en général mar.–dim. 11h–18h, fermées le lundi et entre deux expos.",
+  "desc": "Cinq anciens réservoirs de kérosène de l'aéroport de Longhua, transformés en centre d'art par OPEN Architecture au milieu d'un parc. L'expo en cours se termine le 15 nov. et la suivante n'est pas annoncée.",
+  "highlights": [
+   "Réservoirs industriels reconvertis, parc paysager ouvert",
+   "Architecture d'OPEN Architecture",
+   "Juste à côté du West Bund Museum"
+  ],
+  "tip": "Même sans expo, traverse le parc entre le West Bund Museum et le Long Museum : c'est le meilleur tronçon du West Bund.",
+  "website": "https://www.tankshanghai.com",
+  "priority": "option",
+  "sources": [
+   "https://bankmabsociety.com/exhibitions"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "shanghai-astronomy-museum",
+  "theme": "museums",
+  "name": "Shanghai Astronomy Museum",
+  "nameCn": "上海天文馆",
+  "category": "musee",
+  "city": "Shanghai",
+  "lat": 30.91517,
+  "lng": 121.92239,
+  "coordSource": "OpenStreetMap (Overpass, way 610744664 « 上海天文馆 ») ; cohérent avec Wikipedia et Nominatim, WGS-84",
+  "address": "380 Lingang Avenue, Lingang, Pudong New Area",
+  "cn": "上海市浦东新区临港大道380号 上海天文馆",
+  "metro": "Ligne 16, Lingang Avenue (临港大道) ou Dishui Lake (滴水湖), puis environ 10 min en DiDi",
+  "hours": "Mar.–dim. 9h30–16h (dernière entrée 15h) hors saison ; fermé le lundi en principe, mais le groupe SSTM teste des jours de fermeture décalés : vérifie.",
+  "desc": "L'un des plus grands musées d'astronomie au monde, conçu par Ennead Architects : des volumes courbes sans angle droit, inspirés des orbites, sphère du planétarium posée sur le toit et oculus qui suit le soleil. Une grande pièce d'architecture et de design, mais à environ 1h15-1h30 de ton hôtel.",
+  "highlights": [
+   "Architecture d'Ennead : oculus solaire, sphère suspendue, rampe en spirale",
+   "Planétarium et vraies météorites",
+   "Lingang : zone de la Gigafactory Tesla et du lac Dishui"
+  ],
+  "tip": "Pas de vente sur place : réserve nominativement (WeChat « 上海天文馆 » ou Trip.com, avec ton passeport) ; les créneaux ouvrent environ 3 jours avant, entrée autour de 30 ¥. Pars avant 9h.",
+  "website": "https://www.sstm-sam.org.cn",
+  "priority": "option",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Shanghai_Astronomy_Museum",
+   "https://www.news.cn/tech/20260128/90307bedb84b4652acbeaaec5b3cade3/c.html"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "m50-chronus",
+  "theme": "museums",
+  "name": "M50 & Chronus Art Center",
+  "nameCn": "M50创意园 / 新时线媒体艺术中心",
+  "category": "galerie",
+  "city": "Shanghai",
+  "lat": 31.24988,
+  "lng": 121.44474,
+  "coordSource": "OpenStreetMap (Overpass, way 477237906 « M50 »), WGS-84 ; Chronus Art Center : node OSM 5845025285 à 31.25037, 121.44513",
+  "address": "50 Moganshan Road, Putuo District",
+  "cn": "上海市普陀区莫干山路50号 M50创意园",
+  "metro": "Ligne 13, Jiangning Road (江宁路), environ 10 min à pied",
+  "hours": "Parc accessible tous les jours ; galeries en général 10h–18h, beaucoup fermées le lundi.",
+  "desc": "Ancien quartier de filatures, pionnier des galeries de Shanghai, devenu plus commercial. La vraie raison d'y aller : le Chronus Art Center, fondation dédiée à l'art, à la technologie et aux nouveaux médias. Sa dernière expo trouvée en ligne date du printemps 2025.",
+  "highlights": [
+   "Chronus Art Center : art des médias, art numérique, IA",
+   "Architecture industrielle en brique au bord de Suzhou Creek",
+   "À pied depuis Fotografiska le long de la rivière"
+  ],
+  "tip": "Vérifie d'abord sur chronusartcenter.org qu'une expo est ouverte.",
+  "website": "https://chronusartcenter.org",
+  "priority": "option",
+  "sources": [
+   "https://chronusartcenter.org/exhibitions"
+  ],
+  "confidence": "low"
+ },
+ {
+  "id": "shanghai-natural-history-museum",
+  "theme": "museums",
+  "name": "Shanghai Natural History Museum",
+  "nameCn": "上海自然博物馆",
+  "category": "musee",
+  "city": "Shanghai",
+  "lat": 31.23688,
+  "lng": 121.45801,
+  "coordSource": "OpenStreetMap (Overpass, way 425762388, 北京西路510) ; cohérent avec Wikipedia, WGS-84",
+  "address": "510 West Beijing Road, Jing'an Sculpture Park, Jing'an District",
+  "cn": "上海市静安区北京西路510号 上海自然博物馆",
+  "metro": "Ligne 13, Natural History Museum (自然博物馆), accès direct",
+  "hours": "Mar.–dim. 9h–17h15 (dernière entrée vers 16h), fermé le lundi.",
+  "desc": "Bâtiment en spirale de nautile signé Perkins+Will, à moitié enterré dans le parc de sculptures de Jing'an, avec une façade en cellules végétales et un mur-canyon en pierre.",
+  "highlights": [
+   "Architecture en coquille de nautile, façade organique",
+   "Parc de sculptures de Jing'an autour, couleurs d'automne"
+  ],
+  "tip": "Réserve nominativement en ligne (WeChat « 上海科技馆 » ou Trip.com). Évite le week-end.",
+  "website": "",
+  "priority": "option",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Shanghai_Natural_History_Museum"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "yuz-museum-panlong",
+  "theme": "museums",
+  "name": "Yuz Museum (Panlong, Qingpu)",
+  "nameCn": "余德耀美术馆",
+  "category": "musee",
+  "city": "Shanghai",
+  "lat": 31.19137,
+  "lng": 121.27297,
+  "coordSource": "OpenStreetMap (Overpass, way 1447170303 « 余德耀美术馆 »), WGS-84",
+  "address": "No. 8, Lane 123, Panding Road, Panlong Tiandi, Qingpu District",
+  "cn": "上海市青浦区盘鼎路123弄8号 蟠龙天地 余德耀美术馆",
+  "metro": "Ligne 17, Panlong Road (蟠龙路), environ 5–10 min à pied",
+  "hours": "Mar.–dim. 11h–19h, fermé le lundi (selon SmartShanghai).",
+  "desc": "Le musée du collectionneur Budi Tek a quitté le West Bund pour le village d'eau rénové de Panlong. À l'affiche : « Odyssey », première grande expo en Chine de Choe U-Ram, sculptures cinétiques entre biologie et mécanique, jusqu'au 1er mars.",
+  "highlights": [
+   "Choe U-Ram : machines cinétiques, précision mécanique et lumière",
+   "Panlong Tiandi : village d'eau rénové, canaux et ponts"
+  ],
+  "tip": "Vérifie sur le WeChat officiel que « Odyssey » est bien à l'affiche. À 20 min de DiDi de ton hôtel.",
+  "website": "https://www.yuzmshanghai.org",
+  "priority": "option",
+  "sources": [
+   "https://www.smartshanghai.com/venue/11204/yuz_museum_shanghai",
+   "https://www.smartshanghai.com/event/choe-u-ram-odyssey"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "bund-18",
+  "theme": "museums",
+  "name": "Bund 18",
+  "nameCn": "外滩18号",
+  "category": "landmark",
+  "city": "Shanghai",
+  "lat": 31.24035,
+  "lng": 121.48501,
+  "coordSource": "OpenStreetMap (Overpass, way 1196704498, 中山东一路18号), WGS-84",
+  "address": "18 Zhongshan East 1st Road (The Bund), Huangpu District",
+  "cn": "上海市黄浦区中山东一路18号 外滩18号",
+  "metro": "Lignes 2/10, East Nanjing Road (南京东路), environ 6 min à pied",
+  "hours": "Façade visible 24h/24 ; boutiques en général 10h–22h.",
+  "desc": "Ancienne Chartered Bank (1923), restaurée par une équipe italienne et primée par l'UNESCO. C'est un repère d'architecture plus qu'un lieu d'art. L'ancien Bar Rouge est devenu KEV, un club commercial.",
+  "highlights": [
+   "Façade néoclassique et intérieurs bancaires restaurés"
+  ],
+  "tip": "Passe-y en marchant sur le Bund, sans en faire un arrêt.",
+  "website": "",
+  "priority": "option",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Chartered_Bank_Building,_Shanghai"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "bund-waitan",
+  "theme": "gardens",
+  "name": "Le Bund (Waitan)",
+  "nameCn": "外滩",
+  "category": "landmark",
+  "city": "Shanghai",
+  "lat": 31.23803,
+  "lng": 121.48614,
+  "coordSource": "Wikipedia (The Bund), WGS-84 ; point sur Zhongshan Dong Yi Lu, la promenade surélevée est à environ 100 m à l'est",
+  "address": "Zhongshan East 1st Road (Bund promenade), Huangpu District",
+  "cn": "上海市黄浦区中山东一路外滩观景平台",
+  "metro": "Lignes 2/10 – East Nanjing Road (南京东路), puis 10 min à pied vers l'est",
+  "hours": "Promenade ouverte 24h/24. Illuminations en général 18h–22h en hiver. Coucher du soleil fin novembre vers 16h50.",
+  "desc": "Le front de mer Art déco et néoclassique face aux tours de Lujiazui : l'image de Shanghai. Fin novembre, le meilleur moment est le crépuscule, quand la lumière bleuit sur Pudong avant que les façades s'allument.",
+  "highlights": [
+   "Pont Waibaidu (1908) au nord, sur Suzhou Creek",
+   "Peace Hotel (1929) et la Customs House, références de l'Art déco",
+   "Bund 18, ancienne Chartered Bank restaurée",
+   "Tôt le matin, promenade presque vide et tai-chi des habitants"
+  ],
+  "tip": "Ignore les « photographes » et les invitations à prendre le thé. Le ferry Jinling Road → Dongchang Road (2 ¥) offre la vue depuis le fleuve.",
+  "website": "",
+  "priority": "must",
+  "sources": [
+   "https://en.wikipedia.org/wiki/The_Bund",
+   "https://www.travelchinaguide.com/attraction/shanghai/bund.htm"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "shanghai-tower-118",
+  "theme": "gardens",
+  "name": "Shanghai Tower – Top of Shanghai (118e)",
+  "nameCn": "上海中心大厦 上海之巅观光厅",
+  "category": "landmark",
+  "city": "Shanghai",
+  "lat": 31.23562,
+  "lng": 121.50127,
+  "coordSource": "OpenStreetMap (way 165792123, 上海中心大厦, 银城中路501号), WGS-84",
+  "address": "501 Yincheng Middle Road, Lujiazui, Pudong New Area (entrée de l'observatoire en sous-sol B1/B2)",
+  "cn": "上海市浦东新区陆家嘴银城中路501号 上海中心大厦 上海之巅观光厅",
+  "metro": "Lignes 2/14 – Lujiazui (陆家嘴), environ 10 min à pied",
+  "hours": "Tous les jours 8h30–22h, fin de vente à 21h30. Adulte ~180 ¥ ; zone de l'amortisseur (125e/126e) : billet séparé de 88 ¥.",
+  "desc": "Troisième plus haute tour du monde (632 m), signée Gensler. Sa double façade en spirale est un cas d'école de design structurel. L'observatoire du 118e étage, à 546 m, domine la Jin Mao et le SWFC.",
+  "highlights": [
+   "Vue à 546 m sur le méandre du Huangpu et le Bund",
+   "Amortisseur de masse de 1 000 t (125e/126e, billet séparé)",
+   "Ascenseurs parmi les plus rapides du monde (~18 m/s)",
+   "Librairie Duoyun au 52e et showrooms NIO House et Zeekr dans le podium (statut 2026 à vérifier sur place)"
+  ],
+  "tip": "Monte vers 16h15 : jour, coucher de soleil et ville allumée en une seule visite. Regarde l'AQI le matin même et reporte si c'est brumeux. Billet sur le mini-programme WeChat 上海之巅观光厅.",
+  "website": "",
+  "priority": "must",
+  "sources": [
+   "https://www.travelchinaguide.com/attraction/shanghai/tower.htm",
+   "https://en.wikipedia.org/wiki/Shanghai_Tower",
+   "https://cnevpost.com/2022/02/21/zeekr-opens-global-flagship-store-in-shanghais-landmark-skyscraper/"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "wukang-road",
+  "theme": "gardens",
+  "name": "Wukang Road & Wukang Mansion",
+  "nameCn": "武康路 / 武康大楼",
+  "category": "landmark",
+  "city": "Shanghai",
+  "lat": 31.20627,
+  "lng": 121.4337,
+  "coordSource": "OpenStreetMap (way 293434151, 武康大楼), WGS-84",
+  "address": "Wukang Mansion, 1842-1858 Huaihai Middle Road (corner of Wukang Road), Xuhui District",
+  "cn": "上海市徐汇区淮海中路1842-1858号 武康大楼（武康路口）",
+  "metro": "Lignes 10/11 – Jiaotong University (交通大学), environ 8–10 min à pied",
+  "hours": "Rue accessible en permanence ; l'immeuble est résidentiel et se regarde de l'extérieur. Boutiques et cafés environ 10h–20h.",
+  "desc": "Le Normandie Apartments de László Hudec (1924), en proue de navire au carrefour de cinq rues. Wukang Lu file ensuite vers le nord sous les platanes, entre villas des années 1920-1930. Fin novembre, la voûte de platanes vire au jaune.",
+  "highlights": [
+   "La proue du Wukang Mansion vue depuis le carrefour Huaihai/Xingguo",
+   "Ferguson Lane (376 Wukang Lu) : cafés et galeries dans une cour",
+   "Villas des années 1920-1930 tout le long de la rue",
+   "Platanes jaunes de mi-novembre à début décembre"
+  ],
+  "tip": "Viens avant 10h ou après 16h : lumière rasante et moins de selfies au carrefour. Enchaîne à pied vers Anfu Lu.",
+  "website": "",
+  "priority": "must",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Wukang_Mansion",
+   "https://www.travelchinaguide.com/attraction/shanghai/wukang-road.htm"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "ffc-anfu-hengshan-walk",
+  "theme": "gardens",
+  "name": "Balade Concession française : Wukang Lu → Anfu Lu → Fuxing Xi Lu",
+  "nameCn": "武康路—安福路—复兴西路 梧桐区漫步",
+  "category": "lifestyle",
+  "city": "Shanghai",
+  "lat": 31.21676,
+  "lng": 121.44226,
+  "coordSource": "OpenStreetMap (way 安福路, tronçon central), WGS-84",
+  "address": "Anfu Road (near Wulumuqi Middle Road), Xuhui District – loop via Wukang Road, Fuxing West Road and Hengshan Road",
+  "cn": "上海市徐汇区安福路（近乌鲁木齐中路）",
+  "metro": "Lignes 1/7 – Changshu Road (常熟路) côté est ; lignes 10/11 – Jiaotong University côté Wukang Mansion",
+  "hours": "Rues accessibles 24h/24. Boutiques et cafés environ 10h–21h ; Harmay (55 Wukang Lu) 9h30–22h30.",
+  "desc": "Le cœur résidentiel de l'ancienne Concession française : platanes, villas, lilong et boutiques indépendantes. Anfu Lu concentre concept stores et cafés, Fuxing Xi Lu et Gao'an Lu sont plus calmes, Hengshan Lu est la grande avenue de platanes. C'est la plus belle balade urbaine d'automne.",
+  "highlights": [
+   "Harmay, parfumerie-concept au décor industriel, au 55 Wukang Lu depuis juillet 2026",
+   "to summer (111 Hunan Lu, angle Wukang Lu) : maison de parfum chinoise dans une villa de 1936, référence packaging",
+   "Anfu Lu : concept stores, cafés et Shanghai Dramatic Arts Centre (288 Anfu Lu)",
+   "Fuxing Xi Lu : villas Art déco sous les arbres"
+  ],
+  "tip": "Choisis un jour de semaine : Anfu Lu est saturée le samedi après-midi. To summer ouvre à 11h en semaine.",
+  "website": "",
+  "priority": "must",
+  "sources": [
+   "https://www.wikidata.org/wiki/Q3360263",
+   "https://www.smartshanghai.com/articles/shopping/the-address-please-9-instagram-famous-shops-in-shanghai",
+   "https://www.mrandmrssmith.com/editorial/style/shanghai-shopping-guide"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "shanghai-botanical-garden",
+  "theme": "gardens",
+  "name": "Jardin botanique de Shanghai (Xuhui)",
+  "nameCn": "上海植物园",
+  "category": "jardin",
+  "city": "Shanghai",
+  "lat": 31.1466,
+  "lng": 121.4456,
+  "coordSource": "Estimation WGS-84 : porte n°1 (龙吴路1111号) sur Longwu Lu, à côté de l'arrêt de bus 龙吴路百色路 (OSM nodes 9875830795/9875830796) ; porte non taguée dans OSM",
+  "address": "1111 Longwu Road, Xuhui District (Gate 1). Gate 3: 940 Baise Road; Gate 4: 151 Luocheng Road",
+  "cn": "上海市徐汇区龙吴路1111号 上海植物园1号门",
+  "metro": "Ligne 3 – Shilong Road, puis 10–15 min à pied jusqu'à la porte n°4. Plus simple : DiDi d'environ 15 min depuis l'hôtel, dépose à la porte n°1",
+  "hours": "Tous les jours, environ 7h–17h ; serres et musée du penjing jusqu'à 16h30 environ. Entrée historiquement 15 ¥, billet combiné ~40 ¥ (tarifs 2026 non confirmés).",
+  "desc": "Le grand jardin botanique historique de la ville, à 15 minutes de ton hôtel. Pour l'automne, vise le jardin des érables (槭树园), rouge de mi-novembre à fin décembre. Le jardin et le musée du penjing forment l'une des meilleures collections de bonsaïs de Chine.",
+  "highlights": [
+   "Jardin des érables : couleurs de mi-novembre à fin décembre",
+   "Musée et jardin du penjing (bonsaïs), d'une précision d'orfèvre",
+   "Serre des quatre saisons",
+   "Mémorial de Huang Daopo, pionnière du textile de coton, au nord-est du parc"
+  ],
+  "tip": "Va-y à l'ouverture avec ton père : c'est calme, plat et facile, idéal pour le premier jour après le vol. Demande à l'accueil le plan avec le 槭树园.",
+  "website": "",
+  "priority": "must",
+  "sources": [
+   "https://img1.xinmin.cn/xmwb/2025-10-23/81023.pdf",
+   "https://ltl-shanghai.com/shanghai-botanical-garden/",
+   "https://en.wikipedia.org/wiki/Shanghai_Botanical_Garden"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "suzhou-humble-administrator",
+  "theme": "gardens",
+  "name": "Suzhou – Jardin de l'Administrateur humble",
+  "nameCn": "拙政园",
+  "category": "jardin",
+  "city": "Suzhou",
+  "lat": 31.32548,
+  "lng": 120.62636,
+  "coordSource": "OpenStreetMap (node 6417882690, entrance=main, sur Dongbei Jie), WGS-84",
+  "address": "178 Dongbei Street, Gusu District, Suzhou",
+  "cn": "江苏省苏州市姑苏区东北街178号 拙政园",
+  "metro": "TGV jusqu'à Suzhou (25–30 min), puis métro de Suzhou ligne 6 – Zhuozhengyuan-Subo (拙政园苏博), 5 min à pied (ou ligne 4 – Beisita, 10 min)",
+  "hours": "Tous les jours. Après le 15 novembre : 7h30–17h, dernière entrée vers 16h30. Basse saison : environ 70 ¥.",
+  "desc": "Le plus grand des jardins classiques de Suzhou (UNESCO, XVIe siècle). C'est une leçon de composition : cadrages, fenêtres ajourées, paysage emprunté avec la pagode Beisi. Fin novembre, érables et ginkgos se colorent autour de l'eau.",
+  "highlights": [
+   "Pavillon Yuanxiang et la pagode Beisi « empruntée » au fond du paysage",
+   "Fenêtres-cadres et portes lune : du design pur",
+   "Musée des jardins de Suzhou, attenant"
+  ],
+  "tip": "Achète le billet nominatif à l'avance (compte WeChat officiel des jardins de Suzhou, avec ton passeport) et entre tôt : vers 10h, les groupes saturent les allées. Le Suzhou Museum est à 100 m.",
+  "website": "",
+  "priority": "must",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Humble_Administrator%27s_Garden",
+   "https://www.travelchinaguide.com/attraction/jiangsu/suzhou/humble_garden.htm",
+   "https://www.yzwb.net/news/jiangsu/suzhou/202509/t20250928_270216.html"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "suzhou-museum-pei",
+  "theme": "gardens",
+  "name": "Suzhou Museum (I.M. Pei)",
+  "nameCn": "苏州博物馆",
+  "category": "musee",
+  "city": "Suzhou",
+  "lat": 31.32542,
+  "lng": 120.6235,
+  "coordSource": "OpenStreetMap (way 542534202, 苏州博物馆), WGS-84",
+  "address": "204 Dongbei Street, Gusu District, Suzhou",
+  "cn": "江苏省苏州市姑苏区东北街204号 苏州博物馆",
+  "metro": "Métro de Suzhou ligne 6 – Zhuozhengyuan-Subo (拙政园苏博), 3 min à pied",
+  "hours": "Mar.–dim. 9h–17h, dernière entrée 16h. FERMÉ LE LUNDI. Gratuit, réservation obligatoire pour le bâtiment principal.",
+  "desc": "Le dernier grand musée d'I.M. Pei (2006). Il traduit le jardin classique en géométrie pure : murs blancs, toits gris en losanges, rocaille faite de tranches de pierre posées contre un mur. C'est la visite la plus forte de la journée pour ton œil de designer. Belles collections de jade, laques et céramiques Song et Ming.",
+  "highlights": [
+   "Le jardin de pierre de Pei, rocaille minimaliste « dessinée » contre le mur blanc",
+   "Lumière zénithale et charpente métallique sous les toits en losanges",
+   "Collections de jade et d'artisanat de Suzhou",
+   "Résidence du Prince Zhong (Taiping) attenante"
+  ],
+  "tip": "Réserve ton créneau gratuit jusqu'à 7 jours avant (site officiel ou mini-programme « 苏州博物馆全预约 ») avec ton passeport. Si c'est complet, la branche ouest (苏州博物馆西馆) se visite sans réservation.",
+  "website": "https://www.szmuseum.com/",
+  "priority": "must",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Suzhou_Museum",
+   "https://www.yzwb.net/news/jiangsu/suzhou/202506/t20250623_225770.html",
+   "https://m.thepaper.cn/newsDetail_forward_33471958"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "yu-garden-city-god",
+  "theme": "gardens",
+  "name": "Jardin Yu & temple du Dieu de la ville",
+  "nameCn": "豫园 / 上海城隍庙",
+  "category": "jardin",
+  "city": "Shanghai",
+  "lat": 31.22892,
+  "lng": 121.48775,
+  "coordSource": "OpenStreetMap (way 40036584, 豫园 ; temple way 40036659 : 31.22788, 121.48817), WGS-84",
+  "address": "168 Fuyou Road / 137 Anren Street, Huangpu District (City God Temple: 249 Fangbang Middle Road)",
+  "cn": "上海市黄浦区福佑路168号 豫园（城隍庙：方浜中路249号）",
+  "metro": "Lignes 10/14 – Yuyuan Garden (豫园), 5 min à pied",
+  "hours": "Jardin : mar.–dim. 9h–16h30, vente jusqu'à 16h. FERMÉ LE LUNDI. Environ 40 ¥ en novembre ; 60 ans et plus : demi-tarif.",
+  "desc": "Jardin Ming de 1559 enserré dans le bazar Yuyuan, très touristique. Le jardin lui-même vaut la visite : grande rocaille, mur au dragon, pavillons. Le bazar autour est un piège à touristes, traverse-le sans t'arrêter.",
+  "highlights": [
+   "Grande Rocaille et son pavillon pour la vue d'ensemble",
+   "Mur au dragon ondulant et rocher Yulinglong",
+   "Pont en zigzag et maison de thé Huxinting",
+   "Temple taoïste du Dieu de la ville, juste à côté"
+  ],
+  "tip": "Sois là à 9h. Le passeport suffit au guichet (demi-tarif pour ton père). Ne mange pas dans le bazar.",
+  "website": "",
+  "priority": "high",
+  "sources": [
+   "https://www.dahepiao.com/lvyounews1/20250318506839.html",
+   "https://en.wikipedia.org/wiki/Yu_Garden"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "chenshan-botanical-garden",
+  "theme": "gardens",
+  "name": "Jardin botanique de Chenshan",
+  "nameCn": "上海辰山植物园",
+  "category": "jardin",
+  "city": "Shanghai",
+  "lat": 31.07331,
+  "lng": 121.17716,
+  "coordSource": "OpenStreetMap (node 9795923036, entrance=main), WGS-84",
+  "address": "3888 Chenhua Road, Songjiang District",
+  "cn": "上海市松江区辰花路3888号 上海辰山植物园",
+  "metro": "Ligne 9 – Dongjing, puis bus Songjiang 19 ou 96 ; plus simple : DiDi d'environ 45 min depuis Caohejing",
+  "hours": "Tous les jours, 8h–17h de novembre à février. Entrée 60 ¥.",
+  "desc": "Grand jardin botanique contemporain à Songjiang. Le Jardin de la Carrière (矿坑花园), une ancienne carrière devenue paysage, est une référence d'architecture paysagère, et les trois grandes serres en coque valent le détour. Fin novembre : érables, ginkgos et taxodiums roux autour des lacs.",
+  "highlights": [
+   "Jardin de la Carrière : falaises, lac, passerelles",
+   "Trois grandes serres en coque",
+   "Taxodiums et métaséquoias roux autour des plans d'eau"
+  ],
+  "tip": "Prévois une demi-journée et des baskets, le site est immense. Va au Jardin de la Carrière en fin de matinée, quand la lumière plonge dans la fosse.",
+  "website": "https://www.csnbgsh.cn/",
+  "priority": "high",
+  "sources": [
+   "https://www.csnbgsh.cn/",
+   "https://m.sh.bendibao.com/tour/304459.html"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "jingan-temple",
+  "theme": "gardens",
+  "name": "Temple Jing'an",
+  "nameCn": "静安寺",
+  "category": "landmark",
+  "city": "Shanghai",
+  "lat": 31.22541,
+  "lng": 121.44073,
+  "coordSource": "OpenStreetMap (way 13981430, 静安寺, 南京西路1686号), WGS-84",
+  "address": "1686 West Nanjing Road, Jing'an District",
+  "cn": "上海市静安区南京西路1686号 静安寺",
+  "metro": "Lignes 2/7/14 – Jing'an Temple (静安寺), au-dessus de la station",
+  "hours": "Tous les jours, environ 7h30–17h. Billet d'environ 50 ¥ (à confirmer sur place).",
+  "desc": "Temple bouddhiste fondé au IIIe siècle et reconstruit après 1983. Ses toits dorés au milieu des tours de Nanjing Xi Lu forment l'une des images les plus fortes de la ville.",
+  "highlights": [
+   "Contraste toits dorés / gratte-ciel, surtout au crépuscule",
+   "Grand bouddha en jade blanc dans la salle principale",
+   "Apple Jing'an et sa rangée d'érables sur la place juste à côté"
+  ],
+  "tip": "La meilleure photo se prend de l'extérieur, depuis le trottoir sud de Nanjing Xi Lu, en fin de journée. Compte 40 min à l'intérieur.",
+  "website": "",
+  "priority": "high",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Jing%27an_Temple"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "lingering-garden",
+  "theme": "gardens",
+  "name": "Suzhou – Jardin de la Persistance (Liu Yuan)",
+  "nameCn": "留园",
+  "category": "jardin",
+  "city": "Suzhou",
+  "lat": 31.31697,
+  "lng": 120.58863,
+  "coordSource": "OpenStreetMap (node 4850867299, entrance=main), WGS-84",
+  "address": "338 Liuyuan Road, Gusu District, Suzhou",
+  "cn": "江苏省苏州市姑苏区留园路338号 留园",
+  "metro": "Métro de Suzhou ligne 2 – Shilu puis 15–20 min à pied, ou DiDi de 15 min depuis le Humble Administrator's Garden",
+  "hours": "Tous les jours. Après le 15 novembre : 7h30–17h, dernière entrée vers 16h30. Basse saison : environ 45 ¥.",
+  "desc": "Jardin classique UNESCO, plus dense et plus architectural que le Jardin de l'Administrateur humble. Le jeu des couloirs, des cours et des fenêtres ajourées est une vraie leçon de séquence spatiale. Souvent moins bondé l'après-midi.",
+  "highlights": [
+   "Pic de Guanyun, rocher du lac Tai d'environ 6,5 m",
+   "Galerie de plus de 700 m et fenêtres treillagées toutes différentes",
+   "Érables autour de l'étang central à l'automne"
+  ],
+  "tip": "Billet nominatif sur le compte WeChat des jardins de Suzhou, passeport en main.",
+  "website": "",
+  "priority": "high",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Lingering_Garden",
+   "https://www.travelchinaguide.com/attraction/jiangsu/suzhou/lingering.htm"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "hangzhou-lingyin-westlake",
+  "theme": "gardens",
+  "name": "Hangzhou – Lingyin, Feilai Feng & lac de l'Ouest",
+  "nameCn": "杭州灵隐寺·飞来峰 / 西湖",
+  "category": "landmark",
+  "city": "Hangzhou",
+  "lat": 30.2428,
+  "lng": 120.0968,
+  "coordSource": "OpenStreetMap (node 1218588822, 灵隐寺, 法云弄1号), WGS-84 ; West Lake : Wikipedia 30.24694, 120.14417",
+  "address": "1 Fayun Lane, Xihu District, Hangzhou (Lingyin) ; West Lake east shore via Longxiangqiao",
+  "cn": "浙江省杭州市西湖区法云弄1号 灵隐寺",
+  "metro": "TGV Hongqiao → Hangzhou East (45–60 min), puis métro ligne 1 jusqu'à Longxiangqiao pour le lac ; Lingyin à ~25 min en DiDi du lac",
+  "hours": "Lingyin : tous les jours, environ 7h30–18h. Billets : ~45 ¥ Feilai Feng, temple ~30 ¥ ou gratuit selon une source récente. Lac : accès libre.",
+  "desc": "Lingyin, l'un des grands temples de Chine, est niché dans une vallée boisée ; les bouddhas sculptés dans la roche du Feilai Feng datent des Xe–XIVe siècles. Le lac de l'Ouest est le paysage classique chinois par excellence. Fin novembre, les érables des collines et des chemins de thé sont en couleur.",
+  "highlights": [
+   "Grottes et bouddhas sculptés du Feilai Feng",
+   "Digue Su à pied, tôt le matin",
+   "Plantations de thé Longjing et érables de Jiuxi",
+   "China National Silk Museum (玉皇山路73-1号) pour l'axe textile"
+  ],
+  "tip": "Alternative ou deuxième day trip : Lingyin à l'ouverture, le lac l'après-midi, retour en TGV après 19h.",
+  "website": "",
+  "priority": "high",
+  "sources": [
+   "https://www.travelchinaguide.com/attraction/zhejiang/hangzhou/lingyin.htm",
+   "https://en.wikipedia.org/wiki/Lingyin_Temple"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "tianping-shan-suzhou",
+  "theme": "gardens",
+  "name": "Suzhou – Tianping Shan (érables)",
+  "nameCn": "天平山",
+  "category": "jardin",
+  "city": "Suzhou",
+  "lat": 31.2856,
+  "lng": 120.4983,
+  "coordSource": "Estimation WGS-84 près de l'entrée sud, à partir de l'arrêt de bus 天平山 (OSM node 13078358227 : 31.28521, 120.49823)",
+  "address": "Tianping Mountain Scenic Area, Lingtian Road, Mudu Town, Wuzhong District, Suzhou",
+  "cn": "江苏省苏州市吴中区木渎镇灵天路 天平山风景名胜区",
+  "metro": "Métro de Suzhou ligne 1 – Mudu (sortie 5), puis bus 4 ; ou DiDi d'environ 30 min depuis le centre historique",
+  "hours": "Saison des érables 2025 : 1er nov.–7 déc., 7h–17h tous les jours. 30 ¥. Dates 2026 à confirmer.",
+  "desc": "L'un des sites d'érables les plus célèbres de Chine : des érables centenaires plantés sous les Ming au pied d'une colline de rochers dressés. En 2025, les couleurs ont culminé début décembre.",
+  "highlights": [
+   "Érables centenaires « aux cinq couleurs » autour de l'étang Baiyun",
+   "Colline de rochers dressés et belvédère"
+  ],
+  "tip": "Arrive avant 8h30. À coupler avec Suzhou seulement si tu pars très tôt.",
+  "website": "",
+  "priority": "option",
+  "sources": [
+   "https://www.yzwb.net/news/jiangsu/suzhou/202511/t20251101_284522.html",
+   "https://www.yzwb.net/news/jiangsu/suzhou/202512/t20251206_297472.html"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "longhua-temple",
+  "theme": "gardens",
+  "name": "Temple et pagode de Longhua",
+  "nameCn": "龙华寺 / 龙华塔",
+  "category": "landmark",
+  "city": "Shanghai",
+  "lat": 31.17707,
+  "lng": 121.4471,
+  "coordSource": "OpenStreetMap (way 404694432, 龙华寺 ; pagode way 47011877 : 31.17562, 121.44735), WGS-84",
+  "address": "2853 Longhua Road, Xuhui District",
+  "cn": "上海市徐汇区龙华路2853号 龙华寺",
+  "metro": "Lignes 11/12 – Longhua (龙华), environ 5–10 min à pied ; ~10 min en DiDi depuis l'hôtel",
+  "hours": "Tous les jours, environ 7h–16h30. Billet d'environ 10 ¥ (à confirmer).",
+  "desc": "Le plus grand et le plus ancien ensemble bouddhiste de Shanghai, avec une pagode octogonale de 40 m dont le corps en brique remonte à 977. Temple actif et peu touristique, tout près de ton hôtel. Son restaurant végétarien est une institution locale.",
+  "highlights": [
+   "Pagode de Longhua, 7 étages, à voir de l'extérieur",
+   "Tour de la cloche, célèbre pour la sonnerie du Nouvel An",
+   "Repas végétarien et nouilles du temple à petit prix"
+  ],
+  "tip": "Parfait pour une matinée tranquille avec ton père. Le West Bund est à 10 min en DiDi.",
+  "website": "",
+  "priority": "high",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Longhua_Temple"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "xintiandi",
+  "theme": "gardens",
+  "name": "Xintiandi",
+  "nameCn": "新天地",
+  "category": "landmark",
+  "city": "Shanghai",
+  "lat": 31.22194,
+  "lng": 121.4705,
+  "coordSource": "OpenStreetMap (polygone 新天地, centroïde), WGS-84 ; cohérent avec Wikipedia",
+  "address": "Lane 181 Taicang Road, Huangpu District",
+  "cn": "上海市黄浦区太仓路181弄 新天地",
+  "metro": "Lignes 10/13 – 一大会址·新天地, ou ligne 1 – 一大会址·黄陂南路",
+  "hours": "Allées ouvertes en permanence. Boutiques environ 10h–22h, bars plus tard.",
+  "desc": "Îlot de shikumen des années 1920 réhabilité par Benjamin Wood en 2001 : le prototype de la régénération urbaine commerciale en Chine, dont Zhangyuan est la version des années 2020. Très léché et commercial, utile comme référence d'architecture et de retail.",
+  "highlights": [
+   "Bloc nord : shikumen restaurés et terrasses",
+   "À 10 min à pied de la Maison Hermès",
+   "Sinan Mansions et Fuxing Park à 10 min"
+  ],
+  "tip": "Ne viens pas exprès : passe-y entre la Maison Hermès et les bars de Fuxing Lu. Tianzifang n'est pas indispensable.",
+  "website": "",
+  "priority": "option",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Xintiandi",
+   "https://www.travelchinaguide.com/attraction/shanghai/xin-tian-di.htm"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "jade-buddha-temple",
+  "theme": "gardens",
+  "name": "Temple du Bouddha de jade",
+  "nameCn": "玉佛禅寺",
+  "category": "landmark",
+  "city": "Shanghai",
+  "lat": 31.24359,
+  "lng": 121.43985,
+  "coordSource": "OpenStreetMap (way 404699628, 安远路170号), WGS-84",
+  "address": "170 Anyuan Road, Putuo District",
+  "cn": "上海市普陀区安远路170号 玉佛禅寺",
+  "metro": "Ligne 13 – Jiangning Road (ou ligne 7 – Changshou Road), environ 8–10 min à pied",
+  "hours": "Tous les jours, environ 8h–16h30. Billet ~20 ¥ + supplément pour la salle du bouddha de jade.",
+  "desc": "Temple fondé en 1882 pour abriter deux bouddhas en jade blanc venus de Birmanie, dont un couché. Vrai lieu de culte, plus intime que Jing'an.",
+  "highlights": [
+   "Bouddha assis en jade blanc",
+   "Nouilles végétariennes du réfectoire"
+  ],
+  "tip": "Pour un matin pluvieux, à combiner avec M50 à 15 min.",
+  "website": "",
+  "priority": "option",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Jade_Buddha_Temple"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "guyi-garden",
+  "theme": "gardens",
+  "name": "Jardin Guyi (Nanxiang)",
+  "nameCn": "古猗园",
+  "category": "jardin",
+  "city": "Shanghai",
+  "lat": 31.29256,
+  "lng": 121.31183,
+  "coordSource": "OpenStreetMap (node 9502155916, entrance=main), WGS-84",
+  "address": "218 Huyi Highway, Nanxiang Town, Jiading District",
+  "cn": "上海市嘉定区南翔镇沪宜公路218号 古猗园",
+  "metro": "Ligne 11 – Nanxiang, environ 15 min à pied",
+  "hours": "Tous les jours, environ 7h–17h en hiver. Billet ~12 ¥ (à confirmer).",
+  "desc": "Jardin Ming (XVIe siècle) de Nanxiang, berceau du xiaolongbao. Bambous, pavillons, bateau de pierre : un jardin classique authentique, beaucoup moins bondé que le jardin Yu.",
+  "highlights": [
+   "Bambouseraie et pavillons Ming",
+   "Xiaolongbao de Nanxiang à la source"
+  ],
+  "tip": "Utile seulement si tu veux un jardin classique sans foule sans aller à Suzhou.",
+  "website": "",
+  "priority": "option",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Guyi_Garden"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "zhujiajiao",
+  "theme": "gardens",
+  "name": "Bourg d'eau de Zhujiajiao",
+  "nameCn": "朱家角古镇",
+  "category": "landmark",
+  "city": "Shanghai",
+  "lat": 31.1138,
+  "lng": 121.0516,
+  "coordSource": "OpenStreetMap, pont Fangsheng, à côté du quai 放生桥码头 (node 14339967455), WGS-84",
+  "address": "Zhujiajiao Town (Fangsheng Bridge / North Street), Qingpu District",
+  "cn": "上海市青浦区朱家角镇 朱家角古镇（放生桥·北大街）",
+  "metro": "Ligne 17 – Zhujiajiao, puis 15–20 min à pied",
+  "hours": "Bourg accessible 24h/24, entrée libre ; jardin Kezhi environ 8h30–17h.",
+  "desc": "Bourg d'eau Ming-Qing accessible en métro, avec le pont Fangsheng (1571) et le jardin Kezhi. Joli mais très commercial le week-end, moins convaincant qu'un jardin de Suzhou.",
+  "highlights": [
+   "Pont Fangsheng à cinq arches (1571)",
+   "Jardin Kezhi"
+  ],
+  "tip": "Seulement en semaine, tôt. Entre Zhujiajiao et Suzhou, choisis Suzhou.",
+  "website": "",
+  "priority": "option",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Zhujiajiao"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "labelhood-pillar",
+  "theme": "concept",
+  "name": "LABELHOOD Pillar (+ Labelhood House)",
+  "nameCn": "蕾虎 LABELHOOD",
+  "category": "concept",
+  "city": "Shanghai",
+  "lat": 31.21999,
+  "lng": 121.447,
+  "coordSource": "OpenStreetMap, nœud 4729229090 (184 富民路, encore étiqueté « dong liang »), WGS-84, vérifié via l'API OSM le 10/11/2026",
+  "address": "184 Fumin Lu, near Changle Lu (south of Julu Lu), Jing'an District",
+  "cn": "上海市静安区富民路184号（近长乐路）蕾虎 LABELHOOD",
+  "metro": "Lignes 1/7 Changshu Road (常熟路) ou lignes 2/7/14 Jing'an Temple (静安寺), 10-12 min à pied",
+  "hours": "Tous les jours 10h-22h (Pillar et House), lundi compris.",
+  "desc": "La vitrine physique de Labelhood, l'incubateur de créateurs chinois indépendants fondé par Tasha Liu et moteur de la Fashion Week de Shanghai. Trois étages de vêtements, accessoires et chaussures dans l'ancienne boutique Dongliang de Fumin Lu. Le pendant lifestyle, Labelhood House, est au 796 Julu Lu, à 5 min à pied.",
+  "highlights": [
+   "Uma Wang, Xu Zhi et la nouvelle garde chinoise",
+   "Labelhood House (巨鹿路796号) : mode, chaussures, bijoux et objets maison",
+   "Fumin Lu et Julu Lu à enchaîner à pied"
+  ],
+  "tip": "Fais Pillar puis House dans la foulée (remonte Fumin Lu jusqu'à Julu Lu, puis à gauche). Regarde les finitions métal et cuir des accessoires : bonne veille pour ORBES.",
+  "website": "",
+  "priority": "must",
+  "sources": [
+   "https://www.peninsula.com/en/shanghai/our-city/pencities/shopping-in-shanghai-during-golden-week",
+   "https://www.smartshanghai.com/articles/shopping/the-address-please-9-instagram-famous-shops-in-shanghai",
+   "https://www.openstreetmap.org/node/4729229090"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "maison-dongliang",
+  "theme": "concept",
+  "name": "Maison Dongliang (WYSH)",
+  "nameCn": "栋梁 DONGLIANG 上海旗舰店",
+  "category": "concept",
+  "city": "Shanghai",
+  "lat": 31.2151,
+  "lng": 121.423,
+  "coordSource": "Interpolation sur les numéros OSM de Wuyi Lu (n° 127 à 31.21614,121.42389 ; n° 269 à 121.42077), WGS-84, ±100 m",
+  "address": "Villa 174, WYSH, 168 Wuyi Lu, near Yan'an Xi Lu, Changning District",
+  "cn": "上海市长宁区武夷路168号 WYSH 174号别墅（栋梁 DONGLIANG）",
+  "metro": "Lignes 2/11 Jiangsu Road (江苏路), 12-15 min à pied ; DiDi plus simple",
+  "hours": "Tous les jours 10h-22h (source officielle oct. 2024 : vérifie sur Dianping la veille).",
+  "desc": "Le multimarque pionnier de Pékin (2009) a ouvert en octobre 2024 son flagship shanghaïen dans une villa européenne centenaire de 700 m², au cœur de WYSH, ancienne usine reconvertie. Mode pointue, artisanat et objets pour la maison, avec des expositions thématiques.",
+  "highlights": [
+   "Collaborations exclusives avec Our Legacy, Lemaire et The Row",
+   "Maison : Astier de Villatte, Mad et Len",
+   "Expos sur l'artisanat traditionnel revisité"
+  ],
+  "tip": "Compte 1h. Columbia Circle est à 400 m, de l'autre côté de Yan'an Xi Lu, avec le Hudec Memorial Hall (129 Panyu Lu) au passage.",
+  "website": "",
+  "priority": "must",
+  "sources": [
+   "https://english.shanghai.gov.cn/en-FirstStores/20241024/54129fd59249474fb143f6eb07cec2da.html",
+   "https://au.lifestyle.yahoo.com/china-multibrand-leader-dongliang-returns-171402336.html"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "zhangyuan",
+  "theme": "concept+luxury",
+  "name": "Zhangyuan",
+  "nameCn": "张园",
+  "category": "luxe",
+  "city": "Shanghai",
+  "lat": 31.2298,
+  "lng": 121.4561,
+  "coordSource": "Calculé sur la géométrie OSM des rues (îlot Maoming Bei Lu / Shimen Yi Lu / Wujiang Lu / Weihai Lu), moitié ouest, WGS-84, ±100 m ; way OSM « 张家花园 » à 31.23016, 121.45609",
+  "address": "Lane 590 Weihai Road, Jing'an District (entrées sur Maoming North Rd, Weihai Rd et Shimen 1st Rd)",
+  "cn": "上海市静安区威海路590弄 张园",
+  "metro": "Lignes 2/12/13 – Nanjing West Road (南京西路), 2-3 min à pied",
+  "hours": "Allées accessibles librement. Boutiques environ 10h-22h tous les jours (horaires par enseigne).",
+  "desc": "Le plus grand ensemble de shikumen de Shanghai, restauré par Swire Properties et le Jing'an Group. La zone Ouest (2022) compte plus de 50 marques, dont beaucoup de premières adresses : c'est là que Shanghai teste le luxe dans un lieu patrimonial. Un premier tronçon de la zone Est a ouvert le 30 juin 2026, relié à HKRI Taikoo Hui ; le reste est attendu fin 2027.",
+  "highlights": [
+   "SANDRIVER (W17, 茂名北路200号) : plus grand flagship au monde du cachemirien chinois (janv. 2026), pièces en pulu tibétain tissé main",
+   "Louis Vuitton Objets Nomades : première boutique au monde dédiée",
+   "Sisley House, Ortensia (restaurant français étoilé), ALO, expos éphémères",
+   "Architecture de ruelles lilong des années 1910-1930"
+  ],
+  "tip": "Viens en semaine en fin de matinée : le week-end, c'est la foule des shootings. Regarde le compte WeChat 张园 pour les expos éphémères. The Louis est juste en face, de l'autre côté de Shimen Yi Lu.",
+  "website": "",
+  "priority": "must",
+  "sources": [
+   "https://www.chinadaily.com.cn/a/202603/30/WS69ca42e5a310d6866eb40b53_2.html",
+   "https://global.chinadaily.com.cn/a/202601/12/WS69649258a310d6866eb333cb.html",
+   "https://english.shanghai.gov.cn/en-SpecialtyShoppingAreas/20260703/9f135bc472af47448dc7face360a6acc.html"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "songmont-huaihai",
+  "theme": "concept+luxury+leather",
+  "name": "Songmont – flagship Huaihai",
+  "nameCn": "山下有松（淮海中路店）",
+  "category": "cuir",
+  "city": "Shanghai",
+  "lat": 31.2199,
+  "lng": 121.4581,
+  "coordSource": "Interpolé sur les adresses OSM de Huaihai Middle Rd, côté sud (numéros impairs), entre le n°775 et le n°845, WGS-84, ±80 m",
+  "address": "817–821 Middle Huaihai Road, Huangpu District",
+  "cn": "上海市黄浦区淮海中路817-821号 山下有松",
+  "metro": "Ligne 13 – Middle Huaihai Road (淮海中路), 4 min à pied ; ou lignes 1/10/12 – South Shaanxi Road (陕西南路), 7 min",
+  "hours": "Tous les jours 10h-22h (site officiel).",
+  "desc": "Marque de maroquinerie chinoise née en 2013, figure du « luxe calme » local : cuirs souples, formes architecturales, sans logo. Prix moyen passé de 1 600 à 2 200 ¥ en un an, 42 % de clients qui rachètent dans l'année. La boutique de Huaihai s'est agrandie début 2026 (817-821, environ 600 m²). Une étude de cas directe pour la maroquinerie ORBES.",
+  "highlights": [
+   "Boutique agrandie en 2026, espaces par univers",
+   "Chaque boutique a son nom et son concept (Pine Pavilion au Rock Bund, Tidal Moon à l'IFC)",
+   "HAUS NOWHERE (Gentle Monster), retail spectacle et installations robotiques, juste en face au 798-812",
+   "Autres boutiques : Rock Bund (圆明园路149号), IFC, Taikoo Li Qiantan, Westbund Central"
+  ],
+  "tip": "Regarde les quincailleries, les tranches et le packaging, et note les prix pour ton benchmark. En semaine pour éviter la queue. Traverse ensuite pour 20 min chez HAUS NOWHERE.",
+  "website": "https://songmontofficial.com",
+  "priority": "high",
+  "sources": [
+   "https://www.shobserver.cn/sgh/detail?id=1725348",
+   "https://english.shanghai.gov.cn/en-Latest-WhatsNew/20260820/c86dba0839c04225ba27ee0e395f5876.html",
+   "https://songmontofficial.com/pages/our-locations"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "westbund-central",
+  "theme": "concept",
+  "name": "Westbund Central (flagship Issey Miyake)",
+  "nameCn": "星扬西岸中心",
+  "category": "design",
+  "city": "Shanghai",
+  "lat": 31.16351,
+  "lng": 121.45668,
+  "coordSource": "OpenStreetMap, way 863990736 « 星扬西岸中心 » (centroïde), WGS-84",
+  "address": "Westbund Central, near Longyao Lu and Yunjin Lu, Xuhui Riverside (West Bund), Xuhui District",
+  "cn": "上海市徐汇区 星扬西岸中心（龙耀路、云锦路附近，西岸滨江）",
+  "metro": "Ligne 11 Longyao Road (龙耀路), 5 min à pied",
+  "hours": "Centre environ 10h-22h tous les jours (à vérifier sur Dianping).",
+  "desc": "Le nouveau pôle retail du West Bund. Issey Miyake y a ouvert en mai 2026 son plus grand magasin de Chine (376 m² sur deux niveaux), signé Tokujin Yoshioka : surfaces réfléchissantes, escalier de verre et sculpture cinétique de trois robes plissées. Les six lignes de la marque y sont réunies pour la première fois en Chine.",
+  "highlights": [
+   "Design Tokujin Yoshioka, escalier de verre",
+   "Pleats Please, Bao Bao, Homme Plissé, IM Men, Issey Miyake Eyes (montures imprimées en 3D)",
+   "Boutique Songmont dans le même centre",
+   "Tank Shanghai et West Bund Museum à quelques minutes"
+  ],
+  "tip": "Regarde les montures 3D de la ligne Eyes : bonne référence pour ton travail en titane.",
+  "website": "",
+  "priority": "high",
+  "sources": [
+   "https://theimpression.com/issey-miyake-opens-largest-china-store-at-shanghais-westbund-central/",
+   "https://www.openstreetmap.org/way/863990736"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "columbia-circle",
+  "theme": "concept",
+  "name": "Columbia Circle",
+  "nameCn": "上生·新所",
+  "category": "design",
+  "city": "Shanghai",
+  "lat": 31.2116,
+  "lng": 121.4228,
+  "coordSource": "Entre l'entrée de Yan'an Xi Lu (OSM 31.21203,121.42323) et le club historique (Wikidata Q16199916 : 31.21182,121.4225), WGS-84",
+  "address": "1262 Yan'an Xi Lu, near Panyu Lu, Changning District",
+  "cn": "上海市长宁区延安西路1262号 上生·新所",
+  "metro": "Lignes 2/11 Jiangsu Road (江苏路), ~15 min à pied : DiDi conseillé",
+  "hours": "Site extérieur accessible en journée et en soirée. Boutiques et cafés environ 10h-22h.",
+  "desc": "Ancien Columbia Country Club des années 1920, devenu institut de recherche, puis reconverti en campus créatif par OMA : piscine de 1924, villa Sun Ke de style hispanique signée Hudec, bureaux, boutiques et cafés. Le meilleur exemple de reconversion patrimoniale à Shanghai.",
+  "highlights": [
+   "Piscine du Columbia Country Club restaurée par OMA",
+   "Villa Sun Ke (Hudec, 1931) et bâtiments des années 1920",
+   "Allées arborées, belles couleurs d'automne"
+  ],
+  "tip": "Combine avec Maison Dongliang (WYSH), à 400 m au nord. Vérifie sur le compte WeChat 上生新所 les expos et marchés du moment.",
+  "website": "",
+  "priority": "high",
+  "sources": [
+   "https://english.shanghai.gov.cn/en-SpecialtyShoppingAreas/20231217/5e5702d0882c44249166a0471a4541c8.html",
+   "https://english.shanghai.gov.cn/en-PlanANightOut/20260804/31271ca7407542e7ba7b8e1f9e0caa46.html"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "to-summer-hunan",
+  "theme": "concept",
+  "name": "to summer, maison Hunan Lu",
+  "nameCn": "观夏闲庭（湖南路店）",
+  "category": "concept",
+  "city": "Shanghai",
+  "lat": 31.21,
+  "lng": 121.4355,
+  "coordSource": "Carrefour Hunan Lu / Wukang Lu calculé sur les voies OSM (31.21017,121.43575), WGS-84, ±60 m",
+  "address": "111 Hunan Lu, corner of Wukang Lu, Xuhui District",
+  "cn": "上海市徐汇区湖南路111号（近武康路）观夏闲庭",
+  "metro": "Ligne 10 Shanghai Library (上海图书馆), 6-8 min à pied",
+  "hours": "Lun-ven 11h-21h ; sam-dim 10h-21h30.",
+  "desc": "Le premier flagship (2022) de la maison de parfum chinoise to summer, dont les senteurs puisent dans la flore et la poésie chinoises, dans une villa espagnole de 1936. Un cas d'école d'identité et de packaging premium « made in China ».",
+  "highlights": [
+   "Flacons et coffrets : référence pour le packaging ORBES",
+   "Villa de 1936 avec ses détails d'origine"
+  ],
+  "tip": "Accroche-la à la balade Wukang Lu. Achète un petit coffret pour étudier le packaging.",
+  "website": "",
+  "priority": "option",
+  "sources": [
+   "https://www.smartshanghai.com/articles/shopping/the-address-please-9-instagram-famous-shops-in-shanghai",
+   "https://www.digitaling.com/articles/894501.html"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "haus-nowhere",
+  "theme": "concept",
+  "name": "HAUS NOWHERE (Gentle Monster)",
+  "nameCn": "HAUS NOWHERE 上海",
+  "category": "design",
+  "city": "Shanghai",
+  "lat": 31.2203,
+  "lng": 121.4578,
+  "coordSource": "OpenStreetMap : nœud 14301435101 « HAUS NOWHERE » et nœud 13652138301 Gentle Monster 798-802 淮海中路, WGS-84",
+  "address": "798-812 Huaihai Zhong Lu, near Maoming Nan Lu, Huangpu District",
+  "cn": "上海市黄浦区淮海中路798-812号 HAUS NOWHERE",
+  "metro": "Lignes 1/10/12 South Shaanxi Road (陕西南路), 5 min à pied",
+  "hours": "Tous les jours 10h-22h, entrée libre.",
+  "desc": "Le vaisseau amiral du groupe IICOMBINED (Gentle Monster, Tamburins, Nudake) : retail spectacle avec installations robotiques et cinétiques renouvelées régulièrement.",
+  "highlights": [
+   "Installations mécaniques et robotiques",
+   "Tamburins (parfum) et pâtisserie Nudake",
+   "Juste en face de Songmont"
+  ],
+  "tip": "20-30 min suffisent : pour la mise en scène et l'industrial design, pas pour acheter.",
+  "website": "https://www.gentlemonster.com/stories/haus-shanghai",
+  "priority": "option",
+  "sources": [
+   "https://www.gentlemonster.com/us/en/stores/detail/779149670609076624",
+   "https://english.shanghai.gov.cn/en-FirstStores/20240617/d5e15145a6624281801333b3983ffe51.html"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "duoyun-shanghai-tower",
+  "theme": "concept",
+  "name": "Duoyun Books, Shanghai Tower 52e",
+  "nameCn": "朵云书院旗舰店（上海中心52层）",
+  "category": "design",
+  "city": "Shanghai",
+  "lat": 31.23566,
+  "lng": 121.50111,
+  "coordSource": "OpenStreetMap, nœud 11314400069 « Duoyun Bookstore », WGS-84",
+  "address": "52F, Shanghai Tower, 501 Yincheng Zhong Lu, Lujiazui, Pudong",
+  "cn": "上海市浦东新区银城中路501号 上海中心大厦52层 朵云书院",
+  "metro": "Lignes 2/14 Lujiazui (陆家嘴), 5-10 min à pied",
+  "hours": "Non confirmé pour 2026 (Time Out : 10h-21h).",
+  "desc": "La librairie à 239 m de haut, conçue par Wutopia Lab (2019) : rayonnages blancs, vue plongeante sur le Bund et café.",
+  "highlights": [
+   "Vue sur Lujiazui et le Bund depuis le 52e",
+   "Design intérieur Wutopia Lab"
+  ],
+  "tip": "Vérifie le statut sur Dianping la veille : aucune source 2025-2026 trouvée.",
+  "website": "",
+  "priority": "option",
+  "sources": [
+   "https://english.shanghai.gov.cn/en-BookstoresLibraries/20231219/cbd9d4d9faeb41e29e0b3e23441c8e10.html",
+   "https://www.openstreetmap.org/node/11314400069"
+  ],
+  "confidence": "low"
+ },
+ {
+  "id": "k11-art-mall",
+  "theme": "concept",
+  "name": "K11 Art Mall + chi K11 art museum",
+  "nameCn": "K11购物艺术中心",
+  "category": "concept",
+  "city": "Shanghai",
+  "lat": 31.22547,
+  "lng": 121.46902,
+  "coordSource": "OpenStreetMap, way 48872919 « K11 艺术购物中心 » (centroïde), WGS-84",
+  "address": "300 Huaihai Zhong Lu, Huangpu District",
+  "cn": "上海市黄浦区淮海中路300号 K11购物艺术中心",
+  "metro": "Ligne 1 一大会址·黄陂南路, accès direct",
+  "hours": "Centre tous les jours 10h-22h. Musée chi K11 (B3) : 10h-20h (horaires 2025).",
+  "desc": "Le mall-musée d'Adrian Cheng : art contemporain dans les parties communes, créateurs chinois et musée chi K11 au sous-sol.",
+  "highlights": [
+   "chi K11 art museum (B3)",
+   "À 5 min à pied de la Maison Hermès"
+  ],
+  "tip": "C'est l'expo du chi K11 qui justifie le détour, pas le mall : regarde le programme avant.",
+  "website": "",
+  "priority": "option",
+  "sources": [
+   "https://english.shanghai.gov.cn/en-ArtExhibitions/20251118/623d3a679e76401f8ef9cbe2246762c3.html"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "upper-house-shanghai",
+  "theme": "concept",
+  "name": "Upper House Shanghai (Café Gray Deluxe, Sui Tang Li)",
+  "nameCn": "上海镛舍",
+  "category": "hotel",
+  "city": "Shanghai",
+  "lat": 31.23183,
+  "lng": 121.45821,
+  "coordSource": "OpenStreetMap, nœud 12540989055 « 镛舍 / The Middle House », WGS-84",
+  "address": "366 Shimen Yi Lu, Jing'an District (HKRI Taikoo Hui)",
+  "cn": "上海市静安区石门一路366号 上海镛舍",
+  "metro": "Lignes 2/12/13 West Nanjing Road (南京西路), 3-5 min à pied",
+  "hours": "Hôtel 24h/24. Horaires des restaurants non publiés : Café Gray Deluxe +86 21 3216 8088, Sui Tang Li +86 21 3216 8068.",
+  "desc": "L'hôtel signé Piero Lissoni (2017), ex-The Middle House, rebaptisé Upper House Shanghai en octobre 2025. Minimalisme chaud, bois, pierre et laiton ; une clé Michelin. L'endroit le plus juste pour un déjeuner ou un verre design après Zhangyuan.",
+  "highlights": [
+   "Architecture intérieure Piero Lissoni",
+   "Café Gray Deluxe (brasserie), Sui Tang Li (cuisine shanghaïenne)",
+   "Face à Zhangyuan, dans HKRI Taikoo Hui"
+  ],
+  "tip": "Réserve Café Gray Deluxe au +86 21 3216 8088 (ou cafegray_sh@upperhouse.com). Tenue smart casual.",
+  "website": "https://www.upperhouse.com/shanghai",
+  "priority": "high",
+  "sources": [
+   "https://www.upperhouse.com/shanghai/contact-us",
+   "https://www.swirehotels.com/our-story/media/press-release/sh/2025/uh-rebrand/"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "1933-laochangfang",
+  "theme": "concept",
+  "name": "1933 Laochangfang",
+  "nameCn": "1933老场坊",
+  "category": "landmark",
+  "city": "Shanghai",
+  "lat": 31.25663,
+  "lng": 121.48785,
+  "coordSource": "Wikidata Q11056843 (31.256633,121.48785), WGS-84 ; cohérent avec la voie OSM 沙泾路",
+  "address": "10 Shajing Lu, near Liyang Lu / Haining Lu, Hongkou District",
+  "cn": "上海市虹口区沙泾路10号 1933老场坊",
+  "metro": "Lignes 4/10 Hailun Road (海伦路), 8-10 min à pied",
+  "hours": "Bâtiment visitable environ 9h-20h ; commerces à horaires variables.",
+  "desc": "L'ancien abattoir municipal de 1933 : passerelles, rampes à bétail et escaliers en béton entrelacés autour d'un atrium. Monument national protégé. Les commerces déçoivent, mais l'architecture est une claque pour un œil d'industrial designer.",
+  "highlights": [
+   "Rampes et ponts en béton imbriqués",
+   "Atrium central à la lumière zénithale"
+  ],
+  "tip": "Viens pour le bâtiment : 45 min suffisent.",
+  "website": "",
+  "priority": "option",
+  "sources": [
+   "https://zh.wikipedia.org/wiki/上海公共租界工部局宰牲场",
+   "https://www.metalocus.es/en/news/a-vertical-labyrinth-shanghai-1933-shang-hai-1933lao-chang-fang"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "tx-huaihai",
+  "theme": "concept",
+  "name": "TX Huaihai",
+  "nameCn": "TX淮海｜年轻力中心",
+  "category": "concept",
+  "city": "Shanghai",
+  "lat": 31.22247,
+  "lng": 121.46434,
+  "coordSource": "OpenStreetMap, way 1157347139 « TX淮海 » (centroïde), WGS-84",
+  "address": "523 Huaihai Zhong Lu, near Maoming Nan Lu, Huangpu District",
+  "cn": "上海市黄浦区淮海中路523号 TX淮海",
+  "metro": "Ligne 1 一大会址·黄陂南路 ou lignes 1/10/12 South Shaanxi Road, 5-8 min à pied",
+  "hours": "Tous les jours environ 10h-22h.",
+  "desc": "Le centre « youth culture » de Huaihai : pop-ups, expos, marques chinoises émergentes. Le thermomètre de ce que la Gen Z shanghaïenne achète en 2026.",
+  "highlights": [
+   "Pop-ups et expos qui tournent chaque mois",
+   "Sur l'axe Huaihai, entre K11 et Songmont"
+  ],
+  "tip": "Passe-y en marchant sur Huaihai, sans en faire une sortie dédiée.",
+  "website": "",
+  "priority": "option",
+  "sources": [
+   "https://english.shanghai.gov.cn/en-SpecialtyShoppingAreas/20260302/9759e03487194de9aef38d681d997e24.html"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "lv-the-louis",
+  "theme": "luxury",
+  "name": "Louis Vuitton « The Louis » (HKRI Taikoo Hui)",
+  "nameCn": "路易威登 路易号（兴业太古汇）",
+  "category": "luxe",
+  "city": "Shanghai",
+  "lat": 31.232,
+  "lng": 121.4584,
+  "coordSource": "OSM (API openstreetmap.org, WGS-84) : carrefour Shimen 1st Rd / Wujiang Rd (31.23227, 121.45744) et The Middle House (31.23183, 121.45821) ; précision ~50 m",
+  "address": "HKRI Taikoo Hui, 789 West Nanjing Road, angle Shimen No.1 Road / Wujiang Road, Jing'an District",
+  "cn": "上海市静安区南京西路789号兴业太古汇 路易号（石门一路吴江路路口）",
+  "metro": "Lignes 2/12/13 – Nanjing West Road (南京西路), 3 min à pied",
+  "hours": "Tous les jours 10h-22h (horaires d'ouverture). Entrée gratuite sur réservation dans le mini-programme WeChat « My LV ». Ouvert en juin 2026, novembre non confirmé.",
+  "desc": "Bâtiment en forme de paquebot à coque monogrammée, inauguré le 26 juin 2025 au pied de HKRI Taikoo Hui. Sur trois niveaux et environ 1 600 m² : boutique, exposition « Visionary Journeys » (environ 1 200 m²) et Le Café Louis Vuitton. L'objet de retail-architecture le plus commenté de Chine.",
+  "highlights": [
+   "Exposition « Visionary Journeys » : malles d'archives, savoir-faire d'Asnières",
+   "Le Café Louis Vuitton, à l'intérieur du bateau",
+   "Le bâtiment-malle : du packaging à l'échelle d'un immeuble, référence directe pour l'univers ORBES"
+  ],
+  "tip": "Réserve ton créneau sur « My LV » dès que la réservation ouvre, et vérifie que le lieu est toujours ouvert avant le 21. Le café se réserve à part.",
+  "website": "https://www.louisvuitton.cn",
+  "priority": "must",
+  "sources": [
+   "https://www.jingan.gov.cn/rmtzx/003001/20260626/c72cdfef-730e-4123-a594-59b10b669f37.html",
+   "https://www.jiemian.com/article/12965062.html",
+   "https://www.wallpaper.com/travel/the-louis-louis-vuitton-shanghai-china"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "hermes-maison-shanghai",
+  "theme": "luxury+leather",
+  "name": "Maison Hermès Shanghai",
+  "nameCn": "上海爱马仕之家",
+  "category": "luxe",
+  "city": "Shanghai",
+  "lat": 31.22559,
+  "lng": 121.47148,
+  "coordSource": "Nœud OSM « Hermès » (WGS-84), angle Huaihai Middle Rd / Songshan Rd",
+  "address": "217 Middle Huaihai Road (corner of Songshan Road), Huangpu District",
+  "cn": "上海市黄浦区淮海中路217号 爱马仕之家（近嵩山路）",
+  "metro": "Ligne 1 – 一大会址·黄陂南路, 5 min à pied",
+  "hours": "Horaires non confirmés (en principe tous les jours ~10h-22h). Tél. +86 21 8013 7217.",
+  "desc": "Une des rares « Maisons » Hermès au monde, ouverte en 2014 dans un bâtiment du début du XXe siècle de l'ancienne Concession française : environ 1 200 m² sur quatre niveaux, un étage par univers et un espace d'exposition qui accueille des commandes à des artistes chinois. L'exemple type du flagship patrimonial.",
+  "highlights": [
+   "Rénovation RDAI : façade de briques conservée, intérieurs artisanaux",
+   "Espace d'exposition (Xue Feng en 2026, rien d'annoncé pour fin novembre)",
+   "Sellerie et petite maroquinerie : savoir-faire cuir de référence",
+   "SHANG XIA à deux pas, Xintiandi à 10 min à pied"
+  ],
+  "tip": "Appelle pour savoir quelle expo tourne fin novembre. Enchaîne avec SHANG XIA, quelques numéros plus loin.",
+  "website": "https://www.hermes.cn",
+  "priority": "must",
+  "sources": [
+   "https://www.wallpaper.com/fashion/herms-new-shanghai-home-in-a-20th-century-french-administration-building",
+   "https://jingdaily.com/intels/2026-06/01/hermes-invites-artist-xue-feng-to-transform-its-shanghai-maison"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "nanjing-west-watch-row",
+  "theme": "luxury",
+  "name": "La « rue des montres » de Nanjing West Road",
+  "nameCn": "南京西路名表街",
+  "category": "montres",
+  "city": "Shanghai",
+  "lat": 31.22942,
+  "lng": 121.45119,
+  "coordSource": "Nœud OSM « A. Lange & Söhne » (WGS-84), côté sud de Nanjing West Rd ; la séquence des n°1033 à 1181 s'étend sur ~250 m",
+  "address": "West Nanjing Road n°1033 à 1181 (côté sud, entre Shaanxi North Rd et Maoming North Rd), Jing'an District. A. Lange & Söhne au n°1155",
+  "cn": "上海市静安区南京西路1155号 朗格精品店（南京西路1033–1181号一带）",
+  "metro": "Lignes 2/7/14 – Jing'an Temple ou lignes 2/12/13 – Nanjing West Road, 8 min à pied",
+  "hours": "Boutiques tous les jours 10h-22h. Pas de jour de fermeture.",
+  "desc": "Le tronçon de Nanjing West Road entre Plaza 66 et Maoming North Road aligne les boutiques des grandes maisons suisses et allemandes : Lange, Moser, Breguet, IWC, Audemars Piguet, Vacheron Constantin, Jaeger-LeCoultre, etc. En un après-midi, le meilleur endroit pour sentir la haute horlogerie en Chine.",
+  "highlights": [
+   "A. Lange & Söhne (n°1155) : flagship sur deux niveaux rénové fin 2025",
+   "H. Moser & Cie (n°1079) : première boutique de la marque en Chine continentale",
+   "Breguet (n°1041), TAG Heuer, IWC, Audemars Piguet (n°1175)",
+   "Plaza 66 (1266 Nanjing Xi Lu) juste à l'ouest : Hermès, Cartier, LV, atrium très épuré"
+  ],
+  "tip": "Commence par Lange (finitions) et Moser (minimalisme, cadrans fumés) : deux références directes pour ORBES. En semaine, les vendeurs ont plus de temps.",
+  "website": "",
+  "priority": "must",
+  "sources": [
+   "https://jingdaily.com/intels/2025-12/10/a-lange-and-soehne-debuts-expanded-nanjing-road-store",
+   "https://www.orientalwatch.com/en/topics/363/",
+   "https://www.breguet.com/it/punti-vendita/boutique-breguet-shanghai-west-nanjing-road"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "shanghai-watch-flagship",
+  "theme": "luxury",
+  "name": "Shanghai Watch – flagship Nanjing West Road",
+  "nameCn": "上海表 南京西路旗舰店",
+  "category": "montres",
+  "city": "Shanghai",
+  "lat": 31.231,
+  "lng": 121.4529,
+  "coordSource": "Interpolé sur les adresses OSM du côté nord de Nanjing West Rd, entre le n°962 et le n°1038, WGS-84, ±80 m",
+  "address": "996 West Nanjing Road, Jing'an District, 200040",
+  "cn": "上海市静安区南京西路996号 上海表旗舰店",
+  "metro": "Lignes 2/12/13 – Nanjing West Road (南京西路), 5 min à pied",
+  "hours": "Tous les jours 10h-22h (store locator officiel). Centre de service agréé sur place.",
+  "desc": "Flagship de Shanghai Watch (上海表), héritière de l'usine horlogère d'État fondée en 1955. En face de la rue des montres suisses : tu vois en dix minutes l'écart de prix et de récit entre horlogerie chinoise patrimoniale et haute horlogerie.",
+  "highlights": [
+   "Rééditions patrimoniales, dont l'A581 (1958)",
+   "Pièces des 70 ans de la marque (2025)",
+   "Le point d'entrée en prix de l'horlogerie chinoise"
+  ],
+  "tip": "Idée de cadeau pour ton père : une réédition patrimoniale.",
+  "website": "https://www.shanghaiwatch.com/pages/store-locator",
+  "priority": "high",
+  "sources": [
+   "https://www.shanghaiwatch.com/pages/store-locator",
+   "https://archello.com/project/shanghai-watch-flagship-store"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "plaza-66",
+  "theme": "luxury",
+  "name": "Plaza 66",
+  "nameCn": "恒隆广场",
+  "category": "luxe",
+  "city": "Shanghai",
+  "lat": 31.2295,
+  "lng": 121.449,
+  "coordSource": "Polygone OSM « 恒隆广场 / Plaza 66 » (centroïde 31.22974, 121.44888), ramené vers la façade, WGS-84",
+  "address": "1266 West Nanjing Road (angle Shaanxi North Road), Jing'an District",
+  "cn": "上海市静安区南京西路1266号 恒隆广场",
+  "metro": "Lignes 2/7/14 – Jing'an Temple ou 2/12/13 – Nanjing West Road, 8-10 min à pied",
+  "hours": "Tous les jours, environ 10h-22h.",
+  "desc": "Le mall de luxe historique de Hang Lung, le plus dense de Shanghai en grandes maisons de mode, de joaillerie et d'horlogerie.",
+  "highlights": [
+   "Louis Vuitton, Hermès, Cartier",
+   "Tête de pont de la rue des montres"
+  ],
+  "tip": "Fais Plaza 66, la rue des montres, Shanghai Watch, The Louis puis Zhangyuan à pied : environ 1,2 km.",
+  "website": "",
+  "priority": "high",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Plaza_66"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "taikoo-li-qiantan",
+  "theme": "luxury",
+  "name": "Taikoo Li Qiantan",
+  "nameCn": "前滩太古里",
+  "category": "luxe",
+  "city": "Shanghai",
+  "lat": 31.1548,
+  "lng": 121.4772,
+  "coordSource": "Polygone OSM « 前滩太古里 » (addr 东育路 500, centroïde 31.15484, 121.47724), WGS-84",
+  "address": "Lane 500 Dongyu Road, Qiantan, Pudong New Area",
+  "cn": "上海市浦东新区东育路500弄 前滩太古里",
+  "metro": "Lignes 6/8/11 – Oriental Sports Center (东方体育中心), 2 min à pied",
+  "hours": "Tous les jours, environ 10h-22h (non confirmé).",
+  "desc": "Mall à ciel ouvert de Swire (2021) : environ 250 boutiques, bâtiments bas et promenade-jardin sur les toits. Les maisons y ont leur propre façade, comme dans une rue.",
+  "highlights": [
+   "Audemars Piguet, Cartier, Tiffany & Co., Bulgari",
+   "Toiture-jardin et parcours extérieurs",
+   "Plan aéré : référence pour un futur retail ORBES"
+  ],
+  "tip": "20-25 min de DiDi depuis Caohejing. Évite le week-end après-midi.",
+  "website": "",
+  "priority": "high",
+  "sources": [
+   "https://www.swireproperties.com/en/portfolio/current-developments/taikoo-li-qiantan"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "ifc-mall-shanghai",
+  "theme": "luxury",
+  "name": "Shanghai IFC Mall",
+  "nameCn": "上海国金中心商场",
+  "category": "luxe",
+  "city": "Shanghai",
+  "lat": 31.23824,
+  "lng": 121.49792,
+  "coordSource": "Polygone OSM « 上海国金中心商场 » (addr 世纪大道 8), WGS-84 ; cohérent avec Wikidata Q406446",
+  "address": "8 Century Avenue, Lujiazui, Pudong New Area",
+  "cn": "上海市浦东新区世纪大道8号 上海国金中心商场",
+  "metro": "Lignes 2/14 – Lujiazui (陆家嘴), accès direct en sous-sol",
+  "hours": "Tous les jours, environ 10h-22h.",
+  "desc": "Le mall de luxe de Lujiazui, au pied des tours IFC, fréquenté par la clientèle de la finance : grandes maisons, plusieurs horlogers dont IWC, boutique Songmont « Tidal Moon » et de nombreux restaurants.",
+  "highlights": [
+   "Boutiques horlogères et joaillières",
+   "Songmont « Tidal Moon »",
+   "Accès direct au Ritz-Carlton (Flair, 58e)"
+  ],
+  "tip": "Pratique pour déjeuner et faire un tour des horlogers entre deux visites de Lujiazui.",
+  "website": "",
+  "priority": "option",
+  "sources": [
+   "https://www.wikidata.org/wiki/Q406446",
+   "https://www.iwc.com/au-en/boutiques/asia/china/shanghai/iwc-schaffhausen-boutique-ifc-shanghai"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "bulgari-hotel-shanghai",
+  "theme": "luxury",
+  "name": "Bulgari Hotel Shanghai (Il Bar, La Terrazza)",
+  "nameCn": "上海宝格丽酒店",
+  "category": "hotel",
+  "city": "Shanghai",
+  "lat": 31.2445,
+  "lng": 121.4778,
+  "coordSource": "OSM (API openstreetmap.org) : bâtiments « 华侨城·苏河湾项目 » (北苏州路470) et « 上海总商会旧址 », le long de Henan North Rd, WGS-84, ±60 m",
+  "address": "33 Henan North Road, Jing'an District (rive nord de la Suzhou Creek)",
+  "cn": "上海市静安区河南北路33号 上海宝格丽酒店",
+  "metro": "Lignes 10/12 – Tiantong Road (天潼路), 3 min à pied",
+  "hours": "Hôtel 24h/24. Il Bar (47e) : 10h-1h. La Terrazza (48e, toit) : 17h30-1h.",
+  "desc": "Hôtel ouvert en 2018 dans une tour du projet OCT Suhewan, intérieurs Antonio Citterio Patricia Viel, avec l'ancienne Chambre générale de commerce (1916) restaurée. Les bars en étage donnent sur le Bund et la Suzhou Creek ; Il Ristorante – Niko Romito est au même étage qu'Il Bar.",
+  "highlights": [
+   "Intérieurs Citterio-Viel : marbres, laitons, un vrai cours de matériaux",
+   "Il Bar (47e) et Il Ristorante – Niko Romito",
+   "La Terrazza, sur le toit au 48e",
+   "Bâtiment historique de la Chambre de commerce (1916)"
+  ],
+  "tip": "Réserve par téléphone. Il fait autour de 10 °C le soir : prévois une veste pour la terrasse, ou reste au bar.",
+  "website": "https://www.bulgarihotels.com/en_US/shanghai/bars/il-bar",
+  "priority": "option",
+  "sources": [
+   "https://www.bulgarihotels.com/en_US/shanghai/bars/il-bar",
+   "https://www.bulgarihotels.com/en_US/shanghai/bars/la-terrazza"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "southbund-fabric",
+  "theme": "leather",
+  "name": "Marché aux tissus de South Bund",
+  "nameCn": "南外滩轻纺面料市场",
+  "category": "textile",
+  "city": "Shanghai",
+  "lat": 31.21378,
+  "lng": 121.49519,
+  "coordSource": "Nominatim/OSM, objet « 南外滩轻纺面料市场 », 陆家浜路399号, WGS-84",
+  "address": "399 Lujiabang Road, Huangpu District",
+  "cn": "上海市黄浦区陆家浜路399号 南外滩轻纺面料市场",
+  "metro": "Ligne 4, Nanpu Bridge (南浦大桥), sortie 3, ~5 min à pied",
+  "hours": "Tous les jours 9h-18h, week-end compris. Évite 12h-14h.",
+  "desc": "Quatre étages de stands de tissus avec tailleurs sur place : costumes, chemises, manteaux, expédition à l'étranger possible. Délai standard de 6-7 jours, express en ~2-3 jours avec finitions simplifiées. Sur 9 jours, c'est la meilleure option sur-mesure pour toi et ton père.",
+  "highlights": [
+   "Kate & Kevin (1er étage, stands 128/137/195) : prix affichés, costume 2 000-5 000 ¥, chemise dès ~150 ¥",
+   "Dain Design (2e étage, stand 278) : coupe plus pointue, sur devis",
+   "Suits By Susan (2e étage) : retouches gratuites à vie",
+   "3e étage : manteaux en laine double face et soieries ; 4e : cachemire"
+  ],
+  "tip": "Apporte une veste de référence et des photos. Négocie 20-40 % sauf chez Kate & Kevin (prix fixes). Évite les stands près de l'entrée. Liquide ou Alipay.",
+  "website": "",
+  "priority": "must",
+  "sources": [
+   "https://english.shanghai.gov.cn/en-TrendyStores/20260105/5614f3027a1f4a7c9472e5b0650f2038.html",
+   "https://www.travelofchina.com/south-bund-fabric-market/"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "sandriver-zhangyuan",
+  "theme": "leather",
+  "name": "SANDRIVER Zhangyuan",
+  "nameCn": "沙涓 张园店",
+  "category": "textile",
+  "city": "Shanghai",
+  "lat": 31.23037,
+  "lng": 121.45605,
+  "coordSource": "Nominatim/OSM, centre de l'îlot 张家花园 ; unité W17 non cartographiée, ±150 m",
+  "address": "W17, Zhangyuan, 200 North Maoming Road, Jing'an District",
+  "cn": "上海市静安区茂名北路200号 张园W17 沙涓SANDRIVER",
+  "metro": "Lignes 2/12/13, West Nanjing Road (南京西路)",
+  "hours": "Horaires non publiés ; boutiques de Zhangyuan en général 10h-22h.",
+  "desc": "Marque chinoise de cachemire haut de gamme ; sa boutique de Zhangyuan, son plus grand flagship au monde, a ouvert en janvier 2026. Collections appuyées sur des savoir-faire classés : feutre mongol, pulu tibétain tissé main, broderie Hani.",
+  "highlights": [
+   "Pulu tissé main mêlé à du cachemire fin",
+   "Écharpes en cachemire 13,5 microns sur mesure"
+  ],
+  "tip": "Demande les pièces en pulu, ce sont les plus singulières.",
+  "website": "https://www.sandriver.cn",
+  "priority": "high",
+  "sources": [
+   "https://bccci.net/?p=204561",
+   "https://english.shanghai.gov.cn/en-ShanghaiStyle/20260421/dec37a3682b94b9ebb9d45ad44e03ef3.html"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "shangxia-maison",
+  "theme": "leather",
+  "name": "SHANG XIA – flagship Huaihai",
+  "nameCn": "上下 淮海中路旗舰店",
+  "category": "luxe",
+  "city": "Shanghai",
+  "lat": 31.2257,
+  "lng": 121.4709,
+  "coordSource": "Estimation : ~50 m à l'ouest de Maison Hermès (淮海中路217号, OSM) côté numéros impairs, ±80 m",
+  "address": "233 Huaihai Middle Road, Huangpu District",
+  "cn": "上海市黄浦区淮海中路233号 上下 SHANG XIA",
+  "metro": "Ligne 1, 一大会址·黄陂南路, ~150 m",
+  "hours": "Tous les jours 11h-21h30 selon un guide hôtelier (2026), non recoupé.",
+  "desc": "Maison de luxe chinoise lancée par Hermès en 2008, contrôlée par Exor depuis 2020. Ce flagship (oct. 2022) présente cuir tanné végétal, capes en cachemire, laine de yak et mobilier en zitan, avec service de thé. Référence en artisanat chinois contemporain, esthétique très proche d'ORBES.",
+  "highlights": [
+   "Sacs en cuir tanné végétal et capes en cachemire",
+   "Laine de yak et mobilier en zitan"
+  ],
+  "tip": "Statut 2026 confirmé par une seule source : vérifie sur Dianping. Sinon, passe en sortant d'Hermès.",
+  "website": "https://www.shang-xia.com",
+  "priority": "high",
+  "sources": [
+   "https://wallpaper.com/fashion/shang-xias-striking-shanghai-flagship",
+   "https://www.peninsula.com/en/shanghai/our-city/pencities/shopping-in-shanghai-during-golden-week"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "humsuit",
+  "theme": "leather",
+  "name": "Humsuit",
+  "nameCn": "亨生西服",
+  "category": "mode",
+  "city": "Shanghai",
+  "lat": 31.2285,
+  "lng": 121.4512,
+  "coordSource": "Estimation sur le segment OSM de Shaanxi Bei Lu entre Weihai Lu et Nanjing Xi Lu, ±150 m",
+  "address": "199-201 North Shaanxi Road, Jing'an District",
+  "cn": "上海市静安区陕西北路199-201号 亨生西服",
+  "metro": "Lignes 2/12/13, West Nanjing Road, ~700 m ; ou 2/7/14 Jing'an Temple",
+  "hours": "Horaires non publiés : appelle ou vérifie sur Dianping.",
+  "desc": "Maison de tailleur historique de Shanghai ; sa technique « Fengbang » est inscrite au patrimoine immatériel national : coupe à la main, montage et repassage traditionnels. Le vrai tailleur shanghaïen, à l'opposé du marché aux tissus.",
+  "highlights": [
+   "Costumes, vestes et chemises sur mesure",
+   "Savoir-faire Fengbang classé"
+  ],
+  "tip": "Un vrai sur-mesure demande plusieurs essayages : vise une chemise, ou demande l'envoi en France. À 500 m de Zhangyuan.",
+  "website": "",
+  "priority": "high",
+  "sources": [
+   "https://english.shanghai.gov.cn/en-EditorsPick-ShopinShanghai/20260225/6fd4bd6b1c8f466997f5cdee3a0bfe8e.html"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "baromon",
+  "theme": "leather",
+  "name": "Baromon",
+  "nameCn": "培罗蒙",
+  "category": "mode",
+  "city": "Shanghai",
+  "lat": 31.22164,
+  "lng": 121.44152,
+  "coordSource": "Nominatim/OSM, adresse 华山路249号, WGS-84",
+  "address": "249 Huashan Road, Jing'an District",
+  "cn": "上海市静安区华山路249号 培罗蒙",
+  "metro": "Lignes 2/7/14, Jing'an Temple, ~300 m",
+  "hours": "Horaires non publiés : appelle avant.",
+  "desc": "Label centenaire de la couture masculine shanghaïenne, technique Fengbang : sept à huit mesures pour la veste et autant pour le pantalon.",
+  "highlights": [
+   "Costumes Fengbang"
+  ],
+  "tip": "Alternative à Humsuit. Délais longs : prévois l'expédition.",
+  "website": "",
+  "priority": "option",
+  "sources": [
+   "https://english.shanghai.gov.cn/en-ShanghaiStyle/20260617/e63d994abfc04e2d9cccc2bac052ff7f.html"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "arts-crafts-museum",
+  "theme": "leather",
+  "name": "Musée des arts et métiers de Shanghai",
+  "nameCn": "上海工艺美术博物馆",
+  "category": "musee",
+  "city": "Shanghai",
+  "lat": 31.21221,
+  "lng": 121.44989,
+  "coordSource": "Nominatim/OSM, musée au 汾阳路79号, WGS-84",
+  "address": "79 Fenyang Road, Xuhui District",
+  "cn": "上海市徐汇区汾阳路79号 上海工艺美术博物馆",
+  "metro": "Lignes 1/7, Changshu Road (常熟路), ~500 m",
+  "hours": "Mar-dim 9h-11h30 et 13h-16h30 (dernière entrée 16h). Fermé le lundi.",
+  "desc": "Villa néo-classique de 1905 dans l'ancienne Concession française. Broderie, laque incrustée, jade, costumes d'opéra en fil d'or. Au 3e étage, une dizaine d'ateliers où les artisans travaillent devant toi.",
+  "highlights": [
+   "Ateliers vivants au 3e étage (broderie, jade)",
+   "Paravent laqué incrusté de nacre et de jade",
+   "Costumes d'opéra en fil d'or, coiffes en plumes de martin-pêcheur",
+   "Billet 8 ¥"
+  ],
+  "tip": "Attention à la pause de midi (11h30-13h) : vise 9h. Les ginkgos de Fenyang Lu et Yueyang Lu sont superbes fin novembre.",
+  "website": "",
+  "priority": "high",
+  "sources": [
+   "https://english.shanghai.gov.cn/en-MuseumsGalleries/20240730/9a296c977b41481a8410642d36aaa9c3.html",
+   "https://chinatripedia.com/?p=5271"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "textile-museum",
+  "theme": "leather",
+  "name": "Musée du textile de Shanghai",
+  "nameCn": "上海纺织博物馆",
+  "category": "musee",
+  "city": "Shanghai",
+  "lat": 31.24865,
+  "lng": 121.44153,
+  "coordSource": "Nominatim/OSM, musée au 澳门路150号, WGS-84",
+  "address": "150 Aomen Road, Putuo District",
+  "cn": "上海市普陀区澳门路150号 上海纺织博物馆",
+  "metro": "Ligne 13, Jiangning Road (江宁路), ~350 m",
+  "hours": "Mar-dim 9h30-16h, gratuit, fermé le lundi (source de 2019).",
+  "desc": "Musée installé sur le site d'une ancienne filature de coton au bord de la Suzhou Creek, de l'artisanat aux usines du XXe siècle.",
+  "highlights": [
+   "Machines anciennes et échantillons de tissus",
+   "À 10 min à pied de M50"
+  ],
+  "tip": "Seulement si l'histoire industrielle du textile t'intéresse.",
+  "website": "",
+  "priority": "option",
+  "sources": [
+   "https://govt.chinadaily.com.cn/s/201904/24/WS649d32ef498ea274927c20fd/shanghai-textiles-museum.html"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "puyuan-cashmere",
+  "theme": "leather",
+  "name": "Puyuan : ville ancienne et marché du tricot",
+  "nameCn": "濮院时尚古镇 / 濮院羊毛衫市场",
+  "category": "textile",
+  "city": "Tongxiang (Zhejiang)",
+  "lat": 30.68289,
+  "lng": 120.62964,
+  "coordSource": "Nominatim/OSM, 濮院时尚古镇, WGS-84 ; le marché est dans le bourg, à ~2 km",
+  "address": "Puyuan Fashion Ancient Town, Zhongxing Road, Puyuan Town, Tongxiang, Jiaxing, Zhejiang",
+  "cn": "浙江省嘉兴市桐乡市濮院镇中兴路 濮院时尚古镇",
+  "metro": "TGV Hongqiao → Tongxiang (桐乡站), ~40-50 min, puis DiDi ~25-30 min",
+  "hours": "Ville ancienne en journée (payante) ; marché très matinal.",
+  "desc": "Le plus grand marché de pulls en laine de Chine (~70 % du gros mondial du tricot), qui monte en gamme vers le cachemire. Ville d'eau restaurée.",
+  "highlights": [
+   "Pulls et écharpes en cachemire à prix d'usine"
+  ],
+  "tip": "À coupler avec Haining Leather City (20 km) si tu fais la journée Zhejiang.",
+  "website": "",
+  "priority": "option",
+  "sources": [
+   "https://www.citynewsservice.cn/articles/china-biz-buzz/industry/runways-in-chinas-knitwear-capital-signal-a-stylish-economic-shift-png9l0bm"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "haining-leather-city",
+  "theme": "leather",
+  "name": "Haining China Leather City",
+  "nameCn": "海宁中国皮革城",
+  "category": "cuir",
+  "city": "Haining (Zhejiang)",
+  "lat": 30.50659,
+  "lng": 120.66151,
+  "coordSource": "Nominatim/OSM, centre de la zone commerciale 海宁中国皮革城, WGS-84 ; entrée précise non localisée",
+  "address": "201 Haizhou West Road, Haining, Jiaxing, Zhejiang",
+  "cn": "浙江省嘉兴市海宁市海州西路201号 海宁中国皮革城",
+  "metro": "TGV Hongqiao → Haining West (海宁西站), ~40 min, puis ligne intercité Hanghai jusqu'à 皮革城站 ; ou gare de Haining (ligne classique) à ~4 km",
+  "hours": "Tous les jours, environ 9h-17h. Tél. 0573-87010001.",
+  "desc": "Le plus grand marché du cuir d'Asie : plusieurs bâtiments de vestes en cuir, fourrure et doudounes, en pleine saison fin novembre. Pour de la maroquinerie homme haut de gamme, c'est décevant : surtout de la mode femme de qualité moyenne.",
+  "highlights": [
+   "Vestes en cuir homme : agneau, chèvre, coupes motard",
+   "Négociation : souvent 30-50 % de rabais",
+   "Bonne vision de l'échelle de l'industrie et du live-commerce"
+  ],
+  "tip": "Ça ne vaut la journée que si tu veux une veste en cuir pour toi ou ton père, idéalement couplé avec Puyuan. Évite les sacs « inspirés de ».",
+  "website": "",
+  "priority": "option",
+  "sources": [
+   "https://tidenews.com.cn/news.html?id=3505434"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "hongqiao-pearl-city",
+  "theme": "leather",
+  "name": "Hongqiao Pearl City",
+  "nameCn": "虹桥国际珍珠城",
+  "category": "bijoux",
+  "city": "Shanghai",
+  "lat": 31.19337,
+  "lng": 121.37946,
+  "coordSource": "Nominatim/OSM, adresse 虹梅路3721号, WGS-84",
+  "address": "3721 Hongmei Road, Changning District",
+  "cn": "上海市长宁区虹梅路3721号 虹桥国际珍珠城",
+  "metro": "Ligne 10, Longxi Road (龙溪路), 10-15 min à pied",
+  "hours": "Tous les jours, du matin au soir (horaires non publiés).",
+  "desc": "Option bijoux. Marché couvert de perles, jade et soie ; comptoirs plus haut de gamme en bordure du 2e étage. À 10 min de DiDi de ton hôtel.",
+  "highlights": [
+   "Perles d'eau douce et Akoya",
+   "Enfilage et montage sur place"
+  ],
+  "tip": "Strictement optionnel. Teste les perles et négocie fort.",
+  "website": "",
+  "priority": "option",
+  "sources": [
+   "https://www.travelofchina.com/pearl-market-shanghai/"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "taian-table",
+  "theme": "food",
+  "name": "Taian Table",
+  "nameCn": "泰安门",
+  "category": "restaurant",
+  "city": "Shanghai",
+  "lat": 31.22387,
+  "lng": 121.42832,
+  "coordSource": "OpenStreetMap, nœud 'Taian Table' (镇宁路465弄161), WGS-84",
+  "address": "101-102, Building 1, Garden Office, No.161, Lane 465 Zhenning Road, Changning",
+  "cn": "上海市长宁区镇宁路465弄161号1号楼101-102",
+  "metro": "Jiangsu Road (L2/L11), ~8 min à pied",
+  "hours": "Dîner seulement, du mardi au samedi, arrivées entre 18h et 20h, repas de 2 à 3 h. Fermé dimanche et lundi.",
+  "desc": "Le seul trois-étoiles Michelin de Shanghai dans le guide 2026. Stefan Stiller y sert au comptoir un menu de 10 ou 12 services, renouvelé à chaque saison, entre technique européenne et produits asiatiques. Depuis la fermeture d'Ultraviolet, c'est le grand dîner gastronomique de la ville.",
+  "highlights": [
+   "Seul 3 étoiles Michelin de Shanghai en 2026",
+   "Comptoir de 20 places face à toute la brigade",
+   "Bar à champagne à l'étage"
+  ],
+  "tip": "Réserve tout de suite sur bookings.taian-table.com (ouverture 90 jours avant). Menu 2 588 ¥ (10 services) ou 2 888 ¥ (12), hors vins ; acompte non remboursable à moins de 6 jours. Pas de dress code. Tél. +86 173 0160 5350.",
+  "website": "https://sh.taian-table.cn",
+  "priority": "must",
+  "sources": [
+   "https://sh.taian-table.cn/faq",
+   "https://guide.michelin.com/en/shanghai-municipality/shanghai/restaurant/taian-table",
+   "https://rachelgouk.com/michelin-guide-shanghai-2026-starred-restaurants-bib-gourmands/"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "fu-he-hui",
+  "theme": "food",
+  "name": "Fu He Hui",
+  "nameCn": "福和慧",
+  "category": "restaurant",
+  "city": "Shanghai",
+  "lat": 31.22078,
+  "lng": 121.42511,
+  "coordSource": "Interpolation entre les n° 919 et 1107 de Yuyuan Road dans OpenStreetMap, WGS-84, ±60 m",
+  "address": "1037 Yuyuan Road, Changning",
+  "cn": "上海市长宁区愚园路1037号",
+  "metro": "Jiangsu Road (L2/L11), ~6 min à pied",
+  "hours": "Tous les jours, 11h-13h et 17h30-21h (Guide Michelin).",
+  "desc": "Table végétarienne de haut niveau, deux étoiles Michelin en 2026 : menus de saison autour de produits locaux, dans un décor zen très épuré. La carte des thés est remarquable. L'adresse chinoise la plus « design » de la liste.",
+  "highlights": [
+   "2 étoiles Michelin 2026",
+   "Menus végétariens de saison",
+   "Accord thés très travaillé"
+  ],
+  "tip": "Réserve au +86 21 3980 9188 ou par la conciergerie. Prends l'accord thés plutôt que les vins. Compte au moins 1 000 ¥ par personne (estimation).",
+  "website": "",
+  "priority": "must",
+  "sources": [
+   "https://guide.michelin.com/us/en/shanghai-municipality/shanghai/restaurant/fu-he-hui",
+   "https://rachelgouk.com/michelin-guide-shanghai-2026-starred-restaurants-bib-gourmands/"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "house-of-rong",
+  "theme": "food",
+  "name": "The House of Rong",
+  "nameCn": "荣府宴",
+  "category": "restaurant",
+  "city": "Shanghai",
+  "lat": 31.2298,
+  "lng": 121.4462,
+  "coordSource": "Estimation à partir des n° 154 et 183 de Nanyang Road dans OpenStreetMap, WGS-84, ±60 m",
+  "address": "170 Nanyang Road, Jing'an",
+  "cn": "上海市静安区南阳路170号",
+  "metro": "Jing'an Temple (L2/L7/L14), ~7 min à pied",
+  "hours": "Déjeuner et dîner. Horaires et jour de fermeture non publiés : appelle avant.",
+  "desc": "Vaisseau amiral shanghaïen du groupe Xin Rong Ji, deux étoiles Michelin en 2026, dans une demeure qui appartenait à la famille d'I.M. Pei. Cuisine de Taizhou (Zhejiang) centrée sur les produits de la mer. La grande table chinoise classique du séjour.",
+  "highlights": [
+   "2 étoiles Michelin 2026",
+   "Ancienne maison de la famille d'I.M. Pei",
+   "Poissons et fruits de mer de Taizhou"
+  ],
+  "tip": "Réserve au +86 21 6289 1717 et pré-commande les plats signatures (poisson jaune). Plan B : Xin Rong Ji, Nanjing Xi Lu (1 étoile). Compte au moins 1 000 ¥ par personne (estimation).",
+  "website": "",
+  "priority": "high",
+  "sources": [
+   "https://guide.michelin.com/en/shanghai-municipality/shanghai/restaurant/the-house-of-rong",
+   "https://rachelgouk.com/michelin-guide-shanghai-2026-starred-restaurants-bib-gourmands/"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "old-jesse",
+  "theme": "food",
+  "name": "Old Jesse (Tianping Road)",
+  "nameCn": "老吉士（天平路店）",
+  "category": "restaurant",
+  "city": "Shanghai",
+  "lat": 31.20469,
+  "lng": 121.43332,
+  "coordSource": "OpenStreetMap, nœud '老吉士 / Old Jesse Restaurant' (天平路41), WGS-84",
+  "address": "41 Tianping Road, near Huaihai Xi Road, Xuhui",
+  "cn": "上海市徐汇区天平路41号",
+  "metro": "Jiaotong University (L10/L11), ~6 min à pied",
+  "hours": "Tous les jours, 11h-14h30 et 17h-21h30 (SmartShanghai, déc. 2025 ; non revérifié).",
+  "desc": "L'adresse culte du benbang, la cuisine familiale shanghaïenne : petite salle serrée, service sec. Le porc braisé au sucre et à la sauce soja (hongshao rou) y sert de référence. Va à la maison mère de Tianping Lu plutôt qu'aux succursales.",
+  "highlights": [
+   "Hongshao rou",
+   "Tête de poisson aux oignons verts",
+   "Crabe chevelu en saison (novembre)"
+  ],
+  "tip": "Réservation indispensable : fais-la faire par la conciergerie, et attends-toi à patienter un peu dehors. Compte 150 à 250 ¥ par personne.",
+  "website": "",
+  "priority": "must",
+  "sources": [
+   "https://www.smartshanghai.com/venue/4669/Jesse_(Tianping_Lu)_shanghai"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "lao-zheng-xing",
+  "theme": "food",
+  "name": "Lao Zheng Xing",
+  "nameCn": "老正兴",
+  "category": "restaurant",
+  "city": "Shanghai",
+  "lat": 31.23513,
+  "lng": 121.47564,
+  "coordSource": "OpenStreetMap, nœud '老正兴' (福州路556), WGS-84",
+  "address": "556 Fuzhou Road, Huangpu",
+  "cn": "上海市黄浦区福州路556号",
+  "metro": "People's Square (L1/L2/L8), ~8 min à pied",
+  "hours": "Déjeuner et dîner tous les jours selon les annuaires ; horaires précis non publiés.",
+  "desc": "Une des plus vieilles maisons benbang de la ville, une étoile Michelin en 2026. Le cadre est daté, mais c'est le versant institutionnel du benbang, complémentaire du bistrot Old Jesse.",
+  "highlights": [
+   "1 étoile Michelin 2026",
+   "Crevettes de rivière sautées, poisson jaune à la lie de vin",
+   "À deux pas de Fuzhou Lu et du Bund"
+  ],
+  "tip": "Réserve au +86 21 6322 2624 ou par l'hôtel. Demande le crabe chevelu, en pleine saison. Compte 200 à 350 ¥ par personne (estimation).",
+  "website": "",
+  "priority": "high",
+  "sources": [
+   "https://guide.michelin.com/en/shanghai-municipality/shanghai/restaurant/lao-zheng-xing-huangpu"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "jia-jia-tang-bao",
+  "theme": "food",
+  "name": "Jia Jia Tang Bao (Huanghe Road)",
+  "nameCn": "佳家汤包（黄河路店）",
+  "category": "restaurant",
+  "city": "Shanghai",
+  "lat": 31.23701,
+  "lng": 121.46605,
+  "coordSource": "OpenStreetMap, point d'adresse 黄河路127, WGS-84",
+  "address": "127 Huanghe Road, near Beijing Xi Road, Huangpu",
+  "cn": "上海市黄浦区黄河路127号",
+  "metro": "People's Square (L1/L2/L8), ~5 min à pied",
+  "hours": "Tous les jours, environ 7h30-20h30 ; ferme plus tôt quand la pâte est épuisée.",
+  "desc": "L'institution du xiaolongbao façonné à la commande : pâte fine, version porc-crabe la plus demandée. On commande au comptoir, on attend son tour, on mange vite.",
+  "highlights": [
+   "Xiaolongbao porc-crabe faits minute",
+   "Prix minuscules, zéro chichi",
+   "Sans réservation"
+  ],
+  "tip": "Vas-y avant 10h30 ou après 14h pour éviter la queue. Vérifie l'adresse sur Amap la veille (OSM garde l'ancien n° 90). Compte 40 à 80 ¥.",
+  "website": "",
+  "priority": "high",
+  "sources": [
+   "https://www.smartshanghai.com/venue/4690/Jia_Jia_Tangbao_shanghai",
+   "https://www.trvlogue.com/en/jiajia-tangbao-shanghai-review"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "da-hu-chun",
+  "theme": "food",
+  "name": "Da Hu Chun (Sichuan Middle Road)",
+  "nameCn": "大壶春（四川中路店）",
+  "category": "restaurant",
+  "city": "Shanghai",
+  "lat": 31.2367,
+  "lng": 121.48477,
+  "coordSource": "OpenStreetMap, nœud '大壶春' (四川中路136号), WGS-84",
+  "address": "136 Middle Sichuan Road, Huangpu",
+  "cn": "上海市黄浦区四川中路136号",
+  "metro": "East Nanjing Road (L2/L10), ~6 min à pied",
+  "hours": "Tous les jours, 8h-21h (Guide Michelin).",
+  "desc": "La maison historique du shengjian, petits pains farcis grillés à la poêle, ici en version à pâte levée, plus moelleuse, avec un dessous croustillant. Bib Gourmand 2026. Le petit-déjeuner local idéal avant le Bund.",
+  "highlights": [
+   "Bib Gourmand Michelin 2026",
+   "Shengjian à pâte levée, recette historique",
+   "À 5 min du Bund"
+  ],
+  "tip": "Perce un petit trou et aspire le bouillon avant de croquer : c'est brûlant. Compte 30 à 50 ¥.",
+  "website": "",
+  "priority": "high",
+  "sources": [
+   "https://guide.michelin.com/pl/en/shanghai-municipality/shanghai/restaurant/da-hu-chun-middle-sichuan-road"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "canton-table",
+  "theme": "food",
+  "name": "Canton Table",
+  "nameCn": "Canton Table（外滩三号）",
+  "category": "restaurant",
+  "city": "Shanghai",
+  "lat": 31.23608,
+  "lng": 121.48631,
+  "coordSource": "OpenStreetMap, bâtiment Three on the Bund (中山东一路3号), WGS-84",
+  "address": "5F, Three on the Bund, 3 Zhongshan Dong Yi Road, Huangpu",
+  "cn": "上海市黄浦区中山东一路3号外滩三号5楼",
+  "metro": "East Nanjing Road (L2/L10), ~10 min à pied",
+  "hours": "Tous les jours, 11h30-14h30 et 17h30-21h30 (Guide Michelin).",
+  "desc": "Cantonais étoilé au 5e étage de Three on the Bund, dans un décor shanghaïen des années 1930 : rôtisserie, dim sum et plats de saison, avec vue sur Pudong.",
+  "highlights": [
+   "1 étoile Michelin 2026",
+   "Vue sur Lujiazui illuminé",
+   "Biscuit « feuille d'érable » à la crème, cuit minute"
+  ],
+  "tip": "Réserve au +86 21 6321 3737 en demandant une table côté fenêtre. Garde de la place pour le biscuit. Compte 400 à 700 ¥ par personne (estimation).",
+  "website": "",
+  "priority": "must",
+  "sources": [
+   "https://guide.michelin.com/en/shanghai-municipality/shanghai/restaurant/canton-table"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "lei-garden-xuhui",
+  "theme": "food",
+  "name": "Lei Garden (iapm)",
+  "nameCn": "利苑酒家（环贸iapm店）",
+  "category": "restaurant",
+  "city": "Shanghai",
+  "lat": 31.21757,
+  "lng": 121.45339,
+  "coordSource": "OpenStreetMap, centroïde du centre commercial 环贸iapm, WGS-84 ; restaurant au 4e étage",
+  "address": "Shop 401, 4F, iapm, 999 Middle Huaihai Road, Xuhui",
+  "cn": "上海市徐汇区淮海中路999号环贸iapm商场4楼401",
+  "metro": "South Shaanxi Road (L1/L10/L12), accès direct",
+  "hours": "Déjeuner (dim sum) et dîner tous les jours ; horaires précis non publiés.",
+  "desc": "Antenne de la grande maison cantonaise de Hong Kong, une étoile Michelin 2026 en gamme ¥¥, un rapport qualité-prix rare. Dim sum précis, rôtisserie et soupe du jour.",
+  "highlights": [
+   "1 étoile Michelin 2026, gamme ¥¥",
+   "Dim sum du midi",
+   "À 5 min à pied de Pony Up"
+  ],
+  "tip": "Réserve au +86 21 5425 2283 ; Michelin conseille de pré-commander certains plats. Compte 250 à 400 ¥ par personne (estimation).",
+  "website": "",
+  "priority": "high",
+  "sources": [
+   "https://guide.michelin.com/en/shanghai-municipality/shanghai/restaurant/lei-garden-xuhui"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "pony-up",
+  "theme": "food",
+  "name": "Pony Up",
+  "nameCn": "Pony Up",
+  "category": "bar",
+  "city": "Shanghai",
+  "lat": 31.22313,
+  "lng": 121.45318,
+  "coordSource": "OpenStreetMap, nœud 'Pony Up' (angle Jinxian Lu / Shaanxi Nan Lu), WGS-84",
+  "address": "230 Jinxian Road, at South Shaanxi Road, Huangpu",
+  "cn": "上海市黄浦区进贤路230号（近陕西南路）",
+  "metro": "South Shaanxi Road (L1/L10/L12), ~6 min à pied",
+  "hours": "Tous les jours : front bar 13h-21h, back bar 18h-2h.",
+  "desc": "Le bar de Shanghai le mieux classé à l'Asia's 50 Best Bars 2026 (n° 19). Deux ambiances : un front bar lumineux avec des cocktails de jour en petit format, et un back bar feutré le soir. Signé Dre Yang.",
+  "highlights": [
+   "N° 19 Asia's 50 Best Bars 2026, premier bar de Shanghai",
+   "Mini-cocktails l'après-midi",
+   "Hot-dogs et patty melt"
+  ],
+  "tip": "Viens l'après-midi pour éviter la foule. Pas de dress code.",
+  "website": "",
+  "priority": "must",
+  "sources": [
+   "https://www.enprimeurclub.com/lists/2026-asias-50-best-bars",
+   "https://english.shanghai.gov.cn/en-BarsandPubs/20251011/6afc99ecf6a540e8826fef2c5354bcec.html"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "bar-leone-shanghai",
+  "theme": "food",
+  "name": "Bar Leone Shanghai",
+  "nameCn": "Bar Leone 上海",
+  "category": "bar",
+  "city": "Shanghai",
+  "lat": 31.2172,
+  "lng": 121.4639,
+  "coordSource": "Estimation à partir du n° 521 Fuxing Zhong Lu (OSM, Sinan Mansions), WGS-84, ±60 m",
+  "address": "527 Middle Fuxing Road (Sinan Mansions), Huangpu",
+  "cn": "上海市黄浦区复兴中路527号（思南公馆）",
+  "metro": "Middle Huaihai Road (L13) ou Xintiandi (L10/L13), ~10 min à pied",
+  "hours": "Tous les jours, 18h-1h.",
+  "desc": "Antenne (nov. 2025) de Bar Leone Hong Kong, n° 1 du World's 50 Best Bars 2025 et 2026. Rez-de-chaussée « Bar di Passo », bar sportif italien rétro avec spritz à la pression ; étage plus intime pour les cocktails.",
+  "highlights": [
+   "Spin-off du n° 1 mondial",
+   "Deux étages, deux registres",
+   "Spritz à la pression et bar bites italiens"
+  ],
+  "tip": "Aucune réservation : la file peut être longue en soirée. Tél. +86 130 4410 7216.",
+  "website": "",
+  "priority": "must",
+  "sources": [
+   "https://english.shanghai.gov.cn/en-FirstStores/20251111/b0eba888b85049479795cdc72930d065.html",
+   "https://www.the50.com/bars/list/1-50"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "coa-shanghai",
+  "theme": "food",
+  "name": "Coa Shanghai",
+  "nameCn": "Coa",
+  "category": "bar",
+  "city": "Shanghai",
+  "lat": 31.2172,
+  "lng": 121.4613,
+  "coordSource": "Estimation : côté nord de Fuxing Zhong Lu, en face du n° 579 Speak Low (OSM), WGS-84, ±80 m",
+  "address": "580 Middle Fuxing Road, near Ruijin Er Road, Huangpu",
+  "cn": "上海市黄浦区复兴中路580号（近瑞金二路）",
+  "metro": "Middle Huaihai Road (L13) ou Xintiandi (L10/L13), ~10 min à pied",
+  "hours": "Le soir, tous les jours ; horaires précis non confirmés.",
+  "desc": "Le temple de l'agave de Jay Khan, petit frère du Coa de Hong Kong, sur quatre étages : taqueria, cantina, salón et mezcaleria au dernier. N° 95 de l'Asia's 50 Best Bars 2026.",
+  "highlights": [
+   "N° 95 Asia's 50 Best Bars 2026",
+   "Taqueria au rez-de-chaussée, mezcaleria au 4e",
+   "Juste en face de Speak Low"
+  ],
+  "tip": "Colle bien 复兴中路580号 dans DiDi (certains annuaires affichent l'ancienne adresse).",
+  "website": "",
+  "priority": "high",
+  "sources": [
+   "https://www.enprimeurclub.com/lists/2026-asias-50-best-bars-51-100",
+   "https://www.thatsmags.com/shanghai/post/37658/the-temple-to-the-agave-gods-coa-shanghai-is-back"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "speak-low",
+  "theme": "food",
+  "name": "Speak Low",
+  "nameCn": "Speak Low",
+  "category": "bar",
+  "city": "Shanghai",
+  "lat": 31.21674,
+  "lng": 121.46125,
+  "coordSource": "OpenStreetMap, nœud 'Speak Low (at Ocho Bar Tools)' (复兴中路579), WGS-84",
+  "address": "579 Middle Fuxing Road (behind Ocho Bar Tools), Huangpu",
+  "cn": "上海市黄浦区复兴中路579号",
+  "metro": "Middle Huaihai Road (L13) ou Xintiandi (L10/L13), ~10 min à pied",
+  "hours": "Tous les soirs ; horaires à vérifier sur @speaklow_shanghai.",
+  "desc": "Le speakeasy fondateur de Shinji Nagao. On entre par une porte cachée dans la boutique d'outils de bar Ocho, puis on monte sur plusieurs niveaux de plus en plus confidentiels. Plus classé en 2026, mais c'est la pièce mythique, dans l'esprit de Hope & Sesame.",
+  "highlights": [
+   "Porte secrète dans une boutique de bar tools",
+   "Plusieurs étages, plusieurs ambiances",
+   "Achète un jigger japonais en sortant"
+  ],
+  "tip": "Réservation conseillée au +86 21 6416 0133.",
+  "website": "",
+  "priority": "high",
+  "sources": [
+   "https://www.smartshanghai.com/venue/11327/speak_low",
+   "https://theworlds50best.com/discovery/Establishments/China/Shanghai/Speak-Low.html"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "flair-ritz-pudong",
+  "theme": "food",
+  "name": "Flair (Ritz-Carlton Pudong, 58e)",
+  "nameCn": "Flair 屋顶酒吧（上海浦东丽思卡尔顿酒店58楼）",
+  "category": "bar",
+  "city": "Shanghai",
+  "lat": 31.23643,
+  "lng": 121.50327,
+  "coordSource": "OpenStreetMap, nœud 'Flair Rooftop' (世纪大道8号, Shanghai IFC), WGS-84",
+  "address": "58F, The Ritz-Carlton Shanghai Pudong, Shanghai IFC, 8 Century Avenue, Pudong",
+  "cn": "上海市浦东新区世纪大道8号上海国金中心丽思卡尔顿酒店58楼",
+  "metro": "Lujiazui (L2/L14), accès direct par l'IFC mall",
+  "hours": "Lun-ven 17h30-1h, sam-dim 14h-1h (SmartShanghai ; Time Out indique 17h-2h).",
+  "desc": "Le rooftop face au Bund, au 58e étage de l'IFC, juste à côté de la Perle de l'Orient. Tatler Best 100 Bars Asie-Pacifique 2026. L'équivalent shanghaïen de tes rooftops Park Hyatt et Rosewood à Canton.",
+  "highlights": [
+   "Vue frontale sur le Bund illuminé",
+   "Tatler Best 100 Bars APAC 2026",
+   "Partie intérieure si la terrasse est trop froide"
+  ],
+  "tip": "Réserve au +86 21 2020 1717. Il fait 8 à 12 °C le soir : prends une veste. Smart casual. Compte 150 à 250 ¥ le cocktail (estimation).",
+  "website": "",
+  "priority": "must",
+  "sources": [
+   "https://www.tatlerasia.com/dining/flair-shanghai",
+   "https://www.smartshanghai.com/venue/5577/Flair"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "sir-ellys-terrace",
+  "theme": "food",
+  "name": "Sir Elly's Terrace (The Peninsula)",
+  "nameCn": "上海半岛酒店 Sir Elly's 露台",
+  "category": "bar",
+  "city": "Shanghai",
+  "lat": 31.24327,
+  "lng": 121.48474,
+  "coordSource": "OpenStreetMap, bâtiment 'The Peninsula Shanghai' (中山东一路32号), WGS-84",
+  "address": "13F, The Peninsula Shanghai, 32 Zhongshan Dong Yi Road, Huangpu",
+  "cn": "上海市黄浦区中山东一路32号上海半岛酒店13楼",
+  "metro": "East Nanjing Road (L2/L10), ~12 min à pied",
+  "hours": "Tous les jours 17h-minuit (mai 2026) ; terrasse saisonnière, ouverture fin novembre non garantie.",
+  "desc": "Terrasse en U au 13e étage du Peninsula, au bout nord du Bund, au-dessus du pont Waibaidu : vue à 270° sur Pudong et le Bund historique, plus élégante et plus calme que Flair.",
+  "highlights": [
+   "Vue sur le Bund, Pudong et le pont Waibaidu",
+   "Cadre Art déco du Peninsula"
+  ],
+  "tip": "Appelle le +86 21 2327 6756 pour savoir si la terrasse est encore ouverte.",
+  "website": "https://peninsula.com/en/shanghai/hotel-fine-dining/sir-ellys-terrace",
+  "priority": "option",
+  "sources": [
+   "https://english.shanghai.gov.cn/en-PlanANightOut/20260515/304ed5afbc324131b09ccdd2e1c2bec0.html"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "terrace-915-peace-hotel",
+  "theme": "food",
+  "name": "Terrace 9:15 (Fairmont Peace Hotel)",
+  "nameCn": "费尔蒙和平饭店 9楼露台",
+  "category": "bar",
+  "city": "Shanghai",
+  "lat": 31.24108,
+  "lng": 121.48508,
+  "coordSource": "Nominatim/OpenStreetMap, nœud 和平饭店 (南京东路20号), WGS-84",
+  "address": "9F, Fairmont Peace Hotel, 20 East Nanjing Road, Huangpu",
+  "cn": "上海市黄浦区南京东路20号费尔蒙和平饭店9楼",
+  "metro": "East Nanjing Road (L2/L10), ~8 min à pied",
+  "hours": "Lun-jeu 15h-22h, ven-dim 15h-23h30 (mai 2026).",
+  "desc": "Terrasse rouverte en 2026 au sommet du mythique Peace Hotel (1929), pile face au Bund et à Lujiazui. Le lieu iconique par excellence, et le bon verre de fin d'après-midi avec ton père.",
+  "highlights": [
+   "Hôtel Art déco mythique de 1929",
+   "Vue sur le Bund et Lujiazui",
+   "Ouvert dès 15h, idéal à l'heure dorée"
+  ],
+  "tip": "Arrive vers 16h15 pour la lumière, puis descends voir le hall Art déco et le Jazz Bar historique.",
+  "website": "",
+  "priority": "high",
+  "sources": [
+   "https://english.shanghai.gov.cn/en-PlanANightOut/20260515/304ed5afbc324131b09ccdd2e1c2bec0.html"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "captain-george",
+  "theme": "food",
+  "name": "Captain George Flavor Museum",
+  "nameCn": "Captain George 风味博物馆",
+  "category": "cafe",
+  "city": "Shanghai",
+  "lat": 31.2087,
+  "lng": 121.4504,
+  "coordSource": "Interpolation entre Taiyuan Villa (n° 160, Nominatim) et le n° 388 de Taiyuan Road (OSM), WGS-84, ±100 m",
+  "address": "236 Taiyuan Road, Xuhui",
+  "cn": "上海市徐汇区太原路236号",
+  "metro": "Hengshan Road (L1), ~8 min à pied",
+  "hours": "Tous les jours, 10h-19h (mai 2026).",
+  "desc": "Le café de Peng Jinyang, champion du monde de la World Brewers Cup 2025. Décor « musée des saveurs » façon pharmacie ancienne ; un thermomètre infrarouge te montre comment l'arôme évolue avec la température. La référence specialty coffee de la ville.",
+  "highlights": [
+   "Champion du monde World Brewers Cup 2025",
+   "Pour-overs de saison",
+   "Scénographie très travaillée"
+  ],
+  "tip": "Prends un pour-over (dès 55 ¥) au bar et pose des questions sur le process.",
+  "website": "",
+  "priority": "must",
+  "sources": [
+   "https://eatbook.sg/best-shanghai-cafes/",
+   "https://en.chinaculture.org/a/202506/28/WS685f75c1a31000e9a57391a1_4.html"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "cafe-del-volcan",
+  "theme": "food",
+  "name": "Café del Volcán",
+  "nameCn": "火山咖啡",
+  "category": "cafe",
+  "city": "Shanghai",
+  "lat": 31.2128,
+  "lng": 121.45334,
+  "coordSource": "OpenStreetMap, nœud 'Café del Volcán' (永康路80), WGS-84",
+  "address": "80 Yongkang Road, Xuhui",
+  "cn": "上海市徐汇区永康路80号",
+  "metro": "Jiashan Road (L9/L12) ou South Shaanxi Road, ~8 min à pied",
+  "hours": "Lun-ven 8h-20h, sam-dim 10h-20h.",
+  "desc": "Pionnier du café de spécialité sur Yongkang Lu, minuscule, qui torréfie des single origins de terroirs volcaniques. Sérieux et sans frime.",
+  "highlights": [
+   "Torréfaction maison, single origins",
+   "« Sparkling brew » et affogato"
+  ],
+  "tip": "Peu de places : prends à emporter et marche sous les platanes. Pour-over dès 36 ¥.",
+  "website": "",
+  "priority": "high",
+  "sources": [
+   "https://eatbook.sg/best-shanghai-cafes/"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "ins-land",
+  "theme": "food",
+  "name": "INS Land (Fuxing Park)",
+  "nameCn": "INS新乐场（复兴公园）",
+  "category": "club",
+  "city": "Shanghai",
+  "lat": 31.21979,
+  "lng": 121.4657,
+  "coordSource": "OpenStreetMap, nœud 'Ins Land' (雁荡路109), WGS-84",
+  "address": "109 Yandang Road, inside Fuxing Park, Huangpu",
+  "cn": "上海市黄浦区雁荡路109号（复兴公园内）",
+  "metro": "Xintiandi (L10/L13) ou 一大会址·黄陂南路 (L1), ~8 min à pied",
+  "hours": "Le soir, surtout jeudi-samedi, jusque tard ; horaires non publiés.",
+  "desc": "Complexe nightlife de plusieurs étages dans le parc Fuxing : clubs, bars et live. Chaotique, très jeune et très shanghaïen. À voir une fois, pas pour la musique pointue.",
+  "highlights": [
+   "Plusieurs étages, plusieurs clubs",
+   "À 10 min à pied de Bar Leone, Coa et Speak Low"
+  ],
+  "tip": "Vers minuit après la tournée de Fuxing Lu. Prends ton passeport.",
+  "website": "",
+  "priority": "option",
+  "sources": [
+   "https://www.smartshanghai.com/articles/nightlife/the-shanghai-clubbing-guide-october-2026"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "heim",
+  "theme": "food",
+  "name": "Heim (Green Station)",
+  "nameCn": "Heim",
+  "category": "club",
+  "city": "Shanghai",
+  "lat": 31.2223,
+  "lng": 121.4531,
+  "coordSource": "Estimation : carrefour Changle Lu / Shaanxi Nan Lu (points d'adresse OSM), WGS-84, ±100 m",
+  "address": "Green Station, corner of Changle Road and South Shaanxi Road (unit M101, 462 Changle Road, numéro non confirmé)",
+  "cn": "上海市黄浦区长乐路陕西南路口 Green Station（长乐路462号M101，门牌待确认）",
+  "metro": "South Shaanxi Road (L1/L10/L12), ~6 min à pied",
+  "hours": "Surtout vendredi et samedi ; jusqu'à 3h-4h le week-end.",
+  "desc": "Petit club au son soigné : house et techno mélodiques, pas de hard techno, dans le mini-mall Green Station. Le pendant pointu d'INS.",
+  "highlights": [
+   "House et techno mélodiques",
+   "À 2 min à pied de Pony Up"
+  ],
+  "tip": "Regarde le line-up dans le guide clubbing SmartShanghai de novembre.",
+  "website": "",
+  "priority": "option",
+  "sources": [
+   "https://www.smartshanghai.com/articles/nightlife/the-shanghai-clubbing-guide-october-2026",
+   "https://www.smartshanghai.com/venue/25427/heim"
+  ],
+  "confidence": "low"
+ },
+ {
+  "id": "unitree-jiuguang",
+  "theme": "tech",
+  "name": "Unitree – boutique d'expérience (Jiuguang Jing'an)",
+  "nameCn": "宇树科技具身智能体验馆（久光百货）",
+  "category": "tech",
+  "city": "Shanghai",
+  "lat": 31.22582,
+  "lng": 121.44113,
+  "coordSource": "Nominatim/OSM (department_store 上海久光百货, 南京西路1618号), WGS-84",
+  "address": "2F, Jiuguang Department Store, 1618 West Nanjing Road, Jing'an District",
+  "cn": "上海市静安区南京西路1618号久光百货2楼",
+  "metro": "Lignes 2/7/14 – Jing'an Temple (静安寺), accès direct",
+  "hours": "Horaires de Jiuguang, tous les jours, en général 10h-22h (à vérifier sur Dianping).",
+  "desc": "Premier magasin d'expérience Unitree en Asie, ouvert le 31 mai 2026 : chiens-robots Go2, humanoïdes R1, G1, H2 et mains dextres, de ~9 000 à 170 000 RMB. L'endroit du centre-ville où voir de près la robotique humanoïde chinoise grand public.",
+  "highlights": [
+   "R1 Air à ~29 500 RMB, chiens-robots dès ~8 700 RMB",
+   "Démos de chiens-robots et mains dextres",
+   "Apple Jing'an (gradins en pierre, rangée d'érables) à moins de 200 m"
+  ],
+  "tip": "La boutique est souvent pleine : évite le milieu d'après-midi le week-end.",
+  "website": "https://www.unitree.com",
+  "priority": "must",
+  "sources": [
+   "https://m.thepaper.cn/newsDetail_forward_33275589",
+   "https://www.huxiu.com/article/4868292.html"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "apple-jingan",
+  "theme": "tech",
+  "name": "Apple Jing'an",
+  "nameCn": "Apple 静安零售店",
+  "category": "tech",
+  "city": "Shanghai",
+  "lat": 31.22427,
+  "lng": 121.44145,
+  "coordSource": "Nominatim/OSM (Apple Store, 静安寺广场), WGS-84",
+  "address": "1699 West Nanjing Road (Jing'an Temple Plaza), Jing'an District",
+  "cn": "上海市静安区南京西路1699号（静安寺广场）",
+  "metro": "Lignes 2/7/14 – Jing'an Temple",
+  "hours": "Tous les jours 10h-22h.",
+  "desc": "Apple Store (mars 2024) sur la place du temple Jing'an : rangée d'érables sur la place haute, gradins en pierre locale jusqu'à l'entrée en contrebas. Une étape de 15 minutes.",
+  "highlights": [
+   "Érables colorés fin novembre",
+   "Vue sur le temple Jing'an"
+  ],
+  "tip": "Arrête-toi en sortant de Unitree.",
+  "website": "https://www.apple.com.cn/retail/jingan/",
+  "priority": "option",
+  "sources": [
+   "https://www.apple.com.cn/retail/jingan/"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "huawei-nanjing-east",
+  "theme": "tech",
+  "name": "Huawei Flagship Nanjing East Road",
+  "nameCn": "华为旗舰店·上海南京东路",
+  "category": "tech",
+  "city": "Shanghai",
+  "lat": 31.23951,
+  "lng": 121.48071,
+  "coordSource": "Nominatim/OSM (华为, 南京东路233号 ; bâtiment 南京大楼), WGS-84",
+  "address": "1-3F Nanjing Building, 233 East Nanjing Road (corner of Henan Middle Road), Huangpu District",
+  "cn": "上海市黄浦区南京东路233号（南京大楼）",
+  "metro": "Lignes 2/10 – East Nanjing Road (南京东路), ~5 min à pied",
+  "hours": "Tous les jours 10h-22h.",
+  "desc": "Le flagship Huawei rouvert en avril 2024 : 3 500 m² sur trois niveaux d'un bâtiment historique protégé. Espace mobilité HIMA (AITO, Luxeed), maison connectée HarmonyOS, espace santé et sport. Tout l'écosystème téléphone-voiture-maison qui n'existe pas en Europe.",
+  "highlights": [
+   "AITO et Luxeed exposés",
+   "Maison connectée HarmonyOS en démo, plus un café, au 2e",
+   "À 10 min à pied du Bund"
+  ],
+  "tip": "Tu ne conduis pas : demande une démo en passager de la conduite assistée de l'AITO M9 (réservation sur le site Huawei ou au 400-608-4456).",
+  "website": "https://consumer.huawei.com/cn/retail/nanjingdonglu",
+  "priority": "high",
+  "sources": [
+   "https://consumer.huawei.com/cn/retail/nanjingdonglu",
+   "https://english.shanghai.gov.cn/en-TrendyStores/20240509/a3255145598547b390e0339a67931c89.html"
+  ],
+  "confidence": "high"
+ },
+ {
+  "id": "sstm",
+  "theme": "tech",
+  "name": "Shanghai Science and Technology Museum",
+  "nameCn": "上海科技馆",
+  "category": "musee",
+  "city": "Shanghai",
+  "lat": 31.2206,
+  "lng": 121.53673,
+  "coordSource": "Nominatim/OSM (tourism=museum, 世纪大道2000号), WGS-84",
+  "address": "2000 Century Avenue, Pudong New Area",
+  "cn": "上海市浦东新区世纪大道2000号",
+  "metro": "Ligne 2 – Shanghai Science & Technology Museum (上海科技馆), sortie directe",
+  "hours": "Mar-dim 9h-17h selon le site officiel, mais le groupe teste des jours de fermeture décalés : vérifie sur WeChat sstm01. Adulte 45 RMB, réservation jusqu'à 7 jours avant.",
+  "desc": "Rouvert officiellement le 23 mai 2026 après près de trois ans de travaux : dix zones permanentes (IA, énergie, matériaux, aérospatial…), 80 % interactives. Grand public : un panorama, pas une visite pointue.",
+  "highlights": [
+   "Zone 明日行者 : robots en essaim, interfaces cerveau-machine",
+   "Juste à côté du Shanghai Museum East et du parc Century"
+  ],
+  "tip": "Premier créneau du matin en semaine. Combinable avec le Shanghai Museum East voisin.",
+  "website": "https://en.sstm.org.cn",
+  "priority": "high",
+  "sources": [
+   "https://www.smartshanghai.com/articles/arts-and-stage/reopened-shanghai-science-and-technology-museum-and-here-s-what-you-need-to-know",
+   "https://www.news.cn/tech/20260128/90307bedb84b4652acbeaaec5b3cade3/c.html"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "china-securities-museum",
+  "theme": "tech",
+  "name": "China Securities Museum (Astor House)",
+  "nameCn": "中国证券博物馆（浦江饭店）",
+  "category": "musee",
+  "city": "Shanghai",
+  "lat": 31.24639,
+  "lng": 121.48663,
+  "coordSource": "Nominatim/OSM (bâtiment 浦江饭店), WGS-84",
+  "address": "15 Huangpu Road, Hongkou District (inside the former Astor House Hotel)",
+  "cn": "上海市虹口区黄浦路15号（浦江饭店内）",
+  "metro": "Lignes 10/12 – Tiantong Road (天潼路), ~10 min à pied ; ou East Nanjing Road puis le pont Waibaidu à pied",
+  "hours": "Mar-dim 9h30-16h, fermé le lundi. Entrée gratuite selon les guides ; réservation à vérifier sur le WeChat 中国证券博物馆.",
+  "desc": "Le musée de la Bourse chinoise dans l'Astor House (hôtel fondé en 1846, bâtiment actuel vers 1910). La Bourse de Shanghai y a rouvert en décembre 1990 : la salle des marchés d'origine fait partie de la visite. Avec ton passé PE/M&A, la visite finance la plus parlante de la ville.",
+  "highlights": [
+   "Salle des marchés de 1990",
+   "Titres anciens et archives boursières",
+   "Au pied du pont Waibaidu"
+  ],
+  "tip": "Peu de textes en anglais : prépare Google Lens. Traverse ensuite le pont Waibaidu vers le Bund.",
+  "website": "https://csm.sse.com.cn/en/home/",
+  "priority": "high",
+  "sources": [
+   "https://csm.sse.com.cn/en/home/",
+   "https://www.smartshanghai.com/venue/25317/china_securities_museum"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "id": "agibot-jd-qibao",
+  "theme": "tech",
+  "name": "AgiBot – première boutique (JD MALL Qibao)",
+  "nameCn": "智元机器人京东线下首店（京东MALL上海七宝店）",
+  "category": "tech",
+  "city": "Shanghai",
+  "lat": 31.15806,
+  "lng": 121.34518,
+  "coordSource": "Nominatim/OSM (汇宝购物广场, centroïde, aujourd'hui JD MALL), WGS-84",
+  "address": "JD MALL Qibao (former Huibao Plaza), 3509 Caobao Road, Minhang District",
+  "cn": "上海市闵行区漕宝路3509号 京东MALL上海七宝店",
+  "metro": "Ligne 9 – Qibao (七宝), ~300 m",
+  "hours": "Horaires du mall non publiés (probablement 10h-22h). Démos d'humanoïdes à 11h, 15h30 et 17h30 en juin 2026.",
+  "desc": "Premier magasin physique d'AgiBot (Zhiyuan), l'autre grand nom de l'humanoïde chinois, ouvert le 13 juin 2026 : humanoïdes Lingxi et Yuanzheng, quadrupèdes D1. Clientèle surtout B2B. À 15-20 min de DiDi de ton hôtel.",
+  "highlights": [
+   "Démos d'humanoïdes à horaires fixes",
+   "Quadrupèdes D1 (~12 000 RMB)",
+   "Vieille ville d'eau de Qibao à 15 min à pied"
+  ],
+  "tip": "Cale-toi sur une démo, après vérification des horaires sur Dianping.",
+  "website": "",
+  "priority": "option",
+  "sources": [
+   "https://www.huxiu.com/article/4868292.html",
+   "https://news.pedaily.cn/202606/564722.shtml"
+  ],
+  "confidence": "medium"
+ }
+]
