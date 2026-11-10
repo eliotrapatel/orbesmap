@@ -1,6 +1,8 @@
 import type { PhraseGroup } from "./types";
 
-export const PHRASES: PhraseGroup[] = [
+// Phrases written for the Guangzhou trip; the general ones are reused for every trip.
+
+export const PHRASES_GZ: PhraseGroup[] = [
   {
     "title": "Taxi / DiDi",
     "items": [

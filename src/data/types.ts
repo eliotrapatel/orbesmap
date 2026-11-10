@@ -1,8 +1,11 @@
-export type DayKey = "base" | "d1" | "d2" | "d3" | "d45" | "d6" | "lifestyle" | "ideas";
+/** Day keys are per trip: "base" (hotel), "d1".."d9", "lifestyle", "ideas"… */
+export type DayKey = string;
 
 export type PlaceType =
   | "bijoux" | "mode" | "fabricant" | "salon" | "lifestyle" | "bar" | "hotel"
-  | "packaging" | "textile" | "landmark" | "restaurant" | "mall" | "cashmere";
+  | "packaging" | "textile" | "landmark" | "restaurant" | "mall" | "cashmere"
+  | "concept" | "luxe" | "montres" | "cuir" | "musee" | "galerie" | "jardin"
+  | "design" | "tech" | "cafe" | "club" | "transport";
 
 export interface Place {
   id: string;
@@ -29,7 +32,7 @@ export interface Day {
   title: string;
   /** Neighbourhood / theme of the day */
   theme?: string;
-  /** ISO dates (local Guangzhou date) covered by the day */
+  /** ISO dates (local date at destination) covered by the day */
   dates?: string[];
   color: string;
   /** Glyph shown inside the map marker */
@@ -44,14 +47,45 @@ export interface Flight {
   to: string;
   fromCity: string;
   toCity: string;
-  /** ISO datetime with offset */
+  /** ISO datetime with offset: arrival time for an arrival flight, departure time for a departure flight */
   at: string;
+  departAt?: string;
+  arriveAt?: string;
+  terminal?: string;
+  airline?: string;
   kind: "arrival" | "departure";
 }
 
 export interface PhraseGroup {
   title: string;
   items: { zh: string; pinyin: string; fr: string }[];
+}
+
+export interface Zone {
+  label: string;
+  center: [number, number];
+  zoom: number;
+}
+
+export interface Trip {
+  id: string;
+  /** Short code shown in the switcher, e.g. "GZ 2026" */
+  code: string;
+  title: string;
+  subtitle: string;
+  /** e.g. "7 – 13 juin 2026" */
+  dateLabel: string;
+  start: string;
+  end: string;
+  timezone: string;
+  hotel: { name: string; lat: number; lng: number; placeId?: string };
+  center: [number, number];
+  days: Day[];
+  places: Place[];
+  flights: Flight[];
+  phrases: PhraseGroup[];
+  zones: Zone[];
+  practical?: { title: string; text: string }[];
 }
 
 export type Status = "todo" | "scheduled" | "visited" | "sample";

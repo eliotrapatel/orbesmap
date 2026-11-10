@@ -1,6 +1,6 @@
 // Generated from the June 2026 version (legacy/v1.html). Place ids are kept identical
 // so saved notes, statuses and contacts still match.
-import type { Place } from "./types";
+import type { Place } from "../types";
 
 export const PLACES: Place[] = [
   {

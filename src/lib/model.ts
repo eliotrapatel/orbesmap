@@ -11,7 +11,7 @@ export interface PlaceState {
   note?: string;
   favorite?: boolean;
   visited?: boolean;
-  /** ms epoch of the last local change, used to resolve sync conflicts */
+  /** ms epoch of the last change, used to resolve sync conflicts (newest wins) */
   updatedAt?: number;
 }
 
@@ -40,33 +40,27 @@ export interface Pin {
 export interface Photo {
   id: string;
   placeId: string;
-  /** Local copy (compressed JPEG data URL) — present until uploaded, kept as offline cache */
-  dataUrl?: string;
+  /** the file is stored on this device (IndexedDB) */
+  local?: boolean;
   /** Path in the Supabase "photos" bucket once uploaded */
   path?: string;
   createdAt: number;
   synced?: boolean;
 }
 
-export interface Settings {
-  eurRate: number;
-}
-
+/** Everything the user adds to one trip */
 export interface Data {
   places: Record<string, PlaceState>;
   contacts: Contact[];
   pins: Pin[];
   photos: Photo[];
-  settings: Settings;
 }
 
-export const emptyData = (): Data => ({
-  places: {},
-  contacts: [],
-  pins: [],
-  photos: [],
-  settings: { eurRate: 7.7 },
-});
+export interface Settings {
+  eurRate: number;
+}
+
+export const emptyData = (): Data => ({ places: {}, contacts: [], pins: [], photos: [] });
 
 export const uid = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -75,3 +69,17 @@ export const uid = () =>
         const r = (Math.random() * 16) | 0;
         return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
       });
+
+/** Stable UUID-shaped id derived from a string (used for the one-time import of old data) */
+export function stableId(seed: string): string {
+  let h1 = 0xdeadbeef ^ seed.length;
+  let h2 = 0x41c6ce57 ^ seed.length;
+  for (let i = 0; i < seed.length; i++) {
+    const c = seed.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 2654435761);
+    h2 = Math.imul(h2 ^ c, 1597334677);
+  }
+  const hex = (n: number) => (n >>> 0).toString(16).padStart(8, "0");
+  const a = hex(h1) + hex(h2) + hex(h1 ^ h2) + hex(Math.imul(h1, h2));
+  return `${a.slice(0, 8)}-${a.slice(8, 12)}-4${a.slice(13, 16)}-a${a.slice(17, 20)}-${a.slice(20, 32)}`;
+}
