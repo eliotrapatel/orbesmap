@@ -239,7 +239,7 @@ const BASE = {
     },
     {
       "title": "Réservations et fermetures",
-      "text": "Dès maintenant : Taian Table (sam. 28, arrivée entre 18h et 20h), Canton Table (mer. 25, 18h15), Fu He Hui (jeu. 26, 19h15), Old Jesse (dim. 29, 13h15), Lei Garden et Lao Zheng Xing : fais passer la conciergerie du Renaissance. Dès l'ouverture des ventes : TGV Hongqiao → Suzhou le jeu. 26 vers 7h45, retour Suzhou → gare de Shanghai vers 16h30 (ventes 15 jours avant, donc dès le 11/11, au passeport), Suzhou Museum (créneau du 26 vers 10h30, ouvre 7 jours avant), The Louis (« My LV », ven. 27 vers 16h10). La semaine d'avant, au passeport sur WeChat : West Bund Museum, Fotografiska, Shanghai Tower. Tailleur : commande mer. 25, essayage sam. 28, retrait dim. 29. Fermetures à connaître : Shanghai Museum East fermé le mardi, Terrace 9:15 ouverte lun.–jeu., Perrotin mar.–sam., Rockbund mer.–dim., Taian Table fermé dim. et lun. Bar Leone ne prend pas de réservation. Check-out le dim. 29 à 12h : bagages à la conciergerie."
+      "text": "Dès maintenant : Taian Table (sam. 28, 19h55, arrivée avant 20h), Canton Table (mer. 25, 18h15), Fu He Hui (jeu. 26, 19h40), Old Jesse (dim. 29, 13h15), Lei Garden et Lao Zheng Xing : fais passer la conciergerie du Renaissance. Dès l'ouverture des ventes : TGV Hongqiao → Suzhou le jeu. 26 vers 7h45, retour Suzhou → gare de Shanghai vers 16h30 (ventes 15 jours avant, donc dès le 11/11, au passeport), Suzhou Museum (créneau du 26 vers 10h30, ouvre 7 jours avant), The Louis (« My LV », ven. 27 vers 17h05). La semaine d'avant, au passeport sur WeChat : West Bund Museum, Fotografiska, Shanghai Tower, Shanghai Museum de People's Square (mer. 25, 9h), Science and Technology Museum (sam. 28, 12h40, compte sstm01). Tailleur : commande mer. 25 vers 11h10, essayage sam. 28, retrait dim. 29. Fermetures à connaître : Shanghai Museum East fermé le mardi, Terrace 9:15 ouverte lun.–jeu., Perrotin mar.–sam., Rockbund mer.–dim., Taian Table fermé dim. et lun. Bar Leone ne prend pas de réservation. Check-out le dim. 29 à 12h : bagages à la conciergerie."
     }
   ]
 } as const;
@@ -270,13 +270,54 @@ export const SHA2026: Trip = {
     "tip": "À l'arrivée, ignore les rabatteurs « taxi » dans le hall : va à la file officielle ou suis les panneaux « 网约车 » (VTC) pour ton DiDi. Au retour, quitte l'hôtel vers 18h30 pour être au comptoir vers 19h30-19h45."
   },
   {
+    "id": "jia-jia-tang-bao",
+    "name": "Jia Jia Tang Bao (Huanghe Road)",
+    "day": "d2",
+    "type": "restaurant",
+    "lat": 31.23701,
+    "lng": 121.46605,
+    "time": "Petit-déjeuner 8h30–9h05 (xiaolongbao porc-crabe)",
+    "address": "127 Huanghe Road, near Beijing Xi Road, Huangpu",
+    "cn": "上海市黄浦区黄河路127号",
+    "metro": "People's Square (L1/L2/L8), ~5 min à pied",
+    "desc": "L'institution du xiaolongbao façonné à la commande : pâte fine, version porc-crabe la plus demandée. On commande au comptoir, on attend son tour, on mange vite.",
+    "highlights": [
+      "Horaires : tous les jours ~7h30–20h30, ferme plus tôt quand la pâte est épuisée",
+      "Xiaolongbao porc-crabe faits minute",
+      "Prix minuscules, zéro chichi",
+      "Sans réservation"
+    ],
+    "tip": "Juste au nord de People's Square : arrive avant midi pour éviter la file. Commande le porc-crabe."
+  },
+  {
+    "id": "shanghai-museum-peoples-square",
+    "name": "Shanghai Museum (People's Square)",
+    "day": "d2",
+    "type": "musee",
+    "lat": 31.23019,
+    "lng": 121.47103,
+    "time": "9h10–10h50",
+    "address": "201 Renmin Avenue, Huangpu District",
+    "cn": "上海市黄浦区人民大道201号 上海博物馆",
+    "metro": "Lignes 1, 2, 8, People's Square (人民广场), sortie 1",
+    "website": "https://www.shanghaimuseum.net",
+    "desc": "Le bâtiment historique en forme de « ding » (chaudron de bronze), désormais dédié aux grandes expositions temporaires. Pendant ton séjour : « On Top of the World Tree », grande expo sur les civilisations anciennes des Amériques (Olmèques, Mayas, Aztèques, Incas), avec 1 129 lots prêtés par le Mexique, le Pérou et la Chine (9 juil. 2026–14 nov. 2027). S'y ajoutent « Pearls Returned Home » (phase 2) et « A Momentary Joy » (porcelaines Ming et Qing de la collection Zande Lou).",
+    "highlights": [
+      "Horaires : mar.–dim. 9h–17h (dernière entrée 16h), fermé le lundi",
+      "Expo Amériques anciennes : or et jade précolombiens",
+      "Expériences immersives « Flying Over Machu Picchu » et VR « Secrets of the Rainforest »",
+      "Porcelaines de la collection Zande Lou au 4e étage"
+    ],
+    "tip": "Arrive à l'ouverture. Pas de réservation pour les individuels en principe, mais vérifie sur WeChat la veille."
+  },
+  {
     "id": "southbund-fabric",
     "name": "Marché aux tissus de South Bund",
     "day": "d2",
     "type": "textile",
     "lat": 31.21378,
     "lng": 121.49519,
-    "time": "Mer. 25 10h–11h (commande) · sam. 28 9h30–10h (essayage) · dim. 29 9h30–10h (retrait)",
+    "time": "Mer. 25 11h10–11h55 (commande) · sam. 28 9h30–10h (essayage) · dim. 29 9h30–10h (retrait)",
     "address": "399 Lujiabang Road, Huangpu District",
     "cn": "上海市黄浦区陆家浜路399号 南外滩轻纺面料市场",
     "metro": "Ligne 4, Nanpu Bridge (南浦大桥), sortie 3, ~5 min à pied",
@@ -297,7 +338,7 @@ export const SHA2026: Trip = {
     "type": "jardin",
     "lat": 31.22892,
     "lng": 121.48775,
-    "time": "11h15–12h20",
+    "time": "12h05–13h",
     "address": "168 Fuyou Road / 137 Anren Street, Huangpu District (City God Temple: 249 Fangbang Middle Road)",
     "cn": "上海市黄浦区福佑路168号 豫园（城隍庙：方浜中路249号）",
     "metro": "Lignes 10/14 – Yuyuan Garden (豫园), 5 min à pied",
@@ -318,7 +359,7 @@ export const SHA2026: Trip = {
     "type": "musee",
     "lat": 31.22887,
     "lng": 121.49357,
-    "time": "12h25–13h10",
+    "time": "13h05–13h45",
     "address": "Bund Finance Center, 600 Zhongshan East 2nd Road, Huangpu District",
     "cn": "上海市黄浦区中山东二路600号 外滩金融中心 复星艺术中心",
     "metro": "Ligne 10 ou 14, Yuyuan Garden (豫园), environ 10 min à pied",
@@ -339,7 +380,7 @@ export const SHA2026: Trip = {
     "type": "restaurant",
     "lat": 31.23513,
     "lng": 121.47564,
-    "time": "Déjeuner 13h30–14h40",
+    "time": "Déjeuner 14h (arriver avant la fin du service ; sinon Da Hu Chun, ouvert en continu, à 1 km)",
     "address": "556 Fuzhou Road, Huangpu",
     "cn": "上海市黄浦区福州路556号",
     "metro": "People's Square (L1/L2/L8), ~8 min à pied",
@@ -359,7 +400,7 @@ export const SHA2026: Trip = {
     "type": "musee",
     "lat": 31.24318,
     "lng": 121.48302,
-    "time": "14h55–15h50",
+    "time": "15h10–15h55",
     "address": "20 Huqiu Road, Huangpu District",
     "cn": "上海市黄浦区虎丘路20号 上海外滩美术馆",
     "metro": "Lignes 2/10, East Nanjing Road (南京东路), environ 8 min à pied",
@@ -379,7 +420,7 @@ export const SHA2026: Trip = {
     "type": "galerie",
     "lat": 31.243,
     "lng": 121.4834,
-    "time": "15h50–16h25",
+    "time": "15h55–16h25",
     "address": "3F, 27 Huqiu Road, Huangpu District",
     "cn": "上海市黄浦区虎丘路27号3楼 贝浩登画廊",
     "metro": "Lignes 2/10, East Nanjing Road (南京东路), environ 8 min à pied",
@@ -452,6 +493,25 @@ export const SHA2026: Trip = {
       "Biscuit « feuille d'érable » à la crème, cuit minute"
     ],
     "tip": "Réserve au +86 21 6321 3737 une table côté fenêtre : Lujiazui illuminé en face. Garde de la place pour le biscuit « feuille d'érable »."
+  },
+  {
+    "id": "sir-ellys-terrace",
+    "name": "Sir Elly's Terrace (The Peninsula)",
+    "day": "d2",
+    "type": "bar",
+    "lat": 31.24327,
+    "lng": 121.48474,
+    "time": "Verre 20h15–21h (terrasse saisonnière : sinon le bar intérieur) · TGV tôt jeudi",
+    "address": "13F, The Peninsula Shanghai, 32 Zhongshan Dong Yi Road, Huangpu",
+    "cn": "上海市黄浦区中山东一路32号上海半岛酒店13楼",
+    "metro": "East Nanjing Road (L2/L10), ~12 min à pied",
+    "website": "https://peninsula.com/en/shanghai/hotel-fine-dining/sir-ellys-terrace",
+    "desc": "Terrasse en U au 13e étage du Peninsula, au bout nord du Bund, au-dessus du pont Waibaidu : vue à 270° sur Pudong et le Bund historique, plus élégante et plus calme que Flair.",
+    "highlights": [
+      "Vue sur le Bund, Pudong et le pont Waibaidu",
+      "Cadre Art déco du Peninsula"
+    ],
+    "tip": "Appelle le +86 21 2327 6756 pour savoir si la terrasse est encore ouverte."
   },
   {
     "id": "hongqiao-hsr",
@@ -543,7 +603,7 @@ export const SHA2026: Trip = {
     "type": "musee",
     "lat": 31.24166,
     "lng": 121.46527,
-    "time": "17h30–18h45",
+    "time": "17h20–18h15",
     "address": "127 Guangfu Road, Jing'an District (bord de Suzhou Creek)",
     "cn": "上海市静安区光复路127号 Fotografiska影像艺术中心",
     "metro": "Lignes 8/12, Qufu Road (曲阜路), environ 10 min à pied",
@@ -559,13 +619,35 @@ export const SHA2026: Trip = {
     "tip": "Le lundi, presque tous les musées sont fermés mais Fotografiska ouvre jusqu'à 23h. Réserve ton billet en ligne avec ton passeport. Puis 15 min à pied le long de Suzhou Creek jusqu'au Bulgari."
   },
   {
+    "id": "bulgari-hotel-shanghai",
+    "name": "Bulgari Hotel Shanghai (Il Bar, La Terrazza)",
+    "day": "d3",
+    "type": "bar",
+    "lat": 31.2445,
+    "lng": 121.4778,
+    "time": "Verre 18h20–19h (Il Bar, 47e, à côté de Fotografiska)",
+    "address": "33 Henan North Road, Jing'an District (rive nord de la Suzhou Creek)",
+    "cn": "上海市静安区河南北路33号 上海宝格丽酒店",
+    "metro": "Lignes 10/12 – Tiantong Road (天潼路), 3 min à pied",
+    "website": "https://www.bulgarihotels.com/en_US/shanghai/bars/il-bar",
+    "desc": "Hôtel ouvert en 2018 dans une tour du projet OCT Suhewan, intérieurs Antonio Citterio Patricia Viel, avec l'ancienne Chambre générale de commerce (1916) restaurée. Les bars en étage donnent sur le Bund et la Suzhou Creek ; Il Ristorante – Niko Romito est au même étage qu'Il Bar.",
+    "highlights": [
+      "Horaires : Il Bar 10h–1h ; La Terrazza 17h30–1h",
+      "Intérieurs Citterio-Viel : marbres, laitons, un vrai cours de matériaux",
+      "Il Bar (47e) et Il Ristorante – Niko Romito",
+      "La Terrazza, sur le toit au 48e",
+      "Bâtiment historique de la Chambre de commerce (1916)"
+    ],
+    "tip": "Réserve Il Ristorante – Niko Romito (47e) par téléphone pour 20h, puis verre à Il Bar ou à La Terrazza (48e) si la météo le permet. Prends une veste."
+  },
+  {
     "id": "fu-he-hui",
     "name": "Fu He Hui",
     "day": "d3",
     "type": "restaurant",
     "lat": 31.22078,
     "lng": 121.42511,
-    "time": "Dîner 19h15",
+    "time": "Dîner 19h40 (réserver ; service jusqu'à 21h)",
     "address": "1037 Yuyuan Road, Changning",
     "cn": "上海市长宁区愚园路1037号",
     "metro": "Jiangsu Road (L2/L11), ~6 min à pied",
@@ -579,13 +661,33 @@ export const SHA2026: Trip = {
     "tip": "Réserve au +86 21 3980 9188 ou par la conciergerie. Prends l'accord thés. Essayage à South Bund avant (17h–17h45), puis file directement : 35-40 min en DiDi à l'heure de pointe, l'aller-retour à l'hôtel ne tient pas."
   },
   {
+    "id": "captain-george",
+    "name": "Captain George Flavor Museum",
+    "day": "d4",
+    "type": "cafe",
+    "lat": 31.2087,
+    "lng": 121.4504,
+    "time": "Café 10h–10h25 (ouvre à 10h)",
+    "address": "236 Taiyuan Road, Xuhui",
+    "cn": "上海市徐汇区太原路236号",
+    "metro": "Hengshan Road (L1), ~8 min à pied",
+    "desc": "Le café de Peng Jinyang, champion du monde de la World Brewers Cup 2025. Décor « musée des saveurs » façon pharmacie ancienne ; un thermomètre infrarouge te montre comment l'arôme évolue avec la température. La référence specialty coffee de la ville.",
+    "highlights": [
+      "Horaires : tous les jours 10h–19h",
+      "Champion du monde World Brewers Cup 2025",
+      "Pour-overs de saison",
+      "Scénographie très travaillée"
+    ],
+    "tip": "Prends un pour-over (dès 55 ¥) au bar et pose des questions sur le process."
+  },
+  {
     "id": "wukang-road",
     "name": "Wukang Road & Wukang Mansion",
     "day": "d4",
     "type": "landmark",
     "lat": 31.20627,
     "lng": 121.4337,
-    "time": "9h45–10h05",
+    "time": "10h40–11h",
     "address": "Wukang Mansion, 1842-1858 Huaihai Middle Road (corner of Wukang Road), Xuhui District",
     "cn": "上海市徐汇区淮海中路1842-1858号 武康大楼（武康路口）",
     "metro": "Lignes 10/11 – Jiaotong University (交通大学), environ 8–10 min à pied",
@@ -606,7 +708,7 @@ export const SHA2026: Trip = {
     "type": "lifestyle",
     "lat": 31.21676,
     "lng": 121.44226,
-    "time": "10h05–11h15",
+    "time": "11h–11h50",
     "address": "Anfu Road (near Wulumuqi Middle Road), Xuhui District – loop via Wukang Road, Fuxing West Road and Hengshan Road",
     "cn": "上海市徐汇区安福路（近乌鲁木齐中路）",
     "metro": "Lignes 1/7 – Changshu Road (常熟路) côté est ; lignes 10/11 – Jiaotong University côté Wukang Mansion",
@@ -627,7 +729,7 @@ export const SHA2026: Trip = {
     "type": "concept",
     "lat": 31.21999,
     "lng": 121.447,
-    "time": "11h30–12h15",
+    "time": "12h–12h40",
     "address": "184 Fumin Lu, near Changle Lu (south of Julu Lu), Jing'an District",
     "cn": "上海市静安区富民路184号（近长乐路）蕾虎 LABELHOOD",
     "metro": "Lignes 1/7 Changshu Road (常熟路) ou lignes 2/7/14 Jing'an Temple (静安寺), 10-12 min à pied",
@@ -647,7 +749,7 @@ export const SHA2026: Trip = {
     "type": "restaurant",
     "lat": 31.21757,
     "lng": 121.45339,
-    "time": "Déjeuner 12h30–13h45",
+    "time": "Déjeuner 12h50–14h",
     "address": "Shop 401, 4F, iapm, 999 Middle Huaihai Road, Xuhui",
     "cn": "上海市徐汇区淮海中路999号环贸iapm商场4楼401",
     "metro": "South Shaanxi Road (L1/L10/L12), accès direct",
@@ -667,7 +769,7 @@ export const SHA2026: Trip = {
     "type": "cuir",
     "lat": 31.2199,
     "lng": 121.4581,
-    "time": "13h50–14h20",
+    "time": "14h05–14h30",
     "address": "817–821 Middle Huaihai Road, Huangpu District",
     "cn": "上海市黄浦区淮海中路817-821号 山下有松",
     "metro": "Ligne 13 – Middle Huaihai Road (淮海中路), 4 min à pied ; ou lignes 1/10/12 – South Shaanxi Road (陕西南路), 7 min",
@@ -689,7 +791,7 @@ export const SHA2026: Trip = {
     "type": "design",
     "lat": 31.2203,
     "lng": 121.4578,
-    "time": "14h20–14h50",
+    "time": "14h30–14h55",
     "address": "798-812 Huaihai Zhong Lu, near Maoming Nan Lu, Huangpu District",
     "cn": "上海市黄浦区淮海中路798-812号 HAUS NOWHERE",
     "metro": "Lignes 1/10/12 South Shaanxi Road (陕西南路), 5 min à pied",
@@ -710,7 +812,7 @@ export const SHA2026: Trip = {
     "type": "luxe",
     "lat": 31.2298,
     "lng": 121.4561,
-    "time": "15h10–16h",
+    "time": "15h10–15h50",
     "address": "Lane 590 Weihai Road, Jing'an District (entrées sur Maoming North Rd, Weihai Rd et Shimen 1st Rd)",
     "cn": "上海市静安区威海路590弄 张园",
     "metro": "Lignes 2/12/13 – Nanjing West Road (南京西路), 2-3 min à pied",
@@ -725,13 +827,54 @@ export const SHA2026: Trip = {
     "tip": "Viens en semaine en fin de matinée : le week-end, c'est la foule des shootings. Regarde le compte WeChat 张园 pour les expos éphémères. The Louis est juste en face, de l'autre côté de Shimen Yi Lu."
   },
   {
+    "id": "unitree-jiuguang",
+    "name": "Unitree – boutique d'expérience (Jiuguang Jing'an)",
+    "day": "d4",
+    "type": "tech",
+    "lat": 31.22582,
+    "lng": 121.44113,
+    "time": "15h55–16h20",
+    "address": "2F, Jiuguang Department Store, 1618 West Nanjing Road, Jing'an District",
+    "cn": "上海市静安区南京西路1618号久光百货2楼",
+    "metro": "Lignes 2/7/14 – Jing'an Temple (静安寺), accès direct",
+    "website": "https://www.unitree.com",
+    "desc": "Premier magasin d'expérience Unitree en Asie, ouvert le 31 mai 2026 : chiens-robots Go2, humanoïdes R1, G1, H2 et mains dextres, de ~9 000 à 170 000 RMB. L'endroit du centre-ville où voir de près la robotique humanoïde chinoise grand public.",
+    "highlights": [
+      "Horaires : tous les jours ~10h–22h (horaires de Jiuguang)",
+      "R1 Air à ~29 500 RMB, chiens-robots dès ~8 700 RMB",
+      "Démos de chiens-robots et mains dextres",
+      "Apple Jing'an (gradins en pierre, rangée d'érables) à moins de 200 m"
+    ],
+    "tip": "En face du temple, au 2e étage de Jiuguang. Apple Jing'an (gradins en pierre, rangée d'érables) est sur la place juste à côté si tu veux un arrêt de 10 min."
+  },
+  {
+    "id": "jingan-temple",
+    "name": "Temple Jing'an",
+    "day": "d4",
+    "type": "landmark",
+    "lat": 31.22541,
+    "lng": 121.44073,
+    "time": "16h20–16h55 (ferme vers 17h)",
+    "address": "1686 West Nanjing Road, Jing'an District",
+    "cn": "上海市静安区南京西路1686号 静安寺",
+    "metro": "Lignes 2/7/14 – Jing'an Temple (静安寺), au-dessus de la station",
+    "desc": "Temple bouddhiste fondé au IIIe siècle et reconstruit après 1983. Ses toits dorés au milieu des tours de Nanjing Xi Lu forment l'une des images les plus fortes de la ville.",
+    "highlights": [
+      "Horaires : tous les jours ~7h30–17h",
+      "Contraste toits dorés / gratte-ciel, surtout au crépuscule",
+      "Grand bouddha en jade blanc dans la salle principale",
+      "Apple Jing'an et sa rangée d'érables sur la place juste à côté"
+    ],
+    "tip": "Le temple ferme vers 17h (dernière entrée plus tôt) : entre avant 16h30, puis fais la photo des toits dorés depuis le trottoir sud de Nanjing Xi Lu à la nuit tombante."
+  },
+  {
     "id": "lv-the-louis",
     "name": "Louis Vuitton « The Louis » (HKRI Taikoo Hui)",
     "day": "d4",
     "type": "luxe",
     "lat": 31.232,
     "lng": 121.4584,
-    "time": "16h10–16h50 (créneau « My LV »)",
+    "time": "17h05–17h40 (créneau « My LV »)",
     "address": "HKRI Taikoo Hui, 789 West Nanjing Road, angle Shimen No.1 Road / Wujiang Road, Jing'an District",
     "cn": "上海市静安区南京西路789号兴业太古汇 路易号（石门一路吴江路路口）",
     "metro": "Lignes 2/12/13 – Nanjing West Road (南京西路), 3 min à pied",
@@ -743,7 +886,7 @@ export const SHA2026: Trip = {
       "Le Café Louis Vuitton, à l'intérieur du bateau",
       "Le bâtiment-malle : du packaging à l'échelle d'un immeuble, référence directe pour l'univers ORBES"
     ],
-    "tip": "Réserve le créneau du vendredi 27 vers 16h10 sur le mini-programme WeChat « My LV » dès l'ouverture des réservations, et vérifie avant le 21 que le lieu est toujours ouvert. Le café se réserve à part."
+    "tip": "Réserve le créneau du vendredi 27 vers 17h05 sur le mini-programme WeChat « My LV » dès l'ouverture des réservations, et vérifie avant le 21 que le lieu est toujours ouvert. Le café se réserve à part."
   },
   {
     "id": "nanjing-west-watch-row",
@@ -752,7 +895,7 @@ export const SHA2026: Trip = {
     "type": "montres",
     "lat": 31.22942,
     "lng": 121.45119,
-    "time": "16h55–17h45",
+    "time": "17h45–18h25",
     "address": "West Nanjing Road n°1033 à 1181 (côté sud, entre Shaanxi North Rd et Maoming North Rd), Jing'an District. A. Lange & Söhne au n°1155",
     "cn": "上海市静安区南京西路1155号 朗格精品店（南京西路1033–1181号一带）",
     "metro": "Lignes 2/7/14 – Jing'an Temple ou lignes 2/12/13 – Nanjing West Road, 8 min à pied",
@@ -767,13 +910,33 @@ export const SHA2026: Trip = {
     "tip": "Lundi = vendeurs disponibles. Commence par Lange (n°1155) et Moser (n°1079), puis finis par Plaza 66 (1266 Nanjing Xi Lu) en marchant vers l'ouest. Repère la vitrine Zeitwerk : le site Lange donne tantôt le n°1155, tantôt le n°1169."
   },
   {
+    "id": "xintiandi",
+    "name": "Xintiandi",
+    "day": "d4",
+    "type": "landmark",
+    "lat": 31.22194,
+    "lng": 121.4705,
+    "time": "18h45–19h20",
+    "address": "Lane 181 Taicang Road, Huangpu District",
+    "cn": "上海市黄浦区太仓路181弄 新天地",
+    "metro": "Lignes 10/13 – 一大会址·新天地, ou ligne 1 – 一大会址·黄陂南路",
+    "desc": "Îlot de shikumen des années 1920 réhabilité par Benjamin Wood en 2001 : le prototype de la régénération urbaine commerciale en Chine, dont Zhangyuan est la version des années 2020. Très léché et commercial, utile comme référence d'architecture et de retail.",
+    "highlights": [
+      "Horaires : allées libres ; boutiques ~10h–22h, bars plus tard",
+      "Bloc nord : shikumen restaurés et terrasses",
+      "À 10 min à pied de la Maison Hermès",
+      "Sinan Mansions et Fuxing Park à 10 min"
+    ],
+    "tip": "Fais l'îlot nord, puis descends par Fuxing Park vers Sinan Mansions et Fuxing Zhong Lu, où tu dînes. Si ton père veut souffler, pause à l'hôtel entre 16h30 et 17h30."
+  },
+  {
     "id": "coa-shanghai",
     "name": "Coa Shanghai",
     "day": "d4",
     "type": "bar",
     "lat": 31.2172,
     "lng": 121.4613,
-    "time": "Dîner 18h45 (taqueria) · mezcaleria ensuite",
+    "time": "Dîner 19h30 (taqueria) · mezcaleria ensuite",
     "address": "580 Middle Fuxing Road, near Ruijin Er Road, Huangpu",
     "cn": "上海市黄浦区复兴中路580号（近瑞金二路）",
     "metro": "Middle Huaihai Road (L13) ou Xintiandi (L10/L13), ~10 min à pied",
@@ -793,7 +956,7 @@ export const SHA2026: Trip = {
     "type": "bar",
     "lat": 31.21674,
     "lng": 121.46125,
-    "time": "20h30–21h30",
+    "time": "21h–22h",
     "address": "579 Middle Fuxing Road (behind Ocho Bar Tools), Huangpu",
     "cn": "上海市黄浦区复兴中路579号",
     "metro": "Middle Huaihai Road (L13) ou Xintiandi (L10/L13), ~10 min à pied",
@@ -813,7 +976,7 @@ export const SHA2026: Trip = {
     "type": "bar",
     "lat": 31.2172,
     "lng": 121.4639,
-    "time": "21h45–23h30",
+    "time": "22h15–23h45",
     "address": "527 Middle Fuxing Road (Sinan Mansions), Huangpu",
     "cn": "上海市黄浦区复兴中路527号（思南公馆）",
     "metro": "Middle Huaihai Road (L13) ou Xintiandi (L10/L13), ~10 min à pied",
@@ -833,7 +996,7 @@ export const SHA2026: Trip = {
     "type": "musee",
     "lat": 31.22212,
     "lng": 121.53436,
-    "time": "10h30–12h45 (après l'essayage au tailleur, 9h30–10h)",
+    "time": "10h30–12h30 (après l'essayage au tailleur, 9h30–10h)",
     "address": "1952 Century Avenue, Pudong New Area (entrée B1 côté est, près de Dingxiang Road)",
     "cn": "上海市浦东新区世纪大道1952号 上海博物馆东馆",
     "metro": "Ligne 2, Shanghai Science and Technology Museum (上海科技馆), à côté",
@@ -848,13 +1011,32 @@ export const SHA2026: Trip = {
     "tip": "Retrait des costumes à South Bund à 9h30 avant. Le samedi est chargé : arrive à l'ouverture des portes et vérifie la veille sur WeChat si l'expo bijoux du Met a ouvert. Le musée des sciences est juste à côté."
   },
   {
+    "id": "sstm",
+    "name": "Shanghai Science and Technology Museum",
+    "day": "d5",
+    "type": "musee",
+    "lat": 31.2206,
+    "lng": 121.53673,
+    "time": "12h40–13h40 (à 1 km, même avenue ; réserver sur WeChat sstm01)",
+    "address": "2000 Century Avenue, Pudong New Area",
+    "cn": "上海市浦东新区世纪大道2000号",
+    "metro": "Ligne 2 – Shanghai Science & Technology Museum (上海科技馆), sortie directe",
+    "website": "https://en.sstm.org.cn",
+    "desc": "Rouvert officiellement le 23 mai 2026 après près de trois ans de travaux : dix zones permanentes (IA, énergie, matériaux, aérospatial…), 80 % interactives. Grand public : un panorama, pas une visite pointue.",
+    "highlights": [
+      "Zone 明日行者 : robots en essaim, interfaces cerveau-machine",
+      "Juste à côté du Shanghai Museum East et du parc Century"
+    ],
+    "tip": "Plan B tech du samedi 28 : à côté du Shanghai Museum East (même station de la ligne 2). Fonce à la zone IA et robotique, 1h suffit. Réserve sur le WeChat sstm01."
+  },
+  {
     "id": "ifc-mall-shanghai",
     "name": "Shanghai IFC Mall",
     "day": "d5",
     "type": "luxe",
     "lat": 31.23824,
     "lng": 121.49792,
-    "time": "Déjeuner 13h10–14h15",
+    "time": "Déjeuner 14h–14h50",
     "address": "8 Century Avenue, Lujiazui, Pudong New Area",
     "cn": "上海市浦东新区世纪大道8号 上海国金中心商场",
     "metro": "Lignes 2/14 – Lujiazui (陆家嘴), accès direct en sous-sol",
@@ -874,7 +1056,7 @@ export const SHA2026: Trip = {
     "type": "musee",
     "lat": 31.24024,
     "lng": 121.49203,
-    "time": "14h20–15h25",
+    "time": "14h55–15h45",
     "address": "2777 Binjiang Avenue, Lujiazui, Pudong",
     "cn": "上海市浦东新区滨江大道2777号 浦东美术馆",
     "metro": "Ligne 2, Lujiazui (陆家嘴), environ 10 min à pied",
@@ -895,7 +1077,7 @@ export const SHA2026: Trip = {
     "type": "landmark",
     "lat": 31.23562,
     "lng": 121.50127,
-    "time": "15h40–17h (coucher du soleil 16h50)",
+    "time": "16h–17h05 (coucher du soleil 16h50)",
     "address": "501 Yincheng Middle Road, Lujiazui, Pudong New Area (entrée de l'observatoire en sous-sol B1/B2)",
     "cn": "上海市浦东新区陆家嘴银城中路501号 上海中心大厦 上海之巅观光厅",
     "metro": "Lignes 2/14 – Lujiazui (陆家嘴), environ 10 min à pied",
@@ -910,13 +1092,33 @@ export const SHA2026: Trip = {
     "tip": "Monte vers 16h15 : jour, coucher de soleil et ville allumée en une seule visite. Regarde l'AQI le matin même et reporte si c'est brumeux. Billet sur le mini-programme WeChat 上海之巅观光厅."
   },
   {
+    "id": "flair-ritz-pudong",
+    "name": "Flair (Ritz-Carlton Pudong, 58e)",
+    "day": "d5",
+    "type": "bar",
+    "lat": 31.23643,
+    "lng": 121.50327,
+    "time": "17h15–18h (58e, juste à côté)",
+    "address": "58F, The Ritz-Carlton Shanghai Pudong, Shanghai IFC, 8 Century Avenue, Pudong",
+    "cn": "上海市浦东新区世纪大道8号上海国金中心丽思卡尔顿酒店58楼",
+    "metro": "Lujiazui (L2/L14), accès direct par l'IFC mall",
+    "desc": "Le rooftop face au Bund, au 58e étage de l'IFC, juste à côté de la Perle de l'Orient. Tatler Best 100 Bars Asie-Pacifique 2026. L'équivalent shanghaïen de tes rooftops Park Hyatt et Rosewood à Canton.",
+    "highlights": [
+      "Horaires : lun.–ven. 17h30–1h, sam.–dim. 14h–1h",
+      "Vue frontale sur le Bund illuminé",
+      "Tatler Best 100 Bars APAC 2026",
+      "Partie intérieure si la terrasse est trop froide"
+    ],
+    "tip": "Réserve une table en terrasse au +86 21 2020 1717 pour l'apéritif face au Bund illuminé. Pars à 18h45 pour Taian Table (35-40 min en DiDi)."
+  },
+  {
     "id": "maison-dongliang",
     "name": "Maison Dongliang (WYSH)",
     "day": "d5",
     "type": "concept",
     "lat": 31.2151,
     "lng": 121.423,
-    "time": "18h15–18h55",
+    "time": "18h45–19h15",
     "address": "Villa 174, WYSH, 168 Wuyi Lu, near Yan'an Xi Lu, Changning District",
     "cn": "上海市长宁区武夷路168号 WYSH 174号别墅（栋梁 DONGLIANG）",
     "metro": "Lignes 2/11 Jiangsu Road (江苏路), 12-15 min à pied ; DiDi plus simple",
@@ -936,7 +1138,7 @@ export const SHA2026: Trip = {
     "type": "design",
     "lat": 31.2116,
     "lng": 121.4228,
-    "time": "18h55–19h20",
+    "time": "19h15–19h35",
     "address": "1262 Yan'an Xi Lu, near Panyu Lu, Changning District",
     "cn": "上海市长宁区延安西路1262号 上生·新所",
     "metro": "Lignes 2/11 Jiangsu Road (江苏路), ~15 min à pied : DiDi conseillé",
@@ -956,7 +1158,7 @@ export const SHA2026: Trip = {
     "type": "restaurant",
     "lat": 31.22387,
     "lng": 121.42832,
-    "time": "Dîner 19h40 (arrivées entre 18h et 20h)",
+    "time": "Dîner 19h55 (arrivée avant 20h impérative)",
     "address": "101-102, Building 1, Garden Office, No.161, Lane 465 Zhenning Road, Changning",
     "cn": "上海市长宁区镇宁路465弄161号1号楼101-102",
     "metro": "Jiangsu Road (L2/L11), ~8 min à pied",
@@ -1096,29 +1298,6 @@ export const SHA2026: Trip = {
     "tip": "Premier matin, idéal pour digérer le décalage avec ton père : DiDi de 15 min jusqu'à la porte n°1, file au jardin des érables (槭树园) puis au musée du penjing. Demande le plan à l'accueil."
   },
   {
-    "id": "renaissance-caohejing",
-    "name": "Renaissance Shanghai Caohejing Hotel",
-    "day": "base",
-    "type": "hotel",
-    "lat": 31.16705,
-    "lng": 121.39224,
-    "time": "Check-in mar. 24 vers 21h · départ pour PVG dim. 29 à 18h30",
-    "address": "No. 397 Tianlin Road, Caohejing Hi-Tech Park, Xuhui District, Shanghai 200233",
-    "cn": "上海市徐汇区田林路397号 上海漕河泾万丽酒店",
-    "metro": "Ligne 9 – Caohejing Hi-Tech Park (漕河泾开发区), ~600 m ; ligne 12 – Hongmei Road (虹梅路), ~550 m",
-    "website": "https://www.marriott.com/en-us/hotels/shaca-renaissance-shanghai-caohejing-hotel/overview/",
-    "desc": "Ton hôtel, réservé : un Renaissance (Marriott) de 373 chambres au cœur du parc technologique de Caohejing, quartier de bureaux tech, semi-conducteurs et R&D. Calme le soir, à 7-8 min à pied de la ligne 9 et à 20-30 min de la gare TGV de Hongqiao. Piscine couverte, salle de sport, spa et trois restaurants.",
-    "highlights": [
-      "Horaires : réception 24h/24 ; check-in dès 15h, check-out 12h (à vérifier sur ta confirmation)",
-      "Métro ligne 9, station Caohejing Hi-Tech Park (漕河泾开发区), ~600 m au nord, 7-8 min à pied",
-      "Métro ligne 12, station Hongmei Road (虹梅路), ~550 m au sud",
-      "Jardin botanique de Shanghai (ginkgos et érables fin novembre) à ~5 km, environ 15 min en DiDi",
-      "Xujiahui et Longhua à ~5 km ; musées du West Bund à ~7-9 km",
-      "Gare de Hongqiao à ~13 km (20-30 min) ; PVG à ~48 km (50-70 min)"
-    ],
-    "tip": "Garde une capture de l'adresse en chinois (上海市徐汇区田林路397号 万丽酒店) pour les chauffeurs DiDi, et le numéro de l'hôtel (+86 21 3325 8888) au cas où le chauffeur se perd. Le quartier est mort le soir : dîne et sors à Xuhui, dans l'ancienne Concession française ou au Bund."
-  },
-  {
     "id": "upper-house-shanghai",
     "name": "Upper House Shanghai (Café Gray Deluxe, Sui Tang Li)",
     "day": "lifestyle",
@@ -1140,6 +1319,99 @@ export const SHA2026: Trip = {
     "tip": "Déjeune au Café Gray Deluxe (réserve au +86 21 3216 8088) ou au Sui Tang Li pour la cuisine shanghaïenne (+86 21 3216 8068). Tenue smart casual."
   },
   {
+    "id": "pony-up",
+    "name": "Pony Up",
+    "day": "lifestyle",
+    "type": "bar",
+    "lat": 31.22313,
+    "lng": 121.45318,
+    "time": "16h15–16h45 (cocktail de jour)",
+    "address": "230 Jinxian Road, at South Shaanxi Road, Huangpu",
+    "cn": "上海市黄浦区进贤路230号（近陕西南路）",
+    "metro": "South Shaanxi Road (L1/L10/L12), ~6 min à pied",
+    "desc": "Le bar de Shanghai le mieux classé à l'Asia's 50 Best Bars 2026 (n° 19). Deux ambiances : un front bar lumineux avec des cocktails de jour en petit format, et un back bar feutré le soir. Signé Dre Yang.",
+    "highlights": [
+      "Horaires : front bar 13h–21h, back bar 18h–2h, tous les jours",
+      "N° 19 Asia's 50 Best Bars 2026, premier bar de Shanghai",
+      "Mini-cocktails l'après-midi",
+      "Hot-dogs et patty melt"
+    ],
+    "tip": "Le front bar sert des mini-cocktails l'après-midi, sans foule. Pars à 16h45 au plus tard : DiDi de 15-20 min jusqu'au marché de South Bund pour l'essayage (le marché ferme à 18h)."
+  },
+  {
+    "id": "da-hu-chun",
+    "name": "Da Hu Chun (Sichuan Middle Road)",
+    "day": "lifestyle",
+    "type": "restaurant",
+    "lat": 31.2367,
+    "lng": 121.48477,
+    "time": "Tous les jours 8h–21h",
+    "address": "136 Middle Sichuan Road, Huangpu",
+    "cn": "上海市黄浦区四川中路136号",
+    "metro": "East Nanjing Road (L2/L10), ~6 min à pied",
+    "desc": "La maison historique du shengjian, petits pains farcis grillés à la poêle, ici en version à pâte levée, plus moelleuse, avec un dessous croustillant. Bib Gourmand 2026. Le petit-déjeuner local idéal avant le Bund.",
+    "highlights": [
+      "Bib Gourmand Michelin 2026",
+      "Shengjian à pâte levée, recette historique",
+      "À 5 min du Bund"
+    ],
+    "tip": "Parfait en petit-déjeuner avant le Bund, par exemple mardi à 8h15 avant le jardin Yu (5 min en DiDi)."
+  },
+  {
+    "id": "cafe-del-volcan",
+    "name": "Café del Volcán",
+    "day": "lifestyle",
+    "type": "cafe",
+    "lat": 31.2128,
+    "lng": 121.45334,
+    "time": "Lun-ven 8h–20h, sam-dim 10h–20h",
+    "address": "80 Yongkang Road, Xuhui",
+    "cn": "上海市徐汇区永康路80号",
+    "metro": "Jiashan Road (L9/L12) ou South Shaanxi Road, ~8 min à pied",
+    "desc": "Pionnier du café de spécialité sur Yongkang Lu, minuscule, qui torréfie des single origins de terroirs volcaniques. Sérieux et sans frime.",
+    "highlights": [
+      "Torréfaction maison, single origins",
+      "« Sparkling brew » et affogato"
+    ],
+    "tip": "Peu de places : prends à emporter et marche sous les platanes. Pour-over dès 36 ¥."
+  },
+  {
+    "id": "ins-land",
+    "name": "INS Land (Fuxing Park)",
+    "day": "lifestyle",
+    "type": "club",
+    "lat": 31.21979,
+    "lng": 121.4657,
+    "time": "Jeu-sam, tard le soir",
+    "address": "109 Yandang Road, inside Fuxing Park, Huangpu",
+    "cn": "上海市黄浦区雁荡路109号（复兴公园内）",
+    "metro": "Xintiandi (L10/L13) ou 一大会址·黄陂南路 (L1), ~8 min à pied",
+    "desc": "Complexe nightlife de plusieurs étages dans le parc Fuxing : clubs, bars et live. Chaotique, très jeune et très shanghaïen. À voir une fois, pas pour la musique pointue.",
+    "highlights": [
+      "Plusieurs étages, plusieurs clubs",
+      "À 10 min à pied de Bar Leone, Coa et Speak Low"
+    ],
+    "tip": "Vers minuit après la tournée de Fuxing Lu. Prends ton passeport."
+  },
+  {
+    "id": "heim",
+    "name": "Heim (Green Station)",
+    "day": "lifestyle",
+    "type": "club",
+    "lat": 31.2223,
+    "lng": 121.4531,
+    "time": "Ven-sam, jusqu'à 3h-4h",
+    "address": "Green Station, corner of Changle Road and South Shaanxi Road (unit M101, 462 Changle Road, numéro non confirmé)",
+    "cn": "上海市黄浦区长乐路陕西南路口 Green Station（长乐路462号M101，门牌待确认）",
+    "metro": "South Shaanxi Road (L1/L10/L12), ~6 min à pied",
+    "desc": "Petit club au son soigné : house et techno mélodiques, pas de hard techno, dans le mini-mall Green Station. Le pendant pointu d'INS.",
+    "highlights": [
+      "House et techno mélodiques",
+      "À 2 min à pied de Pony Up"
+    ],
+    "tip": "Regarde le line-up dans le guide clubbing SmartShanghai de novembre."
+  },
+  {
     "id": "shanghai-watch-flagship",
     "name": "Shanghai Watch – flagship Nanjing West Road",
     "day": "ideas",
@@ -1159,69 +1431,6 @@ export const SHA2026: Trip = {
       "Le point d'entrée en prix de l'horlogerie chinoise"
     ],
     "tip": "Idée de cadeau pour ton père : une réédition patrimoniale."
-  },
-  {
-    "id": "jingan-temple",
-    "name": "Temple Jing'an",
-    "day": "ideas",
-    "type": "landmark",
-    "lat": 31.22541,
-    "lng": 121.44073,
-    "time": "16h10–16h50",
-    "address": "1686 West Nanjing Road, Jing'an District",
-    "cn": "上海市静安区南京西路1686号 静安寺",
-    "metro": "Lignes 2/7/14 – Jing'an Temple (静安寺), au-dessus de la station",
-    "desc": "Temple bouddhiste fondé au IIIe siècle et reconstruit après 1983. Ses toits dorés au milieu des tours de Nanjing Xi Lu forment l'une des images les plus fortes de la ville.",
-    "highlights": [
-      "Horaires : tous les jours ~7h30–17h",
-      "Contraste toits dorés / gratte-ciel, surtout au crépuscule",
-      "Grand bouddha en jade blanc dans la salle principale",
-      "Apple Jing'an et sa rangée d'érables sur la place juste à côté"
-    ],
-    "tip": "Le temple ferme vers 17h (dernière entrée plus tôt) : entre avant 16h30, puis fais la photo des toits dorés depuis le trottoir sud de Nanjing Xi Lu à la nuit tombante."
-  },
-  {
-    "id": "unitree-jiuguang",
-    "name": "Unitree – boutique d'expérience (Jiuguang Jing'an)",
-    "day": "ideas",
-    "type": "tech",
-    "lat": 31.22582,
-    "lng": 121.44113,
-    "time": "17h–17h45",
-    "address": "2F, Jiuguang Department Store, 1618 West Nanjing Road, Jing'an District",
-    "cn": "上海市静安区南京西路1618号久光百货2楼",
-    "metro": "Lignes 2/7/14 – Jing'an Temple (静安寺), accès direct",
-    "website": "https://www.unitree.com",
-    "desc": "Premier magasin d'expérience Unitree en Asie, ouvert le 31 mai 2026 : chiens-robots Go2, humanoïdes R1, G1, H2 et mains dextres, de ~9 000 à 170 000 RMB. L'endroit du centre-ville où voir de près la robotique humanoïde chinoise grand public.",
-    "highlights": [
-      "Horaires : tous les jours ~10h–22h (horaires de Jiuguang)",
-      "R1 Air à ~29 500 RMB, chiens-robots dès ~8 700 RMB",
-      "Démos de chiens-robots et mains dextres",
-      "Apple Jing'an (gradins en pierre, rangée d'érables) à moins de 200 m"
-    ],
-    "tip": "En face du temple, au 2e étage de Jiuguang. Apple Jing'an (gradins en pierre, rangée d'érables) est sur la place juste à côté si tu veux un arrêt de 10 min."
-  },
-  {
-    "id": "bulgari-hotel-shanghai",
-    "name": "Bulgari Hotel Shanghai (Il Bar, La Terrazza)",
-    "day": "lifestyle",
-    "type": "bar",
-    "lat": 31.2445,
-    "lng": 121.4778,
-    "time": "Dîner 20h · Il Bar ensuite",
-    "address": "33 Henan North Road, Jing'an District (rive nord de la Suzhou Creek)",
-    "cn": "上海市静安区河南北路33号 上海宝格丽酒店",
-    "metro": "Lignes 10/12 – Tiantong Road (天潼路), 3 min à pied",
-    "website": "https://www.bulgarihotels.com/en_US/shanghai/bars/il-bar",
-    "desc": "Hôtel ouvert en 2018 dans une tour du projet OCT Suhewan, intérieurs Antonio Citterio Patricia Viel, avec l'ancienne Chambre générale de commerce (1916) restaurée. Les bars en étage donnent sur le Bund et la Suzhou Creek ; Il Ristorante – Niko Romito est au même étage qu'Il Bar.",
-    "highlights": [
-      "Horaires : Il Bar 10h–1h ; La Terrazza 17h30–1h",
-      "Intérieurs Citterio-Viel : marbres, laitons, un vrai cours de matériaux",
-      "Il Bar (47e) et Il Ristorante – Niko Romito",
-      "La Terrazza, sur le toit au 48e",
-      "Bâtiment historique de la Chambre de commerce (1916)"
-    ],
-    "tip": "Réserve Il Ristorante – Niko Romito (47e) par téléphone pour 20h, puis verre à Il Bar ou à La Terrazza (48e) si la météo le permet. Prends une veste."
   },
   {
     "id": "huawei-nanjing-east",
@@ -1287,219 +1496,6 @@ export const SHA2026: Trip = {
     "tip": "Arrive à 9h (pause de 11h30 à 13h). Monte direct au 3e voir les ateliers vivants. Puis marche sous les ginkgos de Fenyang Lu jusqu'à Taiyuan Lu."
   },
   {
-    "id": "captain-george",
-    "name": "Captain George Flavor Museum",
-    "day": "lifestyle",
-    "type": "cafe",
-    "lat": 31.2087,
-    "lng": 121.4504,
-    "time": "10h20–11h",
-    "address": "236 Taiyuan Road, Xuhui",
-    "cn": "上海市徐汇区太原路236号",
-    "metro": "Hengshan Road (L1), ~8 min à pied",
-    "desc": "Le café de Peng Jinyang, champion du monde de la World Brewers Cup 2025. Décor « musée des saveurs » façon pharmacie ancienne ; un thermomètre infrarouge te montre comment l'arôme évolue avec la température. La référence specialty coffee de la ville.",
-    "highlights": [
-      "Horaires : tous les jours 10h–19h",
-      "Champion du monde World Brewers Cup 2025",
-      "Pour-overs de saison",
-      "Scénographie très travaillée"
-    ],
-    "tip": "Prends un pour-over (dès 55 ¥) au bar et pose des questions sur le process."
-  },
-  {
-    "id": "pony-up",
-    "name": "Pony Up",
-    "day": "lifestyle",
-    "type": "bar",
-    "lat": 31.22313,
-    "lng": 121.45318,
-    "time": "16h15–16h45 (cocktail de jour)",
-    "address": "230 Jinxian Road, at South Shaanxi Road, Huangpu",
-    "cn": "上海市黄浦区进贤路230号（近陕西南路）",
-    "metro": "South Shaanxi Road (L1/L10/L12), ~6 min à pied",
-    "desc": "Le bar de Shanghai le mieux classé à l'Asia's 50 Best Bars 2026 (n° 19). Deux ambiances : un front bar lumineux avec des cocktails de jour en petit format, et un back bar feutré le soir. Signé Dre Yang.",
-    "highlights": [
-      "Horaires : front bar 13h–21h, back bar 18h–2h, tous les jours",
-      "N° 19 Asia's 50 Best Bars 2026, premier bar de Shanghai",
-      "Mini-cocktails l'après-midi",
-      "Hot-dogs et patty melt"
-    ],
-    "tip": "Le front bar sert des mini-cocktails l'après-midi, sans foule. Pars à 16h45 au plus tard : DiDi de 15-20 min jusqu'au marché de South Bund pour l'essayage (le marché ferme à 18h)."
-  },
-  {
-    "id": "shanghai-museum-peoples-square",
-    "name": "Shanghai Museum (People's Square)",
-    "day": "ideas",
-    "type": "musee",
-    "lat": 31.23019,
-    "lng": 121.47103,
-    "time": "9h–11h30",
-    "address": "201 Renmin Avenue, Huangpu District",
-    "cn": "上海市黄浦区人民大道201号 上海博物馆",
-    "metro": "Lignes 1, 2, 8, People's Square (人民广场), sortie 1",
-    "website": "https://www.shanghaimuseum.net",
-    "desc": "Le bâtiment historique en forme de « ding » (chaudron de bronze), désormais dédié aux grandes expositions temporaires. Pendant ton séjour : « On Top of the World Tree », grande expo sur les civilisations anciennes des Amériques (Olmèques, Mayas, Aztèques, Incas), avec 1 129 lots prêtés par le Mexique, le Pérou et la Chine (9 juil. 2026–14 nov. 2027). S'y ajoutent « Pearls Returned Home » (phase 2) et « A Momentary Joy » (porcelaines Ming et Qing de la collection Zande Lou).",
-    "highlights": [
-      "Horaires : mar.–dim. 9h–17h (dernière entrée 16h), fermé le lundi",
-      "Expo Amériques anciennes : or et jade précolombiens",
-      "Expériences immersives « Flying Over Machu Picchu » et VR « Secrets of the Rainforest »",
-      "Porcelaines de la collection Zande Lou au 4e étage"
-    ],
-    "tip": "Arrive à l'ouverture. Pas de réservation pour les individuels en principe, mais vérifie sur WeChat la veille."
-  },
-  {
-    "id": "jia-jia-tang-bao",
-    "name": "Jia Jia Tang Bao (Huanghe Road)",
-    "day": "lifestyle",
-    "type": "restaurant",
-    "lat": 31.23701,
-    "lng": 121.46605,
-    "time": "Déjeuner 11h40–12h20",
-    "address": "127 Huanghe Road, near Beijing Xi Road, Huangpu",
-    "cn": "上海市黄浦区黄河路127号",
-    "metro": "People's Square (L1/L2/L8), ~5 min à pied",
-    "desc": "L'institution du xiaolongbao façonné à la commande : pâte fine, version porc-crabe la plus demandée. On commande au comptoir, on attend son tour, on mange vite.",
-    "highlights": [
-      "Horaires : tous les jours ~7h30–20h30, ferme plus tôt quand la pâte est épuisée",
-      "Xiaolongbao porc-crabe faits minute",
-      "Prix minuscules, zéro chichi",
-      "Sans réservation"
-    ],
-    "tip": "Juste au nord de People's Square : arrive avant midi pour éviter la file. Commande le porc-crabe."
-  },
-  {
-    "id": "xintiandi",
-    "name": "Xintiandi",
-    "day": "ideas",
-    "type": "landmark",
-    "lat": 31.22194,
-    "lng": 121.4705,
-    "time": "15h30–16h30 (flânerie)",
-    "address": "Lane 181 Taicang Road, Huangpu District",
-    "cn": "上海市黄浦区太仓路181弄 新天地",
-    "metro": "Lignes 10/13 – 一大会址·新天地, ou ligne 1 – 一大会址·黄陂南路",
-    "desc": "Îlot de shikumen des années 1920 réhabilité par Benjamin Wood en 2001 : le prototype de la régénération urbaine commerciale en Chine, dont Zhangyuan est la version des années 2020. Très léché et commercial, utile comme référence d'architecture et de retail.",
-    "highlights": [
-      "Horaires : allées libres ; boutiques ~10h–22h, bars plus tard",
-      "Bloc nord : shikumen restaurés et terrasses",
-      "À 10 min à pied de la Maison Hermès",
-      "Sinan Mansions et Fuxing Park à 10 min"
-    ],
-    "tip": "Fais l'îlot nord, puis descends par Fuxing Park vers Sinan Mansions et Fuxing Zhong Lu, où tu dînes. Si ton père veut souffler, pause à l'hôtel entre 16h30 et 17h30."
-  },
-  {
-    "id": "flair-ritz-pudong",
-    "name": "Flair (Ritz-Carlton Pudong, 58e)",
-    "day": "lifestyle",
-    "type": "bar",
-    "lat": 31.23643,
-    "lng": 121.50327,
-    "time": "17h40–18h45",
-    "address": "58F, The Ritz-Carlton Shanghai Pudong, Shanghai IFC, 8 Century Avenue, Pudong",
-    "cn": "上海市浦东新区世纪大道8号上海国金中心丽思卡尔顿酒店58楼",
-    "metro": "Lujiazui (L2/L14), accès direct par l'IFC mall",
-    "desc": "Le rooftop face au Bund, au 58e étage de l'IFC, juste à côté de la Perle de l'Orient. Tatler Best 100 Bars Asie-Pacifique 2026. L'équivalent shanghaïen de tes rooftops Park Hyatt et Rosewood à Canton.",
-    "highlights": [
-      "Horaires : lun.–ven. 17h30–1h, sam.–dim. 14h–1h",
-      "Vue frontale sur le Bund illuminé",
-      "Tatler Best 100 Bars APAC 2026",
-      "Partie intérieure si la terrasse est trop froide"
-    ],
-    "tip": "Réserve une table en terrasse au +86 21 2020 1717 pour l'apéritif face au Bund illuminé. Pars à 18h45 pour Taian Table (35-40 min en DiDi)."
-  },
-  {
-    "id": "da-hu-chun",
-    "name": "Da Hu Chun (Sichuan Middle Road)",
-    "day": "lifestyle",
-    "type": "restaurant",
-    "lat": 31.2367,
-    "lng": 121.48477,
-    "time": "Tous les jours 8h–21h",
-    "address": "136 Middle Sichuan Road, Huangpu",
-    "cn": "上海市黄浦区四川中路136号",
-    "metro": "East Nanjing Road (L2/L10), ~6 min à pied",
-    "desc": "La maison historique du shengjian, petits pains farcis grillés à la poêle, ici en version à pâte levée, plus moelleuse, avec un dessous croustillant. Bib Gourmand 2026. Le petit-déjeuner local idéal avant le Bund.",
-    "highlights": [
-      "Bib Gourmand Michelin 2026",
-      "Shengjian à pâte levée, recette historique",
-      "À 5 min du Bund"
-    ],
-    "tip": "Parfait en petit-déjeuner avant le Bund, par exemple mardi à 8h15 avant le jardin Yu (5 min en DiDi)."
-  },
-  {
-    "id": "cafe-del-volcan",
-    "name": "Café del Volcán",
-    "day": "lifestyle",
-    "type": "cafe",
-    "lat": 31.2128,
-    "lng": 121.45334,
-    "time": "Lun-ven 8h–20h, sam-dim 10h–20h",
-    "address": "80 Yongkang Road, Xuhui",
-    "cn": "上海市徐汇区永康路80号",
-    "metro": "Jiashan Road (L9/L12) ou South Shaanxi Road, ~8 min à pied",
-    "desc": "Pionnier du café de spécialité sur Yongkang Lu, minuscule, qui torréfie des single origins de terroirs volcaniques. Sérieux et sans frime.",
-    "highlights": [
-      "Torréfaction maison, single origins",
-      "« Sparkling brew » et affogato"
-    ],
-    "tip": "Peu de places : prends à emporter et marche sous les platanes. Pour-over dès 36 ¥."
-  },
-  {
-    "id": "sir-ellys-terrace",
-    "name": "Sir Elly's Terrace (The Peninsula)",
-    "day": "lifestyle",
-    "type": "bar",
-    "lat": 31.24327,
-    "lng": 121.48474,
-    "time": "Tous les jours 17h–minuit (terrasse saisonnière, à confirmer)",
-    "address": "13F, The Peninsula Shanghai, 32 Zhongshan Dong Yi Road, Huangpu",
-    "cn": "上海市黄浦区中山东一路32号上海半岛酒店13楼",
-    "metro": "East Nanjing Road (L2/L10), ~12 min à pied",
-    "website": "https://peninsula.com/en/shanghai/hotel-fine-dining/sir-ellys-terrace",
-    "desc": "Terrasse en U au 13e étage du Peninsula, au bout nord du Bund, au-dessus du pont Waibaidu : vue à 270° sur Pudong et le Bund historique, plus élégante et plus calme que Flair.",
-    "highlights": [
-      "Vue sur le Bund, Pudong et le pont Waibaidu",
-      "Cadre Art déco du Peninsula"
-    ],
-    "tip": "Appelle le +86 21 2327 6756 pour savoir si la terrasse est encore ouverte."
-  },
-  {
-    "id": "ins-land",
-    "name": "INS Land (Fuxing Park)",
-    "day": "lifestyle",
-    "type": "club",
-    "lat": 31.21979,
-    "lng": 121.4657,
-    "time": "Jeu-sam, tard le soir",
-    "address": "109 Yandang Road, inside Fuxing Park, Huangpu",
-    "cn": "上海市黄浦区雁荡路109号（复兴公园内）",
-    "metro": "Xintiandi (L10/L13) ou 一大会址·黄陂南路 (L1), ~8 min à pied",
-    "desc": "Complexe nightlife de plusieurs étages dans le parc Fuxing : clubs, bars et live. Chaotique, très jeune et très shanghaïen. À voir une fois, pas pour la musique pointue.",
-    "highlights": [
-      "Plusieurs étages, plusieurs clubs",
-      "À 10 min à pied de Bar Leone, Coa et Speak Low"
-    ],
-    "tip": "Vers minuit après la tournée de Fuxing Lu. Prends ton passeport."
-  },
-  {
-    "id": "heim",
-    "name": "Heim (Green Station)",
-    "day": "lifestyle",
-    "type": "club",
-    "lat": 31.2223,
-    "lng": 121.4531,
-    "time": "Ven-sam, jusqu'à 3h-4h",
-    "address": "Green Station, corner of Changle Road and South Shaanxi Road (unit M101, 462 Changle Road, numéro non confirmé)",
-    "cn": "上海市黄浦区长乐路陕西南路口 Green Station（长乐路462号M101，门牌待确认）",
-    "metro": "South Shaanxi Road (L1/L10/L12), ~6 min à pied",
-    "desc": "Petit club au son soigné : house et techno mélodiques, pas de hard techno, dans le mini-mall Green Station. Le pendant pointu d'INS.",
-    "highlights": [
-      "House et techno mélodiques",
-      "À 2 min à pied de Pony Up"
-    ],
-    "tip": "Regarde le line-up dans le guide clubbing SmartShanghai de novembre."
-  },
-  {
     "id": "hangzhou-lingyin-westlake",
     "name": "Hangzhou – Lingyin, Feilai Feng & lac de l'Ouest",
     "day": "ideas",
@@ -1558,25 +1554,6 @@ export const SHA2026: Trip = {
     "tip": "Si tu veux un vrai tailleur Fengbang en plus de South Bund : à 500 m de Zhangyuan, glisse-le lundi après The Louis."
   },
   {
-    "id": "sstm",
-    "name": "Shanghai Science and Technology Museum",
-    "day": "ideas",
-    "type": "musee",
-    "lat": 31.2206,
-    "lng": 121.53673,
-    "time": "Mar–dim 9h–17h (jours de fermeture à vérifier)",
-    "address": "2000 Century Avenue, Pudong New Area",
-    "cn": "上海市浦东新区世纪大道2000号",
-    "metro": "Ligne 2 – Shanghai Science & Technology Museum (上海科技馆), sortie directe",
-    "website": "https://en.sstm.org.cn",
-    "desc": "Rouvert officiellement le 23 mai 2026 après près de trois ans de travaux : dix zones permanentes (IA, énergie, matériaux, aérospatial…), 80 % interactives. Grand public : un panorama, pas une visite pointue.",
-    "highlights": [
-      "Zone 明日行者 : robots en essaim, interfaces cerveau-machine",
-      "Juste à côté du Shanghai Museum East et du parc Century"
-    ],
-    "tip": "Plan B tech du samedi 28 : à côté du Shanghai Museum East (même station de la ligne 2). Fonce à la zone IA et robotique, 1h suffit. Réserve sur le WeChat sstm01."
-  },
-  {
     "id": "power-station-of-art",
     "name": "Power Station of Art (PSA)",
     "day": "ideas",
@@ -1632,6 +1609,29 @@ export const SHA2026: Trip = {
       "Bonne vision de l'échelle de l'industrie et du live-commerce"
     ],
     "tip": "Seulement si tu veux une veste en cuir pour toi ou ton père : journée Zhejiang avec Puyuan (cachemire) le matin. Sinon, pas de détour : la maroquinerie homme haut de gamme n'y est pas."
+  },
+  {
+    "id": "renaissance-caohejing",
+    "name": "Renaissance Shanghai Caohejing Hotel",
+    "day": "base",
+    "type": "hotel",
+    "lat": 31.16705,
+    "lng": 121.39224,
+    "time": "Check-in mar. 24 vers 21h · départ pour PVG dim. 29 à 18h30",
+    "address": "No. 397 Tianlin Road, Caohejing Hi-Tech Park, Xuhui District, Shanghai 200233",
+    "cn": "上海市徐汇区田林路397号 上海漕河泾万丽酒店",
+    "metro": "Ligne 9 – Caohejing Hi-Tech Park (漕河泾开发区), ~600 m ; ligne 12 – Hongmei Road (虹梅路), ~550 m",
+    "website": "https://www.marriott.com/en-us/hotels/shaca-renaissance-shanghai-caohejing-hotel/overview/",
+    "desc": "Ton hôtel, réservé : un Renaissance (Marriott) de 373 chambres au cœur du parc technologique de Caohejing, quartier de bureaux tech, semi-conducteurs et R&D. Calme le soir, à 7-8 min à pied de la ligne 9 et à 20-30 min de la gare TGV de Hongqiao. Piscine couverte, salle de sport, spa et trois restaurants.",
+    "highlights": [
+      "Horaires : réception 24h/24 ; check-in dès 15h, check-out 12h (à vérifier sur ta confirmation)",
+      "Métro ligne 9, station Caohejing Hi-Tech Park (漕河泾开发区), ~600 m au nord, 7-8 min à pied",
+      "Métro ligne 12, station Hongmei Road (虹梅路), ~550 m au sud",
+      "Jardin botanique de Shanghai (ginkgos et érables fin novembre) à ~5 km, environ 15 min en DiDi",
+      "Xujiahui et Longhua à ~5 km ; musées du West Bund à ~7-9 km",
+      "Gare de Hongqiao à ~13 km (20-30 min) ; PVG à ~48 km (50-70 min)"
+    ],
+    "tip": "Garde une capture de l'adresse en chinois (上海市徐汇区田林路397号 万丽酒店) pour les chauffeurs DiDi, et le numéro de l'hôtel (+86 21 3325 8888) au cas où le chauffeur se perd. Le quartier est mort le soir : dîne et sors à Xuhui, dans l'ancienne Concession française ou au Bund."
   }
 ],
   // trip-specific phrases first, then the general ones written for Guangzhou
