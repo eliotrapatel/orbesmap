@@ -11,8 +11,36 @@ export interface PlaceState {
   note?: string;
   favorite?: boolean;
   visited?: boolean;
-  /** ms epoch of the last change, used to resolve sync conflicts (newest wins) */
+  /** ms epoch of the last change */
   updatedAt?: number;
+  /** ms epoch of the last change of each field: two devices editing different fields never overwrite each other */
+  fieldsAt?: Record<string, number>;
+}
+
+const META = new Set(["updatedAt", "fieldsAt"]);
+const at = (s: PlaceState, k: string) => s.fieldsAt?.[k] ?? s.updatedAt ?? 0;
+
+/** Field-by-field merge of two versions of a place state (newest field wins). `localNewer` = local has something remote lacks. */
+export function mergePlaceState(local: PlaceState | undefined, remote: PlaceState | undefined): { merged: PlaceState; localNewer: boolean } {
+  if (!local) return { merged: remote || {}, localNewer: false };
+  if (!remote) return { merged: local, localNewer: true };
+  const keys = new Set([...Object.keys(local), ...Object.keys(remote)].filter((k) => !META.has(k)));
+  const merged: Record<string, unknown> = {};
+  const fieldsAt: Record<string, number> = {};
+  let localNewer = false;
+  for (const k of keys) {
+    const la = k in local ? at(local, k) : -1;
+    const ra = k in remote ? at(remote, k) : -1;
+    if (la > ra) {
+      merged[k] = (local as Record<string, unknown>)[k];
+      fieldsAt[k] = la;
+      localNewer = true;
+    } else {
+      merged[k] = (remote as Record<string, unknown>)[k];
+      fieldsAt[k] = ra;
+    }
+  }
+  return { merged: { ...(merged as PlaceState), fieldsAt, updatedAt: Math.max(local.updatedAt || 0, remote.updatedAt || 0) }, localNewer };
 }
 
 export interface Contact {

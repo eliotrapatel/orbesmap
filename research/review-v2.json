@@ -1,0 +1,381 @@
+{
+ "confirmed": [
+  {
+   "dim": "store",
+   "title": "Legacy photo metadata can be lost while the old inline copies (gz_p_*) are freed, leaving photos orphaned in IndexedDB",
+   "file": "src/lib/store.ts",
+   "line": 267,
+   "severity": "high",
+   "scenario": "A June v1 user's localStorage is nearly full of gz_p_* data-URL photos (the comment at line 102 names this as the usual case). Shanghai is the start trip: no saved orbes.trip, and defaultTrip() picks the current or next trip. importLegacyPhotos copies the blobs to IndexedDB, then updateTripData(LEGACY_TRIP) runs loadTrip+saveTrip for the non-current trip. That write fails (quota), and saveTrip cannot free gz_p_ yet because the '.photos' marker is not set, so the photo metadata is never stored. Line 267 then sets LEGACY_MARKER+'.photos' anyway, because ok counts IndexedDB puts, not a successful metadata save. The next saveTrip that fails on any trip (line 105-106) deletes every gz_p_* key. On reload, importLegacy finds no photos, and nothing references the blobs in IndexedDB: the June photos are gone from the app for good.",
+   "fix": "Make saveTrip/updateTripData return a boolean. In importLegacyPhotos, set the '.photos' marker only when ok === legacyPhotos.length AND the gz2026 write succeeded. Better still, re-read loadTrip(LEGACY_TRIP) and check that every legacy photo id is in it before setting the marker. In saveTrip, free gz_p_* only after the same check, and after freeing, retry the gz2026 metadata write as well as the current trip's write.",
+   "reason": "Confirmed in src/lib/store.ts. saveTrip (96-116) returns nothing and only shows a toast on failure. importLegacyPhotos (245-276) sets LEGACY_MARKER+'.photos' at 267-270 whenever every putPhoto succeeded (ok === legacyPhotos.length), even if updateTripData(LEGACY_TRIP) at 262 failed to write gz2026. When the legacy trip is not current, the added metadata is only in that failed write. The 'photo' ops queued at 263 also do nothing: run() (374-375) reads dataOf(gz2026) from localStorage, finds no photo and returns, and flush then drops the op. The next failed saveTrip on any trip sees the marker and deletes every gz_p_* key (104-105). On reload LEGACY_MARKER is already set, so hasLegacyData() is false and nothing is re-imported. The blobs stay in IndexedDB with nothing pointing to them, so the photos are lost. The same loss happens when gz2026 is the current trip: the metadata exists only in memory, and switchTrip (217) reloads from storage before any later gz2026 edit has rewritten it. This needs storage close to full, but the comment at 101-102 names that as the expected case, and defaultTrip() will pick Shanghai once that trip is added."
+  },
+  {
+   "dim": "store",
+   "title": "Sync never restarts after a failed start (expired token while offline, or is_member error) and the UI says everything is synced",
+   "file": "src/lib/store.ts",
+   "line": 567,
+   "severity": "medium",
+   "scenario": "The app opens in China without a VPN and the access token is more than 1 h old. auth-js __loadSession tries to refresh, fails on the network and returns session:null, so initAuth sets session null and skips checkMembership. Later the VPN connects and the auto-refresh ticker succeeds, emitting TOKEN_REFRESHED. The handler stores the session but calls checkMembership only on SIGNED_IN with a different user id, so member stays null and canSync() stays false. The outbox is never flushed, there is no pull and no realtime, and Account shows 'Tout est synchronisé' because sync is still 'idle'. The same happens when the is_member RPC itself fails (line 540-543): the only retry is the 'online' event, which usually does not fire when a VPN toggles because navigator.onLine was true all along. The visibilitychange and flush retries require canSync(), so they do not help.",
+   "fix": "In onAuthStateChange, call checkMembership whenever a session exists and state.member === null (INITIAL_SESSION, TOKEN_REFRESHED, SIGNED_IN), not only when the user changes. Do the same on visibilitychange when member === null. After an RPC failure, add a backoff retry timer. While session is set and member is null, show 'pending' or 'syncing', not 'idle'.",
+   "reason": "Confirmed. In initAuth (548-572), checkMembership runs only after the initial getSession, on SIGNED_IN with a different user id (560), and on the 'online' event (562-565). In auth-js, when the refresh fails with a retryable network error, getSession returns session:null but keeps the stored session. The auto-refresh ticker later succeeds and emits TOKEN_REFRESHED, and the handler only calls set({session}). Visibility-triggered SIGNED_IN events then have before === session.user.id, so they are skipped too. member stays null, canSync() stays false (285), and flush, pull, realtime and the visibilitychange retry (566-568) all do nothing. Account.tsx:17 shows `session ? sync : 'local'`, so it displays 'idle' = 'Tout est synchronisé' while the outbox is never sent. In the RPC-error branch (540-543) sync becomes error/pending, so the label is not wrong there, but the only retry is the 'online' event, which usually does not fire when a VPN toggles."
+  },
+  {
+   "dim": "store",
+   "title": "Deletes from the other device never arrive live: realtime DELETE events cannot be filtered on trip_id",
+   "file": "src/lib/store.ts",
+   "line": 529,
+   "severity": "medium",
+   "scenario": "The subscription uses filter `trip_id=eq.${trip}` for contacts, pins and photos. Supabase Postgres Changes cannot filter DELETE events: with RLS and the default replica identity, the old record holds only the primary key, so trip_id is missing and the event never reaches this subscription. When Eliot's father deletes a contact, pin or photo, Eliot's open app gets no event and keeps showing the item until something else triggers a pull (an unrelated insert or update, or a visibility change).",
+   "fix": "For contacts, pins and photos, add an extra unfiltered `{ event: 'DELETE', schema: 'public', table }` listener that calls onChange (it only schedules a pull, so a delete from another trip just costs one extra pull). Keep the trip_id filter on INSERT and UPDATE.",
+   "reason": "Confirmed. Line 529 subscribes event:'*' with filter `trip_id=eq.${trip}` for contacts, pins and photos. supabase/schema.sql only adds the tables to supabase_realtime (line 109) and sets no REPLICA IDENTITY FULL, and RLS is on. Supabase documents that Postgres Changes DELETE events cannot be filtered. The old record carries only the primary key, so the trip_id filter never matches and the event is not delivered. A contact, pin or photo deleted on the father's phone stays visible on Eliot's open app until another event or a visibility change triggers pull(). Inserts and updates still arrive. The settings subscription (531) is unfiltered, and place_states is never deleted, so neither is affected."
+  },
+  {
+   "dim": "store",
+   "title": "A flush that runs during pull's fetch makes freshly added items disappear locally, or deleted items come back",
+   "file": "src/lib/store.ts",
+   "line": 455,
+   "severity": "medium",
+   "scenario": "pull() awaits flush() and then starts the Promise.all fetch, which can take seconds over a VPN. During the fetch the user adds a contact, pin or photo. scheduleFlush(500) starts a new flush because `flushing` is null by then: it upserts the row, marks the item synced:true and removes its op. The fetch snapshot was taken before that write, so the row is missing from it, and pendingUp (computed after the fetch) no longer contains the op. mergeList then treats the item as 'synced but gone from the server, deleted elsewhere' and drops it, so the new contact or photo vanishes from the UI. The reverse also happens: a delete flushed during the fetch reappears locally. It is fixed only by a later pull (realtime insert event, or a visibility change if realtime is down).",
+   "fix": "Serialize the two: make flush() return early or wait while `pulling` is true and re-run it when pull finishes, or take one lock around both. Alternatively, record a fetchStartedAt in pull, keep the ids of ops completed after it in a set, and treat those ids as pendingUp/pendingDel in the merge.",
+   "reason": "Confirmed. pull() awaits flush() (406), then sends the five selects (407-413). `flushing` is null by then, so an add during the fetch triggers scheduleFlush(500), and a new flush upserts the row, marks it synced:true via updateTripData (356, 365, 383) and removes the op. The select was sent at least 500 ms earlier, so its snapshot lacks the row. pendingUp/pendingDel are built after the fetch from the current outbox (419-422), so the op is gone. mergeList (440-447) sees a synced local item missing from the server and drops it, so the new contact or pin vanishes until the next pull. A delete flushed in that window is re-added from the stale remote list (436). For inserts, the app's own realtime INSERT event usually triggers a corrective pull about 1.2 s later. For deletes there is no live event (see the realtime DELETE finding), so the deleted item stays visible until the next visibility change."
+  },
+  {
+   "dim": "store",
+   "title": "Two open tabs overwrite each other's trip data and outbox in localStorage",
+   "file": "src/lib/store.ts",
+   "line": 281,
+   "severity": "low",
+   "scenario": "Clicking the magic link opens a second tab while the first is still open, and there is no 'storage' event listener. Offline, tab A edits a note: it saves orbes.v2.gz2026 and the outbox [placeOp]. Tab B, still holding its old in-memory state, then adds a pin. saveTrip writes B's full Data without A's note, and persistOutbox writes B's outbox [pinOp], which drops A's op. After A is closed, A's change is gone from both local data and the outbox, so it is never synced.",
+   "fix": "Add window.addEventListener('storage', e => ...): reload state.data when dataKey(state.tripId) changes, and merge OUTBOX_KEY into the in-memory outbox (union by sameRow). At minimum, in persistOutbox, read the stored outbox and merge it before writing. A navigator.locks single-writer lock is the stronger option.",
+   "reason": "There is no 'storage' listener, lock or BroadcastChannel anywhere in src. saveTrip writes the tab's whole in-memory Data, and persistOutbox (279-282) overwrites OUTBOX_KEY with that tab's in-memory outbox, so tab B's write erases tab A's localStorage entries. Real loss needs both tabs to edit offline and tab A to close before syncing. While A stays open its in-memory outbox still flushes its own op with its own data once online. When online, A's edit reaches the server at once and B gets it back by pull or realtime. Magic-link sign-in (sendLoginEmail with emailRedirectTo) does open a second tab, so this can happen, but it needs a narrow sequence. Low rather than medium."
+  },
+  {
+   "dim": "store",
+   "title": "Legacy photo import never retries after an interruption or partial failure",
+   "file": "src/lib/store.ts",
+   "line": 149,
+   "severity": "medium",
+   "scenario": "migrateLegacy sets LEGACY_MARKER synchronously at load, but photos are copied to IndexedDB later and asynchronously in initAuth -> importLegacyPhotos. If the tab is closed or iOS kills it mid-import, or a single putPhoto fails (ok < length), every later load sees hasLegacyData() === false, legacyPhotos stays [], and the remaining June photos are never imported. They stay in gz_p_* keys, invisible in the app.",
+   "fix": "At startup, if LEGACY_MARKER is set but LEGACY_MARKER+'.photos' is not, rebuild legacyPhotos from importLegacy().photos (or from a photo-only scan) and run importLegacyPhotos again. Stable ids, putPhoto overwrites and the id dedupe at 262 make a re-run idempotent. Write the metadata incrementally, or at least after each batch, so a kill does not orphan blobs.",
+   "reason": "Confirmed. migrateLegacy (128-153) sets LEGACY_MARKER synchronously once the text data is written. hasLegacyData() (legacy.ts) returns false as soon as that marker exists, so legacyPhotos is [] on every later load. importLegacyPhotos runs asynchronously from initAuth. If the tab is killed during the putPhoto loop, or one putPhoto fails (ok < length, so '.photos' is not set), the remaining photos are never imported. Their gz_p_* data stays in localStorage, invisible in the app and wasting quota. Blobs already written before a kill have no metadata, which orphans them as well."
+  },
+  {
+   "dim": "store",
+   "title": "Edits to different fields of the same place on two devices: one is silently lost",
+   "file": "src/lib/store.ts",
+   "line": 436,
+   "severity": "medium",
+   "scenario": "place_states stores the whole PlaceState as one jsonb document and resolves conflicts by a single updatedAt. Eliot (offline) sets status 'RDV pris' on a supplier while his father adds a MOQ/price note on the same place. Whichever device has the later updatedAt replaces the whole object on push or pull, so the other person's field change is discarded with no warning.",
+   "fix": "Store updatedAt per field (for example fieldsAt: {status: ts, note: ts}) and merge key by key in pull. On the server, replace the plain upsert with an RPC that merges data jsonb per key by timestamp, or at least makes the upsert conditional (WHERE place_states.updated_at < excluded.updated_at) so that stale pushes are rejected.",
+   "reason": "Confirmed, and worse than reported. run('place') (348-351) sends an unconditional upsert of the whole PlaceState. It does not compare updated_at with the server, so an older offline edit overwrites a newer server row. pull (427-433) then replaces the whole local object, or pushes the whole object back when the local copy is newer. Example: Eliot sets status offline at t1. His father adds a MOQ note online at t2 > t1. Eliot reconnects, and flush overwrites the row with his object, which has no note. The father's device receives the realtime update, sees remote t1 < local t2, and pushes his object, which has no status, back. In the end one of the two field edits is lost with no warning."
+  },
+  {
+   "dim": "store",
+   "title": "Signed photo URLs expire after 12 h and are never refreshed",
+   "file": "src/lib/store.ts",
+   "line": 502,
+   "severity": "low",
+   "scenario": "refreshSignedUrls only requests URLs for photos with no entry in state.photoUrls, and the cache is never cleared. If the app stays open in a phone tab for more than 12 h (common during a trip), every photo uploaded from the other device shows as a broken image until the page is reloaded.",
+   "fix": "Keep a signedAt/expiry per id, for example in a Map. On visibilitychange and in pull, re-request the URLs that expire within about 1 h, and drop the expired ones before refreshSignedUrls runs.",
+   "reason": "Confirmed. refreshSignedUrls (500-511) only requests URLs for photos with no state.photoUrls entry, and nothing ever clears or ages out those entries. A tab that stays alive more than 12 h shows broken images for every photo that is shown through a signed URL rather than a local blob. iOS often reloads background tabs, which hides the problem, but not always."
+  },
+  {
+   "dim": "store",
+   "title": "Photos deleted on the other device leave their files in IndexedDB permanently",
+   "file": "src/lib/store.ts",
+   "line": 474,
+   "severity": "low",
+   "scenario": "When pull's mergeList drops a synced photo that has gone from the server, the local blob in IndexedDB (local:true) and its object URL are never removed. Only deletePhoto on this device calls deletePhotoFile. Over a trip, photos deleted by the other person keep using phone storage that nothing can reach.",
+   "fix": "In pull, after setData, compute the ids that were in local.photos and are not in the merged list. For each, call deletePhotoFile(id), revoke and delete objectUrls.get(id), and remove the photoUrls entry.",
+   "reason": "Confirmed. When mergeList (440-447) drops a synced photo that has gone from the server, nothing calls deletePhotoFile or revokes the object URL. Only deletePhoto (642-650) on the deleting device cleans up. Photos taken on this phone (local:true) and later deleted by the father therefore keep using IndexedDB space that nothing can reach. This is only a storage leak and causes no wrong display."
+  },
+  {
+   "dim": "store",
+   "title": "is_member() trusts the JWT email claim without checking that the email is verified",
+   "file": "supabase/schema.sql",
+   "line": 26,
+   "severity": "low",
+   "scenario": "Membership compares only auth.jwt()->>'email'. If the Supabase project allows email/password sign-up with 'Confirm email' turned off, anyone can sign up with a member's address that has no account yet (for example the father's before his first login), get a session with that email claim, and read and write all shared data and photos.",
+   "fix": "Add a verified check to the query, for example `and exists (select 1 from auth.users u where u.id = auth.uid() and u.email_confirmed_at is not null)`, or check `(auth.jwt()->'user_metadata'->>'email_verified')::boolean`. Also document in the README that 'Confirm email' and 'Secure email change' must stay on, and that sign-up should be OTP-only.",
+   "reason": "is_member (schema.sql 17-28) does compare only auth.jwt()->>'email'. This can only be exploited if the Supabase project allows password or other sign-up while 'Confirm email' is off. On hosted projects confirmation is on by default, and an unconfirmed user gets no session. It is a config-dependent hardening gap, not a defect that occurs under the default setup, so it stays low."
+  },
+  {
+   "dim": "map",
+   "title": "3D effect re-runs on every style load and its easeTo cuts off whatever camera flight is running",
+   "file": "src/components/MapView.tsx",
+   "line": 388,
+   "severity": "medium",
+   "scenario": "The 3D effect depends on [p.threeD, ready], and `ready` goes up on every 'style.load': the first basemap load and the recovery from the fallback style (setState fires style.load in 6.17). Each time, it calls map.easeTo({pitch: 0, zoom: map.getZoom(), duration: 900}), which interrupts any flyTo or fitBounds already running. Realistic case on a slow Chinese connection: the user presses Entrer on the landing screen before the OpenFreeMap style JSON arrives, so App.tsx:424 starts a 2600 ms fitBounds from the globe. The style then loads mid-flight, easeTo replaces the flight, and the camera stops halfway (around zoom 4-6, somewhere over Asia) instead of framing the trip. The same thing happens when the 30 s retry recovers the basemap while a flight is running.",
+   "fix": "Keep the last applied threeD in a ref (prev3D). Always call setLayoutProperty('orbes-3d','visibility',...). Call easeTo only when p.threeD !== prev3D.current, then update the ref. When the style is reloaded with threeD=true, setting visibility is enough, because the pitch is still in place.",
+   "reason": "Confirmed. The effect at MapView.tsx:384-389 depends on [p.threeD, ready]. ready is incremented on every 'style.load' (line 187). The guard at line 386 only skips the fallback style, which has no orbes-3d layer. So the first real basemap load, and the recovery from the fallback style, both reach map.easeTo(...) at line 388. easeTo interrupts the scheduler (camera.ts:881). The Landing overlay is mounted from the start (landingOverlay=true), so the user can press Entrer before the style JSON arrives. App.tsx:424 then starts a 2600 ms fitBounds, and when the style loads mid-flight, easeTo({pitch:0, zoom: current}) replaces it and the camera stops partway. On ready, no other effect touches the camera when landing=false. The same happens when the 30 s, online or visibilitychange retry recovers the style while a flyTo from openPlace or showDay is running."
+  },
+  {
+   "dim": "map",
+   "title": "fitBounds does nothing when map padding plus 48 px is larger than the viewport (trip switch with sheet at 'full', or narrow desktop with a panel open)",
+   "file": "src/App.tsx",
+   "line": 124,
+   "severity": "medium",
+   "scenario": "MapLibre 6.17 adds the map's own padding (setPadding) to fitBounds' padding. If the two together leave no room, cameraForBounds returns undefined and _fitInternal returns without moving (it only logs a warning). On mobile with the list sheet at 'full', bottom = vh-140 and top = 170, which is already more than vh before the 48 px is added. Switching trip from the TopBar or ⌘K in that state (the trip-change effect at App.tsx:97 does not reset the snap) leaves the camera on the old city, possibly thousands of km away, with the new trip's markers off screen. On desktop with a tool or detail open, left 408 + right 476 + 96 = 980 px, so in any window narrower than about 1000 px (iPad landscape is 1024) a trip switch, or a day chosen from ⌘K while a tool is open, does not move the map either.",
+   "fix": "In App.tsx, clamp the insets before passing them: scale top/bottom so that top+bottom <= vh - 150 and left/right so that left+right <= innerWidth - 150. Also reset snap to 'peek' in the trip-change effect and in showDay('all') before calling fly. Alternatively, in MapView's focus effect, check map.cameraForBounds(bounds,{padding:48}). If it is undefined, retry with padding 0, then with absolutePadding and a reduced inset.",
+   "reason": "Confirmed in maplibre 6.17 source. _cameraForBoxAndBearing adds tr.padding (mapPadding) to fitPadding, and camera_helper.ts computes availableHeight = tr.height - (mapPadding.top + mapPadding.bottom + fit.top + fit.bottom). When this is negative it returns undefined, and _fitInternal returns `this` without moving. On mobile at snap 'full', padding is top 170 + bottom vh-140 = vh+30, which already exceeds the canvas height. The trip-change effect (App.tsx:92-98) does not reset snap, so a trip switch from the TopBar does not move the camera. showDay('all') also calls fly(bounds) and returns before setSnap('peek') (App.tsx:143-147), so 'Tous les jours' from the full sheet fails too. On desktop (min-width 900px) with a tool open, horizontal padding is 408+476+96 = 980, so between 900 and about 980 px wide, any fitBounds (trip switch, since only sel is cleared and tool stays; showDay from ⌘K; optimize clears the tool, so it works) does nothing. When setSel(null) runs in the same batch, the padding effect runs before the focus effect, so a selection alone does not block it."
+  },
+  {
+   "dim": "map",
+   "title": "Place markers reused by id across trips are never moved to the new trip's coordinates",
+   "file": "src/components/MapView.tsx",
+   "line": 247,
+   "severity": "medium",
+   "scenario": "Markers are keyed by place.id, and setLngLat is only called when a marker is first created (line 247). Ids that are not in the new trip are removed, but an id present in both trips keeps its marker and is only restyled. Guangzhou's hotel has id \"hotel\", and research/sha2026/to-trip.mjs copies ids straight from program.json. So if Shanghai's hotel (or any other place) also uses \"hotel\" or another shared id, switching GZ to SHA leaves that marker on Guangzhou: the hotel 'H' appears about 1200 km away, while the route line correctly starts from the Shanghai hotel coordinates.",
+   "fix": "Call entry.m.setLngLat([place.lng, place.lat]) on every pass, as the pin effect does. Better, key markers by `${p.trip.id}:${place.id}` so a trip switch rebuilds them, which also restarts the --delay entrance animation.",
+   "reason": "Confirmed in code. setLngLat is only called when the marker is created (MapView.tsx:247), and the reconcile loop keeps every id present in the new trip (lines 224-225). Nothing namespaces ids per trip: to-trip.mjs copies p.id as-is, and Guangzhou's hotel id is 'hotel'. If Shanghai shares any id, especially 'hotel', switching trips leaves that marker at the old city. The new trip then has no marker at the right spot, while the route line correctly starts from the new hotel coordinates. The click handler closure still selects the right id, but it sits at the wrong place. sha2026 data is not present yet, so whether ids collide cannot be checked now, but 'hotel' is a natural id for the converter to receive."
+  },
+  {
+   "dim": "map",
+   "title": "Landing globe rotation adds a fixed 0.012° longitude per frame and fights user gestures",
+   "file": "src/components/MapView.tsx",
+   "line": 375,
+   "severity": "low",
+   "scenario": "The landing overlay has pointer-events: none, so the map underneath still takes pan and pinch. Each frame, tick() calls map.setCenter(lng + 0.012), which is a jumpTo, at any zoom level and at the display's refresh rate. If a phone user pinches into the globe during landing (an easy thing to do), the map at zoom 12-14 slides sideways at about 1.3 km per frame, roughly 80-160 km/s, and drags keep being overridden. On 120 Hz ProMotion iPhones it also spins twice as fast. The plane GeoJSON setData also runs on every frame, which keeps the worker and GPU busy for the whole landing.",
+   "fix": "Use a dt-based rotation (deg/s * dt). Skip it while map.isMoving() or after a user interaction (dragstart/zoomstart sets a pause). Alternatively, disable dragPan, touchZoomRotate and scrollZoom while landing and re-enable them on exit. Update the plane source at most about every 33-50 ms.",
+   "reason": "Confirmed. tick() (MapView.tsx:369-378) calls map.setCenter(lng+0.012), a jumpTo, on every rAF with no zoom or time scaling. Map interactions are not disabled during landing, and the .landing container has pointer-events:none (styles.css:445), so the map can still be dragged and pinched in the uncovered areas. At high zoom the map keeps sliding, and every frame's jumpTo calls _scheduler.interrupt(), which fights user gestures. Speed scales with refresh rate (twice as fast at 120 Hz). planeSrc.setData runs every frame, which costs a worker round-trip per frame. Impact is cosmetic and limited to the landing screen."
+  },
+  {
+   "dim": "map",
+   "title": "No fallback when the style request hangs instead of failing, so the route line and 3D stay unavailable",
+   "file": "src/components/MapView.tsx",
+   "line": 142,
+   "severity": "low",
+   "scenario": "After 12 s, the `slow` timer only shows the banner. fallBack() runs only on an 'error' event. Behind the GFW, a request often stalls rather than failing, and a browser fetch has no short timeout, so 'style.load' never fires and `ready` stays 0 for a minute or more. During that time the route source is never added, so 'Voir le jour' or 'Optimiser' shows numbered markers with no line, and 3D does nothing. Only DOM markers work.",
+   "fix": "In the slow timer, if (!styled) call fallBack(). setStyle(FALLBACK_STYLE) supersedes the pending request, the existing 30 s retry and online/visibility retries then try STYLE_URL again, and style.load with the full style clears `failed`.",
+   "reason": "Confirmed. The 12 s timer (MapView.tsx:142) only calls onBasemapError(true). fallBack() is reached only from the 'error' handler (line 192). The route, arc and plane sources are added only in addLayers on 'style.load', and the route effect returns while !ready (line 328). So if the style request stalls, as behind the GFW (no fetch timeout, often 60 s or more until the TCP or browser timeout), 'Voir le jour' and 'Optimiser' show numbered DOM markers but no line, and the landing arc does not appear, until the request finally errors or succeeds. 3D does nothing in either case, since the fallback has no openmaptiles source, so fallback mainly restores the route, arc and plane."
+  },
+  {
+   "dim": "map",
+   "title": "setPadding is a jumpTo: opening or closing panels and sheet snaps make the map jump and stop animations",
+   "file": "src/components/MapView.tsx",
+   "line": 217,
+   "severity": "low",
+   "scenario": "In 6.17, Camera.setPadding(p) is jumpTo({padding}), which calls _scheduler.interrupt() and moves the visible centre at once. On mobile, closing a place detail (back button or a tap on the map) changes the bottom padding from 0.55*vh to 172, so the map jumps about 100 px with no transition. Each sheet snap also causes a jump. Any padding change while a flyTo is running (for example a vh change from the iOS address bar) stops the flight.",
+   "fix": "In the padding effect, if !map.isMoving(), use map.easeTo({padding, duration: 250}). Otherwise store the padding in a ref and pass it as the padding option of the next flyTo/easeTo in the focus effect (fitBounds is unaffected because it reads tr.padding). Ignore vh changes smaller than about 80 px to avoid jitter from the address bar.",
+   "reason": "Confirmed. Camera.setPadding is jumpTo({padding}) (camera.ts:603-605), and jumpTo calls _scheduler.interrupt(). Closing a place detail on mobile changes the bottom padding from round(0.55*vh) to 172 (App.tsx:120), which shifts the view by about (0.55vh-172)/2, roughly 140 px on an 844 px phone, with no transition. Sheet snaps do the same. A resize changes vh (App.tsx:68-72), and with snap half/full or a panel open this changes the padding, which interrupts a running flyTo, for example when iOS toolbars collapse during a flight. When padding and focus change in the same commit, as in openPlace, the padding effect runs first, so those cases work. The issue is cosmetic or animation interruption only."
+  },
+  {
+   "dim": "map",
+   "title": "A day route with a single stop draws no line from the hotel",
+   "file": "src/components/MapView.tsx",
+   "line": 332,
+   "severity": "low",
+   "scenario": "Coordinates are built only when p.route.length > 1, but the line also includes the hotel as its first point. A scheduled day with one non-hotel stop, or 'Optimiser' on such a day, shows the '1' badge but no hotel-to-stop line.",
+   "fix": "Change the condition to p.route.length >= 1 (or p.route?.length). The hotel prefix already makes a valid two-point LineString.",
+   "reason": "Confirmed. route is route.order with the hotel filtered out (App.tsx:153, 158, 266). MapView.tsx:332 requires p.route.length > 1, yet always prepends the hotel. A scheduled day, or 'Optimiser', with one non-hotel stop shows the '1' seq badge but no hotel-to-stop line, unlike every other day."
+  },
+  {
+   "dim": "ui",
+   "title": "Mobile list sheet: the last rows can't be reached at the half and full positions (padding % is based on width, not height)",
+   "file": "src/styles.css",
+   "line": 500,
+   "severity": "medium",
+   "scenario": "`.side-body { padding-bottom: calc(100% - var(--sheet-h) ...) }`: a percentage padding is relative to the containing block's WIDTH. On a 375x812 phone the sheet is 740px tall. At the half position (--sheet-h 422px) the hidden part is 318px, but the padding is max(0, 375-422+24) = 0. Checked in the dev server: with the list scrolled to the bottom at half, the last row sits at y=1052-1110 in an 812px viewport and 4 rows are still below the screen. The 'Mes lieux' section at the end of the list is invisible. At full (vh-140) about 68px stays hidden, so the last row is cut off. The same rule on .detail-scroll/.drawer-body with 88% gives 12% of width instead of 12% of height, which clips about 20px on phones with no bottom safe area.",
+   "fix": "Stop using % for the hidden amount. In App.tsx, compute the sheet height in px (sheetFull = vh - topH - 20 - safeT, or measure sideRef.current.offsetHeight) and set --sheet-hidden: `${sheetFull - snapPx[snap]}px` next to --sheet-h. Update it during drag as well (onMove sets --sheet-h directly, line 228). Then use `padding-bottom: calc(var(--sheet-hidden) + var(--safe-b) + 24px)`. For PlaceDetail/PinDetail/Drawer, pass a px sheetH (or set --sheet-hidden to 12% of the measured height) instead of '88%'.",
+   "reason": "Confirmed at src/styles.css:500. A percentage in padding-bottom is resolved against the containing block's width. The .side sheet is calc(100% - top-h - 20px - safe-t) tall, which is 740px on a 375x812 phone, and it is translated down by (100% - --sheet-h). --sheet-h comes from App.tsx:121/317 (half = round(vh*0.52) = 422, full = vh-140 = 672). The padding works out to calc(375 - 422 + 24) and calc(375 - 672 + 24), both negative, so both clamp to 0, while the hidden part is 318px at half and 68px at full. At full the hidden 68px is taller than one row (about 58px), so the last list entry (often the last 'Mes lieux' pin) can't be seen at any snap. It can still be reached through the map or ⌘K. For .detail-scroll/.drawer-body, --sheet-h is '88%' (App.tsx:255). The translate uses 12% of the height (about 89px) but the padding is 12% of the width + 24px (about 69px), so about 20px stays clipped when safe-b is 0. Kept at medium only because workarounds exist; arguably high, since this is the main mobile list."
+  },
+  {
+   "dim": "ui",
+   "title": "Mobile: opening a place flies its marker under the 88% detail sheet",
+   "file": "src/App.tsx",
+   "line": 124,
+   "severity": "medium",
+   "scenario": "On mobile, when a detail or drawer is open the map padding bottom is vh*0.55, but PlaceDetail/PinDetail/Drawer are 88% of (vh - top-h - 20). On a 375x812 phone, tapping a row calls openPlace → flyTo with padding top 170 / bottom 447, so the marker lands at y≈267. The detail sheet starts at y≈161, so the selected marker is hidden behind the glass sheet (measured in the dev server: detailTop 160.8, marker centre 267). The user never sees where the place is.",
+   "fix": "The visible strip above an 88% sheet is only about 100px and the top bar/tools cover most of it. Open the detail sheet at a lower snap (about 50-55% of vh, matching the 0.55 padding) with a grip to expand it. Or, if 88% stays, compute padding.bottom from the real sheet top (vh - sheetTop + margin) and lower top padding to top-h + safe-t + 16 so the marker lands in the visible strip.",
+   "reason": "Confirmed. App.tsx:124 sets mobile padding bottom to round(vh*0.55) when sel or tool is set, but the detail/drawer sheets use --sheet-h '88%' (App.tsx:255, 346-350). On a 812px viewport the sheet (740px tall, translated by 12%, about 89px) starts at y≈161. openPlace (App.tsx:126-133) flies with padding top 170 / bottom 447, so the centre lands at (170 + 365)/2 ≈ 267, behind the sheet. The top padding of 170 is already below the sheet top, so no padding value can show the marker while the sheet is at 88%."
+  },
+  {
+   "dim": "ui",
+   "title": "Desktop: detail panel and tool drawers cover the day bar and the map controls",
+   "file": "src/styles.css",
+   "line": 199,
+   "severity": "medium",
+   "scenario": "`.daybar`, `.detail` and `.drawer` all use the same top (12 + top-h + 10). The daybar runs to right:12px at z-index 20, under the detail (z 25) and drawer (z 35). At 1280px with a place open, the detail covers x 828-1268, and the last day chips (x 1126-1207) are hidden and can't be clicked. `.desk-right .mapctl` only moves the controls by --detail-w (440px), but drawers are 560px or 860px wide (Aperçu): with Aperçu open the drawer spans x 408-1268 and the map controls (locate / add pin / 3D, x 561-816) and the zone buttons are fully under it. Map padding.right also assumes 440px.",
+   "fix": "Add a --right-w variable on .app, set from App.tsx: 440 for a detail, 560 or 860 (clamped like the CSS) for a tool drawer. Use it in `.desk-right .daybar { right: calc(var(--right-w) + 24px) }`, in `.desk-right .mapctl { right: calc(var(--right-w) + 24px) }` and in padding.right. Or start .detail/.drawer below the daybar (top + about 52px).",
+   "reason": "Confirmed. .daybar (styles.css:114) runs from right of the side panel to right:12px at z-index 20. .detail (styles.css:204-206, z 25, width --detail-w 440) and .drawer (styles.css:282-286, z 35, width min(560px, …) or min(860px, …) when wide) use the same top, so they sit over the right end of the day bar, and the chips there can't be clicked. Nothing in the CSS shrinks the daybar under .desk-right. .desk-right .mapctl (styles.css:199) only moves the controls by 440px, so a 560px or 860px drawer still covers the locate/pin/3D buttons and zones. App.tsx:123 padding.right also hard-codes 440+36 when a tool is open."
+  },
+  {
+   "dim": "ui",
+   "title": "SavedInput keeps showing a stale value after a remote edit arrives while it is focused, and the next edit overwrites the remote change",
+   "file": "src/components/ui.tsx",
+   "line": 105,
+   "severity": "medium",
+   "scenario": "The sync effect only runs when `value` changes, and it skips the update while focused. Example: Eliot taps into a place's Notes to read it. His father's edit arrives through realtime (value changes, focused=true, so it is ignored). Eliot blurs without typing: commit(v) does nothing because v === last.current, and the effect never runs again because value doesn't change. The field keeps showing the old note until the sheet is reopened. If Eliot then adds a line, his old text plus the new line is saved and the father's edit is silently lost.",
+   "fix": "In onBlur: `focused.current = false; if (v === last.current) { if (value !== last.current) { setV(value); last.current = value; } } else commit(v);`. Or make focused a state variable and add it to the effect deps, keeping the effect's condition.",
+   "reason": "Confirmed at src/components/ui.tsx:101-137. The sync effect depends only on [value] and is skipped while focused.current is true. focused is a ref, so blurring triggers no re-render and the effect does not run again. onBlur calls commit(v), which does nothing when v === last.current. The field therefore keeps the pre-remote text until value changes again or the component remounts. Any later keystroke saves old text plus the edit through onSave, which silently overwrites the father's change in the shared space."
+  },
+  {
+   "dim": "ui",
+   "title": "Escape in an overlay (⌘K palette, phrase full screen, trip menu) also closes the tool drawer behind it",
+   "file": "src/components/ui.tsx",
+   "line": 172,
+   "severity": "low",
+   "scenario": "Drawer registers a window-level Escape listener (useEscape). With Phrases open, the user taps a phrase to get the full-screen ShowScreen and presses Escape: the ShowScreen's listener and the Drawer's listener both fire, so the phrases drawer closes too. Same with Agenda open → ⌘K → Escape in the palette input (CommandPalette.tsx:86 closes the palette, the Drawer listener closes Agenda), and with Escape in the TripMenu.",
+   "fix": "In useEscape, return early if e.defaultPrevented, otherwise call e.preventDefault() before onClose. Register nested overlays (ShowScreen, Lightbox, Modal) in capture phase, or use a module-level stack so only the topmost handler runs. In the palette's Escape branch, call e.preventDefault() (and e.nativeEvent.stopImmediatePropagation(), or rely on the defaultPrevented check).",
+   "reason": "Confirmed. useEscape (ui.tsx:9-15) adds an unconditional window keydown listener for Drawer, Modal, ShowScreen and Lightbox. With a drawer and an overlay both mounted, one Escape runs both handlers. The CommandPalette input's onKeyDown (CommandPalette.tsx:86) calls onClose without stopping propagation, so the event reaches the window and the Drawer listener closes the tool too. Low because phones (the main target) rarely have an Escape key."
+  },
+  {
+   "dim": "ui",
+   "title": "Banner and toast slide in diagonally because the entry animation replaces translateX(-50%)",
+   "file": "src/styles.css",
+   "line": 200,
+   "severity": "low",
+   "scenario": "`.banner` (and `.toast`, line 424) are centred with `transform: translateX(-50%)` but animate with `pop`/`rise`, whose `from` keyframe sets only translateY/scale. The animation interpolates from no X offset to -50%, so every time the 'Touchez la carte…' banner or a toast appears it starts shifted right by half its width and slides left.",
+   "fix": "Centre them with the independent `translate: -50% 0` property instead of transform, or with left:0; right:0; margin-inline:auto; width:fit-content. Or add dedicated keyframes that include translateX(-50%) in `from`.",
+   "reason": "Confirmed. .banner (styles.css:200) and .toast (styles.css:424) are centred with transform: translateX(-50%) and animate with pop/rise (styles.css:412-413). Their `from` keyframes set transform without translateX, and the implicit `to` is the element's own transform. X is therefore interpolated from 0 to -50%, so the element starts half its width to the right and slides left during the 0.25-0.3s entry."
+  },
+  {
+   "dim": "ui",
+   "title": "Landing: pressing Enter runs enter() twice, and Enter on a trip card enters with the old trip",
+   "file": "src/components/Landing.tsx",
+   "line": 26,
+   "severity": "low",
+   "scenario": "A window keydown listener calls enter() on Enter. 'Entrer' has autoFocus, so pressing Enter fires the keydown (enter → onEnter → fly 2600ms + 900ms timeout) and then the button's native click (enter again → a second fly that restarts the flight, plus a second timeout). With a trip card focused by Tab, Enter enters the app with the current trip, then the card's click switches trip, so the camera flies twice.",
+   "fix": "In the keydown handler, ignore events whose target is inside a button/input (`if ((e.target as HTMLElement).closest('button,input,textarea')) return;`), and guard enter() with a ref so it runs once.",
+   "reason": "Confirmed at Landing.tsx:25-29 and 91. The window keydown listener calls enter() on Enter. The 'Entrer' button has autoFocus, and pressing Enter on a focused button also fires its click, which calls enter again (the onClick doesn't check `out`). The result is two onEnter calls: setLanding(false) twice, two 900ms timeouts and a restarted 2600ms fly. With a trip card focused, keydown enters with the current trip, then the card's click runs switchTrip. The trip-change effect (App.tsx:92-98) then flies again because landing is now false. It ends on the right trip but with a double flight. Cosmetic only."
+  },
+  {
+   "dim": "ui",
+   "title": "Clicking ORBES within 0.9 s of entering leaves a blank screen with no UI",
+   "file": "src/App.tsx",
+   "line": 307,
+   "severity": "low",
+   "scenario": "onEnter schedules setLandingOverlay(false) 900ms later and that timeout is never cancelled. If onHome runs inside that window, landing=true and landingOverlay stays true, but the same Landing instance is still mounted with out=true (invisible, pointer-events none). Then the timeout unmounts it. Result: landing=true (TopBar/side hidden) and no landing overlay, so the user sees a bare globe and has to reload.",
+   "fix": "Keep the timeout id in a ref, clear it in onHome (and before scheduling a new one), and remount Landing on home (for example a `key` counter bumped in onHome) so `out` resets to false.",
+   "reason": "Confirmed. onEnter (App.tsx:421-425) schedules setLandingOverlay(false) after 900ms and never cancels it. TopBar renders as soon as landing becomes false. If onHome (App.tsx:307-313) runs within that window, it sets landing=true and landingOverlay=true (already true, so no remount). The same Landing instance stays with out=true, faded and pointer-events none. Then the pending timeout sets landingOverlay=false and unmounts it. The app is left with landing=true (TopBar, side and DayBar hidden) and no overlay, and only a reload recovers. The timing window is narrow."
+  },
+  {
+   "dim": "ui",
+   "title": "Choosing a tool in ⌘K closes it if that tool is already open",
+   "file": "src/components/CommandPalette.tsx",
+   "line": 38,
+   "severity": "low",
+   "scenario": "Palette tool items call onTool = openTool, which toggles (`t === k ? null : k`). With Agenda open, ⌘K → 'Agenda' → Enter closes the Agenda drawer instead of keeping it open.",
+   "fix": "Pass a non-toggling opener to the palette: `onTool={(k) => { setTool(k); setSel(null); }}` (matching whatever else openTool does), and keep the toggle for the TopBar.",
+   "reason": "Confirmed. CommandPalette tool items run p.onTool(t.key) (CommandPalette.tsx:38), and App passes openTool (App.tsx:440), which toggles (`t === k ? null : k`, App.tsx:209-211). Picking the tool that is already open closes it."
+  },
+  {
+   "dim": "ui",
+   "title": "French copy: no singular forms ('1 lieux', '1 jours'), and the 'Favoris' tile shows 'lieux par jour'",
+   "file": "src/components/Agenda.tsx",
+   "line": 51,
+   "severity": "low",
+   "scenario": "A day with a single stop shows '1 lieux · 0/1 visités'. The same applies to the DayBar subtitle (`${count} lieux`, DayBar.tsx:27), the landing card stats and the Overview. In Overview.tsx:49 the 'Favoris' tile's subtitle is the overall density ('x lieux par jour'), which has nothing to do with favourites.",
+   "fix": "Add a helper such as `plural(n, 'lieu', 'lieux')` (French singular for 0 and 1) and use it in all these places. Move the 'x lieux par jour' line to the 'Lieux' tile, or replace the Favoris subtitle with something about favourites (for example 'x à visiter').",
+   "reason": "Confirmed. Agenda.tsx:51 always writes `${stops.length} lieux` and 'visités'. DayBar.tsx:27 writes `${count} lieux`, and the landing stats and cards (Landing.tsx:53-54, 81-83) use plural labels too. In Overview.tsx:47-50 the 'Favoris' tile's subtitle is overall density (all.length / nights, 'lieux par jour'), which has nothing to do with favourites. Copy only."
+  },
+  {
+   "dim": "parity",
+   "title": "v1 photos are imported only once, with no retry: any failure leaves them stuck in localStorage and invisible",
+   "file": "src/lib/store.ts",
+   "line": 133,
+   "severity": "medium",
+   "scenario": "migrateLegacy() builds `legacyPhotos` only when hasLegacyData() is true. hasLegacyData() returns false as soon as LEGACY_MARKER is set (legacy.ts:26), and that marker is written synchronously at store.ts:149, before importLegacyPhotos() (store.ts:248) has copied anything to IndexedDB. If that async copy fails or stops partway, the photos are never picked up again. Example: the father opens the new app in Safari private mode or with IndexedDB blocked, so putPhoto throws; or the tab is killed during the loop. Every later load has hasLegacyData()=false, so legacyPhotos=[]. The data URLs stay in gz_p_* keys, but the new UI never shows them and v1 is no longer served.",
+   "fix": "Decouple the photo import from the text marker. Add a legacyPhotoList() in legacy.ts that scans gz_p_* keys (the same loop and stableId as importLegacy) without checking LEGACY_MARKER. At start, while localStorage has no LEGACY_MARKER + '.photos', fill legacyPhotos from it whatever hasLegacyData() returns, and run importLegacyPhotos. stableId and the dedupe filter at store.ts:264 make retries idempotent. Only clear the in-memory list on full success.",
+   "reason": "Confirmed. migrateLegacy (store.ts:133-154) sets LEGACY_MARKER synchronously at store.ts:149 once the text write succeeds. importLegacyPhotos only runs later and asynchronously, from initAuth (store.ts:554, called once from main.tsx:7). If any putPhoto throws (IndexedDB blocked or over quota), ok < legacyPhotos.length, so the '.photos' marker is not set (store.ts:267). legacyPhotos is then cleared (store.ts:274). If the tab is killed mid-loop, the result is the same. On every later load, hasLegacyData() returns false at legacy.ts:26 because LEGACY_MARKER exists, so legacyPhotos stays [] and nothing retries. The gz_p_* data URLs stay in localStorage: saveTrip only frees them when '.photos' is set. So the photos are not deleted, but no UI shows them any more. Medium: data is stranded, not destroyed."
+  },
+  {
+   "dim": "parity",
+   "title": "If localStorage is full, the v1 import is dropped: the session shows no v1 data, and later edits replace whole v1 place records",
+   "file": "src/lib/store.ts",
+   "line": 147,
+   "severity": "medium",
+   "scenario": "v1 stored photos as base64 in localStorage, so a heavy v1 user can be near the 5 MB quota. writeJSON(dataKey(LEGACY_TRIP), merged) then fails silently: the marker is not set and `merged` is thrown away. `state.data` comes from loadTrip() (line 162), so none of the v1 statuses, notes, supplier sheets or contacts show in that session. If the user edits a place in that session (say, favourites MSX), the next load's merge `{ ...imported.data.places, ...base.places }` (line 142) is shallow per place: the new {favorite} object replaces MSX's whole imported state (status, rating, moq, price, appt, note). Also, when GZ is not the current trip, importLegacyPhotos' updateTripData save fails too, yet the '.photos' marker is still set. saveTrip's quota path (line 105) then deletes the gz_p_* keys, leaving the IndexedDB blobs with no metadata, so the photos are lost.",
+   "fix": "(a) When the write fails and startTrip === LEGACY_TRIP, use `merged` as the in-memory state.data, so the session shows v1 data and the next successful saveTrip persists it. (b) Merge per place: build places from the union of ids as {...imported[id], ...base[id]}, so edits only override the fields they set. (c) Set LEGACY_MARKER + '.photos' only after the photo metadata write really succeeds: have saveTrip/updateTripData return a boolean and check it. Better still, copy photos to IndexedDB and free gz_p_* before writing the text import, so the text write has room.",
+   "reason": "Confirmed. If writeJSON(dataKey(GZ), merged) fails (store.ts:147), `merged` is thrown away and state.data = loadTrip(startTrip) (store.ts:162), so the session shows none of the v1 statuses, notes or contacts. legacyPhotos was already assigned (store.ts:137), so importLegacyPhotos still runs. Its updateTripData save fails, but '.photos' is still set at store.ts:269, because the condition only counts IndexedDB puts. From then on, any failing saveTrip deletes the gz_p_* keys (store.ts:105-106). (1) GZ current: the retry writes state.data, which is the un-merged data plus photo metadata plus any edit. On the next load, re-import (the marker is still unset) merges shallowly at store.ts:142, so an edited place such as {favorite} replaces the whole imported record (status, rating, appt, moq, price, note): v1 data is lost. (2) GZ not current: the photo metadata never reaches the GZ key. A later quota failure on another trip frees gz_p_*, the IndexedDB blobs have no metadata, and re-import finds no gz_p_*, so the photos are lost. This needs storage near quota, which is realistic: v1 kept base64 photos in localStorage and setPhotos swallowed quota errors."
+  },
+  {
+   "dim": "parity",
+   "title": "The landing screen appears on every launch (v1 showed its intro only the first time)",
+   "file": "src/App.tsx",
+   "line": 46,
+   "severity": "low",
+   "scenario": "v1 set localStorage gz_ok after the first 'Découvrir le séjour' tap and skipped the intro from then on (v1 script lines 578-579). The new app always starts with `landing = true`, so every time the app is opened on a phone in a shop or taxi, the user has to tap 'Entrer' and wait for the 2.6 s fly-in before reaching the map or a place card.",
+   "fix": "Persist a flag when the user leaves the landing (for example localStorage 'orbes.entered', inside try/catch). On mount, if it is set (or always while the trip is in progress), start with landing=false and landingOverlay=false and fly straight to tripBounds(). The landing stays reachable through the existing control at App.tsx:311.",
+   "reason": "Confirmed. In v1, the intro button sets localStorage gz_ok, and `if(localStorage.getItem(\"gz_ok\"))` hides #intro on later loads. The new App.tsx:46-48 always starts with landing=true and landingOverlay=true and does not read any stored flag. Leaving the landing triggers a 2600 ms fly (App.tsx:424). Every reopen on a phone costs a tap and a fly-in before the map. This is a parity and UX regression, with no data impact."
+  },
+  {
+   "dim": "parity",
+   "title": "Quick zone buttons (Guangzhou / Dongguan / Shenzhen) are hidden on phones",
+   "file": "src/styles.css",
+   "line": 503,
+   "severity": "low",
+   "scenario": "In v1 the #mc zone buttons stayed visible on mobile (they were only moved, to bottom:64px). In the new app `.zones { display: none; }` inside the max-width:899px block removes them, and the command palette has no zone entries either. On a phone there is no one-tap jump to Shenzhen (Nanyou) or back to the Guangzhou overview.",
+   "fix": "Render trip.zones on mobile, for example as a horizontally scrollable chip row placed relative to .mapctl or inside .m-tools. Alternatively, add a 'Zones' group to CommandPalette that calls fly({center, zoom}).",
+   "reason": "Confirmed. v1 #mc held Guangzhou, Dongguan and Shenzhen fly buttons. Its mobile media query only moves #mc (`#mc{bottom:64px;right:10px}`), and no rule hides .mc-b. In the new app, styles.css:503 sets `.zones { display: none; }` under max-width:899px. The zones render only in App.tsx:383-385, and CommandPalette has no zone or fly entries. On a phone there is no one-tap way to jump between zones; the user must pinch and pan."
+  },
+  {
+   "dim": "parity",
+   "title": "No offline fallback map: when the basemap fails, the map is plain black (v1 had an embedded Guangzhou image)",
+   "file": "src/components/MapView.tsx",
+   "line": 15,
+   "severity": "low",
+   "scenario": "v1 always drew an embedded monochrome Guangzhou image (MONO, an imageOverlay over [[22.97,113.13],[23.34,113.58]]) under the tiles, so some geography stayed visible without network. In the new app, if tiles.openfreemap.org is slow or blocked in China, FALLBACK_STYLE is a single black background layer. Markers float on black with no streets or river, and orientation is lost.",
+   "fix": "Give FALLBACK_STYLE an embedded source per trip: either an 'image' source with the v1 MONO data URL and coordinates [[113.13,23.34],[113.58,23.34],[113.58,22.97],[113.13,22.97]] for GZ, or a small simplified GeoJSON (river, ring roads, coastline) per trip with line layers. The isFallback test at MapView.tsx:176 (layers.length <= 1) must then change to an explicit flag, for example a style name or metadata.",
+   "reason": "Confirmed. v1 always adds `L.imageOverlay(MONO,[[22.97,113.13],[23.34,113.58]],...)` from an embedded base64 image, so Guangzhou geography stays visible without tiles. In the new app, MapView.tsx:15 FALLBACK_STYLE is a single background layer, used when the style fetch fails (MapView.tsx:133-140, 189-191). Markers and routes then sit on plain black. Retry runs every 30 s and on 'online', and a banner is shown, so this is not broken, but the orientation that v1 offered offline is lost. Tiles already in the HTTP cache do not help, because the style JSON itself failed to load."
+  },
+  {
+   "dim": "parity",
+   "title": "Hotel status, rating and RDV can no longer be seen or edited",
+   "file": "src/components/PlaceDetail.tsx",
+   "line": 82,
+   "severity": "low",
+   "scenario": "v1 showed the status, rating and RDV block for every place, the Sofitel included. importLegacy still imports gz_m_hotel (status, rating, appt), but PlaceDetail hides the whole 'Suivi' section with `!hotel`. A hotel RDV typed in v1 (for example a car pickup time) is now invisible in the UI and only shows up in the CSV/PDF export.",
+   "fix": "For the hotel, render at least the Rendez-vous SavedInput (useful for car pickup or check-in times). Show status and rating only when a value already exists, or drop them from the hotel import and move any imported appt into the note.",
+   "reason": "Confirmed. v1 openDetail always builds statusHTML(loc), which holds status chips, rating and RDV. Only the travel-time line is skipped for loc.id==='hotel'. importLegacy (legacy.ts:58-72) imports status, rating and appt for the hotel; only `visited` is excluded. PlaceDetail.tsx:82 wraps the whole Suivi section, including the Rendez-vous field, in `!hotel`, so an imported hotel RDV or note-like appt is not visible anywhere in the place UI. It only reaches exports. Low: rare, and the data is preserved."
+  },
+  {
+   "dim": "deploy",
+   "title": "Live EUR→CNY rate never loads: api.frankfurter.app now answers 301 with no CORS header",
+   "file": "src/lib/rates.ts",
+   "line": 22,
+   "severity": "medium",
+   "scenario": "Open Outils → Convertisseur. The fetch to https://api.frankfurter.app/latest?from=EUR&to=CNY gets an HTTP 301 to https://api.frankfurter.dev/v1/latest?... and that 301 has no Access-Control-Allow-Origin header, so the browser blocks it. I saw this in the dev page's console: 'blocked by CORS policy: No Access-Control-Allow-Origin header', and fetch() rejects with 'TypeError: Failed to fetch'. The .catch swallows the error, nothing gets cached (localStorage 'orbes.rate.eurcny' stays null), and the request is retried each time Tools mounts. The 'Taux du jour (BCE …)' line and its 'apply' button (Tools.tsx:90-94) never show, on every origin, in or out of China. The README sells this feature as 'convertisseur avec taux du jour'.",
+   "fix": "rates.ts:22: fetch https://api.frankfurter.dev/v2/rates?base=EUR&quotes=CNY, which returns 200 with CORS `*` and the body [{\"date\":\"2026-11-10\",\"base\":\"EUR\",\"quote\":\"CNY\",\"rate\":7.4607}]. Parse it as `const row = Array.isArray(j) ? j[0] : null; if (!row?.rate) return; data = { rate: row.rate, date: row.date }`. Keeping /v1/latest also works for now, but it is already deprecated. Optionally store a short failure timestamp (e.g. 15 min) so a blocked network doesn't refetch on every Tools open.",
+   "reason": "Confirmed with curl. GET https://api.frankfurter.app/latest?from=EUR&to=CNY with an Origin header returns HTTP/2 301 to api.frankfurter.dev/v1/latest and carries no access-control-allow-origin, so the browser blocks the cross-origin redirect and fetch rejects. The .catch at src/lib/rates.ts:34 swallows it, nothing is written to localStorage, and since the 6 h cache check (l.17-18) only skips when a cached entry exists, it refetches every time Tools mounts. The live-rate block at Tools.tsx:89-98 (`{live && ...}`) never renders. Lowered from high to medium: the converter itself still works with the stored or manual rate (Tools.tsx:84-87); only the 'taux du jour' suggestion is gone. Note that the reviewer's replacement endpoint is itself deprecated: its v1 response carries a `deprecation: @1779103800` header and `link: <https://api.frankfurter.dev/v2/rates>; rel=successor-version`."
+  },
+  {
+   "dim": "deploy",
+   "title": "Sync stays stuck when the is_member check fails and Supabase becomes reachable again without an 'online' event (VPN toggled in China)",
+   "file": "src/lib/store.ts",
+   "line": 539,
+   "severity": "medium",
+   "scenario": "In mainland China the phone is online but *.supabase.co is unreachable (VPN off). At startup, initAuth → checkMembership → rpc('is_member') fails, so member=null and sync='error'. canSync() needs member to be true (store.ts:299). The user then turns the VPN on and brings the app back to the foreground. The visibilitychange handler (store.ts:573) only calls pull() if canSync(), which is false. The window 'online' handler (store.ts:569) is the only path that retries checkMembership, and toggling a VPN doesn't fire it because navigator.onLine never changed. onAuthStateChange also retries only on SIGNED_IN for a new user id, so a later TOKEN_REFRESHED doesn't re-check membership. Result: nothing is pushed or pulled, there is no realtime, and the father's changes never arrive until a full page reload. Nothing is lost because the outbox persists, but the shared space silently stops working.",
+   "fix": "Add a helper `retryMembership = () => { if (state.session && state.member === null) void checkMembership(); }`. Call it in the visibilitychange handler before the canSync() check, on TOKEN_REFRESHED in onAuthStateChange, and on a backoff timer that checkMembership schedules after an error (e.g. setTimeout 30 s, doubling up to 5 min, cleared on success or sign-out). Guard it with an in-flight flag so the timer and visibilitychange don't run concurrent RPCs.",
+   "reason": "Confirmed in src/lib/store.ts. When the rpc fails, checkMembership (l.538-551) sets member:null. canSync (l.299) needs state.member to be truthy, so flush() returns immediately (l.309) and the visibilitychange handler (l.573-575) does nothing. The only retry paths are the window 'online' listener (l.569-572), which does not fire when navigator.onLine stays true while *.supabase.co is filtered or a VPN is toggled, and onAuthStateChange, which only re-checks on SIGNED_IN with a different user id (l.567), so TOKEN_REFRESHED is ignored. Edits stay queued in the persisted outbox, so nothing is lost, but push, pull and realtime stay off until a reload or a real offline→online transition. This is a realistic case for a phone in mainland China."
+  },
+  {
+   "dim": "deploy",
+   "title": "Slow-basemap timeout only shows the banner and never switches to the fallback style, so routes, the landing arc and the globe stay missing while the style request hangs",
+   "file": "src/components/MapView.tsx",
+   "line": 143,
+   "severity": "low",
+   "scenario": "A network that drops packets to tiles.openfreemap.org without rejecting them (common with GFW interference or very poor mobile data) makes the style fetch hang until the browser gives up, which can take a minute or more. After 12 s the 'slow' timer calls onBasemapError(true) but not fallBack(). So 'style.load' never fires, addLayers() never runs and setReady never increments. Every effect gated on `ready` returns early: the day route line (l.325), the landing flight arc and plane (l.342), 3D buildings and the globe projection. Meanwhile the banner tells the user 'Les lieux restent affichés'. The DOM markers do show, but the itinerary line, which matters for a day plan, doesn't appear until the request finally errors.",
+   "fix": "In the 12 s timeout, call fallBack() when !styled (it already calls onBasemapError and starts the 30 s tryAgain interval). Because `slow` is a one-shot timer, the retried setStyle(STYLE_URL) gets no 12 s cutoff, so a network that is slow but working still ends up on the real basemap. Better still, move the route/arc/plane source and layer creation into a helper that also runs on the fallback style's style.load, so the itinerary never depends on the remote style.",
+   "reason": "Confirmed in src/components/MapView.tsx. The 12 s timer (l.143) only calls onBasemapError(true). fallBack() is reached only from map.on('error') (l.186-189), and the route, arc and plane sources/layers are added only in the 'style.load' handler (l.170-185). Every effect gated on `ready` (l.328 route, l.345 landing arc, l.386 3D) returns early until the style JSON arrives or errors. DOM markers still render (their effects don't require ready to be non-zero), so places stay visible as the banner says. Lowered to low: this only happens when the style.json request hangs rather than fails, the effect lasts until the browser's network timeout (tens of seconds), and the places themselves stay usable. If OpenFreeMap tiles are slow but the style JSON loads, style.load still fires and the route appears."
+  },
+  {
+   "dim": "deploy",
+   "title": "No offline shell: reloading the page with no connection (or theorbes.com unreachable) shows nothing",
+   "file": "index.html",
+   "line": 1,
+   "severity": "low",
+   "scenario": "All the data is kept on the device (localStorage/IndexedDB), but the app shell itself is only fetched over the network. There is no service worker (the legacy blob-SW attempt in legacy/v1.html never worked either, because a service worker can't be registered from a blob: URL) and no cache headers are configured in vercel.json. On iOS Safari, background tabs and home-screen web apps get evicted often. Reopening the app on a plane, in the metro, or while the host is slow or filtered in mainland China gives a browser error page instead of the trip, even though every note and photo is still stored locally. orbesmap.vercel.app (*.vercel.app) is itself usually unreachable from mainland China, so theorbes.com/maps is the only working entry point.",
+   "fix": "If a second file can be served on the same origin and path scope (Vercel: public/sw.js gets copied to dist/sw.js; theorbes.com: /maps/sw.js), register it from main.tsx with scope './'. Have it cache the navigation response (network-first with a cache fallback) and optionally the OpenFreeMap style, sprite and glyphs. Don't count on Cache-Control stale-if-error for iOS.",
+   "reason": "Accurate as a description. There is no service worker anywhere in src/ or public/ (public/ doesn't exist), and vercel.json sets no headers, so a cold reload with no network can't render the app even though localStorage and IndexedDB hold all the data. Kept at low: it is a missing capability rather than a regression (the June version had no working offline shell either), and it only matters when iOS evicts the page and the user reopens it offline. Two parts of the proposed fix are weak. Safari does not honour stale-if-error, so the Cache-Control fallback won't help on iPhones. And theorbes.com/maps headers and paths aren't controlled from this repo, so a service worker served there can't be checked from the code."
+  }
+ ],
+ "rejected": [
+  {
+   "dim": "deploy",
+   "title": "Repo root index.html is now a Vite dev entry; anything still serving the repo's index.html directly gets a blank page",
+   "reason": "This is a pre-merge deployment-checklist item, not a confirmed defect. The root index.html being a Vite entry (`<script type=\"module\" src=\"/src/main.tsx\">`) is the standard setup. vercel.json builds it into dist/index.html, and the README (l.16-24, l.41-47) documents both the build output and the Vercel env vars. The blank-page scenario depends on theorbes.com/maps being served by copying or fetching the raw repo file, which nothing in the repo shows. The README says it is published on theorbes.com/maps and orbesmap.vercel.app but doesn't say how. The 'device-only without env vars' behaviour is intentional and documented ('Sans ces variables, l'app fonctionne entièrement sur l'appareil'). Building locally without .env.local is an operator mistake, not a code bug."
+  }
+ ]
+}

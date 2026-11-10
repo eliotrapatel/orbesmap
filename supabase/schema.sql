@@ -21,9 +21,13 @@ stable
 security definer
 set search_path = public
 as $$
+  -- the e-mail must be listed AND verified (magic link / code proves ownership)
   select exists (
-    select 1 from public.members m
-    where lower(m.email) = lower(coalesce(auth.jwt() ->> 'email', ''))
+    select 1
+    from public.members m
+    join auth.users u on u.id = auth.uid()
+    where lower(m.email) = lower(u.email)
+      and u.email_confirmed_at is not null
   );
 $$;
 revoke all on function public.is_member() from public, anon;
@@ -38,6 +42,53 @@ create table if not exists public.place_states (
   updated_by uuid default auth.uid(),
   primary key (trip_id, place_id)
 );
+
+-- Field-by-field merge of a place state, so two people editing different fields at the same time
+-- never overwrite each other. Each field's timestamp lives in data->'fieldsAt' (ms epoch).
+create or replace function public.upsert_place_state(p_trip text, p_place text, p_data jsonb)
+returns jsonb
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  cur jsonb;
+  res jsonb;
+  fa jsonb;
+  k text;
+  v jsonb;
+  in_at numeric;
+  cur_at numeric;
+begin
+  if not public.is_member() then
+    raise exception 'not a member' using errcode = '42501';
+  end if;
+  select data into cur from public.place_states where trip_id = p_trip and place_id = p_place for update;
+  if cur is null then
+    insert into public.place_states (trip_id, place_id, data, updated_at) values (p_trip, p_place, p_data, now())
+    on conflict (trip_id, place_id) do nothing;
+    if found then return p_data; end if;
+    select data into cur from public.place_states where trip_id = p_trip and place_id = p_place for update;
+  end if;
+  res := cur;
+  fa := coalesce(cur -> 'fieldsAt', '{}'::jsonb);
+  for k, v in select * from jsonb_each(p_data) loop
+    continue when k in ('fieldsAt', 'updatedAt');
+    in_at := coalesce((p_data -> 'fieldsAt' ->> k)::numeric, (p_data ->> 'updatedAt')::numeric, 0);
+    cur_at := coalesce((fa ->> k)::numeric, (cur ->> 'updatedAt')::numeric, -1);
+    if in_at >= cur_at then
+      res := jsonb_set(res, array[k], v, true);
+      fa := jsonb_set(fa, array[k], to_jsonb(in_at), true);
+    end if;
+  end loop;
+  res := jsonb_set(res, '{fieldsAt}', fa, true);
+  res := jsonb_set(res, '{updatedAt}', to_jsonb(greatest(coalesce((cur ->> 'updatedAt')::numeric, 0), coalesce((p_data ->> 'updatedAt')::numeric, 0))), true);
+  update public.place_states set data = res, updated_at = now() where trip_id = p_trip and place_id = p_place;
+  return res;
+end;
+$$;
+revoke all on function public.upsert_place_state(text, text, jsonb) from public, anon;
+grant execute on function public.upsert_place_state(text, text, jsonb) to authenticated;
 
 -- 2. Contacts (WhatsApp / WeChat) attached to a place
 create table if not exists public.contacts (

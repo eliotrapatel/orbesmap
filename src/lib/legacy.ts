@@ -100,6 +100,24 @@ export function importLegacy(): { data: Data; eurRate?: number; photos: LegacyPh
   return { data: d, eurRate: rate > 0 ? rate : undefined, photos };
 }
 
+/** Photos of the old version still waiting to be moved to IndexedDB (independent of the text import marker) */
+export function legacyPhotoList(): LegacyPhoto[] {
+  const out: LegacyPhoto[] = [];
+  try {
+    if (localStorage.getItem(LEGACY_MARKER + ".photos")) return out;
+    for (const p of GZ2026.places) {
+      read<string[]>("gz_p_" + p.id, []).forEach((dataUrl, i) => {
+        if (typeof dataUrl === "string" && dataUrl.startsWith("data:image")) {
+          out.push({ key: "gz_p_" + p.id, index: i, placeId: p.id, id: stableId(`gz-photo|${p.id}|${i}|${dataUrl.length}|${dataUrl.slice(-64)}`) });
+        }
+      });
+    }
+  } catch {
+    /* storage blocked */
+  }
+  return out;
+}
+
 export function readLegacyPhoto(p: LegacyPhoto): string | null {
   const arr = read<string[]>(p.key, []);
   return typeof arr[p.index] === "string" ? arr[p.index] : null;

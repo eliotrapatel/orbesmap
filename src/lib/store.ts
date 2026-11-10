@@ -1,21 +1,23 @@
 // Single source of truth for everything the user adds in the app.
 // - Saved on this device first (localStorage for text, IndexedDB for photo files): works offline.
 // - When signed in with an authorised account (Eliot + his father share one space), every change
-//   is also queued in an outbox and sent to Supabase, with automatic retries.
+//   is queued in an outbox and sent to Supabase with automatic retries; other devices get live updates.
+// - Place states merge field by field (two people editing different fields never overwrite each other).
 // - Data is kept per trip; settings (EUR rate) are shared.
 import { useSyncExternalStore } from "react";
 import type { RealtimeChannel, Session } from "@supabase/supabase-js";
 import { TRIP_BY_ID, defaultTrip } from "../data/trip";
 import type { Trip } from "../data/types";
-import { deletePhotoFile, getPhoto, putPhoto, dataUrlToBlob } from "./idb";
-import { LEGACY_MARKER, LEGACY_TRIP, hasLegacyData, importLegacy, readLegacyPhoto } from "./legacy";
-import { emptyData, uid, type Contact, type Data, type Photo, type Pin, type PlaceState, type Settings } from "./model";
+import { dataUrlToBlob, deletePhotoFile, getPhoto, putPhoto } from "./idb";
+import { LEGACY_MARKER, LEGACY_TRIP, hasLegacyData, importLegacy, legacyPhotoList, readLegacyPhoto } from "./legacy";
+import { emptyData, mergePlaceState, uid, type Contact, type Data, type Photo, type Pin, type PlaceState, type Settings } from "./model";
 import { PHOTO_BUCKET, supabase } from "./supabase";
 
 const dataKey = (tripId: string) => "orbes.v2." + tripId;
 const SETTINGS_KEY = "orbes.settings";
 const OUTBOX_KEY = "orbes.outbox.v2";
 const TRIP_KEY = "orbes.trip";
+const PHOTOS_MARKER = LEGACY_MARKER + ".photos";
 
 type Op =
   | { t: "place"; trip: string; id: string }
@@ -89,30 +91,32 @@ function normalize(d: Partial<Data> | null): Data {
   };
 }
 
-function loadTrip(tripId: string): Data {
-  return normalize(readJSON<Data>(dataKey(tripId)));
+const loadTrip = (tripId: string): Data => normalize(readJSON<Data>(dataKey(tripId)));
+
+/** The old version's inline photos (gz_p_*) can be freed once their copies are referenced in the Guangzhou data */
+function freeLegacyPhotoKeys(): boolean {
+  try {
+    if (!localStorage.getItem(PHOTOS_MARKER)) return false;
+    const keys = Object.keys(localStorage).filter((k) => k.startsWith("gz_p_"));
+    keys.forEach((k) => localStorage.removeItem(k));
+    return keys.length > 0;
+  } catch {
+    return false;
+  }
 }
 
 let warnedFull = false;
-function saveTrip(tripId: string, d: Data) {
+function saveTrip(tripId: string, d: Data): boolean {
   if (writeJSON(dataKey(tripId), d)) {
     warnedFull = false;
-    return;
+    return true;
   }
-  // Storage full: the old version's inline photos (gz_p_*) are the usual culprit. Free them only
-  // once they have been copied to IndexedDB (marker set by importLegacyPhotos).
-  try {
-    if (localStorage.getItem(LEGACY_MARKER + ".photos")) {
-      Object.keys(localStorage).filter((k) => k.startsWith("gz_p_")).forEach((k) => localStorage.removeItem(k));
-      if (writeJSON(dataKey(tripId), d)) return;
-    }
-  } catch {
-    /* ignore */
-  }
+  if (freeLegacyPhotoKeys() && writeJSON(dataKey(tripId), d)) return true;
   if (!warnedFull) {
     warnedFull = true;
     toast("Mémoire du navigateur pleine : les dernières modifications ne sont pas enregistrées sur cet appareil");
   }
+  return false;
 }
 
 function initialTrip(): string {
@@ -127,30 +131,31 @@ function initialTrip(): string {
   return defaultTrip().id;
 }
 
-// One-time import of the June 2026 version's data
-let legacyPhotos: ReturnType<typeof importLegacy>["photos"] = [];
+// ---------- one-time import of the June 2026 version ----------
 let legacyRate: number | undefined;
+let legacyUnsaved: Data | null = null; // kept in memory if storage was too full to save it
 (function migrateLegacy() {
   if (!hasLegacyData()) return;
-  const existing = readJSON<Data>(dataKey(LEGACY_TRIP));
+  const base = normalize(readJSON<Data>(dataKey(LEGACY_TRIP)));
   const imported = importLegacy();
-  legacyPhotos = imported.photos;
   legacyRate = imported.eurRate;
-  // keep anything already typed in the new app, add the old data underneath
-  const base = normalize(existing);
+  const places: Record<string, PlaceState> = {};
+  for (const id of new Set([...Object.keys(imported.data.places), ...Object.keys(base.places)])) {
+    places[id] = mergePlaceState(imported.data.places[id], base.places[id]).merged;
+  }
   const merged: Data = {
-    places: { ...imported.data.places, ...base.places },
+    places,
     contacts: [...base.contacts, ...imported.data.contacts.filter((c) => !base.contacts.some((x) => x.id === c.id))],
     pins: [...base.pins, ...imported.data.pins.filter((p) => !base.pins.some((x) => x.id === p.id))],
     photos: base.photos,
   };
-  if (writeJSON(dataKey(LEGACY_TRIP), merged)) {
+  if (saveTrip(LEGACY_TRIP, merged)) {
     try {
       localStorage.setItem(LEGACY_MARKER, "1");
     } catch {
       /* ignore */
     }
-  }
+  } else legacyUnsaved = merged;
 })();
 
 const savedSettings = readJSON<Settings>(SETTINGS_KEY);
@@ -159,7 +164,7 @@ const startTrip = initialTrip();
 
 let state: State = {
   tripId: startTrip,
-  data: loadTrip(startTrip),
+  data: startTrip === LEGACY_TRIP && legacyUnsaved ? legacyUnsaved : loadTrip(startTrip),
   settings: initialSettings,
   session: null,
   member: null,
@@ -176,15 +181,15 @@ function set(patch: Partial<State>) {
   listeners.forEach((l) => l());
 }
 
-/** Change the data of a trip (current or not) and save it */
-function updateTripData(tripId: string, fn: (d: Data) => Data) {
+/** Change the data of a trip (current or not) and save it. Returns false if it could not be saved on the device. */
+function updateTripData(tripId: string, fn: (d: Data) => Data): boolean {
   if (tripId === state.tripId) {
     const data = fn(state.data);
-    saveTrip(tripId, data);
+    const ok = saveTrip(tripId, data);
     set({ data });
-  } else {
-    saveTrip(tripId, fn(loadTrip(tripId)));
+    return ok;
   }
+  return saveTrip(tripId, fn(loadTrip(tripId)));
 }
 const dataOf = (tripId: string) => (tripId === state.tripId ? state.data : loadTrip(tripId));
 const setData = (fn: (d: Data) => Data) => updateTripData(state.tripId, fn);
@@ -216,62 +221,63 @@ export function switchTrip(tripId: string) {
   } catch {
     /* ignore */
   }
-  set({ tripId, data: loadTrip(tripId) });
+  set({ tripId, data: tripId === LEGACY_TRIP && legacyUnsaved ? legacyUnsaved : loadTrip(tripId) });
   void loadPhotoUrls();
   subscribeRealtime();
   if (canSync()) void pull();
 }
 
-// ---------- photos: device files → object URLs ----------
+// ---------- photos ----------
 const objectUrls = new Map<string, string>();
+const signedAt = new Map<string, number>();
+const SIGNED_TTL = 12 * 3600;
+
 async function loadPhotoUrls() {
-  const urls: Record<string, string> = { ...state.photoUrls };
-  let changed = false;
+  const urls: Record<string, string> = {};
   for (const p of state.data.photos) {
-    if (urls[p.id] || !p.local) continue;
+    if (state.photoUrls[p.id] || !p.local) continue;
     try {
       const blob = await getPhoto(p.id);
       if (blob) {
         const u = URL.createObjectURL(blob);
         objectUrls.set(p.id, u);
         urls[p.id] = u;
-        changed = true;
       }
     } catch {
       /* ignore */
     }
   }
-  if (changed) set({ photoUrls: { ...state.photoUrls, ...urls } });
+  if (Object.keys(urls).length) set({ photoUrls: { ...state.photoUrls, ...urls } });
   await refreshSignedUrls();
 }
 
+/** Moves the old version's photos to IndexedDB. Runs at every start until it fully succeeded. */
 async function importLegacyPhotos() {
-  if (!legacyPhotos.length) return;
-  let ok = 0;
+  const list = legacyPhotoList();
+  if (!list.length) return;
   const added: Photo[] = [];
-  for (const lp of legacyPhotos) {
+  for (const lp of list) {
     const dataUrl = readLegacyPhoto(lp);
     if (!dataUrl) continue;
     try {
       await putPhoto(lp.id, await dataUrlToBlob(dataUrl));
       added.push({ id: lp.id, placeId: lp.placeId, local: true, createdAt: Date.parse("2026-06-13T00:00:00+08:00") });
-      ok++;
     } catch {
-      /* keep the old copy */
+      /* keep the old copy, retried next start */
     }
   }
-  if (added.length) {
-    updateTripData(LEGACY_TRIP, (d) => ({ ...d, photos: [...d.photos, ...added.filter((a) => !d.photos.some((x) => x.id === a.id))] }));
-    added.forEach((p) => enqueue({ t: "photo", trip: LEGACY_TRIP, id: p.id }));
-  }
-  if (ok === legacyPhotos.length) {
+  if (!added.length) return;
+  const saved = updateTripData(LEGACY_TRIP, (d) => ({ ...d, photos: [...d.photos, ...added.filter((a) => !d.photos.some((x) => x.id === a.id))] }));
+  // the marker (which allows freeing gz_p_* keys) is set only when every photo is referenced in saved data
+  const stored = loadTrip(LEGACY_TRIP);
+  if (saved && added.length === list.length && list.every((lp) => stored.photos.some((p) => p.id === lp.id))) {
     try {
-      localStorage.setItem(LEGACY_MARKER + ".photos", "1");
+      localStorage.setItem(PHOTOS_MARKER, "1");
     } catch {
       /* ignore */
     }
   }
-  legacyPhotos = [];
+  if (saved) added.forEach((p) => enqueue({ t: "photo", trip: LEGACY_TRIP, id: p.id }));
   if (state.tripId === LEGACY_TRIP) void loadPhotoUrls();
 }
 
@@ -286,7 +292,6 @@ function persistOutbox() {
 /** Changes are always recorded, even signed out, and sent as soon as an authorised session exists */
 function enqueue(op: Op) {
   outbox = outbox.filter((o) => !sameRow(o, op));
-  // an upsert followed by a delete of the same row only needs the delete
   if (op.t === "contact-del" || op.t === "pin-del" || op.t === "photo-del") {
     const up = op.t.replace("-del", "");
     outbox = outbox.filter((o) => !(o.t === up && "id" in o && o.trip === op.trip && o.id === op.id));
@@ -305,8 +310,18 @@ function scheduleFlush(delay = 500) {
 }
 
 let flushing: Promise<void> | null = null;
-function flush(): Promise<void> {
+let pulling = false;
+let flushAfterPull = false;
+/** completed op keys during a pull's fetch: the merge must not undo them */
+let doneDuringPull: Set<string> | null = null;
+const opKey = (o: Op) => ("id" in o ? `${o.t.replace("-del", "")}:${o.id}` : "settings");
+
+function flush(fromPull = false): Promise<void> {
   if (!canSync()) return Promise.resolve();
+  if (pulling && !fromPull) {
+    flushAfterPull = true;
+    return Promise.resolve();
+  }
   if (flushing) return flushing;
   flushing = (async () => {
     if (!outbox.length) {
@@ -319,6 +334,7 @@ function flush(): Promise<void> {
         const op = outbox[0];
         await run(op);
         outbox = outbox.filter((o) => o !== op);
+        doneDuringPull?.add(opKey(op) + (op.t.endsWith("-del") ? ":del" : ""));
         persistOutbox();
       }
       set({ sync: "idle" });
@@ -349,7 +365,12 @@ async function run(op: Op) {
   switch (op.t) {
     case "place": {
       const s = d.places[op.id] || {};
-      check(await sb.from("place_states").upsert({ trip_id, place_id: op.id, data: s, updated_at: new Date(s.updatedAt || Date.now()).toISOString() }));
+      // server-side field-by-field merge (see supabase/schema.sql → upsert_place_state)
+      const { data: merged, error } = await sb.rpc("upsert_place_state", { p_trip: trip_id, p_place: op.id, p_data: s });
+      if (error) throw error;
+      if (merged) {
+        updateTripData(trip_id, (dd) => ({ ...dd, places: { ...dd.places, [op.id]: mergePlaceState(dd.places[op.id], merged as PlaceState).merged } }));
+      }
       return;
     }
     case "contact": {
@@ -393,7 +414,6 @@ async function run(op: Op) {
 }
 
 // ---------- pull & merge ----------
-let pulling = false;
 let pullAgain = false;
 export async function pull() {
   if (!canSync()) return;
@@ -406,7 +426,8 @@ export async function pull() {
   const trip = state.tripId;
   set({ sync: "syncing" });
   try {
-    await flush();
+    await flush(true);
+    doneDuringPull = new Set();
     const [ps, cs, pins, phs, st] = await Promise.all([
       sb.from("place_states").select("place_id,data,updated_at").eq("trip_id", trip),
       sb.from("contacts").select("*").eq("trip_id", trip),
@@ -417,13 +438,17 @@ export async function pull() {
     for (const r of [ps, cs, pins, phs, st]) if (r.error) throw r.error;
     if (state.tripId !== trip) return; // the trip changed meanwhile; the new one pulls on its own
 
-    // changes still waiting in the outbox win over the server copy
-    const key = (o: Op) => ("id" in o ? `${o.t.replace("-del", "")}:${o.id}` : "settings");
+    // changes still waiting in the outbox, or sent while we were fetching, win over the fetched copy
     const tripOps = outbox.filter((o) => "trip" in o && o.trip === trip);
-    const pendingUp = new Set(tripOps.filter((o) => !o.t.endsWith("-del")).map(key));
-    const pendingDel = new Set(tripOps.filter((o) => o.t.endsWith("-del")).map(key));
-    const settingsPending = outbox.some((o) => o.t === "settings");
+    const pendingUp = new Set(tripOps.filter((o) => !o.t.endsWith("-del")).map(opKey));
+    const pendingDel = new Set(tripOps.filter((o) => o.t.endsWith("-del")).map(opKey));
+    for (const k of doneDuringPull) {
+      if (k.endsWith(":del")) pendingDel.add(k.slice(0, -4));
+      else pendingUp.add(k);
+    }
+    const settingsPending = outbox.some((o) => o.t === "settings") || doneDuringPull.has("settings");
     const toPush: Op[] = [];
+    const before = state.data.photos.map((p) => p.id);
 
     setData((local) => {
       const places: Record<string, PlaceState> = { ...local.places };
@@ -431,10 +456,10 @@ export async function pull() {
       for (const r of ps.data!) {
         remoteIds.add(r.place_id);
         if (pendingUp.has(`place:${r.place_id}`)) continue;
-        const remoteAt = new Date(r.updated_at).getTime();
-        const l = local.places[r.place_id];
-        if (!l || (l.updatedAt || 0) <= remoteAt) places[r.place_id] = { ...(r.data as PlaceState), updatedAt: remoteAt };
-        else toPush.push({ t: "place", trip, id: r.place_id });
+        const remote = { updatedAt: new Date(r.updated_at).getTime(), ...(r.data as PlaceState) };
+        const { merged, localNewer } = mergePlaceState(local.places[r.place_id], remote);
+        places[r.place_id] = merged;
+        if (localNewer) toPush.push({ t: "place", trip, id: r.place_id });
       }
       for (const id of Object.keys(local.places)) if (!remoteIds.has(id) && !pendingUp.has(`place:${id}`)) toPush.push({ t: "place", trip, id });
 
@@ -451,10 +476,10 @@ export async function pull() {
         }
         for (const l of localList) {
           if (out.some((x) => x.id === l.id) || pendingDel.has(`${kind}:${l.id}`)) continue;
-          // never sent → keep it and send it; sent before but gone from the server → deleted elsewhere
-          if (!l.synced) {
+          // never sent (or sent during this fetch) → keep; sent before but gone from the server → deleted elsewhere
+          if (!l.synced || pendingUp.has(`${kind}:${l.id}`)) {
             out.push(l);
-            if (!pendingUp.has(`${kind}:${l.id}`)) toPush.push({ t: kind, trip, id: l.id });
+            if (!l.synced && !pendingUp.has(`${kind}:${l.id}`)) toPush.push({ t: kind, trip, id: l.id });
           }
         }
         return out;
@@ -479,6 +504,17 @@ export async function pull() {
       return { places, contacts, pins: pinList, photos };
     });
 
+    // photos deleted on another device: free their file and URL here
+    const now = new Set(state.data.photos.map((p) => p.id));
+    for (const id of before) {
+      if (now.has(id)) continue;
+      void deletePhotoFile(id).catch(() => undefined);
+      const u = objectUrls.get(id);
+      if (u) URL.revokeObjectURL(u);
+      objectUrls.delete(id);
+      signedAt.delete(id);
+    }
+
     if (st.data && !settingsPending) setSettingsLocal({ eurRate: Number(st.data.eur_rate) || state.settings.eurRate });
     else if (!st.data && !settingsPending) toPush.push({ t: "settings" });
 
@@ -490,6 +526,11 @@ export async function pull() {
     set({ sync: navigator.onLine ? "error" : "pending" });
   } finally {
     pulling = false;
+    doneDuringPull = null;
+    if (flushAfterPull) {
+      flushAfterPull = false;
+      scheduleFlush(0);
+    }
     if (pullAgain) {
       pullAgain = false;
       void pull();
@@ -499,13 +540,27 @@ export async function pull() {
 
 async function refreshSignedUrls() {
   if (!canSync()) return;
-  const need = state.data.photos.filter((p) => p.path && !state.photoUrls[p.id]);
-  if (!need.length) return;
-  const { data, error } = await supabase!.storage.from(PHOTO_BUCKET).createSignedUrls(need.map((p) => p.path!), 60 * 60 * 12);
-  if (error || !data) return;
+  const nowS = Date.now() / 1000;
+  // drop signed URLs that expire within the hour
   const urls = { ...state.photoUrls };
+  for (const [id, t] of signedAt) {
+    if (nowS - t > SIGNED_TTL - 3600) {
+      delete urls[id];
+      signedAt.delete(id);
+    }
+  }
+  const need = state.data.photos.filter((p) => p.path && !urls[p.id]);
+  if (!need.length) {
+    if (Object.keys(urls).length !== Object.keys(state.photoUrls).length) set({ photoUrls: urls });
+    return;
+  }
+  const { data, error } = await supabase!.storage.from(PHOTO_BUCKET).createSignedUrls(need.map((p) => p.path!), SIGNED_TTL);
+  if (error || !data) return;
   data.forEach((r, i) => {
-    if (r.signedUrl) urls[need[i].id] = r.signedUrl;
+    if (r.signedUrl) {
+      urls[need[i].id] = r.signedUrl;
+      signedAt.set(need[i].id, nowS);
+    }
   });
   set({ photoUrls: urls });
 }
@@ -526,7 +581,10 @@ function subscribeRealtime() {
   };
   const ch = supabase!.channel("orbes-" + trip);
   for (const table of ["place_states", "contacts", "pins", "photos"]) {
-    ch.on("postgres_changes", { event: "*", schema: "public", table, filter: `trip_id=eq.${trip}` }, onChange);
+    ch.on("postgres_changes", { event: "INSERT", schema: "public", table, filter: `trip_id=eq.${trip}` }, onChange);
+    ch.on("postgres_changes", { event: "UPDATE", schema: "public", table, filter: `trip_id=eq.${trip}` }, onChange);
+    // DELETE events cannot be filtered (the old row only carries its primary key)
+    ch.on("postgres_changes", { event: "DELETE", schema: "public", table }, onChange);
   }
   ch.on("postgres_changes", { event: "*", schema: "public", table: "settings" }, onChange);
   ch.subscribe();
@@ -534,45 +592,88 @@ function subscribeRealtime() {
 }
 
 // ---------- auth ----------
+let memberRetry: number | undefined;
+let memberDelay = 15_000;
+let checking = false;
 async function checkMembership() {
-  if (!supabase || !state.session) return;
-  const { data, error } = await supabase.rpc("is_member");
-  if (error) {
-    console.warn("[orbes] membership check failed", error);
+  if (!supabase || !state.session || checking) return;
+  checking = true;
+  window.clearTimeout(memberRetry);
+  set({ sync: "syncing" });
+  try {
+    const { data, error } = await supabase.rpc("is_member");
+    if (error) throw error;
+    memberDelay = 15_000;
+    set({ member: Boolean(data), sync: data ? "idle" : "denied" });
+    if (data) {
+      subscribeRealtime();
+      void pull();
+    }
+  } catch (e) {
+    console.warn("[orbes] membership check failed, will retry", e);
     set({ member: null, sync: navigator.onLine ? "error" : "pending" });
-    return;
-  }
-  set({ member: Boolean(data), sync: data ? state.sync : "denied" });
-  if (data) {
-    subscribeRealtime();
-    void pull();
+    memberRetry = window.setTimeout(() => void checkMembership(), memberDelay);
+    memberDelay = Math.min(memberDelay * 2, 5 * 60_000);
+  } finally {
+    checking = false;
   }
 }
+const retryMembership = () => {
+  if (state.session && state.member === null) void checkMembership();
+};
 
 export async function initAuth() {
   void loadPhotoUrls();
   void importLegacyPhotos();
+  window.addEventListener("storage", onStorage);
   if (!supabase) return;
   const { data } = await supabase.auth.getSession();
   set({ session: data.session });
   if (data.session) await checkMembership();
-  supabase.auth.onAuthStateChange((event, session) => {
+  supabase.auth.onAuthStateChange((_event, session) => {
     const before = state.session?.user.id;
     set({ session });
     if (!session) {
+      window.clearTimeout(memberRetry);
       set({ member: null, sync: "idle" });
       subscribeRealtime();
       return;
     }
-    if (event === "SIGNED_IN" && before !== session.user.id) void checkMembership();
+    if (before !== session.user.id) {
+      set({ member: null });
+      void checkMembership();
+    } else retryMembership();
   });
   window.addEventListener("online", () => {
-    if (state.member === null && state.session) void checkMembership();
-    else scheduleFlush(0);
+    retryMembership();
+    scheduleFlush(0);
   });
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible" && canSync()) void pull();
+    if (document.visibilityState !== "visible") return;
+    retryMembership();
+    if (canSync()) void pull();
   });
+}
+
+/** Another tab changed the same data: reload it and merge its pending changes */
+function onStorage(e: StorageEvent) {
+  if (e.key === dataKey(state.tripId)) set({ data: loadTrip(state.tripId) });
+  else if (e.key === OUTBOX_KEY && e.newValue) {
+    try {
+      const theirs = JSON.parse(e.newValue) as Op[];
+      const add = theirs.filter((o) => !outbox.some((x) => sameRow(x, o)));
+      if (add.length) {
+        outbox = [...outbox, ...add];
+        set({ pending: outbox.length });
+        scheduleFlush();
+      }
+    } catch {
+      /* ignore */
+    }
+  } else if (e.key === SETTINGS_KEY) {
+    const s = readJSON<Settings>(SETTINGS_KEY);
+    if (s) set({ settings: s });
+  }
 }
 
 export async function sendLoginEmail(email: string) {
@@ -599,7 +700,13 @@ export async function signOut() {
 // ---------- actions ----------
 export function updatePlace(id: string, patch: Partial<PlaceState>) {
   const trip = state.tripId;
-  setData((d) => ({ ...d, places: { ...d.places, [id]: { ...d.places[id], ...patch, updatedAt: Date.now() } } }));
+  const now = Date.now();
+  setData((d) => {
+    const cur = d.places[id] || {};
+    const fieldsAt = { ...(cur.fieldsAt || {}) };
+    for (const k of Object.keys(patch)) fieldsAt[k] = now;
+    return { ...d, places: { ...d.places, [id]: { ...cur, ...patch, fieldsAt, updatedAt: now } } };
+  });
   enqueue({ t: "place", trip, id });
 }
 
@@ -651,6 +758,7 @@ export function deletePhoto(id: string) {
   void deletePhotoFile(id).catch(() => undefined);
   const u = objectUrls.get(id);
   if (u) URL.revokeObjectURL(u);
+  objectUrls.delete(id);
   if (ph) enqueue({ t: "photo-del", trip, id, path: ph.path || photoPath(trip, ph.placeId, id) });
 }
 
