@@ -24,25 +24,20 @@ npm run dev      # http://localhost:5178
 npm run build    # produit dist/index.html
 ```
 
-## Brancher Supabase (sauvegarde en ligne + partage avec papa)
+## Supabase (sauvegarde en ligne + partage avec papa)
 
-1. Créer un projet sur https://supabase.com (gratuit).
-2. SQL Editor → New query → coller tout `supabase/schema.sql` → Run.
-3. Ajouter les deux adresses autorisées (même SQL Editor) :
-   ```sql
-   insert into public.members (email, name) values
-     ('votre-adresse@exemple.com', 'Eliot'),
-     ('adresse-de-papa@exemple.com', 'Papa');
-   ```
-4. Authentication → URL Configuration → Redirect URLs : ajouter `https://theorbes.com/maps`,
-   `https://orbesmap.vercel.app` et `http://localhost:5178`.
-5. (Conseillé) Authentication → Email Templates → Magic Link : ajouter `{{ .Token }}` dans le texte,
-   pour recevoir aussi un code à 6 chiffres (pratique si le lien s'ouvre dans un autre navigateur).
-6. Vercel → projet orbesmap → Settings → Environment Variables :
-   `VITE_SUPABASE_URL` (format `https://xxxx.supabase.co`) et `VITE_SUPABASE_ANON_KEY`, puis redéployer.
-   En local : les mettre dans `.env.local`.
+Projet : `https://ifugaqjneprbtigvegeb.supabase.co`. L'adresse et la clé publique sont dans
+`src/lib/supabase.ts` (publiques par conception ; l'accès est protégé par les règles de `supabase/schema.sql`).
+Des variables `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` peuvent les remplacer.
 
-Sans ces variables, l'app fonctionne entièrement sur l'appareil.
+Mise en place (déjà faite le 10/11/2026) :
+1. SQL Editor → coller `supabase/schema.sql` → Run, puis ajouter les adresses dans `public.members`.
+2. Authentication → Users → Add user → Create new user : e-mail + mot de passe, cocher « Auto Confirm User ».
+   Une fois par personne. On se connecte ensuite dans l'app (onglet Compte) avec cet e-mail et ce mot de passe.
+   Aucun e-mail n'est envoyé (l'envoi d'e-mails par défaut de Supabase est limité aux membres de l'équipe, 2 par heure).
+3. Mot de passe oublié : Authentication → Users → la personne → modifier le mot de passe.
+
+Sans réseau, l'app fonctionne sur l'appareil et envoie les changements au retour de la connexion.
 
 ## Données de la version de juin
 

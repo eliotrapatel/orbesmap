@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { sendLoginEmail, signOut, useStore, verifyLoginCode, type SyncState } from "../lib/store";
+import { sendLoginEmail, signInWithPassword, signOut, useStore, verifyLoginCode, type SyncState } from "../lib/store";
 import { supabaseConfigured } from "../lib/supabase";
 
 const SYNC_TEXT: Record<SyncState, string> = {
@@ -34,7 +34,8 @@ export default function Account() {
   const pending = useStore((s) => s.pending);
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
-  const [step, setStep] = useState<"email" | "code">("email");
+  const [password, setPassword] = useState("");
+  const [step, setStep] = useState<"password" | "email" | "code">("password");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -84,7 +85,38 @@ export default function Account() {
         <h4>Sauvegarder et partager</h4>
         <p style={{ marginTop: 6 }}>Connectez-vous pour retrouver vos notes, contacts et photos sur tous vos appareils et les partager avec votre père. Sans connexion, tout reste sur cet appareil.</p>
         <div style={{ marginTop: 12 }}><SyncBadge /></div>
-        {step === "email" ? (
+        {step === "password" ? (
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setBusy(true);
+              setErr(null);
+              try {
+                await signInWithPassword(email.trim(), password);
+              } catch (x) {
+                const m = x instanceof Error ? x.message : "";
+                setErr(/invalid login credentials/i.test(m) ? "E-mail ou mot de passe incorrect." : /fetch|network/i.test(m) ? "Pas de connexion au serveur. Vérifiez le réseau (en Chine : eSIM, itinérance ou VPN)." : m || "La connexion a échoué. Réessayez.");
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            <label className="field">
+              <span>E-mail</span>
+              <input className="input" type="email" required autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="vous@exemple.com" />
+            </label>
+            <label className="field">
+              <span>Mot de passe</span>
+              <input className="input" type="password" required autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+            </label>
+            <button className="btn primary block" style={{ marginTop: 12 }} disabled={busy || !email.includes("@") || !password}>
+              {busy ? "Connexion…" : "Se connecter"}
+            </button>
+            <button type="button" className="btn block" style={{ marginTop: 8 }} onClick={() => { setErr(null); setStep("email"); }}>
+              Recevoir plutôt un lien par e-mail
+            </button>
+          </form>
+        ) : step === "email" ? (
           <form
             onSubmit={async (e) => {
               e.preventDefault();
@@ -106,6 +138,9 @@ export default function Account() {
             </label>
             <button className="btn primary block" style={{ marginTop: 12 }} disabled={busy || !email.includes("@")}>
               {busy ? "Envoi…" : "Recevoir le lien de connexion"}
+            </button>
+            <button type="button" className="btn block" style={{ marginTop: 8 }} onClick={() => { setErr(null); setStep("password"); }}>
+              Se connecter avec un mot de passe
             </button>
           </form>
         ) : (

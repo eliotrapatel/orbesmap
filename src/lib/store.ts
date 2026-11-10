@@ -683,6 +683,13 @@ export async function sendLoginEmail(email: string) {
   if (error) throw error;
 }
 
+/** Sign in with the e-mail + password created for each member in Supabase (no e-mail is sent). */
+export async function signInWithPassword(email: string, password: string) {
+  if (!supabase) throw new Error("not configured");
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw error;
+}
+
 export async function verifyLoginCode(email: string, token: string) {
   if (!supabase) throw new Error("not configured");
   const { error } = await supabase.auth.verifyOtp({ email, token, type: "email" });
