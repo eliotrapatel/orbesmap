@@ -765,3 +765,5 @@ a { color: inherit; text-decoration: none; }
 .ai-main b { font-size: 13.5px; font-weight: 500; }
 .ai-main small { font-size: 11.5px; color: var(--soft); }
 .ai-cost { font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.ai-credit .tr-err { margin: 0; padding: 0 16px 14px; }
+.ai-hist .tr-err { padding: 0; }
