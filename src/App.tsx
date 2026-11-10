@@ -8,6 +8,7 @@ import AddPlace, { type Found } from "./components/AddPlace";
 import Checklist from "./components/Checklist";
 import Emergency from "./components/Emergency";
 import Translate from "./components/Translate";
+import Ask from "./components/Ask";
 import Landing from "./components/Landing";
 import MapView, { type FocusRequest } from "./components/MapView";
 import Overview from "./components/Overview";
@@ -527,6 +528,17 @@ export default function App() {
                 />
               )}
               {tool === "translate" && <Translate trip={trip} />}
+              {tool === "ask" && (
+                <Ask
+                  trip={trip}
+                  onOpenPlace={openPlace}
+                  onOpenPin={(p) => {
+                    setSel({ kind: "pin", id: p.id });
+                    setTool(null);
+                    fly({ center: [p.lng, p.lat], zoom: 15 });
+                  }}
+                />
+              )}
               {tool === "checklist" && <Checklist trip={trip} />}
               {tool === "emergency" && <Emergency trip={trip} />}
               {tool === "phrases" && <Phrases trip={trip} />}

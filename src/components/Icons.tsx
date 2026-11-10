@@ -55,3 +55,4 @@ export const IChecklist = mk(<><path d="M9 6h11M9 12h11M9 18h11" /><path d="m3.5
 export const ISos = mk(<><circle cx="12" cy="12" r="9" /><path d="M12 7.5v9M7.5 12h9" /></>);
 export const ILink = mk(<><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1" /><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1" /></>);
 export const IOffline = mk(<><path d="M7 18a4.5 4.5 0 0 1-.6-9 6 6 0 0 1 11.4 1.5A3.8 3.8 0 0 1 17.5 18H7Z" /><path d="M12 10.5v5M9.8 13.5 12 15.7l2.2-2.2" /></>);
+export const IAsk = mk(<><path d="M20 12a8 8 0 0 1-11.6 7.1L4 20l1-4.1A8 8 0 1 1 20 12Z" /><path d="M9.6 9.6a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.3M12 16.6h.01" /></>);

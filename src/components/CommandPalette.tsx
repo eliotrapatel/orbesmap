@@ -10,6 +10,7 @@ const TOOL_WORDS: Partial<Record<ToolKey, string>> = {
   translate: "traduire traduction photo menu interprete conversation parler chinois",
   checklist: "check-list liste depart taches reservations valise",
   practical: "infos hors ligne offline carte telecharger",
+  ask: "demander question assistant carnet ia chat discuter",
 };
 import { Portal, speak, useEscape } from "./ui";
 

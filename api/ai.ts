@@ -78,6 +78,19 @@ const PLACES_SCHEMA = obj({
   places: arr(PLACE_ITEM),
 });
 
+const ASK_SCHEMA = obj({
+  answer: str,
+  refs: arr(obj({ kind: { type: "string", enum: ["place", "pin"] }, id: str })),
+});
+
+const ASK_SYSTEM = `Tu es l'assistant du carnet de voyage d'Eliot (fondateur de la marque ORBES) et de son père. Tu réponds à leurs questions à partir du CARNET ci-dessous (programme, lieux, horaires, réservations, notes et statuts, fiches fournisseurs, contacts, lieux ajoutés, check-list, assurance, vols, infos pratiques, météo, position et heure actuelles).
+Règles :
+- Tu es en LECTURE SEULE : tu ne peux rien modifier, rien réserver, rien envoyer. Si on te demande de changer quelque chose, explique où le faire dans l'app (fiche du lieu, Agenda, Check-list, Compte…).
+- Appuie-toi d'abord sur le carnet. Si l'information n'y est pas, dis-le clairement ; tu peux ajouter une connaissance générale sur Shanghai en précisant « hors carnet ».
+- Utilise l'heure et la position actuelles fournies pour « maintenant », « près de moi », « demain ». Les distances sont à vol d'oiseau, préviens-en.
+- Réponds en français simple, court et concret : 2 à 6 phrases ou une courte liste à puces (lignes commençant par « - »). Pas de titres, pas de tableau.
+- refs : la liste des lieux cités dans ta réponse, avec kind = "place" et l'id d'un lieu du programme, ou kind = "pin" et l'id d'un lieu ajouté. N'invente jamais d'id.`;
+
 const PHOTO_SYSTEM = `Tu aides Eliot, fondateur français de la marque ORBES (maroquinerie et mode premium, minimaliste), en voyage à Shanghai avec son père.
 On t'envoie une photo prise sur place (menu, panneau, étiquette de produit ou de tissu, carte de visite, ticket…). Réponds en français simple.
 - lines : chaque élément lisible, chinois d'origine (zh) et traduction française naturelle (fr). price = prix en yuans si visible, sinon 0. note = précision utile (épicé, ingrédient, taille…) ou "".
@@ -107,7 +120,7 @@ Pour chaque lieu :
 message : une phrase courte pour Eliot (ex. « 4 propositions autour du Bund »).`;
 
 type Job = {
-  task: "photo" | "interpret" | "place";
+  task: "photo" | "interpret" | "place" | "ask";
   system: string;
   text: string;
   image?: string;
@@ -384,6 +397,15 @@ export async function handle(req: Request, deps: Deps = {}): Promise<Response> {
       research: true,
       maxTokens: 8000,
     };
+  } else if (body.task === "ask") {
+    // read-only notebook assistant: no tools at all, it can only read the notebook sent by the app
+    const question = String(body.question || "").slice(0, 2000).trim();
+    const context = typeof body.context === "string" ? body.context : "";
+    if (!question) return json({ error: "bad", message: "Posez une question." }, 400, origin);
+    if (!context || context.length > 400_000) return json({ error: "bad", message: "Carnet illisible ou trop gros." }, 400, origin);
+    const history = Array.isArray(body.history) ? (body.history as { q: string; a: string }[]).slice(-8) : [];
+    const past = history.length ? `Échange précédent :\n${history.map((h) => `Q : ${String(h.q).slice(0, 500)}\nR : ${String(h.a).slice(0, 1500)}`).join("\n")}\n\n` : "";
+    job = { task: "ask", system: `${ASK_SYSTEM}\n\nCARNET (JSON) :\n${context}`, text: `${past}Question : ${question}`, schema: ASK_SCHEMA, effort: "medium", maxTokens: 3000 };
   } else return json({ error: "bad", message: "Tâche inconnue." }, 400, origin);
 
   try {

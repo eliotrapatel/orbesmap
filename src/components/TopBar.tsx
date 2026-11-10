@@ -4,16 +4,17 @@ import type { Trip } from "../data/types";
 import { clock, phase } from "../lib/time";
 import { useWeather } from "../lib/weather";
 import { useSyncState } from "./Account";
-import { ICal, IChat, IChevron, IDownload, IGrid, IInfo, IPlane, ISearch, IUser, ICheck, ITranslate, IChecklist, ISos } from "./Icons";
+import { ICal, IChat, IChevron, IDownload, IGrid, IInfo, IPlane, ISearch, IUser, ICheck, ITranslate, IChecklist, ISos, IAsk } from "./Icons";
 import { WxIcon } from "./WxIcon";
 import { useChecklist } from "./Checklist";
 import { useEscape } from "./ui";
 
-export type ToolKey = "overview" | "agenda" | "translate" | "phrases" | "converter" | "checklist" | "flights" | "practical" | "emergency" | "export" | "account";
+export type ToolKey = "overview" | "agenda" | "ask" | "translate" | "phrases" | "converter" | "checklist" | "flights" | "practical" | "emergency" | "export" | "account";
 
 export const TOOLS: { key: ToolKey; label: string; icon: React.ReactElement; wide?: boolean }[] = [
   { key: "overview", label: "Aperçu", icon: <IGrid />, wide: true },
   { key: "agenda", label: "Agenda", icon: <ICal /> },
+  { key: "ask", label: "Demander", icon: <IAsk /> },
   { key: "translate", label: "Traduire", icon: <ITranslate /> },
   { key: "emergency", label: "Urgence", icon: <ISos /> },
   { key: "phrases", label: "Phrases", icon: <IChat /> },

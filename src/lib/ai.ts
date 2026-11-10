@@ -38,7 +38,7 @@ export type PlaceItem = {
 };
 export type PlacesResult = { kind: "precise" | "suggestions" | "not_found"; message: string; places: PlaceItem[] };
 
-export async function ai<T>(task: "photo" | "interpret" | "place", payload: Record<string, unknown>, timeoutMs = 60_000, signal?: AbortSignal): Promise<T> {
+export async function ai<T>(task: "photo" | "interpret" | "place" | "ask", payload: Record<string, unknown>, timeoutMs = 60_000, signal?: AbortSignal): Promise<T> {
   if (!navigator.onLine) throw new AiError("Pas de réseau : cette fonction a besoin d'Internet.");
   const token = supabase ? (await supabase.auth.getSession()).data.session?.access_token : null;
   if (!token) throw new AiError("Connectez-vous dans l'onglet Compte pour utiliser cette fonction.");
