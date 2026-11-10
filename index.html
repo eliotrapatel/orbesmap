@@ -3,12 +3,24 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#e4e6e7" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <meta name="color-scheme" content="dark" />
+    <!-- installed on the home screen (iPhone / Android): full screen, black status bar, ORBES icon -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="ORBES GZ" />
-    <title>ORBES — Carnets de voyage</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23000'/%3E%3Ctext x='32' y='43' font-family='Georgia,serif' font-size='32' fill='%23fff' text-anchor='middle'%3EO%3C/text%3E%3C/svg%3E" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="ORBES" />
+    <meta name="application-name" content="ORBES" />
+    <link rel="apple-touch-icon" href="https://orbesmap.vercel.app/icons/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="https://orbesmap.vercel.app/icons/icon-192.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <title>ORBES</title>
+    <style>
+      html, body { background: #0a0a0a; margin: 0; }
+      /* shown while the app starts (no white flash) */
+      #root:empty { position: fixed; inset: 0; display: grid; place-items: center; }
+      #root:empty::before { content: "ORBES"; color: #f6f2ea; font: 500 15px/1 "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: 0.42em; opacity: 0.85; }
+    </style>
   </head>
   <body>
     <div id="root"></div>
