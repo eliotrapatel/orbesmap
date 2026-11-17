@@ -46,7 +46,8 @@ begin
   for k, v in select * from jsonb_each(p_data) loop
     continue when k in ('fieldsAt', 'updatedAt');
     in_at := coalesce((p_data -> 'fieldsAt' ->> k)::numeric, (p_data ->> 'updatedAt')::numeric, 0);
-    cur_at := coalesce((fa ->> k)::numeric, (cur ->> 'updatedAt')::numeric, -1);
+    -- a field the record does not have yet is always taken (whatever the record's last change)
+    cur_at := case when cur ? k then coalesce((fa ->> k)::numeric, (cur ->> 'updatedAt')::numeric, 0) else -1 end;
     if in_at >= cur_at then
       res := jsonb_set(res, array[k], v, true);
       fa := jsonb_set(fa, array[k], to_jsonb(in_at), true);
@@ -54,7 +55,10 @@ begin
   end loop;
   res := jsonb_set(res, '{fieldsAt}', fa, true);
   res := jsonb_set(res, '{updatedAt}', to_jsonb(greatest(coalesce((cur ->> 'updatedAt')::numeric, 0), coalesce((p_data ->> 'updatedAt')::numeric, 0))), true);
-  update public.places set data = res, updated_at = now() where trip_id = p_trip and place_id = p_place;
+  -- nothing new: no write (a write would wake the other phone for nothing)
+  if res is distinct from cur then
+    update public.places set data = res, updated_at = now() where trip_id = p_trip and place_id = p_place;
+  end if;
   return res;
 end;
 $$;

@@ -356,12 +356,20 @@ function flush(fromPull = false): Promise<void> {
         // place records wait (in the outbox) while the "places" table does not exist on the server yet
         const op = outbox.find((o) => !(o.t === "def" && defsMissing));
         if (!op) break;
-        await run(op);
+        try {
+          await run(op);
+        } catch (e) {
+          // the op stays in the outbox; the other changes keep going
+          if (e instanceof DefsMissing) continue;
+          throw e;
+        }
         outbox = outbox.filter((o) => o !== op);
         doneDuringPull?.add(opKey(op) + (op.t.endsWith("-del") ? ":del" : ""));
         persistOutbox();
       }
-      set({ sync: "idle", syncedAt: Date.now() });
+      // place changes still waiting for the "places" table: not "synced"
+      if (outbox.some((o) => o.t === "def")) set({ sync: "pending" });
+      else set({ sync: "idle", syncedAt: Date.now() });
     } catch (e) {
       console.warn("[orbes] sync failed, will retry", e);
       set({ sync: navigator.onLine ? "error" : "pending" });
@@ -394,7 +402,7 @@ async function run(op: Op) {
       if (error) {
         if (isMissing(error)) {
           defsMissing = true;
-          return;
+          throw new DefsMissing();
         }
         throw error;
       }
@@ -479,7 +487,10 @@ export async function pull() {
     if (pl.error) {
       if (!isMissing(pl.error)) throw pl.error;
       defsMissing = true;
-    } else defsMissing = false;
+    } else {
+      defsMissing = false;
+      placesKnown = true;
+    }
     if (state.tripId !== trip) return; // the trip changed meanwhile; the new one pulls on its own
 
     // changes still waiting in the outbox, or sent while we were fetching, win over the fetched copy
@@ -579,6 +590,7 @@ export async function pull() {
     toPush.forEach(enqueue);
     // what the other phone (maybe still on the previous version) changed, copied into the place records
     migrate(trip, true);
+    subscribePlaces();
     await loadPhotoUrls();
     if (!outbox.length) set({ sync: "idle", syncedAt: Date.now() });
   } catch (e) {
@@ -640,7 +652,7 @@ function subscribeRealtime() {
     liveTimer = window.setTimeout(() => void pull(), 1200);
   };
   const ch = supabase!.channel("orbes-" + trip);
-  for (const table of ["place_states", "places", "contacts", "pins", "photos"]) {
+  for (const table of ["place_states", "contacts", "pins", "photos"]) {
     ch.on("postgres_changes", { event: "INSERT", schema: "public", table, filter: `trip_id=eq.${trip}` }, onChange);
     ch.on("postgres_changes", { event: "UPDATE", schema: "public", table, filter: `trip_id=eq.${trip}` }, onChange);
     // DELETE events cannot be filtered (the old row only carries its primary key)
@@ -649,6 +661,29 @@ function subscribeRealtime() {
   ch.on("postgres_changes", { event: "*", schema: "public", table: "settings" }, onChange);
   ch.subscribe();
   channel = ch;
+  subscribePlaces();
+}
+
+// the "places" table has its own channel, opened only once it exists on the server: a table missing from
+// a channel could stop the live updates of everything else
+let placesChannel: RealtimeChannel | null = null;
+let placesChannelTrip = "";
+function subscribePlaces() {
+  if (placesChannel && (placesChannelTrip !== state.tripId || !canSync() || defsMissing)) {
+    void supabase?.removeChannel(placesChannel);
+    placesChannel = null;
+  }
+  if (placesChannel || !canSync() || defsMissing || !placesKnown) return;
+  const trip = state.tripId;
+  const ch = supabase!.channel("orbes-places-" + trip);
+  const onChange = () => {
+    window.clearTimeout(liveTimer);
+    liveTimer = window.setTimeout(() => void pull(), 1200);
+  };
+  ch.on("postgres_changes", { event: "*", schema: "public", table: "places", filter: `trip_id=eq.${trip}` }, onChange);
+  ch.subscribe();
+  placesChannel = ch;
+  placesChannelTrip = trip;
 }
 
 // ---------- auth ----------
@@ -781,6 +816,9 @@ export async function signOut() {
 // ---------- places as data (see defs.ts) ----------
 /** true while the server has no "places" table yet (the SQL of supabase/places.sql not run) */
 let defsMissing = false;
+class DefsMissing extends Error {}
+/** the table answered at least once (its live channel can be opened) */
+let placesKnown = false;
 const isMissing = (e: { code?: string; message?: string }) =>
   ["PGRST202", "PGRST205", "42P01", "42883"].includes(e.code || "") || /(could not find|does not exist).*(places|upsert_place)|(places|upsert_place).*(could not find|does not exist)/i.test(e.message || "");
 

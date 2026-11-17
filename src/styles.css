@@ -877,3 +877,7 @@ button.pl-day:hover { border-color: var(--hair-strong); background: rgba(246, 24
 .ed-times .field span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ed-closed { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 12px; font-size: 13px; color: var(--soft); }
 .ed-closed > span { margin-right: 4px; }
+@media (max-width: 380px) { .ed-times { grid-template-columns: 1fr 1fr; } }
+.ag-x { width: 40px; height: 40px; top: -4px; right: -4px; }
+.removed-row .btn-sm { height: 36px; }
+.modal-edit .input[aria-invalid="true"] { border-color: rgba(232, 176, 122, 0.7); }

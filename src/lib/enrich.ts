@@ -30,7 +30,7 @@ export function useEnrich(id: string | null): One {
 
 const s = (v: unknown) => (typeof v === "string" ? v.trim() : "");
 /** Fields an AI update rewrites (kept in "prevSheet" so the former version can come back) */
-const SHEET = ["desc", "highlights", "tip", "metro", "website", "hours", "duration"] as const;
+const SHEET = ["desc", "highlights", "tip", "metro", "website", "hours", "duration", "type", "nameCn", "address", "addressCn", "price", "source"] as const;
 
 // one sheet at a time: adding several places queues their sheets instead of starting parallel web searches
 let chain: Promise<void> = Promise.resolve();
@@ -77,29 +77,35 @@ async function run(id: string): Promise<void> {
     }
     const cur = (getState().data.defs[id] || {}) as Record<string, unknown>;
     const patch: Record<string, unknown> = { enrichedAt: Date.now(), enrichConfidence: r.confidence };
-    if (s(r.desc)) patch.desc = s(r.desc);
+    // an unsure match only fills what is empty: it never replaces a sheet that is already written
+    const sure = r.confidence !== "faible";
+    const empty = (k: string) => {
+      const v = cur[k];
+      return v == null || v === "" || (Array.isArray(v) && !v.length) || (k === "hours" && typeof v === "object" && !(v as Record<string, unknown>).open && !(v as Record<string, unknown>).always);
+    };
+    const may = (k: string) => sure || empty(k);
+    if (s(r.desc) && may("desc")) patch.desc = s(r.desc);
     const hl = (r.highlights || []).map(s).filter(Boolean).slice(0, 5);
-    if (hl.length) patch.highlights = hl;
-    if (s(r.tip)) patch.tip = s(r.tip);
-    if (s(r.metro)) patch.metro = s(r.metro);
-    if (/^https?:\/\//.test(s(r.website))) patch.website = s(r.website);
+    if (hl.length && may("highlights")) patch.highlights = hl;
+    if (s(r.tip) && may("tip")) patch.tip = s(r.tip);
+    if (s(r.metro) && may("metro")) patch.metro = s(r.metro);
+    if (/^https?:\/\//.test(s(r.website)) && may("website")) patch.website = s(r.website);
     const dur = Number(r.durationMin);
-    if (Number.isFinite(dur) && dur >= 10 && dur <= 600) patch.duration = Math.round(dur);
+    if (Number.isFinite(dur) && dur >= 10 && dur <= 600 && may("duration")) patch.duration = Math.round(dur);
     const h = r.hours;
-    if (h && (h.always || s(h.open) || (h.closed || []).length || (h.byDay || []).length || s(h.reservation) || s(h.note))) patch.hours = h;
-    // the sheet as it was, to bring it back if the new one is worse (only what this update rewrites)
-    const prev: Record<string, unknown> = { at: Date.now() };
-    for (const k of SHEET) if (k in patch) prev[k] = cur[k] ?? null;
-    if (Object.keys(prev).length > 1) patch.prevSheet = prev;
+    if (h && (h.always || s(h.open) || (h.closed || []).length || (h.byDay || []).length || s(h.reservation) || s(h.note)) && may("hours")) patch.hours = h;
     // what was already found (and checked) is kept; only empty fields are filled.
     // An unsure match never gets an address: it would be shown to a driver while the point is elsewhere.
-    const sure = r.confidence !== "faible";
     for (const [k, v] of [["nameCn", r.nameCn], ["address", r.address], ["addressCn", r.addressCn], ["price", r.price]] as const) {
       if (!s(cur[k]) && s(v) && (sure || k === "price")) patch[k] = s(v);
     }
     if (!s(cur.source) && /^https?:\/\//.test(s(r.source))) patch.source = s(r.source);
     // "autre" = no better kind found: the current one is kept
     if ((!s(cur.type) || cur.type === "ajout") && s(r.type) && r.type !== "autre") patch.type = s(r.type);
+    // the sheet as it was, to bring it back if the new one is worse (everything this update wrote)
+    const prev: Record<string, unknown> = { at: Date.now() };
+    for (const k of SHEET) if (k in patch) prev[k] = cur[k] ?? null;
+    if (Object.keys(prev).length > 1) patch.prevSheet = prev;
     updateDef(id, patch);
     set(id, IDLE);
     toast(`Fiche de « ${place.name} » mise à jour`);

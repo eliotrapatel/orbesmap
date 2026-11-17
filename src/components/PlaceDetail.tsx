@@ -97,7 +97,7 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH, onMoveP
                 aria-label="Supprimer ce lieu"
                 onClick={() => {
                   const extra = [photos.length ? `${photos.length} photo${photos.length > 1 ? "s" : ""}` : "", contacts.length ? `${contacts.length} contact${contacts.length > 1 ? "s" : ""}` : ""].filter(Boolean).join(" et ");
-                  if (!confirm(`Supprimer « ${place.name} »${extra ? ` avec ${extra}` : ""} ?`)) return;
+                  if (!confirm(`Supprimer définitivement « ${place.name} »${extra ? ` avec ${extra}` : ""} ?\nPour le sortir du programme en pouvant le remettre plus tard, utilisez plutôt « Retirer du programme ».`)) return;
                   photos.forEach((p) => deletePhoto(p.id));
                   contacts.forEach((c) => deleteContact(c.id));
                   // the record stays as "deleted" so the other phone does not bring the place back

@@ -683,8 +683,18 @@ export default function App() {
           onOpenExisting={(e) => {
             setAddLink(false);
             setAddInitial("");
-            const p = trip.places.find((x) => x.id === (e.kind === "pin" ? pinPlaceId(e.id) : e.id));
+            const id = e.kind === "pin" ? pinPlaceId(e.id) : e.id;
+            const p = trip.places.find((x) => x.id === id);
             if (p) openPlace(p);
+            else {
+              // a place removed from the programme: put back, then opened
+              const r = trip.removed?.find((x) => x.id === id);
+              if (r) {
+                updateDef(r.id, { removed: false });
+                toast(`« ${r.name} » remis au programme`);
+                openPlace(r);
+              }
+            }
           }}
         />
       )}

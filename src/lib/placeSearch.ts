@@ -142,7 +142,8 @@ function sameName(a: string, b: string): boolean {
 export function findExisting(f: Found, trip: Trip, pins: Pin[], states: Record<string, PlaceState>): Found["existing"] {
   const near = (o: { lat: number; lng: number }, m: number) => !!f.ll && km({ lat: f.ll[1], lng: f.ll[0] }, o) < m;
   const sameAddr = (a?: string) => !!a && !!f.addressCn && strip(a).length >= 6 && strip(a) === strip(f.addressCn);
-  for (const p of trip.places) {
+  // removed places too: adding one again offers to put it back instead of creating a duplicate
+  for (const p of [...trip.places, ...(trip.removed || [])]) {
     if (sameName(f.name, p.name) || sameName(f.nameCn, p.name) || sameAddr(p.cn) || ((sameName(f.name, p.name) || sameName(f.nameCn, p.name)) && near(p, 0.15)))
       return { kind: "place", id: p.id, name: p.name };
   }

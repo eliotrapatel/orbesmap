@@ -22,8 +22,9 @@ const SEED_AT = 1;
 type Patch = Record<string, PlaceDef>;
 type Rec = Record<string, unknown> & { fieldsAt?: Record<string, number>; updatedAt?: number };
 
-const at = (r: Rec | undefined, k: string) => (r ? (r.fieldsAt?.[k] ?? r.updatedAt ?? 0) : -1);
 const has = (r: Rec | undefined, k: string) => !!r && Object.prototype.hasOwnProperty.call(r, k);
+/** When a field was last changed; -1 when the record does not have it (then anything is newer) */
+const at = (r: Rec | undefined, k: string) => (has(r, k) ? (r!.fieldsAt?.[k] ?? r!.updatedAt ?? 0) : -1);
 
 /** Collects field changes per record, each with its own timestamp */
 function collector() {
@@ -75,7 +76,9 @@ export function migrationPatches(base: Trip, data: Pick<Data, "places" | "pins" 
       const t = at(s, k);
       if (t <= at(d, k) || t <= (out[p.id]?.fieldsAt?.[k] ?? -1)) continue;
       const v = s![k];
-      put(p.id, k, k === "day" ? (typeof v === "string" ? v : p.day) : k === "slot" ? (typeof v === "string" ? v : p.time) : v === true, t);
+      // a day that does not exist (or the hotel's) meant "the programme's day" in the previous version
+      const okDay = typeof v === "string" && v !== "base" && base.days.some((x) => x.key === v);
+      put(p.id, k, k === "day" ? (okDay ? v : p.day) : k === "slot" ? (typeof v === "string" ? v : p.time) : v === true, t);
     }
   });
 
@@ -88,8 +91,14 @@ export function migrationPatches(base: Trip, data: Pick<Data, "places" | "pins" 
     if (!has(d, "origin")) put(id, "origin", "added", SEED_AT);
     if (!has(d, "pinId")) put(id, "pinId", pin.id, SEED_AT);
     if (!has(d, "order")) put(id, "order", 1e12 + (pin.updatedAt || 0), SEED_AT);
+    // name / position: taken from the pin only when the pin itself changed (renamed or moved on a phone still on
+    // the previous version) — "pin_*" keeps the last value taken, so a note written on the pin changes nothing
     for (const k of ["name", "lat", "lng"] as const) {
-      if ((pin.updatedAt || 0) > at(d, k)) put(id, k, pin[k], pin.updatedAt || SEED_AT);
+      const snap = `pin_${k}`;
+      if (has(d, snap) && d![snap] === pin[k]) continue;
+      const t = Math.max(pin.updatedAt || SEED_AT, SEED_AT);
+      if (t > at(d, k) || !has(d, k)) put(id, k, pin[k], t);
+      put(id, snap, pin[k], t);
     }
     for (const [from, to] of PIN_FIELDS) {
       if (!has(x, from)) continue;
@@ -98,11 +107,12 @@ export function migrationPatches(base: Trip, data: Pick<Data, "places" | "pins" 
     }
   }
 
-  // a pin deleted on a phone still on the previous version: its place goes too
-  if (pinsSynced) {
+  // a pin deleted on a phone still on the previous version: its place is removed from the programme (it stays in
+  // "Lieux retirés", so nothing is lost if the pin list was wrong). An empty list is never trusted for this.
+  if (pinsSynced && data.pins.length) {
     const now = Date.now();
     for (const [id, d] of Object.entries(defs)) {
-      if (d && typeof d.pinId === "string" && d.deleted !== true && !data.pins.some((p) => p.id === d.pinId)) put(id, "deleted", true, now);
+      if (d && typeof d.pinId === "string" && has(d, "pin_name") && d.deleted !== true && d.removed !== true && !data.pins.some((p) => p.id === d.pinId)) put(id, "removed", true, now);
     }
   }
 
@@ -124,11 +134,13 @@ export function tripFromDefs(base: Trip, data: Pick<Data, "places" | "pins" | "d
   const all: { p: Place; order: number }[] = [];
   for (const [id, d] of Object.entries(defs)) {
     if (id === META || !d || d.deleted === true) continue;
-    const lat = Number(d.lat);
-    const lng = Number(d.lng);
+    if (typeof d.lat !== "number" || typeof d.lng !== "number") continue;
+    const lat = d.lat;
+    const lng = d.lng;
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
     const day = typeof d.day === "string" && days.has(d.day) && (d.day !== "base" || d.type === "hotel") ? d.day : fallback;
-    const type = (typeof d.type === "string" && d.type in TYPE_LABEL ? d.type : "ajout") as PlaceType;
+    // only the programme's hotel is a hotel (an added place typed "hotel" would become impossible to move or remove)
+    const type = (typeof d.type === "string" && d.type in TYPE_LABEL && (d.type !== "hotel" || d.origin === "programme") ? d.type : "ajout") as PlaceType;
     const time = str(d.slot);
     const h = normHours(d.hours);
     if (h) hours[id] = h;
