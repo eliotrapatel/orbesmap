@@ -8,6 +8,7 @@ import { TYPE_LABEL } from "../data/trip";
 import type { Place, PlaceType, Trip } from "../data/types";
 import type { Hours } from "./hours";
 import type { Data } from "./model";
+import { tripFromDefs } from "./defs";
 
 /** Place id of an added place */
 export const pinPlaceId = (pinId: string) => `_pin:${pinId}`;
@@ -67,7 +68,11 @@ export function fallbackDay(trip: Trip): string {
 /** A day where a place can be put by hand (the hotel's "base" is not one) */
 const placeableDay = (trip: Trip, k: unknown): k is string => typeof k === "string" && k !== "base" && trip.days.some((d) => d.key === k);
 
-export function liveTrip(base: Trip, data: Pick<Data, "places" | "pins">): Trip {
+export function liveTrip(base: Trip, data: Pick<Data, "places" | "pins"> & { defs?: Data["defs"] }): Trip {
+  // places are data (see defs.ts): the trip is built from their records
+  const fromDefs = data.defs ? tripFromDefs(base, { places: data.places, pins: data.pins, defs: data.defs }) : null;
+  if (fromDefs) return fromDefs;
+  // before the migration has run on this phone: the programme of the code + what was changed in the app
   const st = data.places as Record<string, Record<string, unknown> | undefined>;
   let changed = false;
   const programme = base.places.map((p) => {
@@ -106,16 +111,13 @@ export function liveTrip(base: Trip, data: Pick<Data, "places" | "pins">): Trip 
       highlights: strList(x.highlights),
       tip: str(x.tip) || undefined,
       duration: Number.isFinite(duration) && duration >= 10 && duration <= 600 ? Math.round(duration) : undefined,
-      added: {
-        pinId: pin.id,
-        nameCn: nameCn || undefined,
-        why: str(x.why) || undefined,
-        price: str(x.price) || undefined,
-        source: str(x.source) || undefined,
-        hoursText: str(x.hours) || undefined,
-        note: pin.note || undefined,
-        enrichedAt: Number(x.enrichedAt) || undefined,
-      },
+      nameCn: nameCn || undefined,
+      why: str(x.why) || undefined,
+      price: str(x.price) || undefined,
+      source: str(x.source) || undefined,
+      hoursText: str(x.hours) || undefined,
+      enrichedAt: Number(x.enrichedAt) || undefined,
+      added: { pinId: pin.id, note: pin.note || undefined },
     };
   });
   // places removed in the app leave the trip (map, list, agenda, route, exports) but stay listed to be put back
@@ -127,16 +129,16 @@ export function liveTrip(base: Trip, data: Pick<Data, "places" | "pins">): Trip 
 }
 
 /** The same trip object as long as nothing that shapes the trip changed (notes, statuses… don't) */
-let last: { base: Trip; key: string; trip: Trip; places: unknown; pins: unknown } | null = null;
-export function liveTripCached(base: Trip, data: Pick<Data, "places" | "pins">): Trip {
+let last: { base: Trip; key: string; trip: Trip; places: unknown; pins: unknown; defs: unknown } | null = null;
+export function liveTripCached(base: Trip, data: Pick<Data, "places" | "pins" | "defs">): Trip {
   // same data objects (re-render for another reason, e.g. a position update): nothing to rebuild
-  if (last && last.base === base && last.places === data.places && last.pins === data.pins) return last.trip;
+  if (last && last.base === base && last.places === data.places && last.pins === data.pins && last.defs === data.defs) return last.trip;
   const t = liveTrip(base, data);
   const key = t === base ? "" : JSON.stringify([t.places, t.removed, t.hours]);
   if (last && last.base === base && last.key === key) {
-    last = { ...last, places: data.places, pins: data.pins };
+    last = { ...last, places: data.places, pins: data.pins, defs: data.defs };
     return last.trip;
   }
-  last = { base, key, trip: t, places: data.places, pins: data.pins };
+  last = { base, key, trip: t, places: data.places, pins: data.pins, defs: data.defs };
   return t;
 }

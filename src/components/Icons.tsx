@@ -31,6 +31,7 @@ export const IDownload = mk(<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4
 export const IExpand = mk(<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />);
 export const IRoute = mk(<><circle cx="6" cy="19" r="2.5" /><circle cx="18" cy="5" r="2.5" /><path d="M8.5 19H15a3.5 3.5 0 0 0 0-7H9a3.5 3.5 0 0 1 0-7h6.5" /></>);
 export const ITrash = mk(<path d="M3 6h18M8 6V4h8v2M6 6l1 15h10l1-15" />);
+export const IEdit = mk(<path d="M4 20h4L19 9l-4-4L4 16v4ZM13.5 6.5l4 4" />);
 export const IStarFill = (p: P) => <svg viewBox="0 0 24 24" aria-hidden="true" {...p}><path fill="currentColor" d="m12 2.8 2.8 5.8 6.3.9-4.6 4.4 1.1 6.3L12 17.2l-5.6 3 1.1-6.3L2.9 9.5l6.3-.9L12 2.8Z" /></svg>;
 export const IChevron = mk(<path d="m6 9 6 6 6-6" />);
 export const IGrid = mk(<><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></>);

@@ -3,7 +3,7 @@ import type { Day, Place, Trip } from "../data/types";
 import { checkVisit } from "../lib/hours";
 import type { PlaceState } from "../lib/model";
 import { durationOf, fitAll, overlaps, rangeOf, slotText, type DayFit } from "../lib/slots";
-import { toast, updatePlace } from "../lib/store";
+import { toast, updateDef } from "../lib/store";
 import { formatMinutes } from "../lib/geo";
 import { parseTime } from "../lib/time";
 import { Modal } from "./ui";
@@ -18,8 +18,8 @@ export function placeAt(place: Place, day: string, slot: string, trip: Trip) {
   const o = place.orig ? rangeOf(place.orig.time) : null;
   const n = rangeOf(slot);
   const same = !!place.orig && place.orig.day === day && (place.orig.time === slot || (!!o && !!n && o.start === n.start && o.end === n.end));
-  if (same) updatePlace(place.id, { day: null, slot: null });
-  else updatePlace(place.id, { day, slot });
+  if (same && place.orig) updateDef(place.id, { day: place.orig.day, slot: place.orig.time });
+  else updateDef(place.id, { day, slot });
   const d = trip.days.find((x) => x.key === day);
   toast(`« ${place.name} » : ${d?.dates?.[0] ? d.short : d?.title || ""}${slot ? `, ${slot}` : ", sans heure"}`);
 }
@@ -117,7 +117,7 @@ export default function Planner({ trip, place, states, onClose }: { trip: Trip; 
 
       {place.orig && (
         <div className="pl-sec">
-          <button type="button" className="link-btn" onClick={() => { updatePlace(place.id, { day: null, slot: null }); toast(`« ${place.name} » revient au programme d'origine`); onClose(); }}>
+          <button type="button" className="link-btn" onClick={() => { updateDef(place.id, { day: place.orig!.day, slot: place.orig!.time }); toast(`« ${place.name} » revient au programme d'origine`); onClose(); }}>
             Revenir au programme d'origine : {trip.days.find((d) => d.key === place.orig!.day)?.short}{place.orig.time ? `, ${place.orig.time}` : ""}
           </button>
         </div>

@@ -85,6 +85,8 @@ export interface Photo {
 /** Everything the user adds to one trip */
 export interface Data {
   places: Record<string, PlaceState>;
+  /** every place of the trip, as data (table "places"): the whole sheet, merged field by field like place states */
+  defs: Record<string, PlaceDef>;
   contacts: Contact[];
   pins: Pin[];
   photos: Photo[];
@@ -94,7 +96,10 @@ export interface Settings {
   eurRate: number;
 }
 
-export const emptyData = (): Data => ({ places: {}, contacts: [], pins: [], photos: [] });
+export const emptyData = (): Data => ({ places: {}, defs: {}, contacts: [], pins: [], photos: [] });
+
+/** One place's sheet (see defs.ts for its fields); fieldsAt / updatedAt as in place states */
+export type PlaceDef = Record<string, unknown> & { fieldsAt?: Record<string, number>; updatedAt?: number };
 
 export const uid = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto

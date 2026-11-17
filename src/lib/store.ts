@@ -11,7 +11,8 @@ import type { Trip } from "../data/types";
 import { dataUrlToBlob, deletePhotoFile, getPhoto, putPhoto } from "./idb";
 import { LEGACY_MARKER, LEGACY_TRIP, hasLegacyData, importLegacy, legacyPhotoList, readLegacyPhoto } from "./legacy";
 import { liveTripCached } from "./live";
-import { emptyData, mergePlaceState, uid, type Contact, type Data, type Photo, type Pin, type PlaceState, type Settings } from "./model";
+import { migrationPatches } from "./defs";
+import { emptyData, mergePlaceState, uid, type Contact, type Data, type Photo, type Pin, type PlaceDef, type PlaceState, type Settings } from "./model";
 import { PHOTO_BUCKET, supabase } from "./supabase";
 
 const dataKey = (tripId: string) => "orbes.v2." + tripId;
@@ -22,6 +23,7 @@ const PHOTOS_MARKER = LEGACY_MARKER + ".photos";
 
 type Op =
   | { t: "place"; trip: string; id: string }
+  | { t: "def"; trip: string; id: string }
   | { t: "contact"; trip: string; id: string }
   | { t: "contact-del"; trip: string; id: string }
   | { t: "pin"; trip: string; id: string }
@@ -87,6 +89,7 @@ function normalize(d: Partial<Data> | null): Data {
   if (!d) return e;
   return {
     places: d.places || {},
+    defs: d.defs || {},
     contacts: d.contacts || [],
     pins: d.pins || [],
     // keep metadata only (an early build stored photos inline)
@@ -148,6 +151,7 @@ let legacyUnsaved: Data | null = null; // kept in memory if storage was too full
   }
   const merged: Data = {
     places,
+    defs: base.defs,
     contacts: [...base.contacts, ...imported.data.contacts.filter((c) => !base.contacts.some((x) => x.id === c.id))],
     pins: [...base.pins, ...imported.data.pins.filter((p) => !base.pins.some((x) => x.id === p.id))],
     photos: base.photos,
@@ -164,6 +168,7 @@ let legacyUnsaved: Data | null = null; // kept in memory if storage was too full
 const savedSettings = readJSON<Settings>(SETTINGS_KEY);
 const initialSettings: Settings = { eurRate: savedSettings?.eurRate || legacyRate || 7.7 };
 const startTrip = initialTrip();
+let migrateAtStart = true;
 
 let state: State = {
   tripId: startTrip,
@@ -178,6 +183,11 @@ let state: State = {
 };
 let outbox: Op[] = readJSON<Op[]>(OUTBOX_KEY) || [];
 state.pending = outbox.length;
+// the current trip's places become data at the first start of this version (and catch up at each start)
+if (migrateAtStart) {
+  migrateAtStart = false;
+  queueMicrotask(() => migrate(state.tripId, false));
+}
 const listeners = new Set<() => void>();
 
 function set(patch: Partial<State>) {
@@ -215,7 +225,8 @@ export function useTrip(): Trip {
   const id = useStore((s) => s.tripId);
   const places = useStore((s) => s.data.places);
   const pins = useStore((s) => s.data.pins);
-  return liveTripCached(TRIP_BY_ID[id], { places, pins });
+  const defs = useStore((s) => s.data.defs);
+  return liveTripCached(TRIP_BY_ID[id], { places, pins, defs });
 }
 export const currentTrip = (): Trip => liveTripCached(TRIP_BY_ID[state.tripId], state.data);
 
@@ -232,6 +243,7 @@ export function switchTrip(tripId: string) {
     /* ignore */
   }
   set({ tripId, data: tripId === LEGACY_TRIP && legacyUnsaved ? legacyUnsaved : loadTrip(tripId) });
+  migrate(tripId, false);
   void loadPhotoUrls();
   subscribeRealtime();
   if (canSync()) void pull();
@@ -340,8 +352,10 @@ function flush(fromPull = false): Promise<void> {
     }
     set({ sync: "syncing" });
     try {
-      while (outbox.length && canSync()) {
-        const op = outbox[0];
+      while (canSync()) {
+        // place records wait (in the outbox) while the "places" table does not exist on the server yet
+        const op = outbox.find((o) => !(o.t === "def" && defsMissing));
+        if (!op) break;
         await run(op);
         outbox = outbox.filter((o) => o !== op);
         doneDuringPull?.add(opKey(op) + (op.t.endsWith("-del") ? ":del" : ""));
@@ -374,6 +388,19 @@ async function run(op: Op) {
   const trip_id = op.trip;
   const d = dataOf(trip_id);
   switch (op.t) {
+    case "def": {
+      const s = d.defs[op.id] || {};
+      const { data: merged, error } = await sb.rpc("upsert_place", { p_trip: trip_id, p_place: op.id, p_data: s });
+      if (error) {
+        if (isMissing(error)) {
+          defsMissing = true;
+          return;
+        }
+        throw error;
+      }
+      if (merged) updateTripData(trip_id, (dd) => ({ ...dd, defs: { ...dd.defs, [op.id]: mergePlaceState(dd.defs[op.id] as PlaceState, merged as PlaceState).merged as PlaceDef } }));
+      return;
+    }
     case "place": {
       const s = d.places[op.id] || {};
       // server-side field-by-field merge (see supabase/schema.sql → upsert_place_state)
@@ -439,14 +466,20 @@ export async function pull() {
   try {
     await flush(true);
     doneDuringPull = new Set();
-    const [ps, cs, pins, phs, st] = await Promise.all([
+    const [ps, cs, pins, phs, st, pl] = await Promise.all([
       sb.from("place_states").select("place_id,data,updated_at").eq("trip_id", trip),
       sb.from("contacts").select("*").eq("trip_id", trip),
       sb.from("pins").select("*").eq("trip_id", trip),
       sb.from("photos").select("*").eq("trip_id", trip),
       sb.from("settings").select("eur_rate").eq("id", 1).maybeSingle(),
+      sb.from("places").select("place_id,data,updated_at").eq("trip_id", trip),
     ]);
     for (const r of [ps, cs, pins, phs, st]) if (r.error) throw r.error;
+    // the "places" table not created yet on the server: places stay on this phone and wait
+    if (pl.error) {
+      if (!isMissing(pl.error)) throw pl.error;
+      defsMissing = true;
+    } else defsMissing = false;
     if (state.tripId !== trip) return; // the trip changed meanwhile; the new one pulls on its own
 
     // changes still waiting in the outbox, or sent while we were fetching, win over the fetched copy
@@ -512,7 +545,21 @@ export async function pull() {
         phs.data!.map((r) => ({ id: r.id, placeId: r.place_id, path: r.path, createdAt: new Date(r.created_at).getTime(), synced: true })),
         local.photos,
       );
-      return { places, contacts, pins: pinList, photos };
+      // place records (the trip's places), merged field by field like place states
+      const defs: Record<string, PlaceDef> = { ...local.defs };
+      if (!pl.error) {
+        const remoteDefs = new Set<string>();
+        for (const r of pl.data!) {
+          remoteDefs.add(r.place_id);
+          if (pendingUp.has(`def:${r.place_id}`)) continue;
+          const remote = { updatedAt: new Date(r.updated_at).getTime(), ...(r.data as PlaceState) };
+          const { merged, localNewer } = mergePlaceState(local.defs[r.place_id] as PlaceState, remote);
+          defs[r.place_id] = merged as PlaceDef;
+          if (localNewer) toPush.push({ t: "def", trip, id: r.place_id });
+        }
+        for (const id of Object.keys(local.defs)) if (!remoteDefs.has(id) && !pendingUp.has(`def:${id}`)) toPush.push({ t: "def", trip, id });
+      }
+      return { places, defs, contacts, pins: pinList, photos };
     });
 
     // photos deleted on another device: free their file and URL here
@@ -530,6 +577,8 @@ export async function pull() {
     else if (!st.data && !settingsPending) toPush.push({ t: "settings" });
 
     toPush.forEach(enqueue);
+    // what the other phone (maybe still on the previous version) changed, copied into the place records
+    migrate(trip, true);
     await loadPhotoUrls();
     if (!outbox.length) set({ sync: "idle", syncedAt: Date.now() });
   } catch (e) {
@@ -591,7 +640,7 @@ function subscribeRealtime() {
     liveTimer = window.setTimeout(() => void pull(), 1200);
   };
   const ch = supabase!.channel("orbes-" + trip);
-  for (const table of ["place_states", "contacts", "pins", "photos"]) {
+  for (const table of ["place_states", "places", "contacts", "pins", "photos"]) {
     ch.on("postgres_changes", { event: "INSERT", schema: "public", table, filter: `trip_id=eq.${trip}` }, onChange);
     ch.on("postgres_changes", { event: "UPDATE", schema: "public", table, filter: `trip_id=eq.${trip}` }, onChange);
     // DELETE events cannot be filtered (the old row only carries its primary key)
@@ -727,6 +776,47 @@ export async function signOut() {
   await flush().catch(() => undefined);
   await supabase.auth.signOut({ scope: "local" });
   set({ session: null, member: null, sync: "idle" });
+}
+
+// ---------- places as data (see defs.ts) ----------
+/** true while the server has no "places" table yet (the SQL of supabase/places.sql not run) */
+let defsMissing = false;
+const isMissing = (e: { code?: string; message?: string }) =>
+  ["PGRST202", "PGRST205", "42P01", "42883"].includes(e.code || "") || /(could not find|does not exist).*(places|upsert_place)|(places|upsert_place).*(could not find|does not exist)/i.test(e.message || "");
+
+/** Brings the trip's place records up to date (first programme, places added before, previous version's changes) */
+function migrate(tripId: string, pinsSynced: boolean) {
+  const base = TRIP_BY_ID[tripId];
+  if (!base) return;
+  const patches = migrationPatches(base, dataOf(tripId), pinsSynced);
+  const ids = Object.keys(patches);
+  if (!ids.length) return;
+  updateTripData(tripId, (d) => {
+    const defs = { ...d.defs };
+    for (const id of ids) defs[id] = mergePlaceState(defs[id] as PlaceState, patches[id] as PlaceState).merged as PlaceDef;
+    return { ...d, defs };
+  });
+  ids.forEach((id) => enqueue({ t: "def", trip: tripId, id }));
+}
+
+/** Changes fields of a place's sheet (day, slot, removed, deleted, texts, hours, position…), shared with the other phone */
+export function updateDef(id: string, patch: Record<string, unknown>) {
+  const trip = state.tripId;
+  const now = Date.now();
+  setData((d) => {
+    const cur = d.defs[id] || {};
+    const fieldsAt = { ...(cur.fieldsAt || {}) };
+    for (const k of Object.keys(patch)) fieldsAt[k] = now;
+    return { ...d, defs: { ...d.defs, [id]: { ...cur, ...patch, fieldsAt, updatedAt: now } } };
+  });
+  enqueue({ t: "def", trip, id });
+}
+
+/** A new place of the trip (added from a search, a link or on the map); returns its id */
+export function createPlace(fields: Record<string, unknown>): string {
+  const id = uid();
+  updateDef(id, { ...fields, origin: "added", order: 1e12 + Date.now() });
+  return id;
 }
 
 // ---------- actions ----------

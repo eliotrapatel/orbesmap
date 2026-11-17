@@ -29,23 +29,29 @@ export interface Place {
   added?: AddedInfo;
   /** A programme place moved in the app: its original day and slot (from the code) */
   orig?: { day: DayKey; time: string };
-  /** Suggested visit length in minutes (filled for added places) */
+  /** Suggested visit length in minutes */
   duration?: number;
-}
-
-/** What an added place has on top of the common format */
-export interface AddedInfo {
-  pinId: string;
+  /** Chinese name (shown to a driver with the Chinese address) */
   nameCn?: string;
+  /** why it was added (search) */
   why?: string;
   price?: string;
+  /** most reliable page about the place */
   source?: string;
   /** opening hours as free text, shown when no structured hours are known */
   hoursText?: string;
-  /** the note stored on the pin row before notes per person */
-  note?: string;
-  /** when the full sheet was written by the AI (ms) */
+  /** when the sheet was last written by the AI (ms) */
   enrichedAt?: number;
+  /** the sheet before the last AI update can be brought back */
+  hasPrev?: boolean;
+}
+
+/** A place added in the app (not in the first programme) */
+export interface AddedInfo {
+  /** the map pin it was created from, before places became data */
+  pinId?: string;
+  /** the note stored on that pin row before notes per person */
+  note?: string;
 }
 
 export interface Day {

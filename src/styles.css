@@ -865,3 +865,15 @@ button.pl-day:hover { border-color: var(--hair-strong); background: rgba(246, 24
 .removed-main { display: flex; flex-direction: column; min-width: 0; }
 .removed-main b { font-weight: 500; font-size: 14px; }
 .removed-main small { color: var(--soft); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------- Edit the sheet ---------- */
+.enrich-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.modal-edit { max-width: 520px; }
+.modal-edit .field textarea.input { height: auto; min-height: 76px; padding-top: 10px; line-height: 1.45; resize: vertical; }
+.modal-edit .input { font-size: 16px; }
+.modal-edit form > .btn-sm { margin-top: 10px; }
+.ed-hours { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--hair); }
+.ed-times { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.ed-times .field span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ed-closed { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 12px; font-size: 13px; color: var(--soft); }
+.ed-closed > span { margin-right: 4px; }

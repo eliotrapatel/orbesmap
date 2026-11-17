@@ -1,24 +1,22 @@
-// "Compléter la fiche": the AI writes the full sheet of a place added to the map (description, highlights,
-// tip, metro, website, structured opening hours, visit length), in the programme's format. Runs outside the
-// sheet: closing the sheet or opening another place does not stop it; the result is saved in the place's
-// shared record (synced to the other phone) and announced by a toast.
+// "Mettre à jour la fiche avec l'IA", for every place of the trip: the AI researches the place and writes its
+// sheet (description, highlights, tip, metro, website, structured opening hours, visit length). Runs outside the
+// sheet (closing it does not stop it), one place at a time; the result goes into the place's record (shared with
+// the other phone). The sheet as it was before is kept and can be brought back ("Revenir à la fiche précédente").
 import { useSyncExternalStore } from "react";
-import { TRIP_BY_ID } from "../data/trip";
 import { ai, AiError, type EnrichResult } from "./ai";
-import { pinPlaceId } from "./live";
-import { getState, toast, updateRecord } from "./store";
+import { currentTrip, getState, toast, updateDef } from "./store";
 
 type One = { busy: boolean; startedAt: number; err: string | null };
 const jobs = new Map<string, One>();
 const subs = new Set<() => void>();
 const IDLE: One = { busy: false, startedAt: 0, err: null };
 
-function set(pinId: string, v: One) {
-  jobs.set(pinId, v);
+function set(id: string, v: One) {
+  jobs.set(id, v);
   subs.forEach((f) => f());
 }
 
-export function useEnrich(pinId: string | null): One {
+export function useEnrich(id: string | null): One {
   return useSyncExternalStore(
     (f) => {
       subs.add(f);
@@ -26,59 +24,59 @@ export function useEnrich(pinId: string | null): One {
         subs.delete(f);
       };
     },
-    () => (pinId ? jobs.get(pinId) || IDLE : IDLE),
+    () => (id ? jobs.get(id) || IDLE : IDLE),
   );
 }
 
 const s = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+/** Fields an AI update rewrites (kept in "prevSheet" so the former version can come back) */
+const SHEET = ["desc", "highlights", "tip", "metro", "website", "hours", "duration"] as const;
 
 // one sheet at a time: adding several places queues their sheets instead of starting parallel web searches
 let chain: Promise<void> = Promise.resolve();
 
 /**
- * Writes the full sheet of an added place. `auto` (right after adding a place): only when online and signed in
- * with access, silently skipped otherwise (the "Compléter la fiche" button stays on the sheet).
+ * Writes the sheet of a place with the AI. `auto` (right after adding a place): only when online and signed in
+ * with access, silently skipped otherwise (the button stays on the sheet).
  */
-export function enrichPin(pinId: string, auto = false): Promise<void> {
-  if (jobs.get(pinId)?.busy) return chain;
+export function enrichPlace(id: string, auto = false): Promise<void> {
+  if (jobs.get(id)?.busy) return chain;
   const st = getState();
   if (auto && (!navigator.onLine || !st.session || !st.member)) return chain;
-  // queued: busy with no start time yet ("En attente…")
-  set(pinId, { busy: true, startedAt: 0, err: null });
-  chain = chain.then(() => run(pinId));
+  // queued: busy with no start time yet
+  set(id, { busy: true, startedAt: 0, err: null });
+  chain = chain.then(() => run(id));
   return chain;
 }
 
-async function run(pinId: string): Promise<void> {
-  const st = getState();
-  const tripId = st.tripId;
-  const pin = st.data.pins.find((p) => p.id === pinId);
-  if (!pin) {
-    set(pinId, IDLE);
+async function run(id: string): Promise<void> {
+  const tripId = getState().tripId;
+  const trip = currentTrip();
+  const place = trip.places.find((p) => p.id === id);
+  if (!place) {
+    set(id, IDLE);
     return;
   }
-  const base = TRIP_BY_ID[tripId];
-  const id = pinPlaceId(pinId);
-  const x = (st.data.places[id] || {}) as Record<string, unknown>;
-  set(pinId, { busy: true, startedAt: Date.now(), err: null });
+  set(id, { busy: true, startedAt: Date.now(), err: null });
   try {
     const r = await ai<EnrichResult>(
       "enrich",
       {
-        place: { name: pin.name, nameCn: s(x.nameCn), address: s(x.address), addressCn: s(x.addressCn), lat: pin.lat, lng: pin.lng, type: s(x.type), desc: s(x.desc), why: s(x.why), hours: s(x.hours), source: s(x.source), note: s(pin.note) },
-        trip: { title: base?.title || "", dates: base?.dateLabel || "" },
+        place: {
+          name: place.name, nameCn: place.nameCn || "", address: place.address, addressCn: place.cn, lat: place.lat, lng: place.lng, type: place.type,
+          desc: place.desc, why: place.why || "", hours: place.hoursText || "", source: place.source || place.website || "", note: place.added?.note || "",
+        },
+        trip: { title: trip.title, dates: trip.dateLabel },
       },
       290_000,
     );
-    const now = getState();
     // the trip changed or the place was deleted meanwhile: nothing to save
-    if (now.tripId !== tripId || !now.data.pins.some((p) => p.id === pinId)) {
-      set(pinId, IDLE);
+    if (getState().tripId !== tripId || !currentTrip().places.some((p) => p.id === id)) {
+      set(id, IDLE);
       return;
     }
-    const cur = (now.data.places[id] || {}) as Record<string, unknown>;
+    const cur = (getState().data.defs[id] || {}) as Record<string, unknown>;
     const patch: Record<string, unknown> = { enrichedAt: Date.now(), enrichConfidence: r.confidence };
-    // the sheet's text: the new, fuller version replaces the short one
     if (s(r.desc)) patch.desc = s(r.desc);
     const hl = (r.highlights || []).map(s).filter(Boolean).slice(0, 5);
     if (hl.length) patch.highlights = hl;
@@ -88,8 +86,12 @@ async function run(pinId: string): Promise<void> {
     const dur = Number(r.durationMin);
     if (Number.isFinite(dur) && dur >= 10 && dur <= 600) patch.duration = Math.round(dur);
     const h = r.hours;
-    if (h && (h.always || s(h.open) || (h.closed || []).length || (h.byDay || []).length || s(h.reservation) || s(h.note))) patch.hoursData = h;
-    // what was already found (and checked) for this place is kept; only empty fields are filled.
+    if (h && (h.always || s(h.open) || (h.closed || []).length || (h.byDay || []).length || s(h.reservation) || s(h.note))) patch.hours = h;
+    // the sheet as it was, to bring it back if the new one is worse (only what this update rewrites)
+    const prev: Record<string, unknown> = { at: Date.now() };
+    for (const k of SHEET) if (k in patch) prev[k] = cur[k] ?? null;
+    if (Object.keys(prev).length > 1) patch.prevSheet = prev;
+    // what was already found (and checked) is kept; only empty fields are filled.
     // An unsure match never gets an address: it would be shown to a driver while the point is elsewhere.
     const sure = r.confidence !== "faible";
     for (const [k, v] of [["nameCn", r.nameCn], ["address", r.address], ["addressCn", r.addressCn], ["price", r.price]] as const) {
@@ -98,12 +100,22 @@ async function run(pinId: string): Promise<void> {
     if (!s(cur.source) && /^https?:\/\//.test(s(r.source))) patch.source = s(r.source);
     // "autre" = no better kind found: the current one is kept
     if ((!s(cur.type) || cur.type === "ajout") && s(r.type) && r.type !== "autre") patch.type = s(r.type);
-    updateRecord(id, patch);
-    set(pinId, IDLE);
-    toast(`Fiche de « ${pin.name} » complétée`);
+    updateDef(id, patch);
+    set(id, IDLE);
+    toast(`Fiche de « ${place.name} » mise à jour`);
   } catch (e) {
-    const msg = e instanceof AiError ? e.message : "La fiche n'a pas pu être complétée. Réessayez.";
-    set(pinId, { busy: false, startedAt: 0, err: msg });
-    toast(`Fiche de « ${pin.name} » : ${msg}`);
+    const msg = e instanceof AiError ? e.message : "La fiche n'a pas pu être mise à jour. Réessayez.";
+    set(id, { busy: false, startedAt: 0, err: msg });
+    toast(`Fiche de « ${place.name} » : ${msg}`);
   }
+}
+
+/** Brings back the sheet as it was before the last AI update */
+export function restorePrevSheet(id: string) {
+  const prev = (getState().data.defs[id] || {}).prevSheet as Record<string, unknown> | undefined;
+  if (!prev) return;
+  const patch: Record<string, unknown> = { prevSheet: null };
+  for (const k of SHEET) if (k in prev) patch[k] = prev[k];
+  updateDef(id, patch);
+  toast("Fiche précédente remise");
 }

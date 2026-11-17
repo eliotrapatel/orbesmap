@@ -81,11 +81,11 @@ function tripBlock(trip: Trip, data: Data, detailed: boolean, cap: number) {
       points_forts: (p.highlights || []).map((x) => txt(x, cap)),
       conseil: p.tip ? txt(p.tip, cap) : undefined,
       site: p.website,
-      nom_cn: p.added?.nameCn,
-      pourquoi: p.added?.why,
-      horaires_notes: !h ? p.added?.hoursText : undefined,
-      prix: p.added?.price,
-      source: p.added?.source,
+      nom_cn: p.nameCn,
+      pourquoi: p.why,
+      horaires_notes: !h ? p.hoursText : undefined,
+      prix: p.price,
+      source: p.source,
     });
   });
   // contacts saved on a pin before added places shared the place sheet
@@ -93,7 +93,7 @@ function tripBlock(trip: Trip, data: Data, detailed: boolean, cap: number) {
   for (const p of places as Record<string, unknown>[]) {
     const added = trip.places.find((x) => x.id === p.id)?.added;
     if (added) {
-      const old = pinContacts(added.pinId);
+      const old = added.pinId ? pinContacts(added.pinId) : [];
       if (old.length) p.contacts = [...((p.contacts as unknown[]) || []), ...old];
     }
   }
@@ -132,7 +132,7 @@ function buildStableAt(trip: Trip, data: Data, settings: Settings, cap: number):
   const hist = readJSON<{ at: number; r: { kind: string; title: string; summary: string; material: string; contact: Record<string, string>; lines: { zh: string; fr: string; price: number }[] } }[]>("orbes.photo.history") || [];
   const others = TRIPS.filter((t) => t.id !== trip.id).map((t) => {
     const d = readJSON<Data>("orbes.v2." + t.id);
-    const od = d ? { places: d.places || {}, contacts: d.contacts || [], pins: d.pins || [], photos: d.photos || [] } : null;
+    const od = d ? { places: d.places || {}, defs: d.defs || {}, contacts: d.contacts || [], pins: d.pins || [], photos: d.photos || [] } : null;
     return od
       ? tripBlock(liveTrip(t, od), od, false, cap)
       : drop({ voyage: `${t.code} · ${t.title} · ${t.dateLabel}`, lieux: t.places.map((p) => ({ id: p.id, nom: p.name, jour: p.day, type: p.type })) });

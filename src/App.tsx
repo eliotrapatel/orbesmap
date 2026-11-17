@@ -23,10 +23,10 @@ import { Drawer, EscGuard, Toaster } from "./components/ui";
 import type { Place } from "./data/types";
 import { km, optimizeOrder } from "./lib/geo";
 import { dayStops } from "./lib/plan";
-import { addPin, currentAuthor, switchTrip, toast, updatePin, updateRecord, useStore, useTrip } from "./lib/store";
+import { createPlace, currentAuthor, switchTrip, toast, updateDef, updatePlace, useStore, useTrip } from "./lib/store";
 import { noteKey } from "./lib/notes";
 import { pinPlaceId } from "./lib/live";
-import { enrichPin } from "./lib/enrich";
+import { enrichPlace } from "./lib/enrich";
 import type { Pin } from "./lib/model";
 import { ensureCompass, getLoc, onLocateError, resumeLocate, setFollow, startLocate, stopLocate, useLoc } from "./lib/locate";
 import type { Mode } from "./lib/route";
@@ -79,6 +79,8 @@ export default function App() {
   const [focus, setFocus] = useState<FocusRequest | null>(null);
   const [pinMode, setPinMode] = useState(false);
   const [pendingPin, setPendingPin] = useState<LL | null>(null);
+  // a place whose point is being moved on the map ("Déplacer le point sur la carte")
+  const [moveFor, setMoveFor] = useState<Place | null>(null);
   const [addLink, setAddLink] = useState(false);
   // text to search right away when "Ajouter un lieu" opens from the assistant
   const [addInitial, setAddInitial] = useState("");
@@ -136,6 +138,7 @@ export default function App() {
     setPinMode(false);
     setPlaceQueue([]);
     setPendingPin(null);
+    setMoveFor(null);
     setSnap("peek");
     setDay("all");
     setSel(null);
@@ -308,15 +311,18 @@ export default function App() {
     [navCoords, nav, fix],
   );
 
-  // a place found from a link / screenshot becomes one of "my places", with its Chinese address
+  // a place found from a link / screenshot becomes a place of the trip (a record like every other place)
   const saveFound = useCallback(
     (f: Found, ll: LL, quiet = false) => {
-      const pin = addPin({ name: f.name || f.nameCn || "Lieu", lng: ll[0], lat: ll[1] });
-      updateRecord(`_pin:${pin.id}`, { nameCn: f.nameCn, address: f.address, addressCn: f.addressCn, desc: f.desc, why: f.why, hours: f.hours, price: f.price, source: f.source, day: f.day, type: f.type });
-      // the full sheet (programme format: highlights, tip, metro, hours…) is written right away in the background
-      void enrichPin(pin.id, true);
+      const id = createPlace({
+        name: f.name || f.nameCn || "Lieu", lng: ll[0], lat: ll[1], nameCn: f.nameCn, address: f.address, addressCn: f.addressCn, desc: f.desc,
+        why: f.why, hoursText: f.hours, price: f.price, source: f.source, day: f.day, slot: "", type: f.type,
+      });
+      const pin = { id, lng: ll[0], lat: ll[1] };
+      // the full sheet (highlights, tip, metro, hours…) is written right away in the background
+      void enrichPlace(id, true);
       if (!quiet) {
-        setSel({ kind: "place", id: pinPlaceId(pin.id) });
+        setSel({ kind: "place", id });
         setTool(null);
         fly({ center: ll, zoom: 15.5 });
         toast(`« ${f.name || f.nameCn} » ajouté sur la carte`);
@@ -352,7 +358,7 @@ export default function App() {
         toast(`${pins.length} lieu${pins.length > 1 ? "x" : ""} ajouté${pins.length > 1 ? "s" : ""} sur la carte${manual.length ? ` · ${manual.length} à placer à la main` : ""}`);
         if (!manual.length) {
           setTool(null);
-          setSel({ kind: "place", id: pinPlaceId(pins[pins.length - 1].id) });
+          setSel({ kind: "place", id: pins[pins.length - 1].id });
           fly(pins.length === 1 ? { center: [pins[0].lng, pins[0].lat], zoom: 15 } : { bounds: boundsOf(pins) });
         }
       }
@@ -427,12 +433,19 @@ export default function App() {
         dayColor={dayColor}
         dayGlyph={dayGlyph}
         onSelect={(kind, id) => {
-          if (pinMode || landing) return;
+          if (pinMode || landing || moveFor) return;
           const p = trip.places.find((x) => x.id === (kind === "pin" ? pinPlaceId(id) : id));
           if (p) openPlace(p);
         }}
         onMapClick={(ll) => {
           if (landing) return;
+          if (moveFor) {
+            updateDef(moveFor.id, { lng: ll[0], lat: ll[1] });
+            toast(`Point de « ${moveFor.name} » déplacé`);
+            setSel({ kind: "place", id: moveFor.id });
+            setMoveFor(null);
+            return;
+          }
           if (pinMode) {
             setPinMode(false);
             if (pendingFound) {
@@ -510,7 +523,20 @@ export default function App() {
             </div>
           </aside>
 
-          {selectedPlace && !tool && <PlaceDetail key={selectedPlace.id} trip={trip} place={selectedPlace} onBack={() => setSel(null)} onGo={(m) => startNav(selectedPlace, m)} sheetH={detailSheet} />}
+          {selectedPlace && !tool && !moveFor && (
+            <PlaceDetail
+              key={selectedPlace.id}
+              trip={trip}
+              place={selectedPlace}
+              onBack={() => setSel(null)}
+              onGo={(m) => startNav(selectedPlace, m)}
+              sheetH={detailSheet}
+              onMovePoint={() => {
+                setMoveFor(selectedPlace);
+                setTool(null);
+              }}
+            />
+          )}
 
           {toolDef && (
             <Drawer key={toolDef.key} kicker={trip.code} title={toolDef.key === "converter" ? "Convertisseur" : toolDef.label} wide={toolDef.wide} onClose={() => setTool(null)} sheetH={toolSheet}>
@@ -591,6 +617,13 @@ export default function App() {
             </div>
           </div>
 
+          {moveFor && <EscGuard on={() => { setSel({ kind: "place", id: moveFor.id }); setMoveFor(null); }} />}
+          {moveFor && (
+            <div className="banner glass" role="status">
+              Touchez la carte au nouvel endroit de « {moveFor.name} »
+              <button onClick={() => { setSel({ kind: "place", id: moveFor.id }); setMoveFor(null); }}>Annuler</button>
+            </div>
+          )}
           {pinMode && <EscGuard on={() => { setPinMode(false); setPlaceQueue([]); }} />}
           {pinMode && (
             <div className="banner glass" role="status">
@@ -659,15 +692,11 @@ export default function App() {
         <PinForm
           onClose={() => setPendingPin(null)}
           onSave={(name, note) => {
-            const pin = addPin({ name, lng: pendingPin[0], lat: pendingPin[1] });
+            const id = createPlace({ name, lng: pendingPin[0], lat: pendingPin[1], slot: "" });
             // the note goes into my own note (signed in) or the shared one (signed out)
-            if (note) {
-              const k = noteKey(currentAuthor());
-              if (k) updateRecord(`_pin:${pin.id}`, { [k]: note });
-              else updatePin(pin.id, { note });
-            }
+            if (note) updatePlace(id, { [noteKey(currentAuthor()) || "note"]: note });
             setPendingPin(null);
-            setSel({ kind: "place", id: pinPlaceId(pin.id) });
+            setSel({ kind: "place", id });
             toast(`« ${name} » ajouté`);
           }}
         />

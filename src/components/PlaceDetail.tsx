@@ -4,19 +4,20 @@ import type { Place, Trip } from "../data/types";
 import { amapDirections, formatMinutes, googleDirections, travelMinutes } from "../lib/geo";
 import { isHotel, stopTime } from "../lib/plan";
 import { checkVisit, hoursLine, liveStatus } from "../lib/hours";
-import { addContact, addPhoto, currentAuthor, deleteContact, deletePhoto, deletePin, photoSrc, toast, updatePin, updatePlace, updateRecord, useStore } from "../lib/store";
-import { enrichPin, useEnrich } from "../lib/enrich";
+import { addContact, addPhoto, currentAuthor, deleteContact, deletePhoto, deletePin, photoSrc, toast, updateDef, updatePin, updatePlace, updateRecord, useStore } from "../lib/store";
+import { enrichPlace, restorePrevSheet, useEnrich } from "../lib/enrich";
+import EditSheet from "./EditSheet";
 import { fitAll, slotText } from "../lib/slots";
 import { parseTime } from "../lib/time";
 import Planner, { fitLine, placeAt } from "./Planner";
 import { removeFromProgramme } from "./RemovedList";
 import Notes from "./Notes";
-import { IBack, ICamera, ICheck, IClock, IClose, ICopy, IExpand, IGlobe, INav, IPin, IPlus, ISpeaker, IStar, ITrain, ITrash } from "./Icons";
+import { IBack, ICamera, ICheck, IClock, IClose, ICopy, IEdit, IExpand, IGlobe, INav, IPin, IPlus, ISpeaker, IStar, ITrain, ITrash } from "./Icons";
 import { Lightbox, Modal, SavedInput, ShowScreen, compressImage, copy, speak, useEscape, useSheetDrag } from "./ui";
 import { GoBlock } from "./Nav";
 import type { Mode } from "../lib/route";
 
-export default function PlaceDetail({ trip, place, onBack, onGo, sheetH }: { trip: Trip; place: Place; onBack: () => void; onGo: (m: Mode) => void; sheetH?: string }) {
+export default function PlaceDetail({ trip, place, onBack, onGo, sheetH, onMovePoint }: { trip: Trip; place: Place; onBack: () => void; onGo: (m: Mode) => void; sheetH?: string; onMovePoint?: () => void }) {
   const state = useStore((s) => s.data.places[place.id]) || {};
   useEscape(onBack);
   const sheet = useSheetDrag(onBack, sheetH);
@@ -41,8 +42,9 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH }: { tri
   const line = hoursLine(hours);
   // places added in the app share this sheet; what only they have
   const added = place.added;
-  const job = useEnrich(added?.pinId ?? null);
+  const job = useEnrich(hotel ? null : place.id);
   const [planning, setPlanning] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [secs, setSecs] = useState(0);
   useEffect(() => {
     if (!job.busy) return;
@@ -51,7 +53,7 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH }: { tri
   }, [job.busy, job.startedAt]);
   const coords = `${place.lat.toFixed(5)}, ${place.lng.toFixed(5)}`;
   // what is shown to a driver: the Chinese name and address of an added place, the programme's address otherwise
-  const driverZh = added ? [added.nameCn, place.cn !== added.nameCn ? place.cn : ""].filter(Boolean).join("\n") : place.cn;
+  const driverZh = [place.nameCn, place.cn !== place.nameCn ? place.cn : ""].filter(Boolean).join("\n");
   const scheduledDay = !!day?.scheduled && !!day.dates?.length;
   const timed = scheduledDay && parseTime(place.time) != null;
   const suggestion = !hotel && !timed ? fitAll(trip, place, allStates).best : null;
@@ -86,7 +88,10 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH }: { tri
             >
               <IStar />
             </button>
-            {added && (
+            <button className="icon-btn" aria-label="Modifier la fiche" onClick={() => setEditing(true)}>
+              <IEdit />
+            </button>
+            {!hotel && (
               <button
                 className="icon-btn"
                 aria-label="Supprimer ce lieu"
@@ -95,7 +100,9 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH }: { tri
                   if (!confirm(`Supprimer « ${place.name} »${extra ? ` avec ${extra}` : ""} ?`)) return;
                   photos.forEach((p) => deletePhoto(p.id));
                   contacts.forEach((c) => deleteContact(c.id));
-                  deletePin(added.pinId);
+                  // the record stays as "deleted" so the other phone does not bring the place back
+                  updateDef(place.id, { deleted: true });
+                  if (added?.pinId) deletePin(added.pinId);
                   toast("Lieu supprimé");
                   onBack();
                 }}
@@ -112,14 +119,14 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH }: { tri
           </div>
           <h2>{place.name}</h2>
           <div className="sub">
-            {place.time ? <span><IClock /> {place.time}</span> : added && !added.nameCn ? <span>{coords}</span> : null}
+            {place.time ? <span><IClock /> {place.time}</span> : !place.cn ? <span>{coords}</span> : null}
             {!hotel && <span><INav /> {formatMinutes(minutes)} depuis l'hôtel</span>}
           </div>
-          {(live || line || issues.length > 0 || (!line && added?.hoursText)) && (
+          {(live || line || issues.length > 0 || (!line && place.hoursText)) && (
             <div className="hours-box">
               {live && <span className={"hb-live " + live.tone}><i /> Maintenant à {trip.title} : {live.label}</span>}
               {line && <span className="hb-line">{line}</span>}
-              {!line && added?.hoursText && <span className="hb-line">Horaires : {added.hoursText}</span>}
+              {!line && place.hoursText && <span className="hb-line">Horaires : {place.hoursText}</span>}
               {issues.map((x, i) => <span key={i} className={"hb-issue " + x.tone}>{x.tone === "bad" ? "⚠ " : x.tone === "warn" ? "! " : ""}{x.text}</span>)}
               {hours?.note && <span className="hb-line">{hours.note}</span>}
             </div>
@@ -222,7 +229,7 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH }: { tri
 
         <div className="sec">
           <span className="label">Le lieu</span>
-          {added && sheetEmpty && !job.busy && <p className="em-small">Fiche à compléter : l'IA peut la rédiger (description, points forts, conseil, métro, horaires).</p>}
+          {!hotel && sheetEmpty && !job.busy && <p className="em-small">Fiche à compléter : l'IA peut la rédiger (description, points forts, conseil, métro, horaires).</p>}
           {place.desc && <p>{place.desc}</p>}
           {place.highlights.length > 0 && (
             <ul className="hl">
@@ -239,10 +246,10 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH }: { tri
               </div>
             )}
           </div>
-          {added?.why && <p className="em-small">Pourquoi : {added.why}</p>}
-          {added?.price && <p className="em-small">Prix : {added.price}</p>}
-          {added?.source && /^https?:\/\//.test(added.source) && <p className="em-small"><a href={added.source} target="_blank" rel="noopener">Source</a></p>}
-          {added && (
+          {place.why && <p className="em-small">Pourquoi : {place.why}</p>}
+          {place.price && <p className="em-small">Prix : {place.price}</p>}
+          {place.source && /^https?:\/\//.test(place.source) && <p className="em-small"><a href={place.source} target="_blank" rel="noopener">Source</a></p>}
+          {!hotel && (
             <div className="enrich">
               {job.busy ? (
                 <span className="tr-loading">
@@ -251,9 +258,13 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH }: { tri
                 </span>
               ) : (
                 <>
-                  <button className={"btn-sm" + (added.enrichedAt ? "" : " on")} onClick={() => void enrichPin(added.pinId)}>
-                    {added.enrichedAt ? "Mettre à jour la fiche avec l'IA" : "Compléter la fiche avec l'IA"}
-                  </button>
+                  <div className="enrich-btns">
+                    <button className={"btn-sm" + (sheetEmpty ? " on" : "")} onClick={() => void enrichPlace(place.id)}>
+                      {sheetEmpty ? "Compléter la fiche avec l'IA" : "Mettre à jour la fiche avec l'IA"}
+                    </button>
+                    <button className="btn-sm" onClick={() => setEditing(true)}>Modifier la fiche</button>
+                  </div>
+                  {place.hasPrev && <button className="link-btn plan-remove" onClick={() => restorePrevSheet(place.id)}>Revenir à la fiche d'avant la mise à jour</button>}
                   {job.err && <p className="tr-err">{job.err}</p>}
                 </>
               )}
@@ -267,7 +278,7 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH }: { tri
           placeholder={added ? "Stand, contact, prix…" : "Ce que vous avez vu, les prix, les impressions…"}
           onSave={(key, v) => {
             // an added place keeps its former shared note on the pin itself (as before)
-            if (added && key === "note") {
+            if (added?.pinId && key === "note") {
               updatePin(added.pinId, { note: v });
               updateRecord(place.id, { noteBy: currentAuthor() });
             } else updateRecord(place.id, key === "note" ? { note: v, noteBy: currentAuthor() } : { [key]: v });
@@ -314,12 +325,6 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH }: { tri
           <button className="link-btn" onClick={() => setAddingContact(true)}><IPlus /> Ajouter un contact</button>
         </div>
 
-        {added && (
-          <div className="sec">
-            <span className="label">Nom</span>
-            <SavedInput value={place.name} onSave={(v) => v.trim() && updatePin(added.pinId, { name: v.trim() })} />
-          </div>
-        )}
 
         {!hotel && (
           <button className={"visit-btn" + (state.visited ? " on" : "")} aria-pressed={!!state.visited} onClick={() => updatePlace(place.id, { visited: !state.visited })}>
@@ -330,6 +335,7 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH }: { tri
 
       {show && <ShowScreen zh={driverZh} sub={place.address ? `${place.name} — ${place.address}` : place.name} onClose={() => setShow(false)} />}
       {planning && <Planner trip={trip} place={place} states={allStates} onClose={() => setPlanning(false)} />}
+      {editing && <EditSheet trip={trip} place={place} onClose={() => setEditing(false)} onMovePoint={onMovePoint ? () => { setEditing(false); onMovePoint(); } : undefined} />}
       {lightbox && <Lightbox src={lightbox} onClose={() => setLightbox(null)} />}
       {addingContact && (
         <ContactForm

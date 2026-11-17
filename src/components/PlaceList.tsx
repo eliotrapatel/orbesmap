@@ -136,7 +136,7 @@ export default function PlaceList({ trip, places, states, pins, selectedId, quer
                 <span className="row-main">
                   <span className="row-name">{p.name}</span>
                   <span className="row-meta">
-                    {s?.appt ? `RDV ${s.appt}` : [p.time, TYPE_LABEL[p.type] || p.type, !p.time && p.added ? p.added.why || p.desc || p.added.note : ""].filter(Boolean).join(" · ")}
+                    {s?.appt ? `RDV ${s.appt}` : [p.time, TYPE_LABEL[p.type] || p.type, !p.time && p.added ? p.why || p.desc || p.added.note : ""].filter(Boolean).join(" · ")}
                   </span>
                 </span>
                 <span className="row-tags">

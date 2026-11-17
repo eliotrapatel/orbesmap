@@ -22,7 +22,7 @@ function liveOf(t: Trip, current: Trip): Trip {
   if (t.id === current.id) return current;
   try {
     const raw = JSON.parse(localStorage.getItem("orbes.v2." + t.id) || "null");
-    return raw ? liveTrip(t, { places: raw.places || {}, pins: raw.pins || [] }) : t;
+    return raw ? liveTrip(t, { places: raw.places || {}, pins: raw.pins || [], defs: raw.defs || {} }) : t;
   } catch {
     return t;
   }
