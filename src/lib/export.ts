@@ -13,10 +13,9 @@ export function exportCsv(trip: Trip, d: Data) {
     for (const p of trip.places.filter((x) => x.day === day.key)) {
       const s = d.places[p.id] || {};
       const contacts = d.contacts.filter((c) => c.placeId === p.id).map((c) => `${c.name} (${c.kind === "wa" ? "WhatsApp" : "WeChat"} ${c.value})`).join(" | ");
-      rows.push([day.title, p.name, TYPE_LABEL[p.type] || p.type, statusLabel(s.status), s.rating || "", s.moq || "", s.price || "", s.lead || "", s.sample || "", s.appt || "", p.time, p.address, p.cn, p.metro || "", p.website || "", notesText(s as Record<string, unknown>).replace(/\n/g, " "), contacts, s.visited ? "Oui" : "", s.favorite ? "Oui" : "", p.lat, p.lng]);
+      rows.push([day.title, p.name, TYPE_LABEL[p.type] || p.type, statusLabel(s.status), s.rating || "", s.moq || "", s.price || "", s.lead || "", s.sample || "", s.appt || "", p.time, p.address, p.cn, p.metro || "", p.website || "", notesText(s as Record<string, unknown>, p.added?.note).replace(/\n/g, " "), contacts, s.visited ? "Oui" : "", s.favorite ? "Oui" : "", p.lat, p.lng]);
     }
   }
-  for (const pin of d.pins) rows.push(["Mes lieux", pin.name, "Lieu ajouté", "", "", "", "", "", "", "", "", "", "", "", "", notesText(d.places[`_pin:${pin.id}`] as Record<string, unknown>, pin.note).replace(/\n/g, " "), "", "", "", pin.lat, pin.lng]);
   const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
   const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
   const a = document.createElement("a");
@@ -43,24 +42,18 @@ export function exportPdf(trip: Trip, d: Data): boolean {
     h += `<h2>${esc(day.title)}${day.theme ? ` — ${esc(day.theme)}` : ""}</h2>`;
     for (const p of items) {
       const s = d.places[p.id] || {};
-      h += `<div class="p"><div class="n">${esc(p.name)}${s.visited ? " ✓" : ""}${s.favorite ? " ★" : ""}</div><div class="m">${esc(TYPE_LABEL[p.type] || p.type)}, ${esc(p.time)}</div>`;
+      h += `<div class="p"><div class="n">${esc(p.name)}${s.visited ? " ✓" : ""}${s.favorite ? " ★" : ""}</div><div class="m">${esc(TYPE_LABEL[p.type] || p.type)}${p.time ? `, ${esc(p.time)}` : ""}</div>`;
       const badges = [statusLabel(s.status), s.rating ? `${s.rating}/5` : ""].filter(Boolean);
       if (badges.length) h += `<div>${badges.map((b) => `<span class="b">${esc(b)}</span>`).join("")}</div>`;
       if (s.moq || s.price || s.lead || s.sample) h += `<div>MOQ : ${esc(s.moq || "–")} · Prix : ${esc(s.price || "–")} · Délai : ${esc(s.lead || "–")} · Échantillon : ${esc(s.sample || "–")}</div>`;
       if (s.appt) h += `<div>RDV : ${esc(s.appt)}</div>`;
-      h += `<div class="m">${esc(p.address)} — <span class="cn">${esc(p.cn)}</span></div>`;
+      if (p.address || p.cn) h += `<div class="m">${esc(p.address)}${p.address && p.cn ? " — " : ""}<span class="cn">${esc(p.cn)}</span></div>`;
+      else if (p.added) h += `<div class="m">${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</div>`;
       const cs = d.contacts.filter((c) => c.placeId === p.id);
       if (cs.length) h += `<div>Contacts : ${cs.map((c) => esc(`${c.name} (${c.kind === "wa" ? "WhatsApp" : "WeChat"} ${c.value})`)).join(", ")}</div>`;
-      const nt = notesText(s as Record<string, unknown>, undefined, "\n");
+      const nt = notesText(s as Record<string, unknown>, p.added?.note, "\n");
       if (nt) h += `<div><b>Notes :</b> ${esc(nt).replace(/\n/g, "<br>")}</div>`;
       h += `</div>`;
-    }
-  }
-  if (d.pins.length) {
-    h += `<h2>Mes lieux</h2>`;
-    for (const pin of d.pins) {
-      const nt = notesText(d.places[`_pin:${pin.id}`] as Record<string, unknown>, pin.note, "\n");
-      h += `<div class="p"><div class="n">${esc(pin.name)}</div>${nt ? `<div>${esc(nt).replace(/\n/g, "<br>")}</div>` : ""}<div class="m">${pin.lat.toFixed(5)}, ${pin.lng.toFixed(5)}</div></div>`;
     }
   }
   h += `</body></html>`;

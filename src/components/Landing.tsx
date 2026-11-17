@@ -3,6 +3,7 @@ import OrbitMark from "./OrbitMark";
 import { TRIPS } from "../data/trip";
 import type { Trip } from "../data/types";
 import { countable } from "../lib/plan";
+import { liveTrip } from "../lib/live";
 import { getState } from "../lib/store";
 import { clock, countdownParts, phase, tripEndMs, tripStartMs } from "../lib/time";
 
@@ -13,6 +14,17 @@ function visitedOf(t: Trip): number {
     return countable(t).filter((p) => places[p.id]?.visited).length;
   } catch {
     return 0;
+  }
+}
+
+/** A trip with its places added / moved in the app (the current one is already live) */
+function liveOf(t: Trip, current: Trip): Trip {
+  if (t.id === current.id) return current;
+  try {
+    const raw = JSON.parse(localStorage.getItem("orbes.v2." + t.id) || "null");
+    return raw ? liveTrip(t, { places: raw.places || {}, pins: raw.pins || [] }) : t;
+  } catch {
+    return t;
   }
 }
 
@@ -67,7 +79,7 @@ export default function Landing({ trip, onPick, onEnter }: { trip: Trip; onPick:
     return () => window.removeEventListener("resize", fit);
   }, [trip.id]);
   const days = trip.days.filter((d) => d.scheduled).reduce((n, d) => n + (d.dates?.length || 0), 0);
-  const ordered = [...TRIPS].sort((a, b) => b.start.localeCompare(a.start));
+  const ordered = TRIPS.map((t) => liveOf(t, trip)).sort((a, b) => b.start.localeCompare(a.start));
 
   return (
     <div ref={root} className={"landing" + (out ? " out" : "")} role="dialog" aria-label="Accueil">

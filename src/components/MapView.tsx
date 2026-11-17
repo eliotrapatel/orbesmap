@@ -504,7 +504,7 @@ export default function MapView(p: Props) {
     } catch {
       /* ignore */
     }
-  }, [p.route, p.routeColor, p.trip, p.landing, ready]);
+  }, [p.route, p.routeColor, p.trip.id, p.landing, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- landing: flight arc Paris → destination, plane moving, globe slowly turning ---
   useEffect(() => {
@@ -556,7 +556,7 @@ export default function MapView(p: Props) {
       handlers.forEach((h) => h.enable());
       map.touchZoomRotate.disableRotation();
     };
-  }, [p.landing, p.trip, ready]);
+  }, [p.landing, p.trip.id, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- 3D buildings ---
   const prev3D = useRef(false);

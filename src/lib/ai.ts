@@ -37,8 +37,25 @@ export type PlaceItem = {
   confidence: "haute" | "moyenne" | "faible";
 };
 export type PlacesResult = { kind: "precise" | "suggestions" | "not_found"; message: string; places: PlaceItem[] };
+/** Full sheet of an added place (same fields as the programme's places + structured hours) */
+export type EnrichResult = {
+  nameCn: string;
+  address: string;
+  addressCn: string;
+  type: string;
+  desc: string;
+  highlights: string[];
+  tip: string;
+  metro: string;
+  website: string;
+  durationMin: number;
+  price: string;
+  hours: { always: boolean; closed: number[]; open: string; close: string; lastEntry: string; breaks: { from: string; to: string }[]; byDay: { day: number; open: string; close: string }[]; reservation: string; confidence: string; note: string };
+  source: string;
+  confidence: "haute" | "moyenne" | "faible";
+};
 
-export async function ai<T>(task: "photo" | "interpret" | "place" | "ask" | "balance", payload: Record<string, unknown>, timeoutMs = 60_000, signal?: AbortSignal): Promise<T> {
+export async function ai<T>(task: "photo" | "interpret" | "place" | "ask" | "enrich" | "balance", payload: Record<string, unknown>, timeoutMs = 60_000, signal?: AbortSignal): Promise<T> {
   if (!navigator.onLine) throw new AiError("Pas de réseau : cette fonction a besoin d'Internet.");
   const token = supabase ? (await supabase.auth.getSession()).data.session?.access_token : null;
   if (!token) throw new AiError("Connectez-vous dans l'onglet Compte pour utiliser cette fonction.");

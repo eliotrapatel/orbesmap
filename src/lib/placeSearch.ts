@@ -97,8 +97,10 @@ async function geocode(q: string, box: [number, number, number, number], signal:
 /** Search box: the trip's places (incl. Suzhou day trips) plus a margin, or ~5 km around "near me". */
 function boxFor(trip: Trip, near?: { lat: number; lng: number }): [number, number, number, number] {
   if (near) return [near.lng - 0.05, near.lat - 0.05, near.lng + 0.05, near.lat + 0.05];
-  const lats = trip.places.map((p) => p.lat);
-  const lngs = trip.places.map((p) => p.lng);
+  // the programme's places only: a place added far away by mistake must not widen the search area
+  const prog = trip.places.filter((p) => !p.added);
+  const lats = prog.map((p) => p.lat);
+  const lngs = prog.map((p) => p.lng);
   return [Math.min(...lngs) - 0.3, Math.min(...lats) - 0.3, Math.max(...lngs) + 0.3, Math.max(...lats) + 0.3];
 }
 
@@ -168,7 +170,7 @@ export async function runPlaceSearch(opts: { trip: Trip; pins: Pin[]; text: stri
     const rest = url ? opts.text.replace(url, "").trim() : opts.text.trim();
     const image = opts.shot ? await imageToBase64(opts.shot, 1600, 0.8) : undefined;
     if (signal.aborted) throw new AiError("Recherche arrêtée.");
-    const known = [...opts.trip.places.filter((p) => p.type !== "transport" && p.type !== "hotel").map((p) => p.name), ...opts.pins.map((p) => p.name)];
+    const known = [...new Set([...opts.trip.places.filter((p) => p.type !== "transport" && p.type !== "hotel").map((p) => p.name), ...opts.pins.map((p) => p.name)])];
     const near = opts.near ? { lat: opts.near.lat, lng: opts.near.lng, label: "ma position actuelle" } : undefined;
     const r = await ai<PlacesResult>("place", { url, text: rest, image, near, known }, 290_000, signal);
     const places = (r.places || []).filter((p) => p.name || p.nameCn).slice(0, 6);

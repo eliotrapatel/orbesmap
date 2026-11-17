@@ -10,6 +10,7 @@ import { TRIP_BY_ID, defaultTrip } from "../data/trip";
 import type { Trip } from "../data/types";
 import { dataUrlToBlob, deletePhotoFile, getPhoto, putPhoto } from "./idb";
 import { LEGACY_MARKER, LEGACY_TRIP, hasLegacyData, importLegacy, legacyPhotoList, readLegacyPhoto } from "./legacy";
+import { liveTripCached } from "./live";
 import { emptyData, mergePlaceState, uid, type Contact, type Data, type Photo, type Pin, type PlaceState, type Settings } from "./model";
 import { PHOTO_BUCKET, supabase } from "./supabase";
 
@@ -209,8 +210,14 @@ export function useStore<T>(sel: (s: State) => T): T {
   );
 }
 export const getState = () => state;
-export const useTrip = (): Trip => TRIP_BY_ID[useStore((s) => s.tripId)];
-export const currentTrip = (): Trip => TRIP_BY_ID[state.tripId];
+/** The current trip as used in the app: the programme plus the places added and moved in the app (see live.ts) */
+export function useTrip(): Trip {
+  const id = useStore((s) => s.tripId);
+  const places = useStore((s) => s.data.places);
+  const pins = useStore((s) => s.data.pins);
+  return liveTripCached(TRIP_BY_ID[id], { places, pins });
+}
+export const currentTrip = (): Trip => liveTripCached(TRIP_BY_ID[state.tripId], state.data);
 
 export function switchTrip(tripId: string) {
   if (!TRIP_BY_ID[tripId] || tripId === state.tripId) return;
@@ -352,7 +359,8 @@ function flush(fromPull = false): Promise<void> {
   return flushing;
 }
 
-const photoPath = (trip: string, placeId: string, id: string) => `${trip}/${placeId}/${id}.jpg`;
+// storage keys stay plain: an added place's id ("_pin:…") has a colon (programme ids are unchanged by this)
+const photoPath = (trip: string, placeId: string, id: string) => `${trip}/${placeId.replace(/[^A-Za-z0-9._-]/g, "_")}/${id}.jpg`;
 
 async function run(op: Op) {
   const sb = supabase!;

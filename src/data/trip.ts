@@ -8,6 +8,7 @@ export const TYPE_LABEL: Record<PlaceType, string> = {
   restaurant: "Restaurant", mall: "Shopping", cashmere: "Cachemire", concept: "Concept store",
   luxe: "Luxe", montres: "Horlogerie", cuir: "Maroquinerie", musee: "Musée", galerie: "Galerie",
   jardin: "Jardin", design: "Design", tech: "Tech", cafe: "Café", club: "Club", transport: "Transport",
+  ajout: "Mon lieu",
 };
 
 export const STATUSES: { key: Status; label: string; color: string }[] = [

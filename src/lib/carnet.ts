@@ -6,6 +6,7 @@ import type { Trip } from "../data/types";
 import { km } from "./geo";
 import { checkVisit, hoursLine, liveStatus } from "./hours";
 import type { Data, Settings } from "./model";
+import { liveTrip } from "./live";
 import { stopTime } from "./plan";
 import type { Wx } from "./weather";
 import { notesOf } from "./notes";
@@ -58,7 +59,9 @@ function tripBlock(trip: Trip, data: Data, detailed: boolean, cap: number) {
       note_sur_5: s.rating || undefined,
       favori: s.favorite || undefined,
       visite: s.visited || undefined,
-      notes: noteMap(s, undefined, cap),
+      notes: noteMap(s, p.added?.note, cap),
+      ajoute_dans_l_app: p.added ? true : undefined,
+      programme_d_origine: p.orig ? drop({ jour: p.orig.day, horaire: p.orig.time }) : undefined,
       fournisseur: drop({ moq: s.moq, prix: s.price, delai: s.lead, echantillon: s.sample }),
       contacts: contacts.filter((c) => c.placeId === p.id).map((c) => drop({ nom: c.name, appli: c.kind === "wc" ? "WeChat" : "WhatsApp", id: c.value, message: c.message })),
       photos: photos.filter((x) => x.placeId === p.id).length || undefined,
@@ -74,30 +77,26 @@ function tripBlock(trip: Trip, data: Data, detailed: boolean, cap: number) {
       fiabilite_horaires: h?.confidence,
       reservation: h?.reservation,
       alertes_visite: h ? checkVisit(h, day?.dates?.[0], stopTime(p, data.places)).filter((i) => i.tone !== "info").map((i) => i.text) : undefined,
-      description: txt(p.desc, cap),
+      description: p.desc ? txt(p.desc, cap) : undefined,
       points_forts: (p.highlights || []).map((x) => txt(x, cap)),
       conseil: p.tip ? txt(p.tip, cap) : undefined,
+      site: p.website,
+      nom_cn: p.added?.nameCn,
+      pourquoi: p.added?.why,
+      horaires_notes: !h ? p.added?.hoursText : undefined,
+      prix: p.added?.price,
+      source: p.added?.source,
     });
   });
-  const pins = (data.pins || []).map((p) => {
-    const x = st[`_pin:${p.id}`] || {};
-    return drop({
-      id: p.id,
-      nom: p.name,
-      jour: x.day,
-      type: x.type,
-      nom_cn: x.nameCn,
-      adresse: x.address,
-      adresse_cn: x.addressCn,
-      description: x.desc ? txt(x.desc, cap) : undefined,
-      pourquoi: x.why,
-      horaires: x.hours,
-      prix: x.price,
-      source: x.source,
-      notes: noteMap(x, p.note, cap),
-      contacts: contacts.filter((c) => c.placeId === p.id).map((c) => drop({ nom: c.name, appli: c.kind === "wc" ? "WeChat" : "WhatsApp", id: c.value })),
-    });
-  });
+  // contacts saved on a pin before added places shared the place sheet
+  const pinContacts = (pinId: string) => contacts.filter((c) => c.placeId === pinId).map((c) => drop({ nom: c.name, appli: c.kind === "wc" ? "WeChat" : "WhatsApp", id: c.value }));
+  for (const p of places as Record<string, unknown>[]) {
+    const added = trip.places.find((x) => x.id === p.id)?.added;
+    if (added) {
+      const old = pinContacts(added.pinId);
+      if (old.length) p.contacts = [...((p.contacts as unknown[]) || []), ...old];
+    }
+  }
   const seeds = (trip.checklist || []).map((c) => {
     const v = st[`_check:${c.id}`] || {};
     return v.deleted ? null : drop({ tache: c.text, groupe: c.group, avant_le: c.due, qui: v.owner, faite: v.done || false });
@@ -114,7 +113,6 @@ function tripBlock(trip: Trip, data: Data, detailed: boolean, cap: number) {
     jours: trip.days.map((d) => drop({ cle: d.key, nom: d.short, titre: d.title, theme: d.theme, dates: d.dates, au_programme: d.scheduled })),
     vols: trip.flights.map((f) => drop({ vol: f.code, de: `${f.fromCity} ${f.from}`, vers: `${f.toCity} ${f.to}`, depart: f.departAt, arrivee: f.arriveAt, terminal: f.terminal })),
     lieux: places,
-    mes_lieux_ajoutes: pins,
     check_list: detailed ? [...seeds.filter(Boolean), ...custom] : undefined,
     infos_pratiques: detailed ? (trip.practical || []).map((c) => ({ titre: c.title, texte: txt(c.text, cap) })) : undefined,
     urgence:
@@ -133,8 +131,9 @@ function buildStableAt(trip: Trip, data: Data, settings: Settings, cap: number):
   const hist = readJSON<{ at: number; r: { kind: string; title: string; summary: string; material: string; contact: Record<string, string>; lines: { zh: string; fr: string; price: number }[] } }[]>("orbes.photo.history") || [];
   const others = TRIPS.filter((t) => t.id !== trip.id).map((t) => {
     const d = readJSON<Data>("orbes.v2." + t.id);
-    return d
-      ? tripBlock(t, { places: d.places || {}, contacts: d.contacts || [], pins: d.pins || [], photos: d.photos || [] }, false, cap)
+    const od = d ? { places: d.places || {}, contacts: d.contacts || [], pins: d.pins || [], photos: d.photos || [] } : null;
+    return od
+      ? tripBlock(liveTrip(t, od), od, false, cap)
       : drop({ voyage: `${t.code} · ${t.title} · ${t.dateLabel}`, lieux: t.places.map((p) => ({ id: p.id, nom: p.name, jour: p.day, type: p.type })) });
   });
   return JSON.stringify(
@@ -171,7 +170,7 @@ export function buildStable(trip: Trip, data: Data, settings: Settings): string 
 /** What changes from one question to the next. */
 export function buildLive(
   trip: Trip,
-  data: Data,
+  _data: Data,
   fix: { lat: number; lng: number; acc: number; t: number } | null,
   stale: boolean,
   wx: Wx | null,
@@ -197,7 +196,6 @@ export function buildLive(
           return drop({ id: p.id, ouvert: ls?.label, distance_km_vol_oiseau: usable ? Math.round(km(fix!, p) * 10) / 10 : undefined });
         })
         .filter((x) => Object.keys(x).length > 1),
-      mes_lieux_distance: usable ? data.pins.map((p) => ({ id: p.id, distance_km_vol_oiseau: Math.round(km(fix!, p) * 10) / 10 })) : undefined,
     }),
   );
 }

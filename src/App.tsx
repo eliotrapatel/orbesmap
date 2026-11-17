@@ -14,7 +14,7 @@ import Ask from "./components/Ask";
 import Landing from "./components/Landing";
 import MapView, { type FocusRequest } from "./components/MapView";
 import Overview from "./components/Overview";
-import PinDetail, { PinForm } from "./components/PinDetail";
+import { PinForm } from "./components/PinDetail";
 import PlaceDetail from "./components/PlaceDetail";
 import PlaceList, { type Filter } from "./components/PlaceList";
 import TopBar, { TOOLS, type ToolKey } from "./components/TopBar";
@@ -25,6 +25,9 @@ import { km, optimizeOrder } from "./lib/geo";
 import { dayStops } from "./lib/plan";
 import { addPin, currentAuthor, switchTrip, toast, updatePin, updateRecord, useStore, useTrip } from "./lib/store";
 import { noteKey } from "./lib/notes";
+import { pinPlaceId } from "./lib/live";
+import { enrichPin } from "./lib/enrich";
+import type { Pin } from "./lib/model";
 import { ensureCompass, getLoc, onLocateError, resumeLocate, setFollow, startLocate, stopLocate, useLoc } from "./lib/locate";
 import type { Mode } from "./lib/route";
 import { NavCard, PointCard, useNavigation, type NavState, type NavTarget } from "./components/Nav";
@@ -71,11 +74,14 @@ export default function App() {
   const [filter, setFilter] = useState<Filter>({ types: new Set(), fav: false, todo: false });
   const [sel, setSel] = useState<Sel>(null);
   const [tool, setTool] = useState<ToolKey | null>(null);
-  const [route, setRoute] = useState<{ day: string; order: Place[] } | null>(null);
+  // best: the "Meilleur ordre" tour (its own order), else the day in time order
+  const [route, setRoute] = useState<{ day: string; order: Place[]; best?: boolean } | null>(null);
   const [focus, setFocus] = useState<FocusRequest | null>(null);
   const [pinMode, setPinMode] = useState(false);
   const [pendingPin, setPendingPin] = useState<LL | null>(null);
   const [addLink, setAddLink] = useState(false);
+  // text to search right away when "Ajouter un lieu" opens from the assistant
+  const [addInitial, setAddInitial] = useState("");
   // found places without a position, placed by hand one after the other
   const [placeQueue, setPlaceQueue] = useState<Found[]>([]);
   const [queueTotal, setQueueTotal] = useState(0);
@@ -138,17 +144,28 @@ export default function App() {
     if (!landing) fly({ bounds: tripBounds(), pitch: 0, duration: 1600 });
   }, [trip.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // a deleted pin (e.g. removed on another device) closes its panel
+  // a deleted place (e.g. an added place removed on another device) closes its panel
   useEffect(() => {
-    if (sel?.kind === "pin" && !data.pins.some((p) => p.id === sel.id)) setSel(null);
-  }, [data.pins, sel]);
+    if (sel && !trip.places.some((p) => p.id === sel.id)) setSel(null);
+  }, [trip, sel]);
+
+  // the day shown on the map follows the places moved, added or deleted meanwhile (here or on the other phone)
+  useEffect(() => {
+    setRoute((r) => {
+      if (!r) return r;
+      const stops = dayStops(trip, r.day, data.places).filter((p) => p.type !== "hotel");
+      const order = r.best ? [...r.order.map((p) => stops.find((x) => x.id === p.id)).filter((p): p is Place => !!p), ...stops.filter((p) => !r.order.some((x) => x.id === p.id))] : stops;
+      const same = order.length === r.order.length && order.every((p, i) => p.id === r.order[i].id && p.lat === r.order[i].lat && p.lng === r.order[i].lng);
+      return same ? r : { ...r, order };
+    });
+  }, [trip]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- filtering ----
   const visible = useMemo(
     () =>
       trip.places.filter((p) => {
         const s = data.places[p.id];
-        return (day === "all" || p.day === day) && (!filter.fav || s?.favorite) && (!filter.todo || !s?.visited) && (!filter.types.size || filter.types.has(p.type));
+        return (day === "all" || p.day === day) && (!filter.fav || s?.favorite) && (!filter.todo || !s?.visited) && (!filter.types.size || filter.types.has(p.type)) && (!filter.added || !!p.added);
       }),
     [trip, day, filter, data.places],
   );
@@ -189,6 +206,16 @@ export default function App() {
     [fly, threeD],
   );
 
+  /** An added place, by its pin (lists, search and the assistant still know pins) */
+  const openPin = useCallback(
+    (p: Pin) => {
+      setSel({ kind: "place", id: pinPlaceId(p.id) });
+      setTool(null);
+      fly({ center: [p.lng, p.lat], zoom: 15 });
+    },
+    [fly],
+  );
+
   const showDay = useCallback(
     (d: string) => {
       setDay(d);
@@ -200,15 +227,13 @@ export default function App() {
         return;
       }
       const dd = trip.days.find((x) => x.key === d);
-      const stops = trip.places.filter((p) => p.day === d);
-      // my places added to this day are framed too
-      const dayPins = data.pins.filter((p) => (data.places[`_pin:${p.id}`] as Record<string, unknown> | undefined)?.day === d);
+      // places added in the app are places of the trip: they are in the day like the others
+      const framed = trip.places.filter((p) => p.day === d);
       setRoute(dd?.scheduled ? { day: d, order: dayStops(trip, d, data.places).filter((p) => p.type !== "hotel") } : null);
-      const framed = [...stops, ...dayPins];
       if (framed.length) fly(framed.length === 1 ? { center: [framed[0].lng, framed[0].lat], zoom: 14 } : { bounds: boundsOf(framed) });
       if (!desktop) setSnap("peek");
     },
-    [trip, data.places, data.pins, fly, tripBounds, desktop],
+    [trip, data.places, fly, tripBounds, desktop],
   );
 
   const optimize = useCallback(
@@ -223,7 +248,7 @@ export default function App() {
       setDay(d);
       setSel(null);
       setTool(null);
-      setRoute({ day: d, order });
+      setRoute({ day: d, order, best: true });
       fly({ bounds: boundsOf([...order, trip.hotel]) });
       if (!desktop) setSnap("peek");
       toast(`Meilleur ordre : ${order.length} arrêts, ${Math.round(total)} km depuis l'hôtel (numéros sur la carte)`);
@@ -288,8 +313,10 @@ export default function App() {
     (f: Found, ll: LL, quiet = false) => {
       const pin = addPin({ name: f.name || f.nameCn || "Lieu", lng: ll[0], lat: ll[1] });
       updateRecord(`_pin:${pin.id}`, { nameCn: f.nameCn, address: f.address, addressCn: f.addressCn, desc: f.desc, why: f.why, hours: f.hours, price: f.price, source: f.source, day: f.day, type: f.type });
+      // the full sheet (programme format: highlights, tip, metro, hours…) is written right away in the background
+      void enrichPin(pin.id, true);
       if (!quiet) {
-        setSel({ kind: "pin", id: pin.id });
+        setSel({ kind: "place", id: pinPlaceId(pin.id) });
         setTool(null);
         fly({ center: ll, zoom: 15.5 });
         toast(`« ${f.name || f.nameCn} » ajouté sur la carte`);
@@ -325,7 +352,7 @@ export default function App() {
         toast(`${pins.length} lieu${pins.length > 1 ? "x" : ""} ajouté${pins.length > 1 ? "s" : ""} sur la carte${manual.length ? ` · ${manual.length} à placer à la main` : ""}`);
         if (!manual.length) {
           setTool(null);
-          setSel({ kind: "pin", id: pins[pins.length - 1].id });
+          setSel({ kind: "place", id: pinPlaceId(pins[pins.length - 1].id) });
           fly(pins.length === 1 ? { center: [pins[0].lng, pins[0].lat], zoom: 15 } : { bounds: boundsOf(pins) });
         }
       }
@@ -362,8 +389,7 @@ export default function App() {
     body: ".side-body",
   });
 
-  const selectedPlace = sel?.kind === "place" ? trip.places.find((p) => p.id === sel.id) : undefined;
-  const selectedPin = sel?.kind === "pin" ? data.pins.find((p) => p.id === sel.id) : undefined;
+  const selectedPlace = sel ? trip.places.find((p) => p.id === sel.id) : undefined;
   const toolDef = TOOLS.find((t) => t.key === tool);
   // in px, the same number the drag uses (CSS vh is the larger viewport in a browser tab)
   const detailSheet = desktop ? undefined : `${Math.round(vh * DETAIL_VH)}px`;
@@ -379,7 +405,7 @@ export default function App() {
         places={trip.places}
         states={data.places}
         visibleIds={visibleIds}
-        pins={data.pins}
+        pins={[]}
         selected={sel}
         route={route?.order ?? null}
         routeColor={route ? dayColor(route.day) : "#f6f2ea"}
@@ -402,13 +428,8 @@ export default function App() {
         dayGlyph={dayGlyph}
         onSelect={(kind, id) => {
           if (pinMode || landing) return;
-          if (kind === "place") {
-            const p = trip.places.find((x) => x.id === id);
-            if (p) openPlace(p);
-          } else {
-            setSel({ kind, id });
-            setTool(null);
-          }
+          const p = trip.places.find((x) => x.id === (kind === "pin" ? pinPlaceId(id) : id));
+          if (p) openPlace(p);
         }}
         onMapClick={(ll) => {
           if (landing) return;
@@ -478,23 +499,18 @@ export default function App() {
                 trip={trip}
                 places={visible}
                 states={data.places}
-                pins={data.pins}
+                pins={[]}
                 selectedId={sel?.id ?? null}
                 query=""
                 filter={filter}
                 onFilter={setFilter}
                 onOpen={openPlace}
-                onOpenPin={(p) => {
-                  setSel({ kind: "pin", id: p.id });
-                  setTool(null);
-                  fly({ center: [p.lng, p.lat], zoom: 15 });
-                }}
+                onOpenPin={openPin}
               />
             </div>
           </aside>
 
           {selectedPlace && !tool && <PlaceDetail key={selectedPlace.id} trip={trip} place={selectedPlace} onBack={() => setSel(null)} onGo={(m) => startNav(selectedPlace, m)} sheetH={detailSheet} />}
-          {selectedPin && !tool && <PinDetail key={selectedPin.id} trip={trip} pin={selectedPin} onBack={() => setSel(null)} onGo={(m) => startNav(selectedPin, m)} sheetH={detailSheet} />}
 
           {toolDef && (
             <Drawer key={toolDef.key} kicker={trip.code} title={toolDef.key === "converter" ? "Convertisseur" : toolDef.label} wide={toolDef.wide} onClose={() => setTool(null)} sheetH={toolSheet}>
@@ -512,13 +528,7 @@ export default function App() {
                 <Agenda
                   trip={trip}
                   states={data.places}
-                  pins={data.pins}
                   onOpen={openPlace}
-                  onOpenPin={(p) => {
-                    setSel({ kind: "pin", id: p.id });
-                    setTool(null);
-                    fly({ center: [p.lng, p.lat], zoom: 15 });
-                  }}
                   onShowDay={(d) => {
                     setTool(null);
                     showDay(d);
@@ -532,10 +542,11 @@ export default function App() {
                   key={trip.id}
                   trip={trip}
                   onOpenPlace={openPlace}
-                  onOpenPin={(p) => {
-                    setSel({ kind: "pin", id: p.id });
+                  onOpenPin={openPin}
+                  onAddPlace={(q) => {
                     setTool(null);
-                    fly({ center: [p.lng, p.lat], zoom: 15 });
+                    setAddInitial(q);
+                    setAddLink(true);
                   }}
                 />
               )}
@@ -612,14 +623,10 @@ export default function App() {
       {cmdk && (
         <CommandPalette
           trip={trip}
-          pins={data.pins}
+          pins={[]}
           onClose={() => setCmdk(false)}
           onPlace={openPlace}
-          onPin={(p) => {
-            setSel({ kind: "pin", id: p.id });
-            setTool(null);
-            fly({ center: [p.lng, p.lat], zoom: 15 });
-          }}
+          onPin={openPin}
           onTool={(k) => {
             setTool(k);
             setSel(null);
@@ -637,21 +644,14 @@ export default function App() {
       {addLink && (
         <AddPlace
           trip={trip}
-          onClose={() => setAddLink(false)}
-          onAdd={addFound}
+          initialText={addInitial}
+          onClose={() => { setAddLink(false); setAddInitial(""); }}
+          onAdd={(list) => { setAddInitial(""); addFound(list); }}
           onOpenExisting={(e) => {
             setAddLink(false);
-            if (e.kind === "place") {
-              const p = trip.places.find((x) => x.id === e.id);
-              if (p) openPlace(p);
-            } else {
-              const p = data.pins.find((x) => x.id === e.id);
-              if (p) {
-                setSel({ kind: "pin", id: p.id });
-                setTool(null);
-                fly({ center: [p.lng, p.lat], zoom: 15 });
-              }
-            }
+            setAddInitial("");
+            const p = trip.places.find((x) => x.id === (e.kind === "pin" ? pinPlaceId(e.id) : e.id));
+            if (p) openPlace(p);
           }}
         />
       )}
@@ -667,7 +667,7 @@ export default function App() {
               else updatePin(pin.id, { note });
             }
             setPendingPin(null);
-            setSel({ kind: "pin", id: pin.id });
+            setSel({ kind: "place", id: pinPlaceId(pin.id) });
             toast(`« ${name} » ajouté`);
           }}
         />

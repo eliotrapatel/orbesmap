@@ -12,12 +12,12 @@ export type { Found };
 
 const EXAMPLES = ["Un bar à cocktails calme près du Bund", "Où acheter du beau cuir à Jing'an", "Dim sum ouvert après 22h", "Speak Low"];
 
-export default function AddPlace({ trip, onClose, onAdd, onOpenExisting }: { trip: Trip; onClose: () => void; onAdd: (list: Found[]) => void; onOpenExisting: (e: NonNullable<Found["existing"]>) => void }) {
+export default function AddPlace({ trip, initialText, onClose, onAdd, onOpenExisting }: { trip: Trip; initialText?: string; onClose: () => void; onAdd: (list: Found[]) => void; onOpenExisting: (e: NonNullable<Found["existing"]>) => void }) {
   const fix = useLoc((s) => s.fix);
   const pins = useStore((s) => s.data.pins);
   const states = useStore((s) => s.data.places);
   const st = usePlaceSearch();
-  const [text, setText] = useState("");
+  const [text, setText] = useState(initialText || "");
   const [shot, setShot] = useState<File | null>(null);
   const [nearMe, setNearMe] = useState(false);
   const [now, setNow] = useState(Date.now());
@@ -43,6 +43,12 @@ export default function AddPlace({ trip, onClose, onAdd, onOpenExisting }: { tri
     if (st.busy || (!q.trim() && !shot)) return;
     runPlaceSearch({ trip, pins, text: q, shot, near: nearMe && fix ? { lat: fix.lat, lng: fix.lng } : undefined });
   };
+  // opened from the assistant with a place to add: search it right away (a new search replaces the old results)
+  useEffect(() => {
+    if (!initialText?.trim() || st.busy) return;
+    placeSearch.reset();
+    find(initialText);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const secs = Math.max(0, Math.round((now - st.startedAt) / 1000));
   const days = trip.days.filter((d) => d.key !== "base");
   // "already on the map" is recomputed live (my father may have added it meanwhile)

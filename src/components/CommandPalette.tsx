@@ -42,9 +42,12 @@ export default function CommandPalette(p: {
   const items = useMemo<Item[]>(() => {
     const day = (k: string) => p.trip.days.find((d) => d.key === k);
     const out: Item[] = [];
+    const st0 = getState().data.places as Record<string, Record<string, unknown>>;
     for (const pl of p.trip.places) {
       const d = day(pl.day);
-      out.push({ id: "p:" + pl.id, section: "Lieux", title: pl.name, sub: `${d?.title || ""} · ${TYPE_LABEL[pl.type] || pl.type} · ${pl.address}`, icon: <span className="ic dot" style={{ ["--c" as string]: d?.color }}>{pl.type === "hotel" ? "H" : d?.glyph}</span>, run: () => p.onPlace(pl), text: norm([pl.name, pl.cn, pl.address, pl.desc, TYPE_LABEL[pl.type], ...pl.highlights].join(" ")) });
+      // added places were found by their notes in the former "Mes lieux" list: still the case
+      const nt = pl.added ? notesText(st0[pl.id], pl.added.note) : "";
+      out.push({ id: "p:" + pl.id, section: "Lieux", title: pl.name, sub: `${d?.title || ""} · ${TYPE_LABEL[pl.type] || pl.type} · ${pl.address}`, icon: <span className="ic dot" style={{ ["--c" as string]: d?.color }}>{pl.type === "hotel" ? "H" : d?.glyph}</span>, run: () => p.onPlace(pl), text: norm([pl.name, pl.cn, pl.address, pl.desc, TYPE_LABEL[pl.type], ...pl.highlights, nt].join(" ")) });
     }
     const states = getState().data.places as Record<string, Record<string, unknown>>;
     for (const pin of p.pins) {

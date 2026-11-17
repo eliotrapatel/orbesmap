@@ -6,7 +6,9 @@ export type PlaceType =
   | "bijoux" | "mode" | "fabricant" | "salon" | "lifestyle" | "bar" | "hotel"
   | "packaging" | "textile" | "landmark" | "restaurant" | "mall" | "cashmere"
   | "concept" | "luxe" | "montres" | "cuir" | "musee" | "galerie" | "jardin"
-  | "design" | "tech" | "cafe" | "club" | "transport";
+  | "design" | "tech" | "cafe" | "club" | "transport"
+  /** a place added in the app with no known type */
+  | "ajout";
 
 export interface Place {
   id: string;
@@ -23,6 +25,27 @@ export interface Place {
   desc: string;
   highlights: string[];
   tip?: string;
+  /** Places added in the app (from a link, a search, or by hand on the map): they live in the shared data */
+  added?: AddedInfo;
+  /** A programme place moved in the app: its original day and slot (from the code) */
+  orig?: { day: DayKey; time: string };
+  /** Suggested visit length in minutes (filled for added places) */
+  duration?: number;
+}
+
+/** What an added place has on top of the common format */
+export interface AddedInfo {
+  pinId: string;
+  nameCn?: string;
+  why?: string;
+  price?: string;
+  source?: string;
+  /** opening hours as free text, shown when no structured hours are known */
+  hoursText?: string;
+  /** the note stored on the pin row before notes per person */
+  note?: string;
+  /** when the full sheet was written by the AI (ms) */
+  enrichedAt?: number;
 }
 
 export interface Day {

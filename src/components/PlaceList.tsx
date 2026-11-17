@@ -2,7 +2,7 @@ import { useRef } from "react";
 import { STATUSES, TYPE_LABEL } from "../data/trip";
 import type { Place, PlaceType, Trip } from "../data/types";
 import type { Pin, PlaceState } from "../lib/model";
-import { countable, isHotel, nextStop } from "../lib/plan";
+import { countable, dayStops, isHotel, nextStop } from "../lib/plan";
 import { fmtMin, phase } from "../lib/time";
 import { km } from "../lib/geo";
 import { liveStatus } from "../lib/hours";
@@ -11,7 +11,7 @@ import { fmtDistance } from "../lib/route";
 import { useLoc } from "../lib/locate";
 import { IStar, IStarFill } from "./Icons";
 
-export type Filter = { types: Set<PlaceType>; fav: boolean; todo: boolean; near?: boolean };
+export type Filter = { types: Set<PlaceType>; fav: boolean; todo: boolean; near?: boolean; added?: boolean };
 
 interface Props {
   trip: Trip;
@@ -40,10 +40,19 @@ export default function PlaceList({ trip, places, states, pins, selectedId, quer
   const dayOf = (k: string) => trip.days.find((d) => d.key === k)!;
   const groups = near
     ? [{ day: { key: "near", title: "Autour de moi", theme: "Du plus proche au plus loin", color: "#5aa7ff", glyph: "•" } as Trip["days"][number], items: places.filter((p) => !isHotel(trip, p)).sort((a, b) => dist(a)! - dist(b)!) }]
-    : trip.days.map((d) => ({ day: d, items: places.filter((p) => p.day === d.key) })).filter((g) => g.items.length);
+    : trip.days
+        .map((d) => {
+          const items = places.filter((p) => p.day === d.key);
+          // a planned day reads in time order (places added or moved in the app take their slot); other groups keep their order
+          if (!d.scheduled) return { day: d, items };
+          const order = new Map(dayStops(trip, d.key, states).map((p, i) => [p.id, i]));
+          return { day: d, items: items.slice().sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0)) };
+        })
+        .filter((g) => g.items.length);
   const q = query.trim().toLowerCase();
   const pinItems = pins.filter((p) => !q || p.name.toLowerCase().includes(q) || notesText((states as Record<string, Record<string, unknown>>)[`_pin:${p.id}`], p.note).toLowerCase().includes(q));
-  const types = [...new Set(trip.places.map((p) => p.type))].filter((t) => t !== "hotel" && t !== "transport");
+  const types = [...new Set(trip.places.map((p) => p.type))].filter((t) => t !== "hotel" && t !== "transport" && t !== "ajout");
+  const hasAdded = trip.places.some((p) => p.added);
   const ph = phase(trip);
   const nx = ph !== "after" ? nextStop(trip, states) : null;
   const toggleType = (t: PlaceType) => {
@@ -77,6 +86,11 @@ export default function PlaceList({ trip, places, states, pins, selectedId, quer
         <button className={"fchip" + (filter.todo ? " on" : "")} aria-pressed={filter.todo} onClick={() => onFilter({ ...filter, todo: !filter.todo })}>
           Pas encore vus
         </button>
+        {hasAdded && (
+          <button className={"fchip" + (filter.added ? " on" : "")} aria-pressed={!!filter.added} onClick={() => onFilter({ ...filter, added: !filter.added })}>
+            Mes ajouts
+          </button>
+        )}
         {types.map((t) => (
           <button key={t} className={"fchip" + (filter.types.has(t) ? " on" : "")} aria-pressed={filter.types.has(t)} onClick={() => toggleType(t)}>
             {TYPE_LABEL[t] || t}
@@ -120,9 +134,12 @@ export default function PlaceList({ trip, places, states, pins, selectedId, quer
                 </span>
                 <span className="row-main">
                   <span className="row-name">{p.name}</span>
-                  <span className="row-meta">{s?.appt ? `RDV ${s.appt}` : `${p.time} · ${TYPE_LABEL[p.type] || p.type}`}</span>
+                  <span className="row-meta">
+                    {s?.appt ? `RDV ${s.appt}` : [p.time, TYPE_LABEL[p.type] || p.type, !p.time && p.added ? p.added.why || p.desc || p.added.note : ""].filter(Boolean).join(" · ")}
+                  </span>
                 </span>
                 <span className="row-tags">
+                  {p.added && <span className="row-new" title="Ajouté dans l'app">Ajout</span>}
                   {s?.favorite && <IStarFill aria-label="Favori" />}
                   {st && <span className="sdot" title={st.label} style={{ ["--c" as string]: st.color }} />}
                   {ls && ls.tone === "bad" && <span className="row-closed">Fermé</span>}

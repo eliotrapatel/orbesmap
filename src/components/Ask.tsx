@@ -9,7 +9,8 @@ import { useWeather, type Wx } from "../lib/weather";
 import { IPin } from "./Icons";
 
 type Ref = { kind: "place" | "pin"; id: string };
-type Turn = { q: string; a: string; refs: Ref[]; at: number; err?: boolean; pending?: boolean };
+type NewPlace = { name: string; query: string };
+type Turn = { q: string; a: string; refs: Ref[]; at: number; err?: boolean; pending?: boolean; newPlaces?: NewPlace[] };
 const KEY = "orbes.ask.v1";
 const SUGGESTIONS = [
   "On fait quoi demain ?",
@@ -75,8 +76,9 @@ async function send(trip: Trip, question: string, wx: Wx | null) {
     const fmt = (ms: number) => new Intl.DateTimeFormat("fr-FR", { timeZone: trip.timezone, weekday: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(ms);
     // only recent exchanges (the same day): older answers depended on another moment
     const history = turns.filter((t) => !t.err && !t.pending && Date.now() - t.at < 6 * 3600e3).slice(-6).map((t) => ({ q: t.q, a: t.a, at: fmt(t.at) }));
-    const r = await ai<{ answer: string; refs: Ref[] }>("ask", { question: text, context, live, history }, 100_000);
-    replace({ q: text, a: r.answer || "Pas de réponse.", refs: r.refs || [], at });
+    const r = await ai<{ answer: string; refs: Ref[]; newPlaces?: NewPlace[] }>("ask", { question: text, context, live, history }, 100_000);
+    const newPlaces = (r.newPlaces || []).filter((p) => p && (p.name || p.query)).slice(0, 3);
+    replace({ q: text, a: r.answer || "Pas de réponse.", refs: r.refs || [], at, newPlaces });
   } catch (e) {
     replace({ q: text, a: e instanceof AiError ? e.message : "La question n'a pas pu être envoyée. Réessayez.", refs: [], at, err: true });
   }
@@ -117,7 +119,7 @@ function Answer({ text }: { text: string }) {
 }
 
 /** "Demander au carnet": read-only assistant that knows the whole notebook. */
-export default function Ask({ trip, onOpenPlace, onOpenPin }: { trip: Trip; onOpenPlace: (p: Place) => void; onOpenPin: (p: Pin) => void }) {
+export default function Ask({ trip, onOpenPlace, onOpenPin, onAddPlace }: { trip: Trip; onOpenPlace: (p: Place) => void; onOpenPin: (p: Pin) => void; onAddPlace?: (query: string) => void }) {
   const pins = useStore((s) => s.data.pins);
   useLoc((s) => s.status);
   const wx = useWeather(trip.center[1], trip.center[0], trip.timezone);
@@ -137,7 +139,8 @@ export default function Ask({ trip, onOpenPlace, onOpenPin }: { trip: Trip; onOp
     return refs
       .filter((r) => r && r.id && !seen.has(r.id) && (seen.add(r.id), true))
       .map((r) => {
-        const place = trip.places.find((p) => p.id === r.id);
+        // added places are places of the trip ("_pin:…"); older answers may still cite them by their pin id
+        const place = trip.places.find((p) => p.id === r.id) || trip.places.find((p) => p.id === `_pin:${r.id}`);
         if (place) return <button key={r.id} className="btn-sm" onClick={() => onOpenPlace(place)}><IPin /> {place.name}</button>;
         const pin = pins.find((p) => p.id === r.id);
         return pin ? <button key={r.id} className="btn-sm" onClick={() => onOpenPin(pin)}><IPin /> {pin.name}</button> : null;
@@ -170,6 +173,13 @@ export default function Ask({ trip, onOpenPlace, onOpenPin }: { trip: Trip; onOp
                 <div className={"ask-a" + (t.err ? " err" : "")}>
                   <Answer text={t.a} />
                   {refs.length > 0 && <div className="ask-refs">{refs}</div>}
+                  {onAddPlace && !!t.newPlaces?.length && (
+                    <div className="ask-refs ask-new">
+                      {t.newPlaces.map((n) => (
+                        <button key={n.name + n.query} className="btn-sm" onClick={() => onAddPlace(n.query || n.name)}>+ Ajouter {n.name || n.query}</button>
+                      ))}
+                    </div>
+                  )}
                   {t.err && (
                     <button className="btn-sm" onClick={() => { write(trip.id, read(trip.id).filter((x) => x.at !== t.at)); ask(t.q); }}>Réessayer</button>
                   )}

@@ -88,7 +88,7 @@ export function PinForm({ onClose, onSave }: { onClose: () => void; onSave: (nam
   const [name, setName] = useState("");
   const [note, setNote] = useState("");
   return (
-    <Modal title="Ajouter un lieu" intro="Il apparaîtra sur la carte et dans « Mes lieux »." onClose={onClose}>
+    <Modal title="Ajouter un lieu" intro="Il apparaîtra sur la carte et dans la liste (Pistes), avec sa fiche." onClose={onClose}>
       <form onSubmit={(e) => { e.preventDefault(); if (name.trim()) onSave(name.trim(), note.trim()); }}>
         <label className="field"><span>Nom</span><input className="input" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="ex. Boutique vue en passant" /></label>
         <label className="field"><span>Note</span><input className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="ex. demander Lily, 2e étage" /></label>

@@ -1,10 +1,14 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { STATUSES, TYPE_LABEL } from "../data/trip";
 import type { Place, Trip } from "../data/types";
 import { amapDirections, formatMinutes, googleDirections, travelMinutes } from "../lib/geo";
 import { isHotel, stopTime } from "../lib/plan";
 import { checkVisit, hoursLine, liveStatus } from "../lib/hours";
-import { addContact, addPhoto, currentAuthor, deleteContact, deletePhoto, photoSrc, toast, updatePlace, updateRecord, useStore } from "../lib/store";
+import { addContact, addPhoto, currentAuthor, deleteContact, deletePhoto, deletePin, photoSrc, toast, updatePin, updatePlace, updateRecord, useStore } from "../lib/store";
+import { enrichPin, useEnrich } from "../lib/enrich";
+import { fitAll, slotText } from "../lib/slots";
+import { parseTime } from "../lib/time";
+import Planner, { fitLine, placeAt } from "./Planner";
 import Notes from "./Notes";
 import { IBack, ICamera, ICheck, IClock, IClose, ICopy, IExpand, IGlobe, INav, IPin, IPlus, ISpeaker, IStar, ITrain, ITrash } from "./Icons";
 import { Lightbox, Modal, SavedInput, ShowScreen, compressImage, copy, speak, useEscape, useSheetDrag } from "./ui";
@@ -34,6 +38,23 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH }: { tri
   const live = liveStatus(hours, trip.timezone);
   const issues = checkVisit(hours, day?.dates?.[0], stopTime(place, allStates));
   const line = hoursLine(hours);
+  // places added in the app share this sheet; what only they have
+  const added = place.added;
+  const job = useEnrich(added?.pinId ?? null);
+  const [planning, setPlanning] = useState(false);
+  const [secs, setSecs] = useState(0);
+  useEffect(() => {
+    if (!job.busy) return;
+    const t = window.setInterval(() => setSecs(Math.round((Date.now() - job.startedAt) / 1000)), 1000);
+    return () => window.clearInterval(t);
+  }, [job.busy, job.startedAt]);
+  const coords = `${place.lat.toFixed(5)}, ${place.lng.toFixed(5)}`;
+  // what is shown to a driver: the Chinese name and address of an added place, the programme's address otherwise
+  const driverZh = added ? [added.nameCn, place.cn !== added.nameCn ? place.cn : ""].filter(Boolean).join("\n") : place.cn;
+  const scheduledDay = !!day?.scheduled && !!day.dates?.length;
+  const timed = scheduledDay && parseTime(place.time) != null;
+  const suggestion = !hotel && !timed ? fitAll(trip, place, allStates).best : null;
+  const sheetEmpty = !place.desc && !place.highlights.length && !place.tip && !place.metro && !place.website;
 
   const onFile = async (f?: File) => {
     if (!f) return;
@@ -64,41 +85,93 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH }: { tri
             >
               <IStar />
             </button>
+            {added && (
+              <button
+                className="icon-btn"
+                aria-label="Supprimer ce lieu"
+                onClick={() => {
+                  const extra = [photos.length ? `${photos.length} photo${photos.length > 1 ? "s" : ""}` : "", contacts.length ? `${contacts.length} contact${contacts.length > 1 ? "s" : ""}` : ""].filter(Boolean).join(" et ");
+                  if (!confirm(`Supprimer « ${place.name} »${extra ? ` avec ${extra}` : ""} ?`)) return;
+                  photos.forEach((p) => deletePhoto(p.id));
+                  contacts.forEach((c) => deleteContact(c.id));
+                  deletePin(added.pinId);
+                  toast("Lieu supprimé");
+                  onBack();
+                }}
+              >
+                <ITrash />
+              </button>
+            )}
           </div>
           <div className="kicker">
             <span className="sdot" />
             <span className="label">{day?.title || ""}</span>
             <span className="label" style={{ color: "var(--mute)" }}>{TYPE_LABEL[place.type] || place.type}</span>
+            {added && place.type !== "ajout" && <span className="label" style={{ color: "var(--mute)" }}>Ajouté</span>}
           </div>
           <h2>{place.name}</h2>
           <div className="sub">
-            <span><IClock /> {place.time}</span>
+            {place.time ? <span><IClock /> {place.time}</span> : added && !added.nameCn ? <span>{coords}</span> : null}
             {!hotel && <span><INav /> {formatMinutes(minutes)} depuis l'hôtel</span>}
           </div>
-          {(live || line || issues.length > 0) && (
+          {(live || line || issues.length > 0 || (!line && added?.hoursText)) && (
             <div className="hours-box">
               {live && <span className={"hb-live " + live.tone}><i /> Maintenant à {trip.title} : {live.label}</span>}
               {line && <span className="hb-line">{line}</span>}
+              {!line && added?.hoursText && <span className="hb-line">Horaires : {added.hoursText}</span>}
               {issues.map((x, i) => <span key={i} className={"hb-issue " + x.tone}>{x.tone === "bad" ? "⚠ " : x.tone === "warn" ? "! " : ""}{x.text}</span>)}
               {hours?.note && <span className="hb-line">{hours.note}</span>}
             </div>
           )}
         </header>
 
-        <button className="driver" onClick={() => setShow(true)} aria-label="Afficher l'adresse en grand pour le chauffeur">
-          <div className="zh" lang="zh-CN">{place.cn}</div>
-          <div className="en">{place.address}</div>
-          <div className="cta"><IExpand /> Montrer au chauffeur</div>
-        </button>
+        {place.cn && (
+          <button className="driver" onClick={() => setShow(true)} aria-label="Afficher l'adresse en grand pour le chauffeur">
+            <div className="zh" lang="zh-CN">{place.cn}</div>
+            {place.address && <div className="en">{place.address}</div>}
+            <div className="cta"><IExpand /> Montrer au chauffeur</div>
+          </button>
+        )}
 
-        <div className="actions">
+        <div className="actions" style={place.cn ? undefined : { gridTemplateColumns: "repeat(3, 1fr)" }}>
           <a className="action" href={amapDirections(place)} target="_blank" rel="noopener"><INav /> Amap</a>
           <a className="action" href={googleDirections(place)} target="_blank" rel="noopener"><IPin /> Google</a>
-          <button className="action" onClick={() => copy(place.cn, "Adresse copiée pour DiDi", toast)}><ICopy /> DiDi</button>
-          <button className="action" onClick={() => speak(place.cn) || toast("Lecture vocale indisponible")}><ISpeaker /> Écouter</button>
+          {place.cn ? (
+            <>
+              <button className="action" onClick={() => copy(place.cn, "Adresse copiée pour DiDi", toast)}><ICopy /> DiDi</button>
+              <button className="action" onClick={() => speak(driverZh) || toast("Lecture vocale indisponible")}><ISpeaker /> Écouter</button>
+            </>
+          ) : (
+            <button className="action" onClick={() => copy(coords, "Coordonnées copiées", toast)}><ICopy /> Copier</button>
+          )}
         </div>
 
         <GoBlock target={place} onGo={onGo} />
+
+        {!hotel && (
+          <div className="sec plan-sec">
+            <span className="label">Programme</span>
+            <div className="plan-now">
+              <span className="plan-where">
+                <i />
+                <b>{day?.dates?.[0] ? day.short : day?.title}</b>
+                <span>{place.time ? place.time : scheduledDay ? "sans heure" : day?.theme}</span>
+              </span>
+              <button className="btn-sm" onClick={() => setPlanning(true)}>{timed ? "Déplacer" : "Placer"}</button>
+            </div>
+            {suggestion?.ok && !suggestion.tight && (
+              <button className="plan-best" style={{ ["--c" as string]: suggestion.day.color }} onClick={() => placeAt(place, suggestion.day.key, slotText(suggestion.start, suggestion.end), trip)}>
+                <span className="label">Créneau conseillé</span>
+                <b>{suggestion.day.short}, {slotText(suggestion.start, suggestion.end)}</b>
+                <small>{fitLine(suggestion)}</small>
+                <em>Placer</em>
+              </button>
+            )}
+            {place.orig && (
+              <p className="em-small">Programme d'origine : {trip.days.find((d) => d.key === place.orig!.day)?.short}{place.orig.time ? `, ${place.orig.time}` : ""}</p>
+            )}
+          </div>
+        )}
 
         {!hotel && (
           <div className="sec">
@@ -147,7 +220,8 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH }: { tri
 
         <div className="sec">
           <span className="label">Le lieu</span>
-          <p>{place.desc}</p>
+          {added && sheetEmpty && !job.busy && <p className="em-small">Fiche à compléter : l'IA peut la rédiger (description, points forts, conseil, métro, horaires).</p>}
+          {place.desc && <p>{place.desc}</p>}
           {place.highlights.length > 0 && (
             <ul className="hl">
               {place.highlights.map((h) => <li key={h}>{h}</li>)}
@@ -163,12 +237,39 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH }: { tri
               </div>
             )}
           </div>
+          {added?.why && <p className="em-small">Pourquoi : {added.why}</p>}
+          {added?.price && <p className="em-small">Prix : {added.price}</p>}
+          {added?.source && /^https?:\/\//.test(added.source) && <p className="em-small"><a href={added.source} target="_blank" rel="noopener">Source</a></p>}
+          {added && (
+            <div className="enrich">
+              {job.busy ? (
+                <span className="tr-loading">
+                  <span className="spin" /> {job.startedAt ? `Rédaction de la fiche complète… ${secs} s` : "Fiche en attente (une autre est en cours)…"}
+                  <small>Vous pouvez fermer la fiche (gardez l'app ouverte).</small>
+                </span>
+              ) : (
+                <>
+                  <button className={"btn-sm" + (added.enrichedAt ? "" : " on")} onClick={() => void enrichPin(added.pinId)}>
+                    {added.enrichedAt ? "Mettre à jour la fiche avec l'IA" : "Compléter la fiche avec l'IA"}
+                  </button>
+                  {job.err && <p className="tr-err">{job.err}</p>}
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         <Notes
           rec={state as Record<string, unknown>}
-          placeholder="Ce que vous avez vu, les prix, les impressions…"
-          onSave={(key, v) => updateRecord(place.id, key === "note" ? { note: v, noteBy: currentAuthor() } : { [key]: v })}
+          legacyText={added ? added.note : undefined}
+          placeholder={added ? "Stand, contact, prix…" : "Ce que vous avez vu, les prix, les impressions…"}
+          onSave={(key, v) => {
+            // an added place keeps its former shared note on the pin itself (as before)
+            if (added && key === "note") {
+              updatePin(added.pinId, { note: v });
+              updateRecord(place.id, { noteBy: currentAuthor() });
+            } else updateRecord(place.id, key === "note" ? { note: v, noteBy: currentAuthor() } : { [key]: v });
+          }}
         />
 
         <div className="sec">
@@ -211,6 +312,13 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH }: { tri
           <button className="link-btn" onClick={() => setAddingContact(true)}><IPlus /> Ajouter un contact</button>
         </div>
 
+        {added && (
+          <div className="sec">
+            <span className="label">Nom</span>
+            <SavedInput value={place.name} onSave={(v) => v.trim() && updatePin(added.pinId, { name: v.trim() })} />
+          </div>
+        )}
+
         {!hotel && (
           <button className={"visit-btn" + (state.visited ? " on" : "")} aria-pressed={!!state.visited} onClick={() => updatePlace(place.id, { visited: !state.visited })}>
             <ICheck /> {state.visited ? "Visité" : "Marquer comme visité"}
@@ -218,7 +326,8 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH }: { tri
         )}
       </div>
 
-      {show && <ShowScreen zh={place.cn} sub={`${place.name} — ${place.address}`} onClose={() => setShow(false)} />}
+      {show && <ShowScreen zh={driverZh} sub={place.address ? `${place.name} — ${place.address}` : place.name} onClose={() => setShow(false)} />}
+      {planning && <Planner trip={trip} place={place} states={allStates} onClose={() => setPlanning(false)} />}
       {lightbox && <Lightbox src={lightbox} onClose={() => setLightbox(null)} />}
       {addingContact && (
         <ContactForm

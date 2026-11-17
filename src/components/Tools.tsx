@@ -147,9 +147,9 @@ export function Flights({ trip }: { trip: Trip }) {
 
 function OfflineCard({ trip }: { trip: Trip }) {
   const st = useOffline();
-  const pins = useStore((s) => s.data.pins);
   const mb = (b: number) => `${Math.max(1, Math.round(b / 1e6))} Mo`;
-  const points = [...trip.places, trip.hotel, ...trip.zones.map((z) => ({ lng: z.center[0], lat: z.center[1] })), ...pins];
+  // places added in the app are already in trip.places
+  const points = [...trip.places, trip.hotel, ...trip.zones.map((z) => ({ lng: z.center[0], lat: z.center[1] }))];
   const shellHost = location.hostname.endsWith(".vercel.app");
   const standalone = window.matchMedia?.("(display-mode: standalone)").matches || (navigator as unknown as { standalone?: boolean }).standalone === true;
   const ios = /iP(hone|ad|od)/.test(navigator.userAgent);
