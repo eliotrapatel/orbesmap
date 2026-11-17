@@ -6,7 +6,8 @@ import { dayStops, isHotel, stopTime } from "../lib/plan";
 import { plural } from "../lib/fmt";
 import { fmtDay, fmtMin, localDate } from "../lib/time";
 import { checkVisit } from "../lib/hours";
-import { ICalPlus, IMap, IRoute } from "./Icons";
+import { ICalPlus, IClose, IMap, IRoute } from "./Icons";
+import RemovedList, { removeFromProgramme } from "./RemovedList";
 
 export default function Agenda({ trip, states, pins = [], onOpen, onOpenPin, onShowDay, onOptimize }: { trip: Trip; states: Record<string, PlaceState>; pins?: Pin[]; onOpen: (p: Place) => void; onOpenPin?: (p: Pin) => void; onShowDay: (d: string) => void; onOptimize: (d: string) => void }) {
   // places added from a link / on the map, with the day chosen for them
@@ -87,7 +88,8 @@ export default function Agenda({ trip, states, pins = [], onOpen, onOpenPin, onS
                 const t = stopTime(p, states);
                 const issues = checkVisit(trip.hours?.[p.id], first, t).filter((x) => x.tone !== "info" || x.text.startsWith("Réservation"));
                 return (
-                  <button className={"ag-stop" + (i === 0 ? " first" : "") + (i === stops.length - 1 ? " last" : "")} key={p.id} onClick={() => onOpen(p)}>
+                  <div className="ag-row" key={p.id}>
+                  <button className={"ag-stop" + (i === 0 ? " first" : "") + (i === stops.length - 1 ? " last" : "")} onClick={() => onOpen(p)}>
                     <span className="ag-time">{t != null ? fmtMin(t) : "—"}</span>
                     <span className="ag-rail">
                       <span className={"ag-node" + (s.visited ? " done" : "")} />
@@ -105,6 +107,10 @@ export default function Agenda({ trip, states, pins = [], onOpen, onOpenPin, onS
                       })}
                     </span>
                   </button>
+                  <button className="ag-x" aria-label={`Retirer ${p.name} du programme`} title="Retirer du programme" onClick={() => removeFromProgramme(p)}>
+                    <IClose />
+                  </button>
+                  </div>
                 );
               })}
               {pins.filter((p) => pinDay(p) === d.key).length > 0 && (
@@ -118,6 +124,7 @@ export default function Agenda({ trip, states, pins = [], onOpen, onOpenPin, onS
             </section>
           );
         })}
+      <RemovedList trip={trip} />
       <p style={{ fontSize: 12, color: "var(--mute)" }}>Temps de trajet estimés en voiture. Une heure de rendez-vous saisie dans la fiche d'un lieu le replace dans la journée.</p>
     </div>
   );

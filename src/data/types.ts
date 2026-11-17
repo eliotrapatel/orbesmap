@@ -106,6 +106,8 @@ export interface Trip {
   center: [number, number];
   days: Day[];
   places: Place[];
+  /** places removed from the programme in the app (kept here so they can be put back) */
+  removed?: Place[];
   flights: Flight[];
   phrases: PhraseGroup[];
   zones: Zone[];

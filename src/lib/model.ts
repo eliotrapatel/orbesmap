@@ -15,6 +15,8 @@ export interface PlaceState {
   day?: string | null;
   /** placed by hand in the app: the planned slot, e.g. "15h10–15h55" ("" = no time, null = the programme's) */
   slot?: string | null;
+  /** removed from the programme in the app (hidden everywhere, can be put back; null = shown) */
+  removed?: boolean | null;
   /** ms epoch of the last change */
   updatedAt?: number;
   /** ms epoch of the last change of each field: two devices editing different fields never overwrite each other */

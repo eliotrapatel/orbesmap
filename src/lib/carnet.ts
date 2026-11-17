@@ -113,6 +113,7 @@ function tripBlock(trip: Trip, data: Data, detailed: boolean, cap: number) {
     jours: trip.days.map((d) => drop({ cle: d.key, nom: d.short, titre: d.title, theme: d.theme, dates: d.dates, au_programme: d.scheduled })),
     vols: trip.flights.map((f) => drop({ vol: f.code, de: `${f.fromCity} ${f.from}`, vers: `${f.toCity} ${f.to}`, depart: f.departAt, arrivee: f.arriveAt, terminal: f.terminal })),
     lieux: places,
+    lieux_retires_du_programme: detailed && trip.removed?.length ? trip.removed.map((p) => ({ id: p.id, nom: p.name, jour: p.day })) : undefined,
     check_list: detailed ? [...seeds.filter(Boolean), ...custom] : undefined,
     infos_pratiques: detailed ? (trip.practical || []).map((c) => ({ titre: c.title, texte: txt(c.text, cap) })) : undefined,
     urgence:

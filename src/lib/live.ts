@@ -118,8 +118,12 @@ export function liveTrip(base: Trip, data: Pick<Data, "places" | "pins">): Trip 
       },
     };
   });
-  if (!changed && !added.length) return base;
-  return { ...base, places: [...programme, ...added], hours };
+  // places removed in the app leave the trip (map, list, agenda, route, exports) but stay listed to be put back
+  const all = [...programme, ...added];
+  const isOut = (p: Place) => st[p.id]?.removed === true && p.type !== "hotel" && p.id !== base.hotel.placeId;
+  const removed = all.filter(isOut);
+  if (!changed && !added.length && !removed.length) return base;
+  return { ...base, places: removed.length ? all.filter((p) => !isOut(p)) : all, removed, hours };
 }
 
 /** The same trip object as long as nothing that shapes the trip changed (notes, statuses… don't) */
@@ -128,7 +132,7 @@ export function liveTripCached(base: Trip, data: Pick<Data, "places" | "pins">):
   // same data objects (re-render for another reason, e.g. a position update): nothing to rebuild
   if (last && last.base === base && last.places === data.places && last.pins === data.pins) return last.trip;
   const t = liveTrip(base, data);
-  const key = t === base ? "" : JSON.stringify([t.places, t.hours]);
+  const key = t === base ? "" : JSON.stringify([t.places, t.removed, t.hours]);
   if (last && last.base === base && last.key === key) {
     last = { ...last, places: data.places, pins: data.pins };
     return last.trip;

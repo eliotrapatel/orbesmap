@@ -9,6 +9,7 @@ import { enrichPin, useEnrich } from "../lib/enrich";
 import { fitAll, slotText } from "../lib/slots";
 import { parseTime } from "../lib/time";
 import Planner, { fitLine, placeAt } from "./Planner";
+import { removeFromProgramme } from "./RemovedList";
 import Notes from "./Notes";
 import { IBack, ICamera, ICheck, IClock, IClose, ICopy, IExpand, IGlobe, INav, IPin, IPlus, ISpeaker, IStar, ITrain, ITrash } from "./Icons";
 import { Lightbox, Modal, SavedInput, ShowScreen, compressImage, copy, speak, useEscape, useSheetDrag } from "./ui";
@@ -170,6 +171,7 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH }: { tri
             {place.orig && (
               <p className="em-small">Programme d'origine : {trip.days.find((d) => d.key === place.orig!.day)?.short}{place.orig.time ? `, ${place.orig.time}` : ""}</p>
             )}
+            <button className="link-btn plan-remove" onClick={() => removeFromProgramme(place) && onBack()}>Retirer du programme</button>
           </div>
         )}
 

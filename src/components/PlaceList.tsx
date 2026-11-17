@@ -10,6 +10,7 @@ import { notesText } from "../lib/notes";
 import { fmtDistance } from "../lib/route";
 import { useLoc } from "../lib/locate";
 import { IStar, IStarFill } from "./Icons";
+import RemovedList from "./RemovedList";
 
 export type Filter = { types: Set<PlaceType>; fav: boolean; todo: boolean; near?: boolean; added?: boolean };
 
@@ -177,6 +178,7 @@ export default function PlaceList({ trip, places, states, pins, selectedId, quer
           ))}
         </section>
       )}
+      {!near && <RemovedList trip={trip} />}
       <div style={{ height: 20 }} />
     </div>
   );

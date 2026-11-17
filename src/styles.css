@@ -847,3 +847,21 @@ button.pl-day:hover { border-color: var(--hair-strong); background: rgba(246, 24
 .pl-sec .hb-issue { font-size: 12.5px; }
 .ask-new .btn-sm { border-style: dashed; }
 .pl-day.tight small { color: var(--warn); }
+
+/* ---------- Removed from the programme ---------- */
+.plan-remove { margin-top: 6px; color: var(--soft); font-weight: 400; font-size: 13px; }
+.ag-row { position: relative; }
+.ag-row .ag-body { padding-right: 36px; }
+.ag-x { position: absolute; top: 0; right: 0; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; color: var(--mute); transition: color 0.2s, background 0.2s; }
+.ag-x:hover { color: var(--ink); background: rgba(246, 242, 234, 0.06); }
+.ag-x svg { width: 13px; height: 13px; }
+.removed { margin: 18px 12px 0; padding: 0 6px; border-top: 1px solid var(--hair); }
+.removed summary { display: flex; align-items: center; gap: 8px; padding: 14px 0 10px; cursor: pointer; list-style: none; }
+.removed summary::-webkit-details-marker { display: none; }
+.removed summary em { font-style: normal; font-size: 12px; color: var(--soft); }
+.removed summary::after { content: "›"; margin-left: auto; color: var(--soft); transition: transform 0.2s; }
+.removed[open] summary::after { transform: rotate(90deg); }
+.removed-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; }
+.removed-main { display: flex; flex-direction: column; min-width: 0; }
+.removed-main b { font-weight: 500; font-size: 14px; }
+.removed-main small { color: var(--soft); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
