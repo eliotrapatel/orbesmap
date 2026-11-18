@@ -35,7 +35,10 @@ export default function Trips({ onOpen, onClose }: { onOpen: (id: string) => voi
   // a free account prepares one trip per month with the AI: the next one asks for Pro
   const setCreating = (v: boolean) => {
     const p = getState().plan;
-    if (v && p && !p.pro && p.prepLeft <= 0) return requestPro("prep");
+    const quota = !!(v && p && !p.pro && p.prepLeft <= 0);
+    // the intention to create, counted before the quota (« quota »: the Pro screen opened instead)
+    if (v) track("create_started", quota ? "quota" : null);
+    if (quota) return requestPro("prep");
     setCreatingRaw(v ? "choose" : false);
   };
   const name = (profile.name as string) || "";

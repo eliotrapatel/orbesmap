@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { invite, inviteMessage, invites as listInvites, people as listPeople, removeInvite, removePerson, setRole, type Invite, type Person } from "../../lib/share";
 import { pull, toast, useStore, useTrip } from "../../lib/store";
 import Shell from "./Shell";
-import { closeLink, linkOf, linkUrl, openLink } from "../../lib/publicTrip";
+import { closeLink, linkOf, linkUrl, openLink, shareUrl } from "../../lib/publicTrip";
 import { t } from "../../lib/i18n";
 
 const ROLE = { owner: "Propriétaire", editor: "Peut modifier", viewer: "Lecture seule" } as const;
@@ -165,18 +165,20 @@ function PublicLink({ tripId, title }: { tripId: string; title: string }) {
   };
   const url = link?.active ? linkUrl(link.slug) : null;
   const share = async () => {
-    if (!url) return;
+    if (!url || !link) return;
+    // the address shared says where it comes from; the one shown stays short
+    const sent = shareUrl(link.slug);
     const text = t("Le programme de « {title} » sur ORBES Trips", { title });
     if (navigator.share) {
       try {
-        await navigator.share({ title, text, url });
+        await navigator.share({ title, text, url: sent });
         return;
       } catch {
         /* closed, or not possible: copied instead */
       }
     }
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(sent);
       toast(t("Lien copié"));
     } catch {
       toast(t("Copie impossible sur cet appareil"));

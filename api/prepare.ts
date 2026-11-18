@@ -124,6 +124,8 @@ export type Scratch = {
   notified: string | null;
   done: boolean;
   at: number;
+  /** when this run was first started (for the time to a ready programme; absent on a run started before) */
+  started?: number;
   /** version: each write expects the one it read (a call whose run was stopped or replaced meanwhile writes nothing) */
   v: number;
 };
@@ -155,6 +157,8 @@ export type Db = {
   claimPhotos?(tripId: string, hold: string, now: number, cooldown?: number): Promise<boolean>;
   touchPhotos?(tripId: string, hold: string, now: number): Promise<void>;
   releasePhotos?(tripId: string, hold: string, now: number, note: Json): Promise<void>;
+  /** one step of the account's path (supabase/saas-5.sql events: prep_started, prep_ready, prep_failed) */
+  event?(userId: string, name: string, detail: string | null, tripId: string): Promise<void>;
 };
 export type BookResult = { id: number } | { refused: "cap" | "pro" | "prep" | "auth" | "error" };
 export type Deps = {
@@ -188,6 +192,15 @@ export type Deps = {
 
 // ---------- small helpers ----------
 const arr = <T>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
+/** records a step of the account's path; never fails, never holds the preparation (kept alive by `schedule`) */
+const ev = (deps: Deps, userId: string, name: "prep_started" | "prep_ready" | "prep_failed", detail: string | null, tripId: string) => {
+  if (!deps.db.event || !userId) return;
+  try {
+    deps.schedule(deps.db.event(userId, name, detail, tripId).catch(() => undefined));
+  } catch {
+    /* ignore */
+  }
+};
 /** a copy without the undefined fields (JSON drops them: the record never keeps them) */
 const clean = <T extends Json>(o: T): T => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as T;
 const tripDays = (data: Json) => arr<Day>(data.days).filter((x) => x && x.scheduled && Array.isArray(x.dates) && x.dates.length);
@@ -450,7 +463,9 @@ const released = (deps: Deps, data: Json, step = "") => ({ by: "server", at: dep
 
 /** Ends the run: the message on the draft, the unused bookings given back */
 async function stopRun(deps: Deps, tripId: string, s: Scratch, hold: string | null, error: string) {
-  await commit(deps, tripId, (data) => (hold && !holds(data, hold) ? null : draftWith(data, { error, lease: undefined })));
+  const res = await commit(deps, tripId, (data) => (hold && !holds(data, hold) ? null : draftWith(data, { error, lease: undefined })));
+  // the run ended without its programme (a day prepared again is not a preparation of its own)
+  if (res?.changed && !s.only) ev(deps, s.user, "prep_failed", s.capHit && error === s.capHit ? "cap" : error === MSG.stopped ? "stopped" : "ai", tripId);
   await giveBack(deps, tripId, s);
 }
 /**
@@ -574,10 +589,12 @@ async function unit(deps: Deps, tripId: string, s: Scratch, c: Claim, t0: number
   if (step.kind === "finish") {
     const target = s.only ? days.filter((x) => x.dates![0] === s.only) : days;
     let notify = false;
+    let missed = 0;
     const res = await commit(deps, tripId, (cur) => {
       if (!holds(cur, hold)) return null;
       const dd = draftOf(cur)!;
       const left = target.filter((x) => dd.days?.[x.dates![0]] !== "done").length;
+      missed = left;
       // one day prepared again: back to the review whatever happened; the whole trip: the review when all is ready
       const status = s.only || !left ? "review" : "preparing";
       notify = !s.only && status === "review";
@@ -586,8 +603,13 @@ async function unit(deps: Deps, tripId: string, s: Scratch, c: Claim, t0: number
     if (res?.changed && notify && s.notified !== s.run) {
       // said once per run (written first: two calls never send it twice)
       s.notified = s.run;
-      if (await save(deps, tripId, s)) await sendReady(deps, tripId, res.data, s.user).catch((e) => deps.log?.(`prepare notify: ${String(e)}`));
+      if (await save(deps, tripId, s)) {
+        ev(deps, s.user, "prep_ready", s.started ? String(Math.max(0, Math.round((deps.now() - s.started) / 1000))) : null, tripId);
+        await sendReady(deps, tripId, res.data, s.user).catch((e) => deps.log?.(`prepare notify: ${String(e)}`));
+      }
     }
+    // the whole trip asked, some days could not be prepared
+    if (res?.changed && !s.only && missed > 0) ev(deps, s.user, "prep_failed", "days", tripId);
     await giveBack(deps, tripId, s);
     // the photos of the places, in a call of their own: the trip is already ready (never slowed by them)
     if (res?.changed) await deps.kickPhotos?.(tripId, 0).catch(() => false);
@@ -995,8 +1017,9 @@ export async function sendReady(deps: Deps, tripId: string, data: Json, userId: 
   const T = READY[prof.lang === "en" ? "en" : "fr"];
   const alerts = (prof.alerts || {}) as { email?: boolean; push?: boolean };
   const title = String(data.title || "ORBES Trips");
-  // the app opens on this trip (same link as the alerts of api/cron.ts)
-  const url = `${APP_URL}/#${tripId}`;
+  // the app opens on this trip; the link says where it came from (?src=, read once by the app)
+  const url = `${APP_URL}/?src=push_ready#${tripId}`;
+  const mailUrl = `${APP_URL}/?src=email_ready#${tripId}`;
   let pushed = 0;
   if (deps.push && alerts.push !== false) {
     for (const ph of await deps.db.pushSubs(userId).catch(() => [])) {
@@ -1019,9 +1042,9 @@ export async function sendReady(deps: Deps, tripId: string, data: Json, userId: 
 <p style="font-size:16px;margin:0 0 6px">${esc(T.hello(String(prof.name || "")))}</p>
 <p style="font-size:20px;font-weight:600;margin:10px 0 2px">${esc(T.title)}</p>
 <p style="color:#6f6b65;margin:0 0 14px">${esc(T.body(title))}</p>
-<p style="margin:24px 0"><a href="${url}" style="display:inline-block;background:#0a0a0a;color:#f6f2ea;text-decoration:none;padding:12px 20px;border-radius:12px">${esc(T.open)}</a></p>
+<p style="margin:24px 0"><a href="${mailUrl}" style="display:inline-block;background:#0a0a0a;color:#f6f2ea;text-decoration:none;padding:12px 20px;border-radius:12px">${esc(T.open)}</a></p>
 ${FOOTER}</div>`;
-  const ok = await deps.mail(to, T.subject(title), html, [T.hello(String(prof.name || "")), T.title, T.body(title), url, "", "ORBES Trips"].join("\n")).catch(() => false);
+  const ok = await deps.mail(to, T.subject(title), html, [T.hello(String(prof.name || "")), T.title, T.body(title), mailUrl, "", "ORBES Trips"].join("\n")).catch(() => false);
   return ok ? "mail" : "none";
 }
 
@@ -1039,7 +1062,7 @@ function ctxOf(v: unknown): Json {
   return JSON.stringify(out).length > 8000 ? { who: {}, trip: out.trip, lang: out.lang } : out;
 }
 const refusalOf = (r: Exclude<BookResult, { id: number }>["refused"]) => (r === "pro" ? { error: "pro", message: MSG.pro, status: 403 } : r === "prep" ? { error: "pro", message: MSG.prep, status: 403 } : r === "cap" ? { error: "busy", message: MSG.cap, status: 429 } : { error: "unavailable", message: MSG.error, status: 503 });
-const newScratch = (deps: Deps, user: string, ctx: Json): Scratch => ({ run: randomUUID(), user, ctx, bookings: [], spent: {}, attempts: {}, errored: [], only: null, capHit: null, pending: null, inflight: null, notified: null, done: false, at: deps.now(), v: 0 });
+const newScratch = (deps: Deps, user: string, ctx: Json): Scratch => ({ run: randomUUID(), user, ctx, bookings: [], spent: {}, attempts: {}, errored: [], only: null, capHit: null, pending: null, inflight: null, notified: null, done: false, at: deps.now(), started: deps.now(), v: 0 });
 
 /**
  * "start": prepares (or goes on preparing) the trip's missing steps; "day": one day again; "review": stop and show
@@ -1236,6 +1259,8 @@ export async function handle(req: Request, depsIn?: Deps): Promise<Response> {
     await giveBack(deps, tripId, s, { retry: true });
     return reply({ error: "busy" }, 409, origin);
   }
+  // the account's path: a preparation started (a day prepared again is « day_redone », recorded by the app)
+  if (!only) ev(deps, user, "prep_started", keep ? "resume" : "new", tripId);
   deps.schedule(runUnit(tripId, deps).catch((e) => deps.log?.(`prepare run: ${String(e)}`)));
   return reply({ ok: true, at: res.at }, 200, origin);
 }
@@ -1392,6 +1417,15 @@ export function restDb(key: string, f: typeof fetch): Db {
     },
     async touchPhotos(tripId, hold, now) {
       await call(`/rest/v1/place_states?trip_id=eq.${PHOTO_TRIP}&place_id=eq.${enc(tripId)}&data->>hold=eq.${enc(hold)}`, { method: "PATCH", headers: { prefer: "return=minimal" }, body: JSON.stringify({ data: { hold, at: Math.floor(now) }, updated_at: new Date().toISOString() }) });
+    },
+    async event(userId, name, detail, tripId) {
+      // straight into the steps table (service key); a slow or failed write is dropped after 3 s
+      await f(`${SUPA_URL}/rest/v1/events`, {
+        method: "POST",
+        headers: { apikey: key, authorization: `Bearer ${key}`, "content-type": "application/json", prefer: "return=minimal" },
+        body: JSON.stringify({ user_id: userId, name, detail: detail ? detail.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 40) || null : null, trip_id: tripId.slice(0, 64) }),
+        signal: AbortSignal.timeout(3000),
+      }).then(() => undefined, () => undefined);
     },
     async releasePhotos(tripId, hold, now, note) {
       await call(`/rest/v1/place_states?trip_id=eq.${PHOTO_TRIP}&place_id=eq.${enc(tripId)}&data->>hold=eq.${enc(hold)}`, { method: "PATCH", headers: { prefer: "return=minimal" }, body: JSON.stringify({ data: { ...note, hold: null, at: Math.floor(now) }, updated_at: new Date().toISOString() }) });

@@ -211,7 +211,7 @@ export default function ProScreen() {
       : { k: t("Validité"), v: plan?.granted ? t("À vie") : t("Inclus avec votre accès") };
   const top = (
     <div className="v3-bar">
-      <button className="v3-tool pm-close" onClick={closePro} aria-label={t("Fermer")}>
+      <button className="v3-tool pm-close" onClick={() => { track("paywall_closed", why); closePro(); }} aria-label={t("Fermer")}>
         <IClose />
       </button>
       <span className="v3-grow" />

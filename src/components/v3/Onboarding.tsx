@@ -63,7 +63,7 @@ export default function Onboarding() {
 
   const finish = () => {
     updateProfile({ name: name.trim(), travel, interests, pace, budget, lang, home: home.trim(), age, tripsPerYear: freq, heard, onboardedAt: Date.now() });
-    track("signup_done");
+    track("onboarding_done");
   };
   const timer = useRef<number | undefined>(undefined);
   useEffect(() => {

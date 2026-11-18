@@ -35,6 +35,7 @@ check_fn public_trip '{"p_slug":"aaaaaaaaaa"}' "lien public (saas-6)" saas-6.sql
 check_fn my_inbound_token '{}' "alertes et réservations (saas-7)" saas-7.sql
 check_fn track_event '{"p_name":"none","p_detail":null,"p_device":null,"p_ref":null,"p_visitor":null,"p_trip":null,"p_city":null,"p_country":null,"p_region":null,"p_os":null,"p_browser":null}' "ville et appareil (saas-8)" saas-8.sql
 check_fn admin_people '{}' "profils et personas (saas-8)" saas-8.sql
+check_fn track_event '{"p_name":"none","p_detail":null,"p_device":null,"p_ref":null,"p_visitor":null,"p_trip":null,"p_city":null,"p_country":null,"p_region":null,"p_os":null,"p_browser":null,"p_src":null,"p_by":null}' "sources et partageurs (saas-12)" saas-12.sql
 for t in push_subscriptions inbound_items alert_log trip_links events; do
   c=$(code "$U/rest/v1/$t?select=*&limit=0" -H "apikey: $K"); [ "$c" = 200 ] && pass "table $t" || fail "table $t" "HTTP $c"
 done

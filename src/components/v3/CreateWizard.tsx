@@ -1043,7 +1043,8 @@ export async function createTripFromWizard(w: Wiz, business: boolean): Promise<s
     draft,
   });
   switchTrip(id);
-  track("trip_created", null, id);
+  // one step per trip, whether it was made with the form or with the concierge
+  track("trip_created", w.from === "concierge" ? "concierge" : null, id);
   // the concierge's conversation this draft came from is done with
   if (w.from === "concierge") {
     try {

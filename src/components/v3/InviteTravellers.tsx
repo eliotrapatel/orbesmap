@@ -4,6 +4,7 @@ import { invite, invites as listInvites, people as listPeople, sendInviteMessage
 import { currentAuthor, toast, useStore, useTrip } from "../../lib/store";
 import { setTravellers, travellersOf } from "../../lib/business";
 import { t } from "../../lib/i18n";
+import { track } from "../../lib/track";
 
 // Which address each companion of the wizard was invited with, and "Plus tard", on this phone only.
 // Kept under "orbes.wizard." so that signing out clears it with the wizard's drafts.
@@ -235,7 +236,7 @@ export default function InviteTravellers() {
       )}
       <div className="inv-tell-row">
         <button type="button" className="v3-chip" onClick={() => void sendInviteMessage(trip.title, myName, name || emailTo)}>{t("Envoyer le message")}</button>
-        <a className="v3-chip inv-wa" href={whatsappInviteUrl(trip.title, myName)} target="_blank" rel="noopener noreferrer">{t("Par WhatsApp")}</a>
+        <a className="v3-chip inv-wa" href={whatsappInviteUrl(trip.title, myName)} target="_blank" rel="noopener noreferrer" onClick={() => track("trip_shared_whatsapp", "invite", trip.id)}>{t("Par WhatsApp")}</a>
       </div>
     </div>
   );

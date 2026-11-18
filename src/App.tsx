@@ -32,7 +32,7 @@ import type { Pin, PlaceState } from "./lib/model";
 import { ensureCompass, getLoc, onLocateError, resumeLocate, setFollow, startLocate, stopLocate, useLoc } from "./lib/locate";
 import type { Mode } from "./lib/route";
 import { NavCard, PointCard, useNavigation, type NavState, type NavTarget } from "./components/Nav";
-import { track } from "./lib/track";
+import { track, trackOnce } from "./lib/track";
 import { t } from "./lib/i18n";
 import { coverMissing, needsLookup } from "./lib/photoData";
 import { askPhotos, keepTripPhotos } from "./lib/placePhotos";
@@ -234,6 +234,8 @@ export default function App() {
     (d: string) => {
       setDay(d);
       setSel(null);
+      // the first day opened of each trip (once per trip on this phone)
+      if (d !== "all") trackOnce("first_day_opened", trip.id, d, trip.id);
       if (d === "all") {
         setRoute(null);
         if (!desktop) setSnap("peek");

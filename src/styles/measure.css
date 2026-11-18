@@ -1,0 +1,18 @@
+/* The admin's measure of the path (AdminScreen: « Parcours par inscription », « Sources »), same look as its other cards */
+.msr-head { gap: 10px; flex-wrap: wrap; align-items: center; }
+.msr-unit { display: inline-flex; padding: 3px; gap: 2px; border-radius: 12px; border: 1px solid rgba(246, 242, 234, 0.08); background: rgba(246, 242, 234, 0.05); flex: none; }
+.msr-unit button { height: 32px; min-width: 64px; padding: 0 10px; border-radius: 9px; font-size: 13px; color: var(--soft); transition: background 0.3s var(--ease), color 0.2s; }
+.msr-unit button:hover { color: var(--ink); }
+.msr-unit button.on { background: var(--ink); color: #0a0a0a; font-weight: 600; }
+.msr-unit button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.adm-step .msr-pct { min-width: 44px; }
+.msr-quiet { color: var(--mute); }
+/* every period, in a table that scrolls inside its card (never the page) */
+.msr-scroll { margin-top: 12px; overflow-x: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; max-width: 100%; }
+.msr-scroll:focus-visible { outline: 2px solid var(--hair-strong); outline-offset: 2px; border-radius: 8px; }
+.msr-tr { display: grid; grid-template-columns: minmax(112px, 1.5fr) repeat(9, minmax(52px, 1fr)); gap: 6px; padding: 7px 4px; border-bottom: 1px solid rgba(246, 242, 234, 0.06); font-size: 12px; font-variant-numeric: tabular-nums; min-width: 640px; }
+.msr-tr > span:not(:first-child) { text-align: right; }
+.msr-tr.msr-src { grid-template-columns: minmax(120px, 1.6fr) repeat(4, minmax(64px, 1fr)); min-width: 420px; }
+.msr-th { color: var(--mute); font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; align-items: end; }
+.msr-th > span { overflow-wrap: anywhere; }
+.msr-sharer { margin: 6px 0 0; overflow-wrap: anywhere; }
