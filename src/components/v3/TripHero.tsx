@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import type { Day, Place, Trip } from "../../data/types";
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import type { Day, Flight, Place, Trip } from "../../data/types";
 import { TYPE_LABEL } from "../../data/trip";
 import { countable, dayStops, isHotel, stopTime } from "../../lib/plan";
 import { liveTrip } from "../../lib/live";
@@ -8,9 +8,10 @@ import { getState, toast, useStore } from "../../lib/store";
 import { clock, countdownParts, dayOfTrip, fmtDay, fmtMin, homeZone, localDate, phase, sameHour, tripEndMs, tripStartMs } from "../../lib/time";
 import { t } from "../../lib/i18n";
 import { dateLabel } from "../../lib/newTrip";
-import { recapDue, recapImage, recapOf, recapStats, shareRecapBlob } from "../../lib/recap";
+import { coordText, homeCityOf, PLANE_PATH, recapDue, recapImage, recapOf, recapStats, routeOf, shareRecapBlob, type Route } from "../../lib/recap";
 import { track } from "../../lib/track";
 import { setIntent } from "./nav";
+import "../../styles/home.css";
 
 /** The trip with the places added / moved in the app (the open one from the store, the others from this phone) */
 function liveOf(trip: Trip): Trip {
@@ -105,17 +106,6 @@ function relative(when: number | undefined, nowMin: number): { text: string; lat
   return null;
 }
 
-// where home is on the globe, from the phone's timezone (the arc starts there)
-const ZONES: Record<string, [number, number]> = {
-  "Europe/Paris": [2.35, 48.86], "Europe/London": [-0.13, 51.5], "Europe/Brussels": [4.35, 50.85], "Europe/Madrid": [-3.7, 40.42],
-  "Europe/Lisbon": [-9.14, 38.72], "Europe/Berlin": [13.4, 52.52], "Europe/Rome": [12.5, 41.9], "Europe/Zurich": [8.54, 47.37],
-  "Europe/Amsterdam": [4.9, 52.37], "Europe/Luxembourg": [6.13, 49.61], "Europe/Monaco": [7.42, 43.74], "Europe/Geneva": [6.14, 46.2],
-  "America/New_York": [-74, 40.71], "America/Toronto": [-79.38, 43.65], "America/Montreal": [-73.57, 45.5], "America/Chicago": [-87.63, 41.88],
-  "America/Los_Angeles": [-118.24, 34.05], "America/Sao_Paulo": [-46.63, -23.55], "Asia/Shanghai": [121.47, 31.23], "Asia/Hong_Kong": [114.17, 22.32],
-  "Asia/Tokyo": [139.69, 35.69], "Asia/Singapore": [103.82, 1.35], "Asia/Dubai": [55.27, 25.2], "Australia/Sydney": [151.21, -33.87],
-  "Africa/Casablanca": [-7.59, 33.57], "Indian/Reunion": [55.45, -20.88], "America/Martinique": [-61.02, 14.6], "America/Guadeloupe": [-61.53, 16.24],
-};
-
 /** Home: this phone's timezone; on site (the phone has switched to the trip's time), the last one seen before */
 function homeFor(trip: Trip): { zone: string; city: string } | null {
   const here = homeZone();
@@ -132,92 +122,81 @@ function homeFor(trip: Trip): { zone: string; city: string } | null {
   return null;
 }
 
-const rad = Math.PI / 180;
-const toVec = ([lng, lat]: [number, number]) => [Math.cos(lat * rad) * Math.cos(lng * rad), Math.cos(lat * rad) * Math.sin(lng * rad), Math.sin(lat * rad)];
-const toLL = (v: number[]): [number, number] => [Math.atan2(v[1], v[0]) / rad, Math.asin(Math.max(-1, Math.min(1, v[2]))) / rad];
-/** A point `f` of the way along the great circle from a to b */
-function along(a: [number, number], b: [number, number], f: number): [number, number] {
-  const A = toVec(a), B = toVec(b);
-  const w = Math.acos(Math.max(-1, Math.min(1, A[0] * B[0] + A[1] * B[1] + A[2] * B[2])));
-  if (w < 1e-6) return a;
-  const s = Math.sin(w), k1 = Math.sin((1 - f) * w) / s, k2 = Math.sin(f * w) / s;
-  return toLL([k1 * A[0] + k2 * B[0], k1 * A[1] + k2 * B[1], k1 * A[2] + k2 * B[2]]);
+/** Nights between the first and the last day (0 for a trip within a day) */
+const nightsOf = (trip: Trip) => Math.max(0, Math.round((Date.parse(trip.end + "T00:00:00Z") - Date.parse(trip.start + "T00:00:00Z")) / 864e5));
+/** A flight's time, in the timezone of the place it is read at ("" when unknown) */
+const timeIn = (iso: string | undefined, zone: string) => {
+  const d = iso ? new Date(iso) : null;
+  return d && Number.isFinite(d.getTime()) ? clock(zone, d) : "";
+};
+/** The local time written in the ISO string itself (the time at the airport, whatever its timezone): "07:10" */
+const ownTime = (iso: string | undefined) => {
+  const m = iso?.match(/T(\d{2}):(\d{2})/);
+  return m ? `${m[1]}:${m[2]}` : "";
+};
+
+/** The route, set as on a boarding pass: origin and destination (IATA codes when a flight gives them, else the
+ *  cities), one hairline between them, and the plane placed by progress (at home before, along the days during,
+ *  arrived after). Under the ends: the cities (under codes) and the outbound flight's times when known. */
+function RouteLine({ route, f, flight, timezone }: { route: Route; f: number; flight?: Flight; timezone: string }) {
+  const coded = !!route.to.code && (!route.from || !!route.from.code);
+  const a = route.from ? route.from.code || route.from.city : "";
+  const b = route.to.code || route.to.city;
+  const under = (end: Route["from"]) => (end && end.code && end.city && end.city.toUpperCase() !== end.code ? end.city : "");
+  // the outbound flight: departure time at its airport, arrival time at the destination, its code and duration
+  const out = flight?.kind === "arrival" ? flight : undefined;
+  const dep = ownTime(out?.departAt);
+  const arr = out ? timeIn(out.arriveAt || out.at, timezone) : "";
+  const mins = out?.departAt && (out.arriveAt || out.at) ? Math.round((Date.parse(out.arriveAt || out.at) - Date.parse(out.departAt)) / 60000) : NaN;
+  const dur = mins > 0 && mins < 36 * 60 ? span(mins) : "";
+  // each end: its city (under a code) over its time; the middle: the flight's code over its length
+  const cell = (cls: string, top: string, low: string) =>
+    top || low ? (
+      <small className={cls}>
+        {top && <span>{top}</span>}
+        {low && <b>{low}</b>}
+      </small>
+    ) : null;
+  const ca = cell("hx-ca", under(route.from), dep);
+  const note = out ? cell("hx-note", out.code, dur) : null;
+  const cb = cell("hx-cb", under(route.to), arr);
+  const pos = Math.min(1, Math.max(0, f));
+  return (
+    <span className={"hx-route" + (coded ? " coded" : "")} style={{ "--f": pos } as CSSProperties} aria-label={a ? `${a} → ${b}` : b}>
+      {a ? <b className="hx-a" aria-hidden="true">{a}</b> : <span className="hx-a" aria-hidden="true" />}
+      <span className="hx-line" aria-hidden="true">
+        <i className="hx-done" />
+        <svg className="hx-plane" viewBox="0 0 24 24" focusable="false">
+          <path d={PLANE_PATH} transform="rotate(90 12 12)" />
+        </svg>
+      </span>
+      <b className="hx-b" aria-hidden="true">{b}</b>
+      {(ca || note || cb) && (
+        <span className="hx-sub">
+          {ca}
+          {note}
+          {cb}
+        </span>
+      )}
+    </span>
+  );
 }
 
-/** A still globe (meridians and parallels), the flight arc from home to the destination and a plane on it */
-function Globe({ from, to }: { from: [number, number] | null; to: [number, number] }) {
-  const R = 120;
-  const paths = useMemo(() => {
-    // centred a little south of the route, so the flight reads as a curve over the globe
-    const mid = from ? along(from, to, 0.6) : to;
-    const l0 = mid[0] + (from ? 0 : -18), p0 = Math.max(-60, mid[1] - (from ? 26 : 10));
-    const sp0 = Math.sin(p0 * rad), cp0 = Math.cos(p0 * rad);
-    // orthographic projection centred on (l0, p0); `lift` raises the arc above the ground
-    const proj = ([lng, lat]: [number, number], lift = 1) => {
-      const cp = Math.cos(lat * rad), sp = Math.sin(lat * rad), dl = (lng - l0) * rad;
-      const vis = sp0 * sp + cp0 * cp * Math.cos(dl);
-      return { x: R * lift * cp * Math.sin(dl), y: -R * lift * (cp0 * sp - sp0 * cp * Math.cos(dl)), vis };
-    };
-    const line = (pts: [number, number][], lift?: (i: number) => number, min = 0) => {
-      let d = "";
-      let pen = false;
-      pts.forEach((p, i) => {
-        const q = proj(p, lift ? lift(i) : 1);
-        if (q.vis > min) {
-          d += `${pen ? "L" : "M"}${q.x.toFixed(1)} ${q.y.toFixed(1)}`;
-          pen = true;
-        } else pen = false;
-      });
-      return d;
-    };
-    const grid: string[] = [];
-    for (let lng = -180; lng < 180; lng += 20) grid.push(line(Array.from({ length: 61 }, (_, i) => [lng, -90 + i * 3] as [number, number])));
-    for (let lat = -60; lat <= 60; lat += 20) grid.push(line(Array.from({ length: 121 }, (_, i) => [-180 + i * 3, lat] as [number, number])));
-    const N = 64;
-    const arcPts = from ? Array.from({ length: N + 1 }, (_, i) => along(from, to, i / N)) : [];
-    const arc = from ? line(arcPts, (i) => 1 + 0.16 * Math.sin((Math.PI * i) / N), -0.12) : "";
-    const end = proj(to);
-    const start = from ? proj(from) : null;
-    return { grid: grid.filter(Boolean), arc, end, start };
-  }, [from?.[0], from?.[1], to[0], to[1]]); // eslint-disable-line react-hooks/exhaustive-deps
-
+/** Dates, length and the destination's point on the map, in fine type under the name */
+function WhenLine({ trip, today, days }: { trip: Trip; today: { i: number; n: number } | null; days: number }) {
+  const nights = nightsOf(trip);
+  const coords = coordText(trip.center);
+  const length = today ? t("Jour {i} sur {n}", { i: today.i, n: today.n }) : days ? (days > 1 ? t("{n} jours", { n: days }) : t("{n} jour", { n: days })) : "";
   return (
-    <svg className="v3-hero-globe" viewBox="-150 -150 300 300" aria-hidden="true">
-      <defs>
-        <radialGradient id="v3g-sphere" cx="0.68" cy="0.28" r="0.9">
-          <stop offset="0" stopColor="#1d1c1a" />
-          <stop offset="0.55" stopColor="#0c0c0d" />
-          <stop offset="1" stopColor="#050505" />
-        </radialGradient>
-        <radialGradient id="v3g-halo" cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0.78" stopColor="rgba(216,196,126,0)" />
-          <stop offset="0.86" stopColor="rgba(216,196,126,0.10)" />
-          <stop offset="1" stopColor="rgba(216,196,126,0)" />
-        </radialGradient>
-      </defs>
-      <circle r={R + 22} fill="url(#v3g-halo)" />
-      <circle r={R} fill="url(#v3g-sphere)" stroke="rgba(246,242,234,0.16)" strokeWidth="0.8" />
-      <g fill="none" stroke="rgba(246,242,234,0.09)" strokeWidth="0.6">
-        {paths.grid.map((d, i) => <path key={i} d={d} />)}
-      </g>
-      {paths.arc && (
-        <>
-          <path id="v3g-arc" className="v3-hero-arc" d={paths.arc} pathLength={1} fill="none" stroke="var(--gold)" strokeWidth="1.6" strokeLinecap="round" />
-          <circle className="v3-hero-plane" r="2.6" fill="var(--ink)">
-            <animateMotion dur="7s" repeatCount="indefinite" keyPoints="0;1" keyTimes="0;1" calcMode="linear">
-              <mpath href="#v3g-arc" />
-            </animateMotion>
-          </circle>
-        </>
-      )}
-      {paths.start && paths.start.vis > 0 && <circle cx={paths.start.x} cy={paths.start.y} r="2.2" fill="rgba(246,242,234,0.7)" />}
-      {paths.end.vis > 0 && (
-        <g transform={`translate(${paths.end.x} ${paths.end.y})`}>
-          <circle r="8" fill="none" stroke="var(--gold)" strokeOpacity="0.35" strokeWidth="0.8" />
-          <circle r="3.2" fill="var(--gold)" />
-        </g>
-      )}
-    </svg>
+    <>
+      {/* each part keeps its words together: a line breaks between parts, never inside "6 nuits" */}
+      <small className="v3-hero-when">
+        <span className="hx-nw">{dateLabel(trip.start, trip.end)}</span>
+        {length && <> · <span className="hx-nw">{length}</span></>}
+        {!today && nights > 0 && <> · <span className="hx-nw">{nights > 1 ? t("{n} nuits", { n: nights }) : t("{n} nuit", { n: nights })}</span></>}
+      </small>
+      {coords && <small className="hx-coord">{coords}</small>}
+    </>
   );
 }
 
@@ -230,21 +209,25 @@ function useNow(ms: number) {
   return now;
 }
 
-/** The trip to come (or under way) at the top of "Mes voyages": globe, clocks, countdown, what is ready, and the way in */
+/** The trip to come (or under way) at the top of "Mes voyages": the destination, its route, clocks, countdown,
+ *  what is ready, and the way in */
 export default function TripHero({ trip: base, onOpen }: { trip: Trip; onOpen: (id: string) => void }) {
   const now = useNow(1000);
   // the open trip's places added / moved since: the card follows them without a reload
   const defs = useStore((st) => (st.tripId === base.id ? st.data.defs : null));
   const pins = useStore((st) => (st.tripId === base.id ? st.data.pins : null));
+  const homeAnswer = useStore((st) => String((st.profile as { home?: unknown }).home || ""));
   const trip = useMemo(() => liveOf(base), [base, defs, pins]); // eslint-disable-line react-hooks/exhaustive-deps
   const draft = (useStore((s) => s.trips[base.id])?.draft as { status?: string } | undefined)?.status;
   const preparing = !!draft && draft !== "done";
   const ph = phase(trip, now);
   const cd = countdownParts(ph === "before" ? tripStartMs(trip) : tripEndMs(trip), now);
   const home = useMemo(() => homeFor(trip), [trip.id, trip.timezone]); // eslint-disable-line react-hooks/exhaustive-deps
-  const from = home ? ZONES[home.zone] || (home.zone.startsWith("Europe/") ? ZONES["Europe/Paris"] : null) : ZONES["Europe/Paris"];
+  const route = useMemo(() => routeOf(trip, homeCityOf(trip)), [trip, homeAnswer]); // eslint-disable-line react-hooks/exhaustive-deps
   const days = trip.days.filter((d) => d.scheduled).reduce((n, d) => n + (d.dates?.length || 0), 0);
   const today = ph === "during" ? dayOfTrip(trip, now) : null;
+  // where the plane stands on the route: at home before, along the days during, arrived after
+  const along = ph === "before" ? 0 : ph === "after" ? 1 : today ? (today.i - 0.5) / today.n : 0.5;
   const total = countable(trip).length;
   const visited = useMemo(() => visitedOf(trip), [trip, now - (now % 15000)]); // eslint-disable-line react-hooks/exhaustive-deps
   // the flight that matters now: the one out before and the way back once there
@@ -283,11 +266,14 @@ export default function TripHero({ trip: base, onOpen }: { trip: Trip; onOpen: (
       <small>{t("{v}/{n} visités", { v: visited, n: total })}</small>
     </span>
   );
+  const routeLine = <RouteLine route={route} f={along} flight={ph === "before" ? flight : undefined} timezone={trip.timezone} />;
+  // the outbound flight is already on the route (code and times): only the other one is listed with the facts
+  const flightFact = flight?.code && !(ph === "before" && flight.kind === "arrival");
 
   // on site: today's programme first; just back: the recap (both are cards with their own buttons)
   if (ph === "during" && !preparing)
     return (
-      <TodayCard trip={trip} now={now} top={top} globe={<Globe from={from} to={trip.center} />} onOpen={() => onOpen(base.id)} progress={progress}
+      <TodayCard trip={trip} now={now} top={top} route={routeLine} onOpen={() => onOpen(base.id)} progress={progress}
         returnIn={cd.d > 0 ? t("{d} j {h} h", { d: cd.d, h: cd.h }) : t("{h} h {m} min", { h: cd.h, m: String(cd.m).padStart(2, "0") })}
         facts={
           <span className="v3-facts">
@@ -298,19 +284,17 @@ export default function TripHero({ trip: base, onOpen }: { trip: Trip; onOpen: (
       />
     );
   if (ph === "after" && !preparing && recapDue(trip, now))
-    return <RecapCard trip={trip} from={from} top={top} globe={<Globe from={from} to={trip.center} />} onOpen={() => onOpen(base.id)} />;
+    return <RecapCard trip={trip} top={top} route={routeLine} onOpen={() => onOpen(base.id)} />;
 
   return (
     <button className={"v3-hero" + (ph === "during" ? " live" : "")} onClick={() => onOpen(base.id)}>
-      <Globe from={from} to={trip.center} />
       {top}
 
       <span className="v3-hero-body">
         <b className="v3-d v3-hero-title">{trip.title}</b>
-        <small className="v3-hero-when">
-          {dateLabel(trip.start, trip.end)}
-          {today ? ` · ${t("Jour {i} sur {n}", { i: today.i, n: today.n })}` : days ? ` · ${days > 1 ? t("{n} jours", { n: days }) : t("{n} jour", { n: days })}` : ""}
-        </small>
+        <WhenLine trip={trip} today={today} days={days} />
+
+        {routeLine}
 
         {ph !== "after" && (
           <span className="v3-cdn" role="timer" aria-label={ph === "before" ? t("Compte à rebours avant l'arrivée") : t("Temps restant sur place")}>
@@ -327,7 +311,7 @@ export default function TripHero({ trip: base, onOpen }: { trip: Trip; onOpen: (
         <span className="v3-facts">
           <span><b>{total}</b> {total > 1 ? t("lieux") : t("lieu")}</span>
           {hotel && <span>{/^h[oô]tel\b/i.test(hotel) ? null : <>{t("Hôtel")} </>}<b>{hotel}</b></span>}
-          {flight?.code && <span><b>{flight.code}</b> {flight.from} → {flight.to}</span>}
+          {flightFact && <span><b>{flight.code}</b> {flight.from} → {flight.to}</span>}
         </span>
 
         {(ph !== "before" || visited > 0) && total > 0 && (
@@ -352,8 +336,8 @@ const onGround = (open: () => void) => (e: React.MouseEvent) => {
 };
 
 /** On site: "Aujourd'hui", day X of N, the next stop and how its time stands, what is left today, and two ways in */
-function TodayCard({ trip, now, top, globe, onOpen, progress, returnIn, facts }: {
-  trip: Trip; now: number; top: ReactNode; globe: ReactNode; onOpen: () => void; progress: ReactNode; returnIn: string; facts: ReactNode;
+function TodayCard({ trip, now, top, route, onOpen, progress, returnIn, facts }: {
+  trip: Trip; now: number; top: ReactNode; route: ReactNode; onOpen: () => void; progress: ReactNode; returnIn: string; facts: ReactNode;
 }) {
   const slot = now - (now % 15000);
   const states = useStore((s) => (s.tripId === trip.id ? s.data.places : null));
@@ -371,9 +355,9 @@ function TodayCard({ trip, now, top, globe, onOpen, progress, returnIn, facts }:
 
   return (
     <div className="v3-hero live static" onClick={onGround(onOpen)}>
-      {globe}
       {top}
       <span className="v3-hero-body today">
+        {route}
         <span className="v3-lbl v3-today-k">{t("Aujourd'hui")} · {t("Jour {i} sur {n}", { i: dt.i, n: dt.n })}</span>
         <small className="v3-hero-when">{trip.title}{theme ? ` · ${theme}` : ""}</small>
 
@@ -440,20 +424,20 @@ function TodayCard({ trip, now, top, globe, onOpen, progress, returnIn, facts }:
 }
 
 /** Just back: the trip in figures, and its story image to share */
-function RecapCard({ trip, from, top, globe, onOpen }: {
-  trip: Trip; from: [number, number] | null; top: ReactNode; globe: ReactNode; onOpen: () => void;
+function RecapCard({ trip, top, route, onOpen }: {
+  trip: Trip; top: ReactNode; route: ReactNode; onOpen: () => void;
 }) {
   const states = useStore((s) => (s.tripId === trip.id ? s.data : null));
   const draft = useStore((s) => s.trips[trip.id]?.draft);
   const r = useMemo(() => recapOf(trip), [trip, states, draft]); // eslint-disable-line react-hooks/exhaustive-deps
-  const key = JSON.stringify(r) + (from || []).join(",");
+  const key = JSON.stringify(r);
   // the image is drawn ahead, so the share sheet opens right on the touch (phones refuse it after a wait)
   const [img, setImg] = useState<{ key: string; blob: Blob } | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     let live = true;
     const id = window.setTimeout(() => {
-      recapImage(r, from).then((blob) => { if (live) setImg({ key, blob }); }, () => undefined);
+      recapImage(r).then((blob) => { if (live) setImg({ key, blob }); }, () => undefined);
     }, 500);
     return () => {
       live = false;
@@ -465,7 +449,7 @@ function RecapCard({ trip, from, top, globe, onOpen }: {
     if (busy) return;
     setBusy(true);
     try {
-      const blob = img?.key === key ? img.blob : await recapImage(r, from);
+      const blob = img?.key === key ? img.blob : await recapImage(r);
       const res = await shareRecapBlob(r, blob);
       if (res !== "cancelled") track("export", "recap", trip.id);
       if (res === "saved") toast(t("Image du récapitulatif enregistrée"));
@@ -481,12 +465,13 @@ function RecapCard({ trip, from, top, globe, onOpen }: {
 
   return (
     <div className="v3-hero static recap" onClick={onGround(onOpen)}>
-      {globe}
       {top}
       <span className="v3-hero-body">
-        <span className="v3-lbl">{t("Récapitulatif")}</span>
-        <b className="v3-d v3-hero-title" style={{ marginTop: 8 }}>{trip.title}</b>
+        <span className="v3-lbl hx-kicker">{t("Récapitulatif")}</span>
+        <b className="v3-d v3-hero-title">{trip.title}</b>
         <small className="v3-hero-when">{r.dates}</small>
+        {coordText(r.center) && <small className="hx-coord">{coordText(r.center)}</small>}
+        {route}
         <span className="v3-recap-stats">
           {stats.map(([v, l]) => (
             <span key={l}>

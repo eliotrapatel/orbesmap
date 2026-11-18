@@ -1,0 +1,63 @@
+/* =================== home (Nov 2026): the route of the trip card, its fine type, the first-time home ===================
+   Editorial, not illustrated: the destination in the display face, the route as on a boarding pass (codes, one hairline,
+   the plane placed by progress), coordinates and times in fine tracked capitals. Motion: the line draws once, the
+   plane settles; nothing loops. (styles.css loads after this file: every rule here uses its own hx- classes.) */
+
+/* the destination's point on the map, under the dates */
+.hx-nw { white-space: nowrap; }
+.hx-coord { margin-top: 7px; font-size: 10px; line-height: 1.2; letter-spacing: 0.16em; text-transform: uppercase; color: var(--mute); font-variant-numeric: tabular-nums; }
+/* "Récapitulatif" above the name on the recap card */
+.hx-kicker { margin-bottom: 12px; }
+
+/* ---------- the route ---------- */
+.hx-route { display: grid; grid-template-columns: auto minmax(44px, 1fr) auto; grid-template-areas: "a line b" "sub sub sub"; align-items: center; column-gap: 14px;
+  margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--hair); min-width: 0; }
+.hx-a { grid-area: a; }
+.hx-b { grid-area: b; text-align: right; }
+.hx-a, .hx-b { display: block; min-width: 0; max-width: min(36vw, 170px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font: 500 14px/1 var(--display); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink); }
+.hx-b { margin-right: -0.14em; }
+/* IATA codes: set large, like a boarding pass */
+.hx-route.coded .hx-a, .hx-route.coded .hx-b { max-width: none; font-size: 30px; letter-spacing: 0.04em; }
+.hx-route.coded .hx-b { margin-right: -0.04em; }
+
+.hx-line { grid-area: line; position: relative; height: 16px; min-width: 0; }
+/* the whole way: one hairline, drawn once from the origin */
+.hx-line::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--hair-strong); transform-origin: left center;
+  animation: hx-draw 0.9s var(--ease) 0.15s both; }
+/* the destination: a point */
+.hx-line::after { content: ""; position: absolute; right: 0; top: 50%; width: 5px; height: 5px; margin-top: -2.5px; border-radius: 50%; background: var(--ink); }
+/* the way already made, from the origin's ring to the plane */
+.hx-done { position: absolute; left: 0; top: 50%; height: 1px; width: calc(var(--f, 0) * 100%); background: var(--ink); animation: hx-in 0.6s var(--ease) 0.75s both; }
+.hx-done::before { content: ""; position: absolute; left: 0; top: -2.5px; width: 6px; height: 6px; box-sizing: border-box; border: 1px solid var(--ink); border-radius: 50%; background: #0e0e0f; }
+.hx-plane { position: absolute; top: 50%; left: calc(13px + (100% - 37px) * var(--f, 0)); width: 14px; height: 14px; margin-top: -7px; fill: var(--ink);
+  animation: hx-plane 0.7s var(--ease) 0.6s both; }
+
+/* under the ends: the cities (under codes) and the outbound flight's times; its code and length in the middle */
+.hx-sub { grid-area: sub; display: flex; align-items: baseline; gap: 12px; margin-top: 9px; min-width: 0; }
+.hx-ca, .hx-cb, .hx-note { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.hx-ca > span, .hx-cb > span, .hx-note > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; line-height: 1; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--mute); }
+.hx-ca > b, .hx-cb > b, .hx-note > b { font: 500 13px/1 var(--display); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.hx-ca { flex: 0 1 auto; align-items: flex-start; }
+.hx-note { flex: 1 1 auto; align-items: center; text-align: center; }
+.hx-note > b { color: var(--soft); }
+.hx-cb { flex: 0 1 auto; margin-left: auto; align-items: flex-end; text-align: right; }
+
+@keyframes hx-draw { from { transform: scaleX(0); } }
+@keyframes hx-in { from { opacity: 0; } }
+@keyframes hx-plane { from { opacity: 0; transform: translateX(-8px); } }
+@media (prefers-reduced-motion: reduce) {
+  .hx-line::before, .hx-done, .hx-plane { animation: none; }
+}
+@media (max-width: 360px) {
+  .hx-route { column-gap: 12px; }
+  .hx-route.coded .hx-a, .hx-route.coded .hx-b { font-size: 26px; }
+}
+
+/* ---------- the first-time home: no trip yet ---------- */
+.hx-empty { display: flex; flex-direction: column; align-items: flex-start; margin-top: clamp(40px, 12vh, 112px); }
+.hx-empty .v3-lbl { padding-bottom: 14px; width: 100%; border-bottom: 1px solid var(--hair); }
+.hx-empty-h { margin: 22px 0 0; font-size: clamp(42px, 13.5vw, 60px); line-height: 0.92; max-width: 9.5em; }
+.hx-empty .v3-lead { margin-top: 18px; }
+.hx-empty .v3-btn { margin-top: 30px; }

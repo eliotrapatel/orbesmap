@@ -74,11 +74,13 @@ export default function Trips({ onOpen, onClose }: { onOpen: (id: string) => voi
   if (!trips.length)
     return (
       <Shell top={top} className="v3-empty">
-        <div className="v3-bigmark"><OrbitMark size={88} /></div>
-        <p className="v3-lbl" style={{ textAlign: "center", marginTop: 30 }}>{greeting()}{name ? ` ${name}` : ""}</p>
-        <h1 className="v3-d v3-h2" style={{ textAlign: "center" }}>{t("Votre premier voyage commence ici.")}</h1>
-        <p className="v3-lead" style={{ textAlign: "center", margin: "14px auto 0" }}>{t("Une destination et des dates suffisent. Le reste se construit avec vous.")}</p>
-        <button className="v3-btn" style={{ marginTop: 26 }} onClick={() => setCreating(true)}>{t("＋ Créer un voyage")}</button>
+        {/* no illustration: one confident line in the display face, what it takes, and the way in */}
+        <div className="hx-empty">
+          <p className="v3-lbl">{greeting()}{name ? ` ${name}` : ""}</p>
+          <h1 className="v3-d hx-empty-h">{t("Votre premier voyage commence ici.")}</h1>
+          <p className="v3-lead">{t("Une destination et des dates suffisent. Le reste se construit avec vous.")}</p>
+          <button className="v3-btn" onClick={() => setCreating(true)}>{t("＋ Créer un voyage")}</button>
+        </div>
         <div className="v3-spacer" />
       </Shell>
     );

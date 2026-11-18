@@ -131,15 +131,16 @@ function HomeScroll({ children }: { children: ReactNode }) {
   );
 }
 
-/** While the session loads: the start-up mark of the page stays exactly where it was, then an orbit is drawn around it */
+/** While the session loads: the start-up mark of the page stays exactly where it was; if the wait goes on, the name
+ *  appears under it and a fine hairline draws itself once beneath the name (nothing turns, nothing loops) */
 function Splash() {
   // a long wait (no network): say so instead of a silent screen
   const [slow, setSlow] = useState(false);
-  // once the orbit and the name are fully drawn, the closing copy keeps them (a copy plays no drawing of its own)
+  // once the name and its line are fully drawn, the closing copy keeps them (a copy plays no drawing of its own)
   const [drawn, setDrawn] = useState(false);
   useEffect(() => {
     const tm = window.setTimeout(() => setSlow(true), 8000);
-    const td = window.setTimeout(() => setDrawn(true), 2900);
+    const td = window.setTimeout(() => setDrawn(true), 2700);
     return () => {
       window.clearTimeout(tm);
       window.clearTimeout(td);
@@ -148,16 +149,9 @@ function Splash() {
   return (
     <div className={"v3 v3-splash fl-splash" + (drawn ? " fl-splash-drawn" : "")} aria-busy="true">
       <div className="fl-splash-mark">
-        <svg className="fl-splash-orbit" viewBox="0 0 200 80" aria-hidden="true">
-          <g transform="rotate(-18 100 40)">
-            <ellipse className="fl-splash-path" cx="100" cy="40" rx="96" ry="26" pathLength={1} />
-            <circle className="fl-splash-sat" r="2">
-              <animateMotion begin="1.9s" dur="9s" repeatCount="indefinite" path="M196,40 A96,26 0 1,1 4,40 A96,26 0 1,1 196,40" />
-            </circle>
-          </g>
-        </svg>
         <OrbitMark size={34} title="ORBES Trips" />
         <span className="fl-splash-word" aria-hidden="true">ORBES Trips</span>
+        <span className="fl-splash-rule" aria-hidden="true" />
       </div>
       {slow && <p className="v3-note fl-splash-slow" role="status">{t("Connexion en cours… Vérifiez votre réseau\u00a0: l'app s'ouvrira dès qu'il sera rétabli.")}</p>}
     </div>

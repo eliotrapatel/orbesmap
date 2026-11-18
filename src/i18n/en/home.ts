@@ -30,4 +30,10 @@ export default {
   "Où allez-vous ensuite ?": "Where to next?",
   "Voyages passés": "Past trips",
   "Guidage Google Maps": "Google Maps directions",
+  // the trip card and the story image: the destination's coordinates, the nights
+  "{v}° N": "{v}° N",
+  "{v}° S": "{v}° S",
+  "{v}° E": "{v}° E",
+  "{v}° O": "{v}° W",
+  "{n} nuit": "{n} night",
 } satisfies Record<string, string>;
