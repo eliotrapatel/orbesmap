@@ -3,6 +3,7 @@
 // one chosen on the public page, else the phone's. English texts live in src/i18n/en/*.ts ({ "français": "English" }).
 import { getState, updateProfile, useStore } from "./store";
 import { supabase } from "./supabase";
+import { track } from "./track";
 
 export type Lang = "fr" | "en";
 
@@ -30,6 +31,7 @@ export const useLang = (): Lang => useStore((s) => langOfProfile(s.profile) || d
 
 /** Changes the language (the account's when signed in, this device's otherwise) */
 export function setLang(l: Lang) {
+  track("language_changed", l);
   try {
     localStorage.setItem(LANG_KEY, l);
   } catch {

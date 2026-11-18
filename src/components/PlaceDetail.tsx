@@ -20,6 +20,7 @@ import { t, locale } from "../lib/i18n";
 import { money, useBusiness, useExpenses } from "../lib/business";
 import { exportReport } from "../lib/export";
 import { vote, votesOf } from "../lib/social";
+import { track } from "../lib/track";
 
 export default function PlaceDetail({ trip, place, onBack, onGo, sheetH, onMovePoint }: { trip: Trip; place: Place; onBack: () => void; onGo: (m: Mode) => void; sheetH?: string; onMovePoint?: () => void }) {
   const state = useStore((s) => s.data.places[place.id]) || {};
@@ -199,7 +200,7 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH, onMoveP
             <span className="label">{t("Suivi")}</span>
             <div className="seg" role="group" aria-label={t("Statut")}>
               {STATUSES.filter((s) => !s.business || business).map((s) => (
-                <button key={s.key} className={state.status === s.key ? "on" : ""} style={{ ["--c" as string]: s.color }} aria-pressed={state.status === s.key} onClick={() => updatePlace(place.id, { status: state.status === s.key ? null : s.key })}>
+                <button key={s.key} className={state.status === s.key ? "on" : ""} style={{ ["--c" as string]: s.color }} aria-pressed={state.status === s.key} onClick={() => { updatePlace(place.id, { status: state.status === s.key ? null : s.key }); if (state.status !== s.key) track("status_set", s.key, trip.id); }}>
                   <i /> {t(s.label)}
                 </button>
               ))}
@@ -294,6 +295,7 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH, onMoveP
             legacyText={added ? added.note : undefined}
             placeholder={added ? t("Stand, contact, prix…") : t("Ce que vous avez vu, les prix, les impressions…")}
             onSave={(key, v) => {
+              if (v.trim()) track("note_written", place.type, trip.id);
               // an added place keeps its former shared note on the pin itself (as before)
               if (added?.pinId && key === "note") {
                 updatePin(added.pinId, { note: v });

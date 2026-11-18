@@ -78,6 +78,9 @@ export default function App() {
   const [filter, setFilter] = useState<Filter>({ types: new Set(), fav: false, todo: false });
   const [sel, setSel] = useState<Sel>(null);
   const [tool, setTool] = useState<ToolKey | null>(null);
+  useEffect(() => {
+    if (tool) track("tool_opened", tool);
+  }, [tool]);
   // best: the "Meilleur ordre" tour (its own order), else the day in time order
   const [route, setRoute] = useState<{ day: string; order: Place[]; best?: boolean } | null>(null);
   const [focus, setFocus] = useState<FocusRequest | null>(null);
@@ -210,6 +213,7 @@ export default function App() {
     (p: Place) => {
       setSel({ kind: "place", id: p.id });
       setTool(null);
+      track("place_opened", p.type, trip.id);
       fly({ center: [p.lng, p.lat], zoom: threeD ? 16 : 14.6 });
     },
     [fly, threeD],

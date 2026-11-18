@@ -1247,6 +1247,7 @@ export function deletePin(id: string) {
 
 export async function addPhoto(placeId: string, blob: Blob): Promise<boolean> {
   const trip = state.tripId;
+  track("photo_added", null, trip);
   const photo: Photo = { id: uid(), placeId, local: true, createdAt: Date.now() };
   try {
     await putPhoto(photo.id, blob);

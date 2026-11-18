@@ -6,6 +6,7 @@ import { localDate } from "../lib/time";
 import { ICheck, IPlus, ITrash } from "./Icons";
 import { locale, t } from "../lib/i18n";
 import { travellersOf } from "../lib/business";
+import { track } from "../lib/track";
 
 type Item = { id: string; text: string; due?: string; group?: string; owner?: string; done?: boolean; deleted?: boolean; custom?: boolean; order?: number };
 /** Who an item is for: each traveller of the trip, or everyone (keys are the names in lower case: "eliot", "papa"…) */
@@ -77,7 +78,7 @@ export default function Checklist({ trip }: { trip: Trip }) {
               const late = !i.done && i.due && i.due < today;
               return (
                 <div key={i.id} className={"ck-item" + (i.done ? " done" : "")}>
-                  <button className="ck-box" role="checkbox" aria-checked={!!i.done} aria-label={i.text} onClick={() => updateRecord(`_check:${i.id}`, { done: !i.done })}>
+                  <button className="ck-box" role="checkbox" aria-checked={!!i.done} aria-label={i.text} onClick={() => { updateRecord(`_check:${i.id}`, { done: !i.done }); if (!i.done) track("checklist_done", null, trip.id); }}>
                     {i.done && <ICheck />}
                   </button>
                   <div className="ck-main">

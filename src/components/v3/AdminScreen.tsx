@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "../../lib/store";
 import {
-  adminAccounts, adminCodes, adminCreateCode, adminFunnel, adminOverview, adminSetCodeActive, adminSetPro, adminUser, adminWaitlist, type Funnel, type UserSheet,
+  adminAccounts, adminCodes, adminCreateCode, adminFunnel, adminOverview, adminSetCodeActive, adminAi, adminSetPro, adminUser, adminWaitlist, type AiRow, type Funnel, type UserSheet,
   type AccountRow, type CodeRow, type Overview, type WaitRow,
 } from "../../lib/pro";
 import Shell from "./Shell";
@@ -14,7 +14,7 @@ type Tab = "figures" | "profiles" | "accounts" | "codes" | "waitlist";
 const TABS: [Tab, string][] = [["figures", "Chiffres"], ["profiles", "Profils"], ["accounts", "Comptes"], ["codes", "Codes"], ["waitlist", "Attente"]];
 const DURATIONS: [string, number | null][] = [["30 jours", 30], ["90 jours", 90], ["1 an", 365], ["À vie", null]];
 const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(locale(), { day: "numeric", month: "short", year: "2-digit", timeZone: "Europe/Paris" }) : "—");
-const usd = (n: number) => t("{n} $", { n: (Number(n) || 0).toFixed(2) });
+const usd = (n: number) => t("{n} $", { n: (Number(n) || 0) < 0.1 && Number(n) > 0 ? (Number(n) || 0).toFixed(4) : (Number(n) || 0).toFixed(2) });
 const copy = (text: string, what: string) =>
   navigator.clipboard?.writeText(text).then(() => toast(t("{what} copié", { what: t(what) })), () => toast(t("Copie impossible sur cet appareil")));
 
@@ -95,6 +95,75 @@ function Figures() {
         <p className="v3-note">{t("Hors espace partagé, dont les demandes sont suivies à part.")}</p>
       </div>
       <Path />
+      <AiBySteps />
+    </>
+  );
+}
+
+const AI_STEP: Record<string, string> = {
+  intake: "Lecture du collage", extract: "Lecture d'une réservation", outline: "Trame du voyage", essentials: "Essentiel pratique", day: "Préparation d'un jour",
+  adjust: "Ajustement", enrich: "Fiche complète", place: "Recherche d'un lieu", ask: "Question à l'assistant", photo: "Photo traduite", interpret: "Interprète", inbound: "Réservation transférée",
+};
+const nf = (n: number) => new Intl.NumberFormat(locale()).format(Math.round(n));
+
+/** Everyone's AI over 30 days, per step: requests, tokens, web searches, time, cost */
+function AiBySteps() {
+  const { data, err } = useLoad<AiRow[]>(() => adminAi(undefined, 720));
+  if (err) return <p className="v3-note">{err}</p>;
+  if (!data?.length) return null;
+  const by = new Map<string, { n: number; ko: number; tin: number; tout: number; s: number; ms: number; usd: number }>();
+  for (const r of data) {
+    const x = by.get(r.task) || { n: 0, ko: 0, tin: 0, tout: 0, s: 0, ms: 0, usd: 0 };
+    x.n++;
+    if (!r.ok) x.ko++;
+    x.tin += (r.tokens_cached || 0) + (r.tokens_in || 0);
+    x.tout += r.tokens_out || 0;
+    x.s += (r.searches || 0) + (r.fetches || 0);
+    x.ms += r.ms || 0;
+    x.usd += Number(r.usd) || 0;
+    by.set(r.task, x);
+  }
+  const rows = [...by].sort((a, b) => b[1].usd - a[1].usd);
+  return (
+    <div className="v3-glass adm-card">
+      <span className="v3-lbl">{t("IA par étape, 30 jours")}</span>
+      <div className="adm-table">
+        <div className="adm-tr adm-th"><span>{t("Étape")}</span><span>{t("Demandes")}</span><span>{t("Tokens lus / écrits")}</span><span>{t("Web")}</span><span>{t("Durée moy.")}</span><span>{t("Coût")}</span></div>
+        {rows.map(([k, x]) => (
+          <div key={k} className="adm-tr">
+            <span>{t(AI_STEP[k] || k)}</span><span>{x.n}{x.ko ? ` (${x.ko} ✗)` : ""}</span><span>{nf(x.tin)} / {nf(x.tout)}</span><span>{x.s}</span>
+            <span>{(x.ms / x.n / 1000).toFixed(1)} s</span><span>{usd(x.usd)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** One account's AI requests, one by one */
+function AiDetail({ userId }: { userId: string }) {
+  const { data, err } = useLoad<AiRow[]>(() => adminAi(userId, 24 * 90), [userId]);
+  if (err) return <p className="v3-note">{err}</p>;
+  if (!data?.length) return null;
+  return (
+    <>
+      <span className="v3-lbl adm-sub">{t("Détail de l'IA (90 jours, {n} demandes)", { n: data.length })}</span>
+      <div className="adm-timeline">
+        {data.slice(0, 100).map((r, i) => (
+          <div key={i} className="adm-ev">
+            <span className="adm-ev-at">{when(r.at)}</span>
+            <span className="v3-grow">
+              {t(AI_STEP[r.task] || r.task)}{r.trip ? ` · ${r.trip}` : ""}{r.ok ? "" : ` · ✗ ${r.error || ""}`}
+              <small style={{ display: "block" }}>
+                {r.tokens_in != null ? t("{a} lus ({c} en cache) · {b} écrits", { a: nf((r.tokens_in || 0) + (r.tokens_cached || 0)), c: nf(r.tokens_cached || 0), b: nf(r.tokens_out || 0) }) : ""}
+                {r.searches || r.fetches ? ` · ${t("{s} recherches, {f} pages", { s: r.searches || 0, f: r.fetches || 0 })}` : ""}
+                {r.ms ? ` · ${(r.ms / 1000).toFixed(1)} s` : ""}{r.model ? ` · ${r.model}` : ""}
+              </small>
+            </span>
+            <small>{usd(Number(r.usd))}</small>
+          </div>
+        ))}
+      </div>
     </>
   );
 }
@@ -119,6 +188,10 @@ const STEP_LABEL: Record<string, string> = {
   app_open: "App ouverte", trip_created: "Voyage créé", trip_opened: "Voyage ouvert", trip_validated: "Voyage validé",
   place_added: "Lieu ajouté", invite_sent: "Invitation envoyée", export: "Export", pro_screen: "Écran Pro",
   code_redeemed: "Code Pro activé", waitlist_join: "Liste d'attente rejointe",
+  link_opened: "Lien public créé", public_view: "Programme partagé vu", trip_copied: "Voyage copié", expense_added: "Dépense ajoutée",
+  place_opened: "Lieu ouvert", tool_opened: "Outil ouvert", status_set: "Statut changé", note_written: "Note écrite", photo_added: "Photo ajoutée",
+  vote: "Vote", comment_added: "Commentaire", checklist_done: "Check-list cochée", language_changed: "Langue changée", alerts_changed: "Alertes changées",
+  search: "Recherche", adjust_asked: "Ajustement demandé", day_redone: "Jour régénéré",
 };
 /** Details of a step and AI uses, in words */
 const DETAIL: Record<string, string> = {
@@ -293,6 +366,7 @@ function AccountSheet({ row, onClose }: { row: AccountRow; onClose: () => void }
             {Object.keys(u.ai.tasks).length > 0 && (
               <p className="v3-note">{t("IA par usage : {list}.", { list: Object.entries(u.ai.tasks).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${t(AI_TASK[k] || k)} ${n}`).join(", ") })}</p>
             )}
+            <AiDetail userId={row.user_id} />
             <span className="v3-lbl adm-sub">{t("Parcours (200 dernières actions)")}</span>
             <div className="adm-timeline">
               {u.events.map((e, i) => (

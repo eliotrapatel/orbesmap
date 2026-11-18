@@ -7,6 +7,7 @@ import { geocode } from "./placeSearch";
 import { createPlace, getState, updateProfile, updateTrip } from "./store";
 import { addExpense, travellersOf } from "./business";
 import { supabase } from "./supabase";
+import { track } from "./track";
 
 const VAPID_PUBLIC = "BK5AQrfBJZC_DtZYyUGPrOeegzY8JzepoT5t6ia_5m1tF8sFZXySh39SlbBCQcfO6Ozc2lqdnQRCyID5f8O5ow4";
 export const INBOUND_DOMAIN = "in.theorbes.com";
@@ -17,7 +18,10 @@ export const alertPrefs = (): AlertPrefs => {
   const a = (getState().profile.alerts || {}) as Partial<AlertPrefs>;
   return { email: a.email !== false, push: a.push !== false };
 };
-export const setAlertPrefs = (patch: Partial<AlertPrefs>) => updateProfile({ alerts: { ...alertPrefs(), ...patch } });
+export const setAlertPrefs = (patch: Partial<AlertPrefs>) => {
+  updateProfile({ alerts: { ...alertPrefs(), ...patch } });
+  for (const [k, v] of Object.entries(patch)) track("alerts_changed", `${k}_${v ? "on" : "off"}`);
+};
 
 // ---------- notifications on this phone ----------
 const standalone = () => window.matchMedia?.("(display-mode: standalone)").matches || (navigator as { standalone?: boolean }).standalone === true;

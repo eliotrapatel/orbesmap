@@ -170,3 +170,15 @@ export async function deleteMyAccount() {
   await signOut().catch(() => undefined);
   location.replace(location.pathname);
 }
+
+export type AiRow = {
+  at: string; email: string; task: string; trip: string | null; ok: boolean; error: string | null; tokens_cached: number | null; tokens_in: number | null;
+  tokens_out: number | null; searches: number | null; fetches: number | null; ms: number | null; usd: number; model: string;
+};
+/** Every AI request with its detail (supabase/saas-11.sql); one account with userId */
+export async function adminAi(userId?: string, hours = 720): Promise<AiRow[]> {
+  const { data, error } = await sb().rpc("admin_ai", { p_user: userId ?? null, p_hours: hours });
+  if (missing(error)) throw new Error(t("Lancez supabase/saas-11.sql pour voir le détail de l'IA."));
+  fail(error, "La lecture");
+  return (data || []) as AiRow[];
+}

@@ -288,6 +288,7 @@ export function reviewNow(tripId: string) {
 
 /** Prepares one day again; the day's current places stay until the new research has succeeded */
 export async function regenerateDay(tripId: string, date: string) {
+  track("day_redone", date, tripId);
   const d = draftOf(tripId);
   if (!d || run.busy) return;
   const days = { ...(d.days || {}) };
@@ -309,6 +310,7 @@ export function confirmTrip(tripId: string) {
 const MAX_ADDS = 3;
 /** "Ajuster en une phrase": the AI says what to change, the app applies it; returns what changed */
 export async function adjustProgramme(request: string): Promise<string> {
+  track("adjust_asked", null, getState().tripId);
   const trip = currentTrip();
   const days = trip.days.filter((x) => x.scheduled && x.dates?.length);
   const programme = days

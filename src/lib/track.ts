@@ -6,7 +6,9 @@ import { supabase } from "./supabase";
 export type Step =
   | "visit" | "signup_email" | "signup_done" | "sign_in" | "app_open" | "trip_created" | "trip_opened" | "trip_validated"
   | "place_added" | "invite_sent" | "export" | "pro_screen" | "code_redeemed" | "waitlist_join"
-  | "link_opened" | "public_view" | "trip_copied" | "expense_added";
+  | "link_opened" | "public_view" | "trip_copied" | "expense_added"
+  | "place_opened" | "tool_opened" | "status_set" | "note_written" | "photo_added" | "vote" | "comment_added"
+  | "checklist_done" | "language_changed" | "alerts_changed" | "search" | "adjust_asked" | "day_redone";
 
 const VISITOR_KEY = "orbes.vid";
 /** This device's random identifier (made once) */

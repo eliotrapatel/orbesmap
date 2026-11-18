@@ -4,6 +4,7 @@
 import { useMemo } from "react";
 import { authorName } from "./notes";
 import { currentAuthor, getState, updatePlace, updateRecord, useStore } from "./store";
+import { track } from "./track";
 
 const keyOf = (author: string) => author.toLowerCase().replace(/[^a-z0-9]/g, "_");
 const me = () => currentAuthor() || "moi";
@@ -29,6 +30,7 @@ export function vote(placeId: string, v: 1 | -1) {
   const k = "vote_" + keyOf(me());
   const cur = (getState().data.places[placeId] as Record<string, unknown> | undefined)?.[k] as { v?: number } | undefined;
   updatePlace(placeId, { [k]: cur?.v === v ? null : { v, name: myName() } } as never);
+  if (cur?.v !== v) track("vote", v === 1 ? "for" : "against", getState().tripId);
 }
 
 export type Comment = { id: string; day: string; text: string; author: string; name: string; at: number; mine: boolean };
@@ -52,5 +54,6 @@ export function useComments(day: string): Comment[] {
 export function addComment(day: string, text: string) {
   const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
   updateRecord(PREFIX + id, { day, text: text.trim().slice(0, 1000), author: me(), name: myName(), at: Date.now() });
+  track("comment_added", null, getState().tripId);
 }
 export const deleteComment = (id: string) => updateRecord(PREFIX + id, { deleted: true });

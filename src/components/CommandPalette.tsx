@@ -16,6 +16,7 @@ const TOOL_WORDS: Partial<Record<ToolKey, string>> = {
   ask: "demander question assistant carnet ia chat discuter ask ai notebook talk",
 };
 import { Portal, speak, useEscape } from "./ui";
+import { track } from "../lib/track";
 
 type Item = { id: string; section: string; title: string; sub?: string; icon: React.ReactNode; run: () => void; text: string };
 
@@ -85,6 +86,7 @@ export default function CommandPalette(p: {
   }, [i]);
 
   const run = (it?: Item) => {
+    if (it) track("search", q.trim() ? "query" : "browse");
     if (!it) return;
     p.onClose();
     it.run();
