@@ -70,6 +70,8 @@
           var v = store.getItem("orbes.vid"), l = store.getItem("orbes.lang");
           if (v) q.set("_vid", v);
           if (l) q.set("_lang", l);
+          // this page keeps loading until the new one opens: track() records nothing here (counted once, over there)
+          window.__orbesLeaving = true;
           L.replace("https://orbesmap.vercel.app/?" + q.toString() + L.hash);
         } catch (e) {}
       })();

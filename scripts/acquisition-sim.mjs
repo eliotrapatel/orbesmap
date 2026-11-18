@@ -92,6 +92,7 @@ function page(url, { local = {}, session = {}, standalone = false, referrer = ""
     threw = true;
   }
   out.threw = threw;
+  out.leaving = ctx.__orbesLeaving === true;
   return out;
 }
 {
@@ -104,6 +105,8 @@ function page(url, { local = {}, session = {}, standalone = false, referrer = ""
   const self = page("https://theorbes.com/maps", { referrer: "https://theorbes.com/" });
   check(self.replaced && !new URL(self.replaced).searchParams.has("_ref"), "theorbes.com itself is not sent as a referrer");
   check(!!page("https://www.theorbes.com/maps").replaced, "www.theorbes.com too");
+  check(a.leaving && !page("https://orbesmap.vercel.app/").leaving, "the page left behind records nothing (window.__orbesLeaving), only when it is sent away");
+  check(/__orbesLeaving\) return;/.test(read("src/lib/track.ts")), "track() skips everything on a page being left");
 }
 const stays = [
   ["signed in", { local: { "orbes.auth": "{}" } }],
@@ -118,7 +121,7 @@ const stays = [
 ];
 for (const [what, o] of stays) {
   const r = page("https://theorbes.com/maps", o);
-  check(!r.replaced && !r.threw, `stays on theorbes.com: ${what}`);
+  check(!r.replaced && !r.threw && !r.leaving, `stays on theorbes.com: ${what}`);
 }
 for (const q of ["#access_token=x&refresh_token=y", "?code=abc", "?reset=1", "#type=recovery&access_token=x", "#error=access_denied&error_code=otp_expired", "?token_hash=x&type=signup"]) {
   const r = page(`https://theorbes.com/maps${q}`);
@@ -194,7 +197,16 @@ function remindWorld({ at = "2026-11-18T10:05:00Z", users = [], sql = true, rese
     elapsed: () => elapsed,
     listSql: async () => {
       calls.sql++;
-      return sql ? users.filter((u) => !u.email_confirmed_at) : "missing";
+      if (!sql) return "missing";
+      // what unconfirmed_signups (saas-15.sql) returns: never confirmed, never invited, not already claimed in alert_log,
+      // last e-mail more than 2 h ago, created 2–36 h ago, the 50 oldest
+      const t = now.getTime();
+      return users
+        .filter((u) => !u.email_confirmed_at && !u.invited_at && !log.has(`confirm:${u.id}`))
+        .filter((u) => !u.confirmation_sent_at || t - Date.parse(u.confirmation_sent_at) >= 2 * 3600e3)
+        .filter((u) => t - Date.parse(u.created_at) >= 2 * 3600e3 && t - Date.parse(u.created_at) <= 36 * 3600e3)
+        .sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at))
+        .slice(0, 50);
     },
     listAdmin: async (page) => {
       calls.admin++;
@@ -230,10 +242,10 @@ const acct = (id, h, o = {}) => ({ id, email: `${id}@x.fr`, created_at: hoursAgo
   check(r1.sent === 2, "at most 2 per run");
   for (const k of [...w.log.keys()]) w.log.set(k, hoursAgo(NOW, 0.5));
   w.log.set("confirm:old1", hoursAgo(NOW, 0.2));
-  w.log.set("confirm:old2", hoursAgo(NOW, 0.2));
-  w.log.set("confirm:old3", hoursAgo(NOW, 0.2));
   const r2 = await R.confirmReminders(w.deps);
-  check(r2.sent === 1, "at most 6 per hour (5 in the last hour: one more)");
+  check(r2.sent === 1, "at most 4 per hour (3 in the last hour: one more)");
+  const r3 = await R.confirmReminders(w.deps);
+  check(r3.sent === 0, "…then nothing more within that hour");
   const order = remindWorld({ users: [acct("young", 3), acct("old", 30)] });
   await R.confirmReminders(order.deps);
   check(order.calls.sent[0] === "old@x.fr", "the oldest sign-up first");
@@ -248,9 +260,28 @@ const acct = (id, h, o = {}) => ({ id, email: `${id}@x.fr`, created_at: hoursAgo
   const f = remindWorld({ users: [acct("a", 3)], resend: () => 422 });
   const rf = await R.confirmReminders(f.deps);
   check(rf.failed === 1 && f.log.has("confirm:a") && f.calls.events.join() === "a:reminder_failed", "another refusal: recorded, never tried again");
-  const z = remindWorld({ users: [acct("a", 3)], resend: () => 0 });
-  await R.confirmReminders(z.deps);
-  check(!z.log.has("confirm:a"), "no answer at all: given back for a later run");
+  const z = remindWorld({ users: [acct("a", 3), acct("b", 4)], resend: () => 0 });
+  const rz = await R.confirmReminders(z.deps);
+  check(rz.failed === 1 && z.log.has("confirm:b") && !z.log.has("confirm:a") && z.calls.events.join() === "b:reminder_failed", "no answer at all (or none within 8 s): the claim is kept (never twice), the run stops");
+  check((await R.confirmReminders(z.deps)).failed === 1 && z.log.has("confirm:a"), "…and that account is never tried again, the next one is");
+}
+{
+  // more than 50 accounts already reminded in the window: a newer sign-up still gets its reminder
+  const old = Array.from({ length: 60 }, (_, i) => acct(`old${i}`, 30 - i * 0.1));
+  const w = remindWorld({ users: [...old, acct("fresh", 3)], claims: old.map((u) => ({ key: `confirm:${u.id}`, at: hoursAgo(NOW, 5) })) });
+  const r = await R.confirmReminders(w.deps);
+  check(r.sent === 1 && w.calls.sent.join() === "fresh@x.fr", "60 accounts already reminded in the window: the new sign-up is still reminded");
+  const sql = read("supabase/saas-15.sql");
+  check(/not exists \(select 1 from public\.alert_log a where a\.key = 'confirm:' \|\| u\.id::text\)/.test(sql) && /u\.confirmation_sent_at <= now\(\) - interval '2 hours'/.test(sql) && /and u\.invited_at is null/.test(sql), "unconfirmed_signups leaves out accounts already claimed, e-mailed less than 2 h ago, or invited");
+  check(/perform 'public\.alert_log'::regclass;/.test(sql), "saas-15.sql checks that alert_log (saas-7.sql) is there first");
+}
+{
+  // invited or created by hand: never a « Confirm signup » e-mail it did not ask for (SQL and Auth admin API)
+  const inv = acct("inv", 3, { invited_at: hoursAgo(NOW, 3) });
+  const s1 = remindWorld({ users: [inv] });
+  const a1 = remindWorld({ users: [inv], sql: false, at: "2026-11-18T10:02:00Z" });
+  check((await R.confirmReminders(s1.deps)).sent === 0 && (await R.confirmReminders(a1.deps)).sent === 0 && a1.calls.admin === 1, "an invited account is never reminded (SQL list and Auth admin API)");
+  check(/ctl\.abort\(\), 8000\)/.test(read("api/cron.ts")) && /signal: ctl\.signal/.test(read("api/cron.ts")), "the resend call of the cron stops after 8 s");
 }
 for (const [at, ok, what] of [
   ["2026-11-18T07:59:00Z", false, "8:59 in Paris (winter): nothing"],
@@ -389,11 +420,11 @@ const PV = await import("../api/preview.ts");
   const vj = JSON.parse(read("vercel.json"));
   const red = vj.redirects?.[0];
   const rw1 = vj.rewrites?.[0];
-  const rw2 = vj.rewrites?.[1];
-  const bots = [red?.missing?.[0]?.value, rw1?.has?.[0]?.value, rw2?.has?.find((x) => x.type === "header")?.value];
-  check(bots.every((b) => b && b === bots[0]), "one robot list for the redirect and both rewrites");
+  const bots = [red?.missing?.[0]?.value, rw1?.has?.[0]?.value];
+  check(bots.every((b) => b && b === bots[0]), "one robot list for the redirect and the rewrite");
   check(red?.source === rw1?.source && red?.source === "/p/:slug([a-z0-9]{10,24})" && red?.destination === "/?t=:slug" && red?.permanent === false, "/p/<slug>: a person is sent to /?t=<slug> (307), a robot to the preview");
-  check(rw1?.destination === "/api/preview?t=:slug" && rw2?.source === "/" && rw2?.destination === "/api/preview?t=:t" && rw2?.has?.some((x) => x.type === "query" && x.key === "t"), "/?t=<slug> for a robot: the preview too; a person on / is never concerned");
+  // no rewrite of "/": Vercel serves dist/index.html before any rewrite, so a robot on /?t=<slug> could never reach it
+  check(rw1?.destination === "/api/preview?t=:slug" && vj.rewrites.length === 1 && !vj.rewrites.some((x) => x.source === "/"), "/p/<slug> for a robot: the preview; nothing rewrites \"/\" (a person on / is never concerned)");
   // Vercel compares the value with the whole header: the same anchored test here
   const re = new RegExp(`^${bots[0]}$`);
   const robots = {
@@ -436,6 +467,17 @@ const PV = await import("../api/preview.ts");
 }
 
 // ---------------------------------------------------------------- texts: every new French text has its English
+{
+  // review fixes: a cancelled copy is forgotten, a draft wins over the intent, a confirmed sign-up never shows its screen again
+  const page = read("src/components/v3/PublicTripPage.tsx");
+  check(/const closeJoin = \(\) => \{\s*if \(!signedIn && !pendingSignup\(\)\) forgetCopy\(\);/.test(page) && (page.match(/onClick=\{closeJoin\}/g) || []).length === 2, "the sign-up sheet closed without an account (« Annuler », outside): the copy is forgotten on this device");
+  const trips = read("src/components/v3/Trips.tsx");
+  const iTake = trips.indexOf('takeIntent(session, "dest")');
+  const iDraft = trips.indexOf("if (wizardDraft()) return;");
+  check(iTake > 0 && iDraft > iTake && iDraft < trips.indexOf('track("intent_applied"'), "a form draft on this device: the intent waits, neither used nor counted");
+  check(/sessionStorage\.removeItem\("orbes\.signup"\)/.test(read("src/lib/store.ts")), "a session arriving clears the pending sign-up (« Vérifiez vos e-mails » never for a confirmed address)");
+}
+
 section("Texts · English for every t(\"…\") added by this lot");
 {
   const { execSync } = await import("node:child_process");

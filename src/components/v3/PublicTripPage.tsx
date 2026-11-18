@@ -5,12 +5,12 @@ import type { Place } from "../../data/types";
 import { TYPE_LABEL } from "../../data/trip";
 import { dayStops } from "../../lib/plan";
 import { addDays, dateLabel } from "../../lib/newTrip";
-import { copyTrip, fetchPublic, rememberCopy, type PublicTrip } from "../../lib/publicTrip";
+import { copyTrip, fetchPublic, forgetCopy, rememberCopy, type PublicTrip } from "../../lib/publicTrip";
 import { useStore } from "../../lib/store";
 import { track } from "../../lib/track";
 import OrbitMark from "../OrbitMark";
 import Shell from "./Shell";
-import AuthBox, { type AuthMode } from "./AuthBox";
+import AuthBox, { pendingSignup, type AuthMode } from "./AuthBox";
 import type { Intent } from "../../lib/intentData";
 import { t } from "../../lib/i18n";
 
@@ -92,6 +92,12 @@ export default function PublicTripPage({ slug, copyNow }: { slug: string; copyNo
     }
     setCopying(true);
   };
+  // the sheet closed without an account (« Annuler », a tap outside): the copy is given up on this device, unless a
+  // sign-up left from it (its confirmation brings the copy back)
+  const closeJoin = () => {
+    if (!signedIn && !pendingSignup()) forgetCopy();
+    setJoining(false);
+  };
   const tripLine = `${trip.title} · ${days.length > 1 ? t("{n} jours", { n: days.length }) : t("{n} jour", { n: days.length })}`;
   return (
     <Shell ring={false} top={top} className="v3-public-trip">
@@ -130,12 +136,12 @@ export default function PublicTripPage({ slug, copyNow }: { slug: string; copyNo
       </div>
       {copying && <CopySheet pub={pub} onClose={() => setCopying(false)} />}
       {joining && (
-        <div className="v3-acct-wrap pt-sheet-wrap" onClick={() => setJoining(false)}>
+        <div className="v3-acct-wrap pt-sheet-wrap" onClick={closeJoin}>
           <div className="v3-glass pt-sheet pt-auth-sheet" role="dialog" aria-label={t("Copier ce voyage")} onClick={(e) => e.stopPropagation()}>
             <span className="v3-lbl">{t("Copier ce voyage")}</span>
             <h2 className="v3-d" style={{ fontSize: 26, marginTop: 8 }}>{trip.title}</h2>
             <AuthBox mode={joinMode} onMode={setJoinMode} intent={joinIntent} context={t("Créez un compte pour copier {trip}", { trip: tripLine })} redirectQuery={`?copyof=${slug}`} />
-            <button type="button" className="v3-link" onClick={() => setJoining(false)}>{t("Annuler")}</button>
+            <button type="button" className="v3-link" onClick={closeJoin}>{t("Annuler")}</button>
           </div>
         </div>
       )}

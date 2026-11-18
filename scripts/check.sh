@@ -24,7 +24,6 @@ BOT="WhatsApp/2.24.1 A"
 body -A "$BOT" "$APP/p/aaaaaaaaaaaa" | grep -q 'og:title' && pass "/p/… : aperçu pour les robots (og:title)" || fail "/p/… robot" "pas de balise og:title"
 r=$(curl -s -o /dev/null -w "%{http_code} %{redirect_url}" -A "Mozilla/5.0 (iPhone)" "$APP/p/aaaaaaaaaaaa?src=x")
 case "$r" in 30[78]*"t=aaaaaaaaaaaa"*"src=x"*|30[78]*"src=x"*"t=aaaaaaaaaaaa"*) pass "/p/… : une personne va vers /?t=… (src= gardé)";; *) fail "/p/… humain" "$r";; esac
-body -A "$BOT" "$APP/?t=aaaaaaaaaaaa" | grep -q 'og:title' && pass "/?t=… : aperçu pour les robots" || fail "/?t=… robot" "pas d'aperçu (la page de l'app est servie : la réécriture ne passe pas avant le fichier)"
 c=$(code "$APP/og/programme-fr.png"); [ "$c" = 200 ] && pass "image d'aperçu" || fail "image d'aperçu" "HTTP $c"
 
 echo "Fonctions Vercel"

@@ -10,7 +10,7 @@ import { Ph } from "../PlacePhoto";
 import TripHero from "./TripHero";
 import OrbitMark from "../OrbitMark";
 import Shell, { Steps } from "./Shell";
-import CreateWizard, { type Wiz } from "./CreateWizard";
+import CreateWizard, { wizardDraft, type Wiz } from "./CreateWizard";
 import { markIntentUsed, takeIntent } from "../../lib/intent";
 import { supabase } from "../../lib/supabase";
 import Concierge, { CreateChooser } from "./Concierge";
@@ -78,6 +78,9 @@ export default function Trips({ onOpen, onClose }: { onOpen: (id: string) => voi
     if (intentTried.current || trips.length || creating || !session || !supabase) return;
     const found = takeIntent(session, "dest");
     if (!found?.intent.dest) return;
+    // a form already started on this device opens as it was (CreateWizard keeps its draft first): the intent waits,
+    // neither used nor counted
+    if (wizardDraft()) return;
     intentTried.current = true;
     const { intent, from } = found;
     const dest = intent.dest!;
@@ -87,7 +90,7 @@ export default function Trips({ onOpen, onClose }: { onOpen: (id: string) => voi
       .limit(1)
       .then(
         ({ data, error }) => {
-          if (!alive.current || error || !Array.isArray(data) || data.length || tripCount.current) return;
+          if (!alive.current || error || !Array.isArray(data) || data.length || tripCount.current || wizardDraft()) return;
           // the free plan's limit stays as it is: nothing opens by itself once it is reached
           const p = getState().plan;
           if (p && !p.pro && p.prepLeft <= 0) return;

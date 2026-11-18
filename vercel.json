@@ -41,22 +41,6 @@
         }
       ],
       "destination": "/api/preview?t=:slug"
-    },
-    {
-      "source": "/",
-      "has": [
-        {
-          "type": "query",
-          "key": "t",
-          "value": "(?<t>[a-z0-9]{10,24})"
-        },
-        {
-          "type": "header",
-          "key": "user-agent",
-          "value": ".*(?:WhatsApp|facebookexternalhit|Facebot|Twitterbot|TelegramBot|Slackbot|Discordbot|LinkedInBot|SkypeUriPreview|Applebot|Pinterestbot|redditbot|Embedly|vkShare|Iframely|Googlebot|bingbot).*"
-        }
-      ],
-      "destination": "/api/preview?t=:t"
     }
   ]
 }

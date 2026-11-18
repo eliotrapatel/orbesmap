@@ -94,6 +94,14 @@ export const rememberCopy = (slug: string) => {
     /* ignore */
   }
 };
+/** The copy asked, given up (the sign-up sheet closed without an account): never opened by itself later */
+export const forgetCopy = () => {
+  try {
+    localStorage.removeItem(COPY_KEY);
+  } catch {
+    /* ignore */
+  }
+};
 /** The trip to copy brought back by the confirmation link (?copyof=<slug>), taken off the address once read */
 function copyFromLink(): string | null {
   try {

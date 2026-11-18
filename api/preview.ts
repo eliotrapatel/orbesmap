@@ -1,7 +1,8 @@
 // Vercel function: the link preview of a shared programme (lot acquisition, R10). WhatsApp, iMessage, Telegram, Slack…
 // read a page's title, description and image to draw a card under the link. The app is one page for everyone, so
-// vercel.json sends only these preview robots here (never a person: a person goes to /?t=<slug>, the app itself):
-//   /p/<slug> (the shared address) and /?t=<slug> (an address copied from the bar).
+// vercel.json sends only these preview robots here, on /p/<slug> (the shared address; never a person: a person goes to
+// /?t=<slug>, the app itself). An address copied from the bar (/?t=<slug>) shows the generic ORBES Trips card: Vercel
+// serves the app's page for "/" before any rewrite (known limit).
 // It reads the programme through public_trip (already readable without an account: supabase/saas-6.sql), and answers a
 // small page with the trip's own title and description and a typographic card (public/og/*.png: no map, no photo, no
 // AI image). A closed link, an unknown one or any error: the generic ORBES Trips card, nothing leaks, never an error.

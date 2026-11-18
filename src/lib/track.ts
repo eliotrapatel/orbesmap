@@ -54,6 +54,8 @@ const ENDPOINT = location.hostname.endsWith(".vercel.app") ? "/api/track" : "htt
 /** Records one step (`trip`: the trip it concerns). "visit" and "app_open" count once per opening of the app. */
 export function track(name: Step, detail?: string | null, trip?: string | null) {
   if (!supabase) return;
+  // theorbes.com/maps sending this visitor to orbesmap.vercel.app (index.html, R08): counted there only
+  if ((window as { __orbesLeaving?: boolean }).__orbesLeaving) return;
   if (name === "visit" || name === "app_open") {
     if (once.has(name)) return;
     once.add(name);

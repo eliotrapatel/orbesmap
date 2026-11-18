@@ -936,6 +936,13 @@ export async function initAuth() {
     }
     if (before !== session.user.id) {
       if (event === "SIGNED_IN") track("sign_in");
+      // a sign-up confirmed (here or through the e-mail link in another tab): its « Vérifiez vos e-mails » screen
+      // never comes back after a sign-out (AuthBox, orbes.signup)
+      try {
+        sessionStorage.removeItem("orbes.signup");
+      } catch {
+        /* ignore */
+      }
       adoptAccount(session.user.id);
       set({ member: null });
       void checkMembership();

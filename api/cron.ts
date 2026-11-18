@@ -286,7 +286,11 @@ function reminderDeps(key: string, now: Date, t0: number) {
       await db(`/rest/v1/alert_log?key=eq.${encodeURIComponent(k)}`, key, { method: "DELETE" });
     },
     resend: async (email: string) => {
-      const r = await fetch(`${SUPA_URL}/auth/v1/resend?redirect_to=${encodeURIComponent(`${APP_URL}/`)}`, { method: "POST", headers: h, body: JSON.stringify({ type: "signup", email }) }).catch(() => null);
+      // never more than 8 s: a call that hangs gives 0 (the claim is kept, nothing sent twice)
+      const ctl = new AbortController();
+      const tm = setTimeout(() => ctl.abort(), 8000);
+      const r = await fetch(`${SUPA_URL}/auth/v1/resend?redirect_to=${encodeURIComponent(`${APP_URL}/`)}`, { method: "POST", headers: h, body: JSON.stringify({ type: "signup", email }), signal: ctl.signal }).catch(() => null);
+      clearTimeout(tm);
       return r ? r.status : 0;
     },
     log: async (userId: string, detail: string) => {

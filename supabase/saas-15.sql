@@ -16,11 +16,12 @@ begin
   perform 'public.events'::regclass;
   perform 'public.is_admin()'::regprocedure;
   perform 'public.trip_links'::regclass;
+  perform 'public.alert_log'::regclass;
   if not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'events' and column_name = 'browser') then
     raise exception 'missing column';
   end if;
 exception when undefined_table or undefined_function or raise_exception then
-  raise exception 'Lancez d''abord supabase/saas-5.sql, saas-6.sql et saas-8.sql, puis ce fichier.';
+  raise exception 'Lancez d''abord supabase/saas-5.sql, saas-6.sql, saas-7.sql et saas-8.sql, puis ce fichier.';
 end $$;
 
 -- 1. the names track_step accepts (one row per name; a later lot adds its own rows, nothing is rewritten)
@@ -97,6 +98,12 @@ as $$
     and u.deleted_at is null
     and coalesce(u.is_anonymous, false) = false
     and u.email is not null
+    -- an account invited or created by hand never asked for a « Confirm signup » e-mail
+    and u.invited_at is null
+    -- already reminded (or tried) once: never in the list again, so newer sign-ups are never pushed out by the limit
+    and not exists (select 1 from public.alert_log a where a.key = 'confirm:' || u.id::text)
+    -- its last confirmation e-mail left less than 2 hours ago (« Renvoyer l'e-mail »): not yet
+    and (u.confirmation_sent_at is null or u.confirmation_sent_at <= now() - interval '2 hours')
     and u.created_at <= now() - make_interval(hours => greatest(0, least(p_min_hours, 720)))
     and u.created_at >= now() - make_interval(hours => greatest(1, least(p_max_hours, 720)))
   order by u.created_at
