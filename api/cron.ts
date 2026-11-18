@@ -64,6 +64,15 @@ const TXT = {
 type Place = { id: string; name: string; slot: string; start: number | null; address: string; closed: boolean };
 
 export async function POST(req: Request): Promise<Response> {
+  try {
+    return await run(req);
+  } catch (e) {
+    // the reason is written in the database's log of wake-ups (net._http_response), readable from the SQL editor
+    return json({ error: String((e as Error)?.message || e).slice(0, 300) }, 500);
+  }
+}
+
+async function run(req: Request): Promise<Response> {
   const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
   if (!key) return json({ error: "SUPABASE_SERVICE_ROLE_KEY missing" }, 503);
   // only the database's own wake-up may run this
@@ -71,8 +80,17 @@ export async function POST(req: Request): Promise<Response> {
   const cfg = (await db("/rest/v1/app_config?key=eq.cron_secret&select=value", key)) as { value: string }[];
   if (!secret || !cfg?.[0]?.value || secret !== cfg[0].value) return json({ error: "forbidden" }, 403);
 
-  const vapid = (process.env.VAPID_PRIVATE_KEY || "").trim();
-  if (vapid) webpush.setVapidDetails("mailto:hello@joinentity.com", VAPID_PUBLIC, vapid);
+  // a key pasted with quotes or spaces still works; a wrong key only stops the notifications, never the e-mails
+  let vapid = (process.env.VAPID_PRIVATE_KEY || "").trim().replace(/^["']|["']$/g, "");
+  const warnings: string[] = [];
+  if (vapid) {
+    try {
+      webpush.setVapidDetails("mailto:hello@joinentity.com", VAPID_PUBLIC, vapid);
+    } catch (e) {
+      warnings.push(`VAPID_PRIVATE_KEY: ${(e as Error).message}`);
+      vapid = "";
+    }
+  } else warnings.push("VAPID_PRIVATE_KEY missing");
   const resend = (process.env.RESEND_API_KEY || "").trim();
   const from = process.env.MAIL_FROM || "ORBES Trips <trips@auth.theorbes.com>";
   const now = new Date();
@@ -174,7 +192,7 @@ ${list}
       }
     }
   }
-  return json({ ok: true, trips: trips.length, ...sent });
+  return json({ ok: true, trips: trips.length, ...sent, ...(warnings.length ? { warnings } : {}), ...(resend ? {} : { warning_mail: "RESEND_API_KEY missing" }) });
 }
 
 function addDays(iso: string, n: number) {
