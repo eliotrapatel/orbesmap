@@ -1,4 +1,6 @@
+import "../../styles/brand.css";
 import { useEffect, useState } from "react";
+import { appHome } from "../../lib/export";
 import type { Place } from "../../data/types";
 import { TYPE_LABEL } from "../../data/trip";
 import { dayStops } from "../../lib/plan";
@@ -93,6 +95,11 @@ export default function PublicTripPage({ slug, copyNow }: { slug: string; copyNo
           {ideas.map((p) => <Stop key={p.id} p={p} open={open === p.id} onToggle={() => setOpen(open === p.id ? null : p.id)} />)}
         </section>
       )}
+
+      <footer className="br-pub">
+        <p className="br-pub-by"><OrbitMark size={14} /><span>{t("Préparé avec ORBES Trips")}</span></p>
+        <a className="v3-btn ghost br-pub-cta" href={appHome()} onClick={() => track("link_opened", "brand_cta")}>{t("Préparez votre voyage")}</a>
+      </footer>
 
       <div className="pt-cta">
         <button className="v3-btn" disabled={!authReady} onClick={copy}>{t("Copier ce voyage")}</button>
