@@ -123,6 +123,67 @@
 .lp2-btn:hover .lp2-arrow { transform: translateX(3px); }
 .lp2-fine { margin-top: 16px; font-size: 12px; color: var(--soft); letter-spacing: 0.01em; }
 
+/* « Où et quand ? » (lot acquisition): a line like a boarding pass, hairlines only, above the buttons. Phone: the city
+   on its own line, arrival | departure under it (under the button on a short phone); tablet and computer: one row.
+   The results open above the field (the hero clips what overflows it). */
+.lp2-where { margin-top: 24px; }
+.lp2-where-lbl { margin-bottom: 8px; }
+.lp2-where-row { display: grid; grid-template-columns: minmax(0, 1fr); border-top: 1px solid var(--hair-strong); border-bottom: 1px solid var(--hair-strong); }
+.lp2-when-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); border-top: 0; }
+.lp2-cell { position: relative; display: flex; flex-direction: column; justify-content: center; min-width: 0; min-height: 56px; padding: 6px 0; }
+.lp2-cell-date + .lp2-cell-date { border-left: 1px solid var(--hair); padding-left: 16px; }
+.lp2-cell label { font-size: 10.5px; line-height: 1.2; letter-spacing: 0.14em; text-transform: uppercase; color: var(--mute); cursor: text; }
+.lp2-cell input { display: block; width: 100%; min-width: 0; height: 30px; padding: 0; margin: 0; background: none; border: 0; outline: 0; border-radius: 0; color: var(--ink); font: 500 16px/1.2 var(--font); color-scheme: dark; -webkit-appearance: none; appearance: none; text-align: left; }
+.lp2-cell input::placeholder { color: var(--mute); font-weight: 400; }
+.lp2-cell input::-webkit-date-and-time-value { text-align: left; }
+.lp2-cell:focus-within label { color: var(--soft); }
+.lp2-where-err { margin-top: 8px; font-size: 12.5px; color: var(--bad, #e88c7a); }
+.lp2-results { position: absolute; z-index: 6; left: -8px; right: -8px; bottom: calc(100% + 4px); list-style: none; margin: 0; padding: 4px; border-radius: var(--r); border: 1px solid var(--hair-strong); background: rgba(10, 10, 10, 0.97); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); box-shadow: 0 -18px 40px -16px rgba(0, 0, 0, 0.9); max-height: min(264px, 40vh); overflow-y: auto; }
+.lp2-results button { display: flex; align-items: baseline; gap: 10px; width: 100%; min-height: 44px; padding: 0 12px; border-radius: 8px; text-align: left; color: var(--ink); font-size: 15px; }
+.lp2-results button b { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lp2-results button span { font-size: 12.5px; color: var(--mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lp2-results button.on, .lp2-results button:hover { background: rgba(246, 242, 234, 0.07); }
+.lp2-when + .lp2-ctas { margin-top: 16px; }
+/* tablet and computer: the city and the two dates on one row (the copy becomes a two-column grid for that row only) */
+@media (min-width: 700px) {
+  .lp2-copy { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 2fr); }
+  .lp2-copy > * { grid-column: 1 / -1; }
+  .lp2-copy > .lp2-where { grid-column: 1; }
+  .lp2-copy > .lp2-when { grid-column: 2; align-self: end; }
+  .lp2-when-row { border-top: 1px solid var(--hair-strong); }
+  .lp2-cell-dest { padding-right: 16px; }
+  .lp2-when .lp2-cell-date:first-child { border-left: 1px solid var(--hair); padding-left: 16px; }
+}
+@media (min-width: 1024px) {
+  .lp2-where { margin-top: 32px; }
+  .lp2-when + .lp2-ctas { margin-top: 24px; }
+}
+/* a narrow phone (344): « Préparer ce voyage » is longer than « Créer mon compte »: the quiet text link next to it
+   gives up a little of its side padding so both stay on one line */
+@media (max-width: 399.98px) {
+  .lp2-ctas .lp2-btn + .lp2-quiet { padding: 0 8px; }
+}
+@media (max-width: 359.98px) {
+  .lp2-ctas .lp2-btn + .lp2-quiet { padding: 0 6px; }
+}
+/* phones: the dates go under the button, so the button always shows on the first screen (the city stays above it) */
+@media (max-width: 699.98px) {
+  .lp2-copy { display: flex; flex-direction: column; }
+  .lp2-copy > .lp2-when { order: 1; margin-top: 16px; }
+  .lp2-copy > .lp2-fine { order: 2; }
+  .lp2-when-row { border-top: 1px solid var(--hair-strong); }
+  .lp2-where + .lp2-when + .lp2-ctas { margin-top: 16px; }
+}
+/* short phones (375 × 667, 344 × 640): the line stays compact */
+@media (max-width: 699.98px) and (max-height: 760px) {
+  .lp2-copy > .lp2-when { margin-top: 12px; }
+  .lp2-where { margin-top: 16px; }
+  .lp2-where-lbl { margin-bottom: 4px; }
+  .lp2-cell { min-height: 48px; padding: 4px 0; }
+  .lp2-cell input { height: 26px; }
+  .lp2-where + .lp2-when + .lp2-ctas { margin-top: 12px; }
+}
+
 @media (max-width: 699.98px) {
   .lp2-copy > .v3-lbl { display: none; }
   .lp2-h1 { margin-top: 0; }

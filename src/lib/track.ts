@@ -17,7 +17,7 @@ export type Step =
   | "trip_shared_whatsapp" | "onboarding_done" | "signup_submitted" | "email_confirmed" | "prep_started" | "prep_ready" | "prep_failed"
   | "invite_accepted" | "check_email_shown" | "confirm_resent" | "quota_seen" | "manual_trip_created" | "validate_explained"
   | "trip_pass_granted" | "ai_budget_hit" | "landing_destination" | "invite_email_sent" | "reminder_sent" | "offline_ready"
-  | "offline_reminder_sent" | "offline_used" | "confirm_screen" | "landing_intent" | "intent_applied" | "public_copy_click" | "app_redirect";
+  | "offline_reminder_sent" | "offline_used" | "confirm_screen" | "landing_intent" | "intent_applied" | "public_copy_click" | "app_redirect" | "link_preview";
 
 const VISITOR_KEY = "orbes.vid";
 /** This device's random identifier (made once) */
@@ -34,8 +34,15 @@ function visitor(): string | null {
   }
 }
 const device = () => (window.matchMedia?.("(min-width: 900px)").matches ? "computer" : "phone");
-/** The site a visitor came from (its domain only), never this one */
+/** The site a visitor came from (its domain only), never this one. Sent on from theorbes.com/maps (index.html keeps it
+ *  for this opening of the app), else the page's own referrer. */
 const referrer = () => {
+  try {
+    const kept = sessionStorage.getItem("orbes.ref");
+    if (kept && /^[a-z0-9.-]{1,80}$/.test(kept)) return kept;
+  } catch {
+    /* ignore */
+  }
   try {
     const h = document.referrer ? new URL(document.referrer).hostname.replace(/^www\./, "") : "";
     return h && h !== location.hostname && !h.endsWith("theorbes.com") && !h.endsWith("orbesmap.vercel.app") ? h : null;
@@ -63,6 +70,8 @@ const ENDPOINT = location.hostname.endsWith(".vercel.app") ? "/api/track" : "htt
 /** Records one step (`trip`: the trip it concerns). "visit" and "app_open" count once per opening of the app. */
 export function track(name: Step, detail?: string | null, trip?: string | null) {
   if (!supabase) return;
+  // theorbes.com/maps sending this visitor to orbesmap.vercel.app (index.html, R08): counted there only
+  if ((window as { __orbesLeaving?: boolean }).__orbesLeaving) return;
   if (name === "visit" || name === "app_open") {
     if (once.has(name)) return;
     once.add(name);

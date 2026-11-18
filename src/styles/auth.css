@@ -56,6 +56,16 @@
 .auth-back { min-height: 44px; }
 .auth-fine { margin-top: 14px; line-height: 1.5; }
 
+/* « Vérifiez vos e-mails » after a sign-up: the address in large, the mailbox, continue, send again, wrong address */
+.auth-check-to { margin: 0; }
+.auth-check-mail { font-size: 19px; line-height: 1.25; font-weight: 600; color: var(--ink); overflow-wrap: anywhere; margin: -4px 0 2px; }
+.auth-check-mailers { display: flex; flex-wrap: wrap; gap: 8px; }
+.auth-check-mailers .v3-btn { flex: 1 1 calc(50% - 4px); min-width: 0; width: auto; margin: 0; text-decoration: none; }
+.auth-check-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; padding: 6px 2px 0; }
+.auth-check-row .auth-inline { margin: 0; }
+.auth-check-row .auth-inline:disabled { color: var(--mute); text-decoration: none; cursor: default; font-variant-numeric: tabular-nums; }
+.auth-context { margin-bottom: 2px; }
+
 /* "Choisissez un nouveau mot de passe": full screen, over every screen of the app */
 .v3.auth-recovery { z-index: 200; }
 .auth-rec-col { position: relative; width: 100%; max-width: 440px; min-height: 100%; margin: 0 auto; display: flex; flex-direction: column; padding: calc(var(--safe-t) + 22px) max(20px, env(safe-area-inset-right, 0px)) calc(var(--safe-b) + 24px) max(20px, env(safe-area-inset-left, 0px)); }
@@ -70,3 +80,9 @@
   .auth-swap { animation: none; }
   .auth-ink, .auth-tabs button, .auth-bars i { transition: none; }
 }
+
+/* « Copier ce voyage » on a shared programme, not signed in: the sign-up in the copy sheet (lot acquisition) */
+.pt-sheet.pt-auth-sheet { max-height: calc(100dvh - 12px); overflow-y: auto; overscroll-behavior: contain; gap: 0; }
+.pt-auth-sheet > .v3-d { margin-bottom: 14px; }
+.pt-auth-sheet .auth-box { padding: 0; background: none; border: 0; border-radius: 0; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.pt-auth-sheet > .v3-link { align-self: center; min-height: 44px; margin-top: 4px; }

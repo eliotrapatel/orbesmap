@@ -154,7 +154,7 @@ console.log("4. api/cron.ts: e-mail links tagged, notification links unchanged")
   const c = read("api/cron.ts");
   check(/const mailUrl = `\$\{APP_URL\}\/\?src=email_day#\$\{trip\.id\}`/.test(c) && /<a href="\$\{mailUrl\}"/.test(c) && /closedNames\.join\(", "\)\) : "", mailUrl\]/.test(c), "day e-mail: button and text say src=email_day");
   check(/const url = `\$\{APP_URL\}\/#\$\{trip\.id\}`;/.test(c) && /tag: `day-\$\{trip\.id\}` \}\)/.test(c) && /url, tag: `day-/.test(c) && /url, tag: `stop-/.test(c), "day and stop notifications keep the plain link (no reload of an open app)");
-  check(/const tripUrl = `\$\{APP_URL\}\/\?src=email_back#\$\{trip\.id\}`/.test(c) && /const nextUrl = `\$\{APP_URL\}\/\?src=email_back`/.test(c) && /<a href="\$\{nextUrl\}"/.test(c), "back-home e-mail: both links say src=email_back");
+  check(/const tripUrl = `\$\{APP_URL\}\/\?src=email_back#\$\{trip\.id\}`/.test(c) && /const nextUrl = `\$\{APP_URL\}\/\?new=1&src=email_back`/.test(c) && /<a href="\$\{nextUrl\}"/.test(c), "back-home e-mail: both links say src=email_back");
 }
 
 // ---------- 5. supabase/saas-12.sql, read ----------

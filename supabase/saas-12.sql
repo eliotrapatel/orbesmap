@@ -113,7 +113,7 @@ begin
     'invite_accepted', 'check_email_shown', 'confirm_resent', 'quota_seen', 'manual_trip_created', 'validate_explained',
     'trip_pass_granted', 'ai_budget_hit', 'landing_destination', 'invite_email_sent', 'reminder_sent', 'offline_ready',
     'offline_reminder_sent', 'offline_used', 'confirm_screen', 'landing_intent', 'intent_applied', 'public_copy_click',
-    'app_redirect']);
+    'app_redirect', 'link_preview']);
   -- a name another lot registered (public.event_names, when that table exists)
   if not ok and to_regclass('public.event_names') is not null then
     begin

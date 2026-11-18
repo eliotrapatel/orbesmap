@@ -4,6 +4,9 @@
 type Json = Record<string, unknown>;
 const SUPA_URL = process.env.SUPABASE_URL || "https://ifugaqjneprbtigvegeb.supabase.co";
 const SUPA_KEY = process.env.SUPABASE_ANON_KEY || "sb_publishable_0qPu_8XZTLk-l68k2kPUvQ_7UXk-fCu";
+// the steps recorded by track_step (supabase/saas-15.sql, which keeps its list of names in event_names); the same
+// list is in src/lib/track.ts. Before that file: track_event, which records the names it knows and drops the others.
+export const STEP_NAMES = new Set(["check_email_shown", "confirm_resent", "confirm_screen", "landing_destination", "intent_applied", "public_copy_click", "link_preview", "app_redirect"]);
 const ORIGINS = [/^https:\/\/(www\.)?theorbes\.com$/, /^https:\/\/orbesmap(-[a-z0-9-]+)?\.vercel\.app$/, /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/];
 
 function cors(origin: string | null): Record<string, string> {

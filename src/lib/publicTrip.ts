@@ -1,9 +1,12 @@
 // A trip's public link (supabase/saas-6.sql): its owner opens it, anyone with it reads the programme without an
 // account, and a signed-in person can copy it into their own trips with their own dates.
+import type { Session } from "@supabase/supabase-js";
 import type { Trip } from "../data/types";
 import { META, tripFromDefs } from "./defs";
 import { addDays, dateLabel, newTripRecord } from "./newTrip";
-import { createPlace, createTrip, switchTrip, updateTrip } from "./store";
+import { createPlace, createTrip, getState, switchTrip, updateTrip } from "./store";
+import { accountIntent, markIntentUsed, takeIntent } from "./intent";
+import { SLUG_RE, type Intent } from "./intentData";
 import { supabase } from "./supabase";
 import { tripFromRecord, type TripRec } from "./trips";
 import { refCode, track } from "./track";
@@ -16,8 +19,9 @@ const sb = () => {
 };
 const missing = (e: { code?: string } | null) => !!e && ["PGRST202", "PGRST205", "42883", "42P01"].includes(e.code || "");
 
-/** The address to give: always the main site's */
-export const linkUrl = (slug: string) => `https://theorbes.com/maps?t=${slug}`;
+/** The address to give: the app's own (lot acquisition, R08 + R10): /p/<slug> shows a preview card in WhatsApp and
+ *  iMessage (api/preview.ts), and opens the programme for a person (vercel.json sends them to /?t=<slug>) */
+export const linkUrl = (slug: string) => `https://orbesmap.vercel.app/p/${slug}`;
 /** The same address as shared or copied: it says its channel and who shares it (?src=public&by=<opaque code>) */
 export const shareUrl = (slug: string) => tagUrl(linkUrl(slug), "public", refCode());
 
@@ -93,12 +97,67 @@ export const rememberCopy = (slug: string) => {
     /* ignore */
   }
 };
-export const takeRememberedCopy = (): string | null => {
+/** The copy asked, given up (the sign-up sheet closed without an account): never opened by itself later */
+export const forgetCopy = () => {
   try {
-    const s = localStorage.getItem(COPY_KEY);
-    if (s) localStorage.removeItem(COPY_KEY);
-    return s;
+    localStorage.removeItem(COPY_KEY);
+  } catch {
+    /* ignore */
+  }
+};
+/** The trip to copy brought back by the confirmation link (?copyof=<slug>), taken off the address once read */
+function copyFromLink(): string | null {
+  try {
+    const q = new URLSearchParams(location.search);
+    const s = (q.get("copyof") || "").toLowerCase();
+    if (!q.has("copyof")) return null;
+    q.delete("copyof");
+    const rest = q.toString();
+    history.replaceState(history.state, "", location.pathname + (rest ? `?${rest}` : "") + location.hash);
+    return SLUG_RE.test(s) ? s : null;
   } catch {
     return null;
   }
+}
+/** A programme this account already copied (never a second copy started by itself) */
+const alreadyCopied = (slug: string) => Object.values(getState().trips || {}).some((x) => (x?.draft as { copiedFrom?: string } | undefined)?.copiedFrom === slug);
+
+/**
+ * The copy asked before signing in, once signed in: this device first (orbes.copy), then the confirmation link
+ * (?copyof=), else the account's intent (the link opened on another phone or browser). Marked used at once on this
+ * device (the copy sheet never reopens by itself); `ready` resolves once the account knows too (or after 1.5 s).
+ * The copy sheet always asks for the dates: never a silent copy.
+ */
+export const takeRememberedCopy = (session?: Session | null): { slug: string; ready: Promise<void> } | null => {
+  let slug: string | null = null;
+  let how: "copy_device" | "copy_link" | "copy_account" = "copy_device";
+  try {
+    slug = localStorage.getItem(COPY_KEY);
+    if (slug) localStorage.removeItem(COPY_KEY);
+  } catch {
+    slug = null;
+  }
+  if (slug && !SLUG_RE.test(slug)) slug = null;
+  if (!slug) {
+    slug = copyFromLink();
+    how = "copy_link";
+  }
+  let intent: Intent | null = null;
+  if (!slug) {
+    const found = takeIntent(session, "copy");
+    if (found?.intent.copy) {
+      intent = found.intent;
+      slug = found.intent.copy;
+      how = "copy_account";
+    }
+  } else {
+    // the same trip waiting on the account: marked used too, so another phone does not open it again
+    const acc = accountIntent(session);
+    if (acc?.kind === "copy" && acc.copy === slug && !acc.used) intent = acc;
+  }
+  if (!slug) return null;
+  const wait = intent ? markIntentUsed(intent, session) : Promise.resolve();
+  if (alreadyCopied(slug)) return null;
+  track("intent_applied", how);
+  return { slug, ready: Promise.race([wait, new Promise<void>((r) => setTimeout(r, 1500))]) };
 };

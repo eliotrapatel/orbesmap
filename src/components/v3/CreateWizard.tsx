@@ -334,12 +334,14 @@ function useSorter(wRef: MutableRefObject<Wiz>, setW: (f: (x: Wiz) => Wiz) => vo
 
 /** "Créer un voyage" in 4 steps: where, when (+ bookings read from a confirmation), what you already know, the ideal programme.
  *  Every change is kept on this device as it is made: closing, going back or leaving the app loses nothing. */
-export default function CreateWizard({ onCancel, onCreated }: { onCancel: () => void; onCreated: (id: string) => void }) {
+export default function CreateWizard({ onCancel, onCreated, initial }: { onCancel: () => void; onCreated: (id: string) => void; initial?: Partial<Wiz> | null }) {
   const profile = useStore((s) => s.profile);
+  // initial: the city and dates given on the welcome page (lot acquisition), used only when no draft is kept
   const [w, setW] = useState<Wiz>(() => wizardDraft() || {
     step: 1, cities: [], start: "", end: "", hotelName: "", hotelAddress: "", flights: [], know: "", places: [], fixed: [], wishes: [],
     pace: (profile.pace as string) || "balanced", interests: (profile.interests as string[]) || [], dayWishes: {},
     mode: profile.travel === "business" ? "business" : "leisure", travellers: [],
+    ...(initial || {}),
   });
   const [dir, setDir] = useState<1 | -1>(1);
   const nextRef = useRef<() => void>(() => undefined);

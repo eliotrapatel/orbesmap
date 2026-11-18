@@ -18,5 +18,32 @@
     "api/mail.ts": {
       "maxDuration": 30
     }
-  }
+  },
+  "redirects": [
+    {
+      "source": "/p/:slug([a-z0-9]{10,24})",
+      "missing": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(?:WhatsApp|facebookexternalhit|Facebot|Twitterbot|TelegramBot|Slackbot|Discordbot|LinkedInBot|SkypeUriPreview|Applebot|Pinterestbot|redditbot|Embedly|vkShare|Iframely|Googlebot|bingbot).*"
+        }
+      ],
+      "destination": "/?t=:slug",
+      "permanent": false
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/p/:slug([a-z0-9]{10,24})",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(?:WhatsApp|facebookexternalhit|Facebot|Twitterbot|TelegramBot|Slackbot|Discordbot|LinkedInBot|SkypeUriPreview|Applebot|Pinterestbot|redditbot|Embedly|vkShare|Iframely|Googlebot|bingbot).*"
+        }
+      ],
+      "destination": "/api/preview?t=:slug"
+    }
+  ]
 }

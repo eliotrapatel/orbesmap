@@ -10,7 +10,9 @@ import { Ph } from "../PlacePhoto";
 import TripHero from "./TripHero";
 import OrbitMark from "../OrbitMark";
 import Shell, { Steps } from "./Shell";
-import CreateWizard from "./CreateWizard";
+import CreateWizard, { wizardDraft, type Wiz } from "./CreateWizard";
+import { markIntentUsed, takeIntent } from "../../lib/intent";
+import { supabase } from "../../lib/supabase";
 import Concierge, { CreateChooser } from "./Concierge";
 import { track } from "../../lib/track";
 import CreateOptions, { type Prefill } from "./CreateOptions";
@@ -40,14 +42,14 @@ export default function Trips({ onOpen, onClose }: { onOpen: (id: string) => voi
   // a free account prepares one trip per month with the AI: once it is used, the options (AI with Pro, by hand, a copy)
   const setCreating = (v: boolean) => {
     const p = getState().plan;
-    if (v && p && !p.pro && p.prepLeft <= 0) {
-      // the intention to create, counted before the quota (« quota »: the options open instead of the AI)
-      track("create_started", "quota");
+    const quota = !!(v && p && !p.pro && p.prepLeft <= 0);
+    // the intention to create, counted before the quota (« quota »: the options open instead of the AI)
+    if (v) track("create_started", quota ? "quota" : null);
+    if (quota) {
       track("tool_opened", "create_options");
       setPrefill(undefined);
       return setCreatingRaw("options");
     }
-    if (v) track("create_started", null);
     setCreatingRaw(v ? "choose" : false);
   };
   const name = (profile.name as string) || "";
@@ -73,6 +75,50 @@ export default function Trips({ onOpen, onClose }: { onOpen: (id: string) => voi
     else if (takeEntry("new")) setCreating(true);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const coverlessKey = coverless.map((x) => x.id).join(",");
+
+  // a destination given on the welcome page (lot acquisition, R14): an account with no trip at all arrives straight in
+  // the form, prefilled (city + dates → « Programme », one tap to start; city only → « Quand »). Checked on the server
+  // first (a new phone shows an empty list for a moment before the account's trips arrive): any doubt, nothing changes.
+  const session = useStore((s) => s.session);
+  const [initialWiz, setInitialWiz] = useState<Partial<Wiz> | null>(null);
+  const intentTried = useRef(false);
+  const alive = useRef(true);
+  const tripCount = useRef(trips.length);
+  tripCount.current = trips.length;
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+  useEffect(() => {
+    if (intentTried.current || trips.length || creating || !session || !supabase) return;
+    const found = takeIntent(session, "dest");
+    if (!found?.intent.dest) return;
+    // a form already started on this device opens as it was (CreateWizard keeps its draft first): the intent waits,
+    // neither used nor counted
+    if (wizardDraft()) return;
+    intentTried.current = true;
+    const { intent, from } = found;
+    const dest = intent.dest!;
+    void supabase
+      .from("trips")
+      .select("id")
+      .limit(1)
+      .then(
+        ({ data, error }) => {
+          if (!alive.current || error || !Array.isArray(data) || data.length || tripCount.current || wizardDraft()) return;
+          // the free plan's limit stays as it is: nothing opens by itself once it is reached
+          const p = getState().plan;
+          if (p && !p.pro && p.prepLeft <= 0) return;
+          setInitialWiz(intent.start && intent.end ? { step: 4, maxStep: 4, cities: [dest], start: intent.start, end: intent.end } : { step: 2, maxStep: 2, cities: [dest] });
+          setCreatingRaw("form");
+          track("intent_applied", from === "account" ? "dest_account" : "dest_device");
+          void markIntentUsed(intent, session);
+        },
+        () => undefined,
+      );
+  }, [trips.length, session]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!coverlessKey) return;
     const tm = window.setTimeout(() => coverless.forEach((x) => void askPhotos(x, true)), 4000);
@@ -82,7 +128,7 @@ export default function Trips({ onOpen, onClose }: { onOpen: (id: string) => voi
   if (creating === "choose") return <CreateChooser onCancel={() => setCreating(false)} onPick={(k) => { track("tool_opened", `create_${k}`); setCreatingRaw(k); }} />;
   if (creating === "options") return <CreateOptions prefill={prefill} onCancel={() => setCreating(false)} onCreated={(id) => { setCreating(false); onOpen(id); }} />;
   if (creating === "concierge") return <Concierge onCancel={() => setCreating(false)} onForm={() => setCreatingRaw("form")} onCreated={(id) => { setCreating(false); onOpen(id); }} onQuota={(pf) => { track("tool_opened", "create_options"); setPrefill(pf); setCreatingRaw("options"); }} />;
-  if (creating) return <CreateWizard onCancel={() => setCreating(false)} onCreated={(id) => { setCreating(false); onOpen(id); }} />;
+  if (creating) return <CreateWizard initial={initialWiz} onCancel={() => { setInitialWiz(null); setCreating(false); }} onCreated={(id) => { setInitialWiz(null); setCreating(false); onOpen(id); }} />;
 
   const top = (
     <div className="v3-bar">

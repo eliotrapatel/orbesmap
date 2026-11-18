@@ -15,6 +15,67 @@
     <link rel="icon" type="image/png" sizes="192x192" href="https://orbesmap.vercel.app/icons/icon-192.png?v=2" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <title>ORBES</title>
+    <!-- the card shown under a link to the app (WhatsApp, iMessage…); a shared programme gets its own (api/preview.ts) -->
+    <meta name="description" content="Carnet de voyage préparé par IA : chaque journée prête, chaque lieu vérifié. Gratuit pour commencer." />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="ORBES Trips" />
+    <meta property="og:title" content="ORBES Trips — Carnet de voyage" />
+    <meta property="og:description" content="Carnet de voyage préparé par IA : chaque journée prête, chaque lieu vérifié. Gratuit pour commencer." />
+    <meta property="og:url" content="https://orbesmap.vercel.app/" />
+    <meta property="og:image" content="https://orbesmap.vercel.app/og/home-fr.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script>
+      // One installable address (lot acquisition, R08): the app installs and opens offline on orbesmap.vercel.app only.
+      // theorbes.com/maps sends a visitor there, but only someone with nothing kept on this address (not signed in, no
+      // unsent change, no data of the June 2026 version, not opened from the home screen, not coming back from an
+      // e-mail link). Any doubt (storage blocked, an error): the app opens here as before.
+      (function () {
+        try {
+          var L = location, q = new URLSearchParams(L.search);
+          var mine = ["_from", "_vid", "_ref", "_lang"];
+          if (mine.some(function (k) { return q.has(k); })) {
+            // arrival: the visitor's id, language, original referrer and the redirect itself are kept, then the four
+            // parameters leave the address before the app reads it (the rest of the query and the # stay)
+            try {
+              var LS = window.localStorage, SS = window.sessionStorage;
+              var vid = q.get("_vid") || "", lg = q.get("_lang") || "", rf = (q.get("_ref") || "").toLowerCase();
+              if (/^[A-Za-z0-9-]{8,64}$/.test(vid) && !LS.getItem("orbes.vid")) LS.setItem("orbes.vid", vid);
+              if ((lg === "fr" || lg === "en") && !LS.getItem("orbes.lang")) LS.setItem("orbes.lang", lg);
+              if (/^[a-z0-9.-]{1,80}$/.test(rf)) SS.setItem("orbes.ref", rf);
+              if (q.get("_from") === "maps") SS.setItem("orbes.from", "maps");
+            } catch (e) {}
+            mine.forEach(function (k) { q.delete(k); });
+            var rest = q.toString();
+            history.replaceState(history.state, "", L.pathname + (rest ? "?" + rest : "") + L.hash);
+            return;
+          }
+          if (L.hostname !== "theorbes.com" && L.hostname !== "www.theorbes.com") return;
+          if ((window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || navigator.standalone) return;
+          var all = L.search + "&" + L.hash.replace(/^#/, "&");
+          if (/[?&](access_token|refresh_token|error|error_code|error_description|code|reset|token_hash)=/.test(all) || /type=recovery/.test(all)) return;
+          var store = window.localStorage;
+          for (var i = 0; i < store.length; i++) {
+            var k = store.key(i) || "";
+            if ((k.indexOf("orbes.") === 0 && k !== "orbes.vid" && k !== "orbes.lang") || k.indexOf("gz_") === 0 || k.indexOf("sb-") === 0) return;
+          }
+          var ref = "";
+          try {
+            ref = document.referrer ? new URL(document.referrer).hostname.replace(/^www\./, "").toLowerCase() : "";
+          } catch (e) {}
+          if (/(^|\.)theorbes\.com$|orbesmap\.vercel\.app$/.test(ref)) ref = "";
+          q.set("_from", "maps");
+          if (ref) q.set("_ref", ref);
+          var v = store.getItem("orbes.vid"), l = store.getItem("orbes.lang");
+          if (v) q.set("_vid", v);
+          if (l) q.set("_lang", l);
+          // this page keeps loading until the new one opens: track() records nothing here (counted once, over there)
+          window.__orbesLeaving = true;
+          L.replace("https://orbesmap.vercel.app/?" + q.toString() + L.hash);
+        } catch (e) {}
+      })();
+    </script>
     <style>
       html, body { background: #0a0a0a; margin: 0; }
       /* shown while the app starts (no white flash) */

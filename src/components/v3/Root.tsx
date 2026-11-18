@@ -161,6 +161,8 @@ function Splash() {
   );
 }
 
+// on the way to the copy sheet of a programme (the account is told first, 1.5 s at most): the start-up mark meanwhile
+let leavingForCopy = false;
 function Screen() {
   const authReady = useStore((s) => s.authReady);
   const session = useStore((s) => s.session);
@@ -198,9 +200,11 @@ function Screen() {
   if (session && member !== null && !profile.onboardedAt && !onboardingDeferred()) return <Stage key="onboarding" kind="onboarding"><Onboarding /></Stage>;
   // "Copier ce voyage" asked before signing in: back to that programme, its copy sheet open
   if (session) {
-    const pending = takeRememberedCopy();
+    if (leavingForCopy) return splash;
+    const pending = takeRememberedCopy(session);
     if (pending) {
-      location.replace(`${location.pathname}?t=${encodeURIComponent(pending)}&copy=1`);
+      leavingForCopy = true;
+      void pending.ready.then(() => location.replace(`${location.pathname}?t=${encodeURIComponent(pending.slug)}&copy=1`));
       return splash;
     }
   }

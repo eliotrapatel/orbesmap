@@ -1,12 +1,37 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { resendSignupEmail, sendPasswordReset, signInWithPassword, signUpWithPassword } from "../../lib/store";
 import { track } from "../../lib/track";
-import { t } from "../../lib/i18n";
+import { getLang, t } from "../../lib/i18n";
+import { intentLabel, type Intent } from "../../lib/intentData";
+import { mailersFor, resendLeft } from "../../lib/confirmData";
 import { legalHref } from "./Legal";
 import "../../styles/auth.css";
 
 export type AuthMode = "signup" | "signin";
-type View = "form" | "forgot" | "forgot-sent";
+type View = "form" | "forgot" | "forgot-sent" | "check";
+
+// the « Vérifiez vos e-mails » screen survives a reload of the tab (iOS drops a page left for the mail app): the address
+// and when the e-mail left, for this tab only, never the password
+const SIGNUP_KEY = "orbes.signup";
+type Pending = { email: string; at: number };
+/** A sign-up waiting for its confirmation in this tab (the last 2 hours) */
+export function pendingSignup(): Pending | null {
+  try {
+    const p = JSON.parse(sessionStorage.getItem(SIGNUP_KEY) || "null") as Pending | null;
+    return p && typeof p.email === "string" && /^\S+@\S+\.\S+$/.test(p.email) && Number(p.at) > Date.now() - 2 * 3600e3 ? p : null;
+  } catch {
+    return null;
+  }
+}
+const keepPending = (p: Pending | null) => {
+  try {
+    if (p) sessionStorage.setItem(SIGNUP_KEY, JSON.stringify(p));
+    else sessionStorage.removeItem(SIGNUP_KEY);
+  } catch {
+    /* ignore */
+  }
+};
+const apple = () => typeof navigator !== "undefined" && (/iphone|ipad|ipod/i.test(navigator.userAgent) || (/macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1));
 
 export const MIN_PASSWORD = 8;
 
@@ -85,10 +110,28 @@ type Field = "email" | "password";
  * The account form of the public page: "Créer un compte" (e-mail + password) and "Se connecter" (e-mail + password),
  * "Mot de passe oublié" (a link to choose a new one). No one-time link or code to sign in.
  */
-export default function AuthBox({ mode, onMode, focusKey, lockedEmail }: { mode: AuthMode; onMode: (m: AuthMode) => void; focusKey?: number; lockedEmail?: string }) {
-  const [view, setView] = useState<View>("form");
-  // an invitation's address (JoinTripPage): filled in and kept, the trip opens for that address only
-  const [email, setEmail] = useState(lockedEmail || "");
+export default function AuthBox({ mode, onMode, focusKey, intent, context, redirectQuery, lockedEmail }: {
+  mode: AuthMode;
+  onMode: (m: AuthMode) => void;
+  focusKey?: number;
+  /** what the visitor asked for before having an account (a city and dates, a trip to copy): goes with the account */
+  intent?: Intent | null;
+  /** the line above the sign-up form (« Créez votre compte pour préparer Shanghai · 12–18 mars ») */
+  context?: string | null;
+  /** what the confirmation link brings back (« ?copyof=<slug> ») */
+  redirectQuery?: string;
+  /** an invitation's address (JoinTripPage): filled in and kept, the trip opens for that address only */
+  lockedEmail?: string;
+}) {
+  // a sign-up already waiting in this tab (the page was reloaded): its « Vérifiez vos e-mails » screen again
+  const [restored] = useState(() => (mode === "signup" ? pendingSignup() : null));
+  const [view, setView] = useState<View>(restored ? "check" : "form");
+  // the address the confirmation went to, and when (the 60 s before « Renvoyer » counts from there)
+  const [sentTo, setSentTo] = useState(restored?.email || "");
+  const [sentAt, setSentAt] = useState(restored?.at || 0);
+  const [now, setNow] = useState(() => Date.now());
+  const autoTried = useRef(false);
+  const [email, setEmail] = useState(lockedEmail || restored?.email || "");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -126,6 +169,7 @@ export default function AuthBox({ mode, onMode, focusKey, lockedEmail }: { mode:
 
   const switchMode = (m: AuthMode) => {
     if (m === mode && view === "form") return;
+    if (view === "check") keepPending(null);
     setView("form");
     clearErr();
     if (m !== mode) setNote(null);
@@ -175,7 +219,7 @@ export default function AuthBox({ mode, onMode, focusKey, lockedEmail }: { mode:
     }
     track("signup_email");
     void run(async () => {
-      const r = await signUpWithPassword(mail, password);
+      const r = await signUpWithPassword(mail, password, intent ? { intent } : undefined, redirectQuery);
       if (r === "exists") {
         setNote(null);
         onMode("signin");
@@ -184,19 +228,99 @@ export default function AuthBox({ mode, onMode, focusKey, lockedEmail }: { mode:
       }
       track("signup_submitted");
       if (r === "confirm") {
-        onMode("signin");
-        setNote(
-          <>
-            <b>{t("Confirmez votre adresse : nous vous avons envoyé un e-mail.")}</b> {t("Ouvrez le lien qu'il contient : votre compte s'ouvre. Sur un autre appareil, connectez-vous ici.")}
-          </>,
-        );
+        // « Vérifiez vos e-mails »: the address in large, the mailbox, « J'ai confirmé · continuer », « Renvoyer »
+        const at = Date.now();
+        setSentTo(mail);
+        setSentAt(at);
+        setNow(at);
+        setNote(null);
+        autoTried.current = false;
+        keepPending({ email: mail, at });
+        setView("check");
+        track("check_email_shown", "signup");
       }
     });
   };
 
+  // the « Renvoyer dans 42 s » count, while the screen shows
+  useEffect(() => {
+    if (view !== "check") return;
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [view]);
+  const wait = resendLeft(sentAt, now);
+
+  /** « J'ai confirmé · continuer »: signs in with the password still typed; auto = once, silently, back on the tab */
+  const confirmNow = async (auto = false) => {
+    if (busy) return;
+    if (!password) {
+      // the tab was reloaded (no password kept): the sign-in, the address ready
+      keepPending(null);
+      setView("form");
+      clearErr();
+      onMode("signin");
+      window.setTimeout(() => pwRef.current?.focus(), 60);
+      return;
+    }
+    if (!auto) {
+      setBusy(true);
+      clearErr();
+    }
+    try {
+      await signInWithPassword(sentTo, password);
+      keepPending(null);
+      track("confirm_screen", auto ? "auto_ok" : "continue_ok");
+      // the session arrives through onAuthStateChange: the app opens
+    } catch (e) {
+      const code = String((e as { code?: string })?.code || "");
+      const msg = String((e as Error)?.message || "");
+      const waiting = code === "email_not_confirmed" || /Email not confirmed/i.test(msg);
+      if (waiting) track("confirm_screen", auto ? "auto_wait" : "continue_wait");
+      if (!auto) setErr(waiting ? t("Pas encore confirmé : touchez le lien dans l'e-mail, puis revenez ici.") : authMessage(e));
+    }
+    if (!auto) setBusy(false);
+  };
+  // back on the tab after opening the e-mail: one silent try (never a loop: Supabase limits sign-in attempts)
+  useEffect(() => {
+    if (view !== "check" || !password) return;
+    const onBack = () => {
+      if (document.visibilityState !== "visible" || autoTried.current) return;
+      autoTried.current = true;
+      void confirmNow(true);
+    };
+    document.addEventListener("visibilitychange", onBack);
+    return () => document.removeEventListener("visibilitychange", onBack);
+  }); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const resendCheck = () => {
+    if (wait > 0) return;
+    void run(async () => {
+      await resendSignupEmail(sentTo, redirectQuery);
+      const at = Date.now();
+      setSentAt(at);
+      setNow(at);
+      keepPending({ email: sentTo, at });
+      track("confirm_resent", "button");
+      setNote(<b>{t("C'est renvoyé. Regardez aussi dans les courriers indésirables.")}</b>);
+    });
+  };
+  /** « Ce n'est pas la bonne adresse »: back to the sign-up form, the cursor in the e-mail */
+  const wrongAddress = () => {
+    track("confirm_screen", "wrong_address");
+    keepPending(null);
+    setNote(null);
+    clearErr();
+    setView("form");
+    if (mode !== "signup") onMode("signup");
+    window.setTimeout(() => {
+      emailRef.current?.focus();
+      emailRef.current?.select();
+    }, 60);
+  };
+
   const resend = () =>
     void run(async () => {
-      await resendSignupEmail(mail);
+      await resendSignupEmail(mail, redirectQuery);
       setNote(<b>{t("C'est renvoyé. Regardez aussi dans les courriers indésirables.")}</b>);
     });
 
@@ -236,11 +360,34 @@ export default function AuthBox({ mode, onMode, focusKey, lockedEmail }: { mode:
       {/* two modes: a segmented control (two pressed / not pressed buttons) */}
       <div className="auth-tabs" role="group" aria-label={t("Compte")}>
         <span className="auth-ink" aria-hidden="true" data-on={mode} />
-        <button type="button" aria-pressed={mode === "signup" && view === "form"} className={mode === "signup" ? "on" : ""} onClick={() => switchMode("signup")}>{t("Créer un compte")}</button>
-        <button type="button" aria-pressed={mode === "signin" || view !== "form"} className={mode === "signin" ? "on" : ""} onClick={() => switchMode("signin")}>{t("Se connecter")}</button>
+        <button type="button" aria-pressed={mode === "signup" && (view === "form" || view === "check")} className={mode === "signup" ? "on" : ""} onClick={() => switchMode("signup")}>{t("Créer un compte")}</button>
+        <button type="button" aria-pressed={mode === "signin" || (view !== "form" && view !== "check")} className={mode === "signin" ? "on" : ""} onClick={() => switchMode("signin")}>{t("Se connecter")}</button>
       </div>
 
-      {view === "forgot-sent" ? (
+      {view === "check" ? (
+        <div className="auth-swap auth-check" key="check">
+          <span className="auth-badge" aria-hidden="true"><IMail /></span>
+          <p className="auth-title" role="status">{t("Vérifiez vos e-mails")}</p>
+          <p className="v3-msg auth-check-to">{t("Nous avons envoyé un lien de confirmation à")}</p>
+          <p className="auth-check-mail">{sentTo}</p>
+          <p className="auth-sub">{t("Ouvrez-le pour activer votre compte. Il peut arriver dans les courriers indésirables.")}</p>
+          {intent && intentText(intent) && <p className="auth-note">{t("Votre voyage {trip} vous attend après la confirmation.", { trip: intentText(intent) })}</p>}
+          <div className="auth-check-mailers">
+            {mailersFor(sentTo, apple()).map((m) => (
+              <a key={m.id} className="v3-btn ghost" href={m.href} target={m.id === "mail" ? undefined : "_blank"} rel="noopener" onClick={() => track("confirm_screen", `mail_${m.id}`)}>{t(m.label)}</a>
+            ))}
+          </div>
+          {err && <p className="v3-err auth-err" role="alert">{err}</p>}
+          <button type="button" className="v3-btn auth-go" disabled={busy} aria-busy={busy || undefined} onClick={() => void confirmNow()}>
+            {busy ? <span className="auth-wait">{t("Un instant…")}</span> : password ? t("J'ai confirmé · continuer") : t("J'ai confirmé · me connecter")}
+          </button>
+          {note && <p className="auth-note" role="status">{note}</p>}
+          <div className="auth-check-row">
+            <button type="button" className="auth-inline" onClick={resendCheck} disabled={busy || wait > 0}>{wait > 0 ? t("Renvoyer dans {n} s", { n: wait }) : t("Renvoyer l'e-mail")}</button>
+            <button type="button" className="auth-inline" onClick={wrongAddress}>{t("Ce n'est pas la bonne adresse")}</button>
+          </div>
+        </div>
+      ) : view === "forgot-sent" ? (
         <div className="auth-swap" key="sent">
           <span className="auth-badge" aria-hidden="true"><ICheckLine /></span>
           <p className="auth-title">{t("Regardez vos e-mails")}</p>
@@ -278,6 +425,7 @@ export default function AuthBox({ mode, onMode, focusKey, lockedEmail }: { mode:
             submit();
           }}
         >
+          {mode === "signup" && context && !note && <p className="auth-note auth-context">{context}</p>}
           {note && <p className="auth-note" role="status">{note}</p>}
           <EmailField value={email} onChange={onEmail} inputRef={emailRef} error={emailErr} locked={!!lockedEmail} />
           <PasswordField id={"auth-pw-" + mode} inputRef={pwRef} value={password} onChange={onPassword} label={mode === "signup" ? t("Choisissez un mot de passe") : t("Mot de passe")} autoComplete={mode === "signup" ? "new-password" : "current-password"} invalid={!!pwErr} describedBy={pwErr ? "auth-pw-err" : undefined} />
@@ -318,7 +466,18 @@ function EmailField({ value, onChange, inputRef, error, autoFocus, locked }: { v
   );
 }
 
+/** « Shanghai · 12–18 mars » (a city; a copy's line is the page's own) */
+const intentText = (i: Intent) => (i.kind === "dest" ? intentLabel(i, getLang()) : "");
+
 const ic = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true } as const;
+function IMail() {
+  return (
+    <svg {...ic}>
+      <rect x="3" y="5.5" width="18" height="13" rx="2" />
+      <path d="m3.5 7 8.5 6 8.5-6" />
+    </svg>
+  );
+}
 function IEye() {
   return (
     <svg {...ic}>

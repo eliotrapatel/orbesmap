@@ -5,11 +5,13 @@
 // - two days after a trip ends (lot retention): one "welcome back" e-mail, with a few figures of the trip and a way to the next one.
 // - after all of these (lot cycle, api/_cycle.ts): the invitation follow-ups, J-3 / J-2 before a trip, the first trip,
 //   the trip of the month and the detected bookings, each in its own try/catch (a failure never stops the alerts).
+// - once, 2 to 36 hours after a sign-up never confirmed (lot acquisition): the confirmation e-mail again (api/_confirm.ts).
 // Needs on Vercel: SUPABASE_SERVICE_ROLE_KEY, VAPID_PRIVATE_KEY, RESEND_API_KEY (MAIL_FROM optional).
 // Optional: CYCLE_PAUSE=1 stops every message of the cycle, CYCLE_DAY_CAP (default 150 e-mails a day).
 import webpush from "web-push";
 import { kickStale } from "./prepare.js";
 import { deriveUnsub, restDeps, runCycle } from "./_cycle.js";
+import { confirmReminders, REMIND, type Unconfirmed } from "./_confirm.js";
 
 type Json = Record<string, unknown>;
 const SUPA_URL = process.env.SUPABASE_URL || "https://ifugaqjneprbtigvegeb.supabase.co";
@@ -118,6 +120,7 @@ export async function POST(req: Request): Promise<Response> {
 
 async function run(req: Request): Promise<Response> {
   const started = Date.now();
+  const t0 = started;
   const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
   if (!key) return json({ error: "SUPABASE_SERVICE_ROLE_KEY missing" }, 503);
   // only the database's own wake-up may run this
@@ -288,7 +291,53 @@ ${FOOTER}</div>`;
   } catch (e) {
     warnings.push(`cycle: ${String((e as Error)?.message || e).slice(0, 120)}`);
   }
-  return json({ ok: true, trips: trips.length, ...sent, ...(restarted ? { restarted } : {}), ...(warnings.length ? { warnings } : {}), ...(resend ? {} : { warning_mail: "RESEND_API_KEY missing" }) });
+  // the single reminder of a sign-up never confirmed (lot acquisition, R07), only with time left in this run; a failure
+  // here never touches what was sent above
+  let reminders = 0;
+  try {
+    reminders = (await confirmReminders(reminderDeps(key, now, t0))).sent;
+  } catch (e) {
+    warnings.push(`confirm: ${String((e as Error)?.message || e).slice(0, 120)}`);
+  }
+  return json({ ok: true, trips: trips.length, ...sent, ...(reminders ? { reminders } : {}), ...(restarted ? { restarted } : {}), ...(warnings.length ? { warnings } : {}), ...(resend ? {} : { warning_mail: "RESEND_API_KEY missing" }) });
+}
+
+/** The real database, Auth and clock for the reminder of api/_confirm.ts */
+function reminderDeps(key: string, now: Date, t0: number) {
+  const h = { apikey: key, authorization: `Bearer ${key}`, "content-type": "application/json" };
+  return {
+    now,
+    elapsed: () => Date.now() - t0,
+    listSql: async (): Promise<Unconfirmed[] | "missing"> => {
+      const r = await fetch(`${SUPA_URL}/rest/v1/rpc/unconfirmed_signups`, { method: "POST", headers: h, body: JSON.stringify({ p_min_hours: REMIND.minHours, p_max_hours: REMIND.maxHours, p_limit: 50 }) });
+      if (r.status === 404) return "missing";
+      if (!r.ok) throw new Error(`db ${r.status} unconfirmed_signups`);
+      return ((await r.json()) as Unconfirmed[]) || [];
+    },
+    listAdmin: async (page: number): Promise<Unconfirmed[]> => {
+      const r = (await db(`/auth/v1/admin/users?page=${page}&per_page=200`, key)) as { users?: Unconfirmed[] } | null;
+      return Array.isArray(r?.users) ? r.users : [];
+    },
+    claims: async () => ((await db("/rest/v1/alert_log?key=like.confirm:*&select=key,at", key)) as { key: string; at: string }[]) || [],
+    claim: async (k: string) => {
+      const r = (await db("/rest/v1/alert_log", key, { method: "POST", headers: { prefer: "resolution=ignore-duplicates,return=representation" }, body: JSON.stringify({ key: k }) })) as unknown[];
+      return Array.isArray(r) && r.length > 0;
+    },
+    unclaim: async (k: string) => {
+      await db(`/rest/v1/alert_log?key=eq.${encodeURIComponent(k)}`, key, { method: "DELETE" });
+    },
+    resend: async (email: string) => {
+      // never more than 8 s: a call that hangs gives 0 (the claim is kept, nothing sent twice)
+      const ctl = new AbortController();
+      const tm = setTimeout(() => ctl.abort(), 8000);
+      const r = await fetch(`${SUPA_URL}/auth/v1/resend?redirect_to=${encodeURIComponent(`${APP_URL}/`)}`, { method: "POST", headers: h, body: JSON.stringify({ type: "signup", email }), signal: ctl.signal }).catch(() => null);
+      clearTimeout(tm);
+      return r ? r.status : 0;
+    },
+    log: async (userId: string, detail: string) => {
+      await fetch(`${SUPA_URL}/rest/v1/events`, { method: "POST", headers: { ...h, prefer: "return=minimal" }, body: JSON.stringify({ user_id: userId, name: "confirm_resent", detail }) });
+    },
+  };
 }
 
 function addDays(iso: string, n: number) {
@@ -423,6 +472,7 @@ async function welcomeBack(all: { id: string; data: Json }[], key: string, resen
       const figures = [T.days(days), ...(visited > 0 ? [T.visited(visited)] : []), ...(photos > 0 ? [T.photos(photos)] : [])];
       const intro = figures.length > 1 ? T.backIntro(city) : T.backIntroShort(city);
       const tripUrl = `${APP_URL}/?src=email_back#${trip.id}`;
+      const nextUrl = `${APP_URL}/?new=1&src=email_back`;
       const html = `<div style="font-family:Helvetica,Arial,sans-serif;max-width:520px;margin:0 auto;padding:28px 22px;color:#0a0a0a">
 <p style="font-size:13px;letter-spacing:.2em;text-transform:uppercase;margin:0 0 22px">ORBES Trips</p>
 <p style="font-size:16px;margin:0 0 6px">${esc(T.backHello(name))}</p>
@@ -431,10 +481,10 @@ ${figures.length > 1 ? `<p style="font-size:20px;font-weight:600;margin:10px 0 1
 <p style="font-size:15px;margin:10px 0 0">${esc(T.recap)}</p>
 <p style="margin:22px 0"><a href="${tripUrl}" style="display:inline-block;background:#0a0a0a;color:#f6f2ea;text-decoration:none;padding:12px 20px;border-radius:12px">${esc(T.openRecap)}</a></p>
 <p style="font-size:15px;margin:26px 0 4px">${esc(T.nextQ)}</p>
-<p style="margin:0 0 24px"><a href="${APP_URL}/?new=1&src=email_back" style="color:#0a0a0a">${esc(T.nextLink)}</a></p>
+<p style="margin:0 0 24px"><a href="${nextUrl}" style="color:#0a0a0a">${esc(T.nextLink)}</a></p>
 <p style="font-size:12px;color:#6f6b65">${esc(T.stop)}</p>
 ${FOOTER}</div>`;
-      const text = [T.backHello(name), intro, figures.length > 1 ? figures.join(" · ") : "", T.recap, tripUrl, "", T.nextQ, T.nextLink, `${APP_URL}/?new=1&src=email_back`, "", T.stop, "ORBES Trips"].join("\n");
+      const text = [T.backHello(name), intro, figures.length > 1 ? figures.join(" · ") : "", T.recap, tripUrl, "", T.nextQ, T.nextLink, nextUrl, "", T.stop, "ORBES Trips"].join("\n");
       const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { authorization: `Bearer ${resend}`, "content-type": "application/json" },
