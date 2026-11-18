@@ -42,7 +42,7 @@
 .prc-buy .v3-msg { margin: 0; font-size: 13.5px; }
 .prc-ok b { color: var(--ok); }
 .prc-code { border-top: 1px solid var(--hair); padding-top: 2px; }
-.prc-code summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px; min-height: 40px; font-size: 13.5px; color: var(--soft); }
+.prc-code summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: 13.5px; color: var(--soft); }
 .prc-code summary::-webkit-details-marker { display: none; }
 .prc-code summary::after { content: "›"; margin-left: auto; color: var(--mute); transition: transform 0.2s var(--ease); }
 .prc-code[open] summary::after { transform: rotate(90deg); }
@@ -68,23 +68,27 @@
   border: 1px solid rgba(216, 196, 126, 0.62); background: rgba(216, 196, 126, 0.05); vertical-align: middle;
 }
 .pro-mark > span { display: block; margin-right: -0.24em; letter-spacing: 0.24em; transform: translateY(0.04em); }
-.pro-mark-sm { height: 18px; padding: 0 6px; border-radius: 4px; font-size: 9px; }
+.pro-mark-sm { height: 19px; padding: 0 6px; border-radius: 4px; font-size: 10px; }
 .pro-mark-md { height: 26px; padding: 0 9px; border-radius: 6px; font-size: 11.5px; }
 .pro-mark-lg { height: 40px; padding: 0 15px; border-radius: 9px; font-size: 17px; box-shadow: inset 0 0 0 3px #050505, inset 0 0 0 4px rgba(216, 196, 126, 0.3); }
 
 /* Existing "PRO" tags across the app take the mark's look (doubled class: wins over the base rule wherever it loads) */
 .pro-tag.pro-tag {
-  height: 18px; padding: 0 calc(6px - 0.2em) 0 6px; border-radius: 4px; box-sizing: border-box;
-  font: 500 9px/1 var(--display); letter-spacing: 0.2em; color: var(--gold);
+  height: 19px; padding: 0 calc(6px - 0.2em) 0 6px; border-radius: 4px; box-sizing: border-box;
+  font: 500 10px/1 var(--display); letter-spacing: 0.2em; color: var(--gold);
   background: rgba(216, 196, 126, 0.05); border: 1px solid rgba(216, 196, 126, 0.62); vertical-align: 1px;
 }
+/* on the gold-tinted Pro note the frame is drawn stronger, so the hairline holds against its ground */
+.pro-note .pro-tag.pro-tag { border-color: rgba(216, 196, 126, 0.8); }
 /* on an ivory selected segment the frame turns ink so it stays legible */
 .v3-seg button.on .pro-tag.pro-tag { color: #0a0a0a; border-color: rgba(10, 10, 10, 0.55); background: transparent; }
 
 /* ---- the Pro screen frame ---- */
-.pm .v3-bg { background:
+/* doubled with .v3-pro: wins over styles.css's ".v3-pro .v3-bg", which loads after this file */
+.v3-pro.pm .v3-bg { background:
   radial-gradient(70% 34% at 50% -2%, rgba(216, 196, 126, 0.14), transparent 72%),
   radial-gradient(60% 34% at 110% 70%, rgba(246, 242, 234, 0.05), transparent 70%); }
+.pm .pm-close { width: 44px; height: 44px; border-radius: 14px; }
 .pm-close svg { width: 18px; height: 18px; }
 
 /* staged reveal on enter: opacity + a short rise, once */
@@ -93,7 +97,7 @@
 
 /* ---- the membership card ---- */
 .pm-card {
-  position: relative; isolation: isolate; overflow: hidden; width: 100%; max-width: 400px; margin: 14px auto 0;
+  position: relative; isolation: isolate; overflow: hidden; width: 100%; max-width: none; margin: 14px 0 0;
   aspect-ratio: 1.72 / 1; border-radius: 20px; padding: 18px 20px 17px; display: flex; flex-direction: column;
   border: 1px solid rgba(216, 196, 126, 0.42);
   background:
@@ -115,7 +119,10 @@
 .pm-card-orbit ellipse + ellipse { stroke: rgba(246, 242, 234, 0.08); stroke-width: 0.8; }
 .pm-card-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .pm-card-brand { font: 500 10.5px/1 var(--display); letter-spacing: 0.3em; margin-right: -0.3em; text-transform: uppercase; color: var(--soft); white-space: nowrap; }
-.pm-card-name { margin-top: auto; font-size: clamp(24px, 7.4vw, 30px); line-height: 1; letter-spacing: 0.04em; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* scoped under .pm-card: wins over ".v3-d" (tighter tracking, 0.94 line box) which loads later; the padding keeps the capitals clear of the clip */
+.pm-card .pm-card-name { margin-top: auto; padding: 0.06em 0 0.04em; font-size: clamp(24px, 7.4vw, 30px); line-height: 1.04; letter-spacing: 0.04em; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: color 0.6s var(--ease); }
+/* a preview (not yet a member): the name stays at reading grey, so becoming a member visibly brightens the card */
+.pm-card.is-preview .pm-card-name { color: var(--soft); }
 .pm-card-foot { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(216, 196, 126, 0.2); }
 .pm-fact { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .pm-fact.r { text-align: right; align-items: flex-end; }
@@ -131,11 +138,16 @@
 .pm-cmp { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
 .pm-c0 { width: 35%; }
 .pm-cmp th, .pm-cmp td { padding: 0; font-weight: 400; text-align: center; vertical-align: middle; }
-.pm-cmp thead th { padding: 12px 2px 11px; vertical-align: bottom; border-radius: 12px 12px 0 0; }
-.pm-cmp thead th.pick { cursor: pointer; }
+.pm-cmp thead th { padding: 0; vertical-align: top; border-radius: 12px 12px 0 0; }
+.pm-colhead { display: block; width: 100%; min-height: 44px; padding: 12px 2px 11px; text-align: center; }
+/* a plan's column head is a button: it selects that plan, like its card below */
+.pm-colbtn { font: inherit; color: inherit; background: none; border: 0; border-radius: 12px 12px 0 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.pm-colbtn:hover .pm-cn { color: var(--ink); }
+.pm-cmp thead th.on .pm-colbtn:hover .pm-cn { color: var(--gold); }
+.pm-colbtn:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
 .pm-cn { display: block; font-size: 9.5px; line-height: 1.1; letter-spacing: 0.06em; text-transform: uppercase; color: var(--soft); white-space: nowrap; transition: color 0.3s var(--ease); }
 .pm-cp { display: block; margin-top: 6px; font: 500 14px/1 var(--display); color: var(--ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.pm-cper { display: block; margin-top: 4px; font-size: 9.5px; line-height: 1.1; color: var(--mute); white-space: nowrap; }
+.pm-cper { display: block; margin-top: 3px; font-size: 9.5px; line-height: 1.1; color: var(--mute); white-space: nowrap; }
 .pm-cmp tbody th { text-align: left; padding: 10px 8px 10px 8px; font-size: 12px; line-height: 1.3; color: var(--soft); }
 .pm-cmp tbody td { padding: 10px 2px; }
 .pm-cmp tbody tr > * { border-top: 1px solid rgba(246, 242, 234, 0.07); }
@@ -173,8 +185,8 @@
   .pm-card { padding: 15px 16px 14px; border-radius: 18px; }
   .pm-card-brand { font-size: 9.5px; letter-spacing: 0.26em; margin-right: -0.26em; }
   .pm-cmp-wrap { padding: 2px 3px 4px; }
-  .pm-c0 { width: 33%; }
-  .pm-cn { font-size: 8.5px; letter-spacing: 0.04em; }
+  .pm-c0 { width: 31%; }
+  .pm-cn { letter-spacing: 0.02em; }
   .pm-cp { font-size: 12.5px; }
   .pm-cmp tbody th { font-size: 11.5px; padding-left: 6px; padding-right: 4px; }
   .pm-qty { font-size: 10.5px; }
@@ -182,8 +194,49 @@
 @media (min-width: 720px) {
   .pm-cmp tbody th { font-size: 12.5px; }
 }
+
+/* ---- prices: the figure in the display capitals, its period quiet in body type ---- */
+.prc-amount { display: inline-flex; align-items: baseline; gap: 5px; flex: none; white-space: nowrap; }
+.prc-period { font: 400 12px/1 var(--font); color: var(--mute); }
+
+/* ---- the plans' column, the honest line, the docked action, the access code ---- */
+.pm-main > .pm-cmp-wrap:first-child { margin-top: 28px; }
+.pm-honest { margin-top: 18px; padding: 0 2px; }
+.pm-honest .v3-msg { margin: 0; font-size: 13px; line-height: 1.5; color: var(--mute); }
+.pm-honest .prc-ok { display: flex; gap: 10px; align-items: flex-start; color: var(--soft); }
+.pm-dock {
+  position: sticky; bottom: 0; z-index: 3; margin: 6px -20px 0; padding: 22px 20px calc(var(--safe-b, 0px) + 14px);
+  background: linear-gradient(180deg, rgba(3, 3, 3, 0) 0, rgba(3, 3, 3, 0.9) 20px, #030303 34px);
+}
+.pm-cta { justify-content: space-between; padding: 0 20px; box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.9); }
+.pm-cta-l { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pm-cta-p { flex: none; display: inline-flex; align-items: baseline; gap: 5px; font: 500 15px/1 var(--display); letter-spacing: 0.01em; font-variant-numeric: tabular-nums; color: rgba(10, 10, 10, 0.62); animation: pm-swap 0.4s var(--ease) both; }
+.pm-cta-per { font: 400 12.5px/1 var(--font); letter-spacing: 0; color: rgba(10, 10, 10, 0.5); }
+.pm-dock-done {
+  display: flex; align-items: center; justify-content: center; gap: 10px; height: 54px; margin: 0; border-radius: 16px;
+  border: 1px solid rgba(127, 209, 185, 0.32); background: rgba(127, 209, 185, 0.06); color: var(--ink); font-size: 14.5px; font-weight: 500;
+  animation: pm-swap 0.45s var(--ease) both;
+}
+.pm-dock-done .prc-ok-ic { margin-top: 0; }
+.pm-codebox { margin-top: 2px; }
+.pm-dock-err { margin: 0 2px 10px; font-size: 13px; line-height: 1.4; }
+
+/* ---- desktop: the card and the reason hold still on the left, the plans scroll on the right ---- */
+@media (min-width: 960px) {
+  .v3-pro.pm.prc .v3-col { max-width: 1080px; padding-left: 48px; padding-right: 48px; }
+  .pm-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr); gap: 72px; align-items: start; }
+  .pm-hero { position: sticky; top: 28px; padding-bottom: 24px; }
+  .pm-hero .v3-h1 { font-size: 52px; margin-top: 34px; }
+  .pm-hero .v3-lead { max-width: 30em; }
+  .pm-main > .pm-cmp-wrap:first-child { margin-top: 14px; }
+  .pm-dock { margin: 6px 0 0; padding: 22px 0 18px; }
+}
+@media (max-width: 360px) {
+  .pm-cta { padding: 0 16px; font-size: 14.5px; }
+  .pm-cta-p { font-size: 14px; }
+}
 @media (prefers-reduced-motion: reduce) {
-  .pm-rise, .pm-card, .pm-v { animation: none; }
+  .pm-rise, .pm-card, .pm-v, .pm-cta-p, .pm-dock-done { animation: none; }
   .pm-card::after { display: none; }
-  .pm-cmp .on, .pm-cmp td, .pm-cmp th, .pm-cn { transition: none; }
+  .pm-cmp .on, .pm-cmp td, .pm-cmp th, .pm-cn, .pm-card .pm-card-name { transition: none; }
 }
