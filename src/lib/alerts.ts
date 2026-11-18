@@ -78,10 +78,26 @@ export async function inboundAddress(): Promise<string | null> {
 /** A booking whose dates fall outside all the account's trips (api/inbound.ts): the trip it announces */
 export type DetectedTrip = { city: string; country: string; start: string; end: string };
 export type InboundItem = { id: number; trip_id: string | null; received_at: string; from_addr: string | null; subject: string | null; extracted: Partial<ExtractResult> & { detected?: DetectedTrip }; status: string };
-/** The new trip a forwarded booking announces (none once it was added to a trip) */
+// a flight often leaves the day before the trip starts, or lands the day after it ends (same rule as api/inbound.ts)
+const NEAR_DAYS = 2;
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+const shiftDay = (iso: string, n: number) => new Date(Date.parse(`${iso}T12:00:00Z`) + n * 864e5).toISOString().slice(0, 10);
+/**
+ * The new trip a forwarded booking announces: none once it was added to a trip, and none once one of the account's
+ * trips covers its dates (created from another booking of the same stay, or by hand), so the same trip is never
+ * offered twice; the booking then waits in the inbox like any other, to add to that trip.
+ */
 export const detectedTrip = (it: InboundItem): DetectedTrip | null => {
   const d = it.extracted?.detected;
-  return !it.trip_id && d && /^\d{4}-\d{2}-\d{2}$/.test(d.start || "") ? d : null;
+  if (it.trip_id || !d || !ISO_DAY.test(d.start || "")) return null;
+  const end = d.end && ISO_DAY.test(d.end) && d.end >= d.start ? d.end : d.start;
+  const covered = Object.values(getState().trips).some((r) => {
+    const rec = (r || {}) as { start?: unknown; end?: unknown; deleted?: unknown };
+    const s = String(rec.start || "").slice(0, 10);
+    const e = String(rec.end || "").slice(0, 10);
+    return rec.deleted !== true && ISO_DAY.test(s) && ISO_DAY.test(e) && shiftDay(s, -NEAR_DAYS) <= end && shiftDay(e, NEAR_DAYS) >= d.start;
+  });
+  return covered ? null : d;
 };
 export async function inboundItems(): Promise<InboundItem[]> {
   if (!supabase || !getState().session) return [];

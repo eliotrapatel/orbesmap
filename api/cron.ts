@@ -12,13 +12,21 @@ const VAPID_PUBLIC = "BK5AQrfBJZC_DtZYyUGPrOeegzY8JzepoT5t6ia_5m1tF8sFZXySh39Slb
 const APP_URL = "https://orbesmap.vercel.app";
 const MORNING = { from: 7 * 60 + 25, to: 7 * 60 + 45 };
 const AHEAD = { from: 25, to: 35 };
-// the "welcome back" e-mail: from the 2nd day after the trip's end, within the 7 days after it, at a decent hour at home
+// the "welcome back" e-mail: from the 2nd day after the trip's end, within the 7 days after it, between 9:30 and 20:00
+// Paris time (the account's own timezone is not stored on the server, so every traveller gets it in that window)
 const RETURN = { afterDays: 2, withinDays: 7, from: 9 * 60 + 30, to: 20 * 60 };
-const HOME_TZ = "Europe/Paris";
+const RETURN_TZ = "Europe/Paris";
 // the discreet signature at the bottom of every e-mail
 const FOOTER = `<p style="font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#a8a39b;margin:22px 0 0">ORBES Trips</p>`;
-// "de Lisbonne", "d'Amsterdam"
-const deCity = (c: string) => (/^[aeiouyàâäéèêëîïôöûüœ]/i.test(c) ? `d'${c}` : `de ${c}`);
+// "de Lisbonne", "d'Amsterdam", "du Caire", "de la Havane", "des Sables-d'Olonne", "de l'Haÿ"
+const deCity = (c: string) => {
+  const a = /^(le|la|les)\s+(.+)$/i.exec(c) || /^(l)['’]\s*(.+)$/i.exec(c);
+  if (a) {
+    const art = a[1].toLowerCase();
+    return art === "l" ? `de l'${a[2]}` : `${art === "le" ? "du" : art === "les" ? "des" : "de la"} ${a[2]}`;
+  }
+  return /^[aeiouyàâäéèêëîïôöûüœ]/i.test(c) ? `d'${c}` : `de ${c}`;
+};
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
@@ -258,10 +266,31 @@ function zoneOr(tz: unknown, fallback: string): string {
   }
 }
 const daysBetween = (a: string, b: string) => Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / 864e5);
-async function countOf(path: string, key: string): Promise<number> {
+/** How many rows match, counted by the database (no row is downloaded); 0 when it cannot tell */
+async function countRows(path: string, key: string): Promise<number> {
   try {
-    const r = (await db(path, key)) as unknown[];
-    return Array.isArray(r) ? r.length : 0;
+    const r = await fetch(`${SUPA_URL}${path}${path.includes("?") ? "&" : "?"}limit=1`, { method: "HEAD", headers: { apikey: key, authorization: `Bearer ${key}`, prefer: "count=exact" } });
+    const n = Number((r.headers.get("content-range") || "").split("/")[1]);
+    return r.ok && Number.isFinite(n) ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+/**
+ * The places visited during a trip, counted like the app's trip card (TripHero): ticked "visited" (or the old
+ * "visited" status), not removed from the programme, never the hotel.
+ */
+async function visitedCount(tripId: string, hotelId: string, key: string): Promise<number> {
+  try {
+    const id = encodeURIComponent(tripId);
+    const seen = (await db(`/rest/v1/place_states?trip_id=eq.${id}&or=(data->>visited.eq.true,data->>status.eq.visited)&select=place_id,removed:data->>removed`, key)) as { place_id: string; removed: string | null }[];
+    const ids = new Set(seen.filter((r) => r.removed !== "true").map((r) => r.place_id));
+    if (!ids.size) return 0;
+    // the hotel and the places deleted or removed from the trip do not count
+    const out = (await db(`/rest/v1/places?trip_id=eq.${id}&or=(data->>type.eq.hotel,data->>deleted.eq.true,data->>removed.eq.true)&select=place_id`, key)) as { place_id: string }[];
+    for (const r of out) ids.delete(r.place_id);
+    if (hotelId) ids.delete(hotelId);
+    return ids.size;
   } catch {
     return 0;
   }
@@ -270,10 +299,14 @@ async function countOf(path: string, key: string): Promise<number> {
 /**
  * Two days after a trip ends (its end date in its own timezone), once per traveller and trip: "Bon retour de <ville>",
  * a few figures of the trip, a link to its recap and one to prepare the next trip. Only trips that ended within the
- * last 7 days (nothing is sent for older trips), only to travellers who kept the e-mails on (Alerts), at a decent hour.
+ * last 7 days (nothing is sent for older trips), only to travellers who kept the e-mails on (Alerts), in the daytime
+ * (Paris time).
  */
 async function welcomeBack(all: { id: string; data: Json }[], key: string, resend: string, from: string, now: Date): Promise<number> {
   if (!resend) return 0;
+  // outside the daytime window nothing is read at all
+  const paris = localNow(RETURN_TZ, now);
+  if (paris.min < RETURN.from || paris.min >= RETURN.to) return 0;
   const today = now.toISOString().slice(0, 10);
   const ended = all.filter((t) => {
     const d = t.data;
@@ -289,32 +322,53 @@ async function welcomeBack(all: { id: string; data: Json }[], key: string, resen
     return since >= RETURN.afterDays && since <= RETURN.withinDays;
   });
   if (!ended.length) return 0;
-  // who already had it (the log keeps 30 days, longer than the 7-day window, so never twice)
+  // who already had it, or was skipped for good (the log keeps 30 days, longer than the 7-day window, so never twice)
   const done = new Set(((await db("/rest/v1/alert_log?key=like.return:*&select=key", key)) as { key: string }[]).map((r) => r.key));
+  const claim = async (k: string) => {
+    const r = (await db("/rest/v1/alert_log", key, { method: "POST", headers: { prefer: "resolution=ignore-duplicates,return=representation" }, body: JSON.stringify({ key: k }) })) as unknown[];
+    return Array.isArray(r) && r.length > 0;
+  };
   let count = 0;
   for (const trip of ended) {
     const d = trip.data;
     const members = (await db(`/rest/v1/trip_members?trip_id=eq.${encodeURIComponent(trip.id)}&select=user_id`, key)) as { user_id: string }[];
     const todo = members.filter((m) => !done.has(`return:${m.user_id}:${trip.id}`));
     if (!todo.length) continue;
-    const city = String(d.title || "").trim() || String(((d.zones as { label?: string }[] | undefined) || [])[0]?.label || "").trim();
+    // the city: the trip's first city (its title may join several, or be a name the travellers gave it)
+    const zones = (Array.isArray(d.zones) ? d.zones : []) as { label?: string }[];
+    const cities = (((d.draft as { cities?: { name?: string }[] } | undefined)?.cities) || []) as { name?: string }[];
+    const city = String(zones[0]?.label || "").trim() || String(cities[0]?.name || "").trim() || String(d.title || "").trim();
     if (!city) continue;
-    // the figures, read once per trip; only those worth showing
+    // the figures: read once per trip, and only once someone is to receive the e-mail
     const days = Math.max(1, daysBetween(String(d.start), String(d.end)) + 1);
-    const visited = await countOf(`/rest/v1/place_states?trip_id=eq.${encodeURIComponent(trip.id)}&data->>status=eq.visited&select=place_id`, key);
-    const photos = await countOf(`/rest/v1/photos?trip_id=eq.${encodeURIComponent(trip.id)}&select=id`, key);
+    let figs: { visited: number; photos: number } | null = null;
     for (const { user_id } of todo) {
+      const k = `return:${user_id}:${trip.id}`;
       const prof = ((await db(`/rest/v1/profiles?id=eq.${user_id}&select=data`, key)) as { data: Json }[])[0]?.data || {};
       const alerts = (prof.alerts || {}) as { email?: boolean };
-      if (alerts.email === false) continue;
-      // at home, at a decent hour (the account's timezone when it is known, else Paris)
-      const home = localNow(zoneOr(prof.timezone || prof.homeZone, HOME_TZ), now);
-      if (home.min < RETURN.from || home.min >= RETURN.to) continue;
-      const to = await emailOf(user_id, key);
-      if (!to) continue;
+      // e-mails turned off: skipped for good, never looked at again for this trip
+      if (alerts.email === false) {
+        await claim(k).catch(() => false);
+        continue;
+      }
+      let to: string | null = null;
+      try {
+        to = ((await db(`/auth/v1/admin/users/${user_id}`, key)) as { email?: string })?.email || null;
+      } catch {
+        continue; // the account could not be read this time: tried again on the next run
+      }
+      if (!to) {
+        // an account without an e-mail address: skipped for good
+        await claim(k).catch(() => false);
+        continue;
+      }
       // claimed before sending: two runs at the same time never send it twice
-      const claim = (await db("/rest/v1/alert_log", key, { method: "POST", headers: { prefer: "resolution=ignore-duplicates,return=representation" }, body: JSON.stringify({ key: `return:${user_id}:${trip.id}` }) })) as unknown[];
-      if (!Array.isArray(claim) || !claim.length) continue;
+      if (!(await claim(k))) continue;
+      if (!figs) {
+        const hotelId = String(((d.hotel || {}) as { placeId?: string }).placeId || "");
+        figs = { visited: await visitedCount(trip.id, hotelId, key), photos: await countRows(`/rest/v1/photos?trip_id=eq.${encodeURIComponent(trip.id)}`, key) };
+      }
+      const { visited, photos } = figs;
       const T = TXT[prof.lang === "en" ? "en" : "fr"];
       const name = String(prof.name || "");
       const figures = [T.days(days), ...(visited > 0 ? [T.visited(visited)] : []), ...(photos > 0 ? [T.photos(photos)] : [])];

@@ -131,6 +131,8 @@ function useTripFromBooking(onDone: (id: number) => void): { busy: number | null
 /** The new trips announced by forwarded bookings, in the alerts block (account menu) */
 function NextTrips() {
   const inboxShown = useInboxOn();
+  // a trip created or changed (from another booking, or by hand) can cover an offer's dates: it is then no longer offered
+  useStore((s) => s.trips);
   const [items, setItems] = useState<InboundItem[]>([]);
   useEffect(() => {
     void inboundItems().then(setItems, () => setItems([]));
@@ -223,6 +225,8 @@ export function InboundInbox() {
   const [items, setItems] = useState<InboundItem[]>([]);
   const [busy, setBusy] = useState<number | null>(null);
   const tripId = useStore((s) => s.tripId);
+  // a trip created or changed can cover a "new trip" offer's dates: the booking then shows as one to add
+  useStore((s) => s.trips);
   useEffect(() => {
     void inboundItems().then(setItems);
   }, [tripId]);
@@ -250,7 +254,8 @@ export function InboundInbox() {
             <div className="btn-row" style={{ marginTop: 8 }}>
               {next && <button className="btn primary rt-create" disabled={flow.busy !== null || busy === it.id} onClick={() => flow.start(it)}>{flow.busy === it.id ? t("Préparation…") : t("Créer ce voyage")}</button>}
               <button className="btn" disabled={busy === it.id} onClick={async () => { await dismissInbound(it.id); setItems(items.filter((y) => y.id !== it.id)); }}>{t("Ignorer")}</button>
-              <button className={next ? "btn" : "btn primary"} disabled={busy === it.id || !what.length} onClick={async () => {
+              {/* a booking outside all the trips is never added to the open trip by mistake: only "Créer ce voyage" */}
+              {!next && <button className="btn primary" disabled={busy === it.id || !what.length} onClick={async () => {
                 setBusy(it.id);
                 try {
                   const r = await addInbound(it, currentTrip());
@@ -259,7 +264,7 @@ export function InboundInbox() {
                 } finally {
                   setBusy(null);
                 }
-              }}>{busy === it.id ? t("Ajout…") : t("Ajouter au voyage")}</button>
+              }}>{busy === it.id ? t("Ajout…") : t("Ajouter au voyage")}</button>}
             </div>
           </div>
         );
