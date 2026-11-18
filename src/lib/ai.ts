@@ -63,7 +63,34 @@ export type EnrichResult = {
   confidence: "haute" | "moyenne" | "faible";
 };
 
-export async function ai<T>(task: "photo" | "interpret" | "place" | "ask" | "enrich" | "balance", payload: Record<string, unknown>, timeoutMs = 60_000, signal?: AbortSignal): Promise<T> {
+export type AiTask = "photo" | "interpret" | "place" | "ask" | "enrich" | "balance" | "extract" | "intake" | "outline" | "day" | "adjust" | "essentials";
+
+/** A booking or appointment at a fixed time (read from a confirmation or the paste box) */
+export type FixedItem = { kind: "reservation" | "rendez-vous" | "billet" | "autre"; name: string; date: string; time: string; endTime: string; address: string; notes: string };
+export type ExtractResult = {
+  flights: { code: string; airline: string; from: string; to: string; fromCity: string; toCity: string; departAt: string; arriveAt: string; terminal: string }[];
+  hotel: { name: string; address: string; addressCn: string; checkIn: string; checkOut: string };
+  fixed: FixedItem[];
+  notes: string;
+};
+export type IntakeResult = { places: { name: string; city: string; why: string; mustSee: boolean; source: string }[]; fixed: FixedItem[]; wishes: string[]; summary: string };
+export type OutlineResult = { days: { date: string; theme: string; area: string; include: string[]; fixed: string[] }[]; notes: string };
+export type DayPlace = {
+  name: string; nameCn: string; address: string; addressCn: string; lat: number; lng: number; coordSystem: "WGS84" | "GCJ02" | "BD09" | "none";
+  type: string; start: string; end: string; desc: string; why: string; tip: string; metro: string; website: string; source: string; fixed: boolean; confidence: "haute" | "moyenne" | "faible";
+};
+export type DayResult = { theme: string; places: DayPlace[] };
+export type AdjustResult = { message: string; changes: { action: "remove" | "move" | "retime" | "add"; day: string; name: string; toDay: string; start: string; end: string; query: string; why: string }[] };
+export type EssentialsResult = {
+  lang: { code: string; name: string; speech: string };
+  checklist: { text: string; due: string; group: string }[];
+  phrases: { title: string; items: { local: string; romanized: string; fr: string }[] }[];
+  emergency: { label: string; number: string; note: string }[];
+  consulate: { name: string; address: string; phone: string; emergency: string; website: string };
+  practical: { title: string; text: string }[];
+};
+
+export async function ai<T>(task: AiTask, payload: Record<string, unknown>, timeoutMs = 60_000, signal?: AbortSignal): Promise<T> {
   if (!navigator.onLine) throw new AiError("Pas de réseau : cette fonction a besoin d'Internet.");
   const token = supabase ? (await supabase.auth.getSession()).data.session?.access_token : null;
   if (!token) throw new AiError("Connectez-vous dans l'onglet Compte pour utiliser cette fonction.");
