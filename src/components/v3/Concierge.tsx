@@ -5,10 +5,11 @@ import { getLang, locale, t } from "../../lib/i18n";
 import { getState, requestPro, useStore } from "../../lib/store";
 import { track } from "../../lib/track";
 import Shell from "./Shell";
-import { createTripFromWizard, WIZARD_KEY, type Wiz } from "./CreateWizard";
+import { clearWizardDraft, CONCIERGE_KEY, createTripFromWizard, lastWay, LinkTile, linkCard, rememberWay, URL_RE, useKeyboardFit, useOnline, WIZARD_KEY, wizardDraft, wizHasContent, type Wiz } from "./CreateWizard";
 import { INTERESTS, PACES, TRAVEL } from "./Onboarding";
-import { CcArrow, CcBed, CcBell, CcCal, CcClip, CcClock, CcClose, CcImg, CcLink, CcMic, CcPeople, CcPin, CcPlane, CcPlus, CcSend, CcSpark, ConciergeOrbit } from "./ConciergeIcons";
+import { CcArrow, CcBed, CcBell, CcCal, CcCheck, CcClip, CcClock, CcClose, CcImg, CcMic, CcPeople, CcPin, CcPlane, CcPlus, CcRefresh, CcSend, CcSpark, ConciergeOrbit } from "./ConciergeIcons";
 import "../../styles/concierge.css";
+import "../../styles/creation.css";
 
 // The look follows the validated mockup, direction « C · Concierge » (.claude/mockups/saas-v3, screens 06 to 11):
 // no bubbles on the concierge's side, glass cards inside the exchange, discreet bubbles for the traveller.
@@ -26,19 +27,58 @@ const Dots = () => <span className="cc-dots" aria-hidden="true"><i /><i /><i /><
 
 // ---------- the choice: the form or the concierge ----------
 
-/** "Créer un voyage": a preview of the two ways, the person picks one */
+/** "Créer un voyage": a preview of the two ways, the person picks one. The way chosen last time is marked (never
+ *  skipped to), and a conversation or a form left half-way says where it stopped. */
 export function CreateChooser({ onPick, onCancel }: { onPick: (k: "concierge" | "form") => void; onCancel: () => void }) {
+  const [last] = useState(lastWay);
+  const [chat, setChat] = useState(() => {
+    const s = load();
+    return s && s.msgs.length > 1 ? s : null;
+  });
+  const [form, setForm] = useState(wizardDraft);
+  // « Effacer… » asks for a second touch (a stray touch never wipes anything)
+  const [forget, setForget] = useState<"chat" | "form" | null>(null);
+  useEffect(() => {
+    if (!forget) return;
+    const tm = window.setTimeout(() => setForget(null), 4000);
+    return () => window.clearTimeout(tm);
+  }, [forget]);
+  // the order is fixed when the screen opens: what is half-way first, else the way chosen last time
+  const [formFirst] = useState(() => (form && !chat ? true : chat && !form ? false : last === "form"));
+  const pick = (k: "concierge" | "form") => {
+    rememberWay(k);
+    onPick(k);
+  };
   const top = (
     <div className="v3-bar">
       <button className="v3-tool" onClick={onCancel} aria-label={t("Fermer")}><CcClose /></button>
       <span className="v3-grow" />
     </div>
   );
-  return (
-    <Shell ring={false} top={top} className="cc-chooser">
-      <p className="v3-lbl" style={{ marginTop: 18 }}>{t("Créer un voyage")}</p>
-      <h1 className="v3-d v3-h2">{t("Comment préférez-vous ?")}</h1>
-      <button type="button" className="ch-card" onClick={() => onPick("concierge")}>
+  const chatWhere = chat?.facts.cities[0]?.name;
+  const formWhere = form?.cities.map((c) => c.name).join(" · ");
+  const lastTag = <span className="v3-tag dim">{t("Dernier choix")}</span>;
+  // something to resume: the previews are shortened so both ways show on a small phone
+  const resume = !!chat || !!form;
+  const forgetBtn = (k: "chat" | "form") => (
+    <button type="button" className={"ch-forget" + (forget === k ? " sure" : "")}
+      onClick={() => {
+        if (forget !== k) return setForget(k);
+        setForget(null);
+        if (k === "chat") {
+          save(null);
+          setChat(null);
+        } else {
+          clearWizardDraft();
+          setForm(null);
+        }
+      }}>
+      {forget === k ? t("Touchez encore pour effacer") : k === "chat" ? t("Effacer la conversation") : t("Effacer le brouillon")}
+    </button>
+  );
+  const concierge = (
+    <div className="ch-way" key="concierge">
+      <button type="button" className={"ch-card" + (last === "concierge" ? " last" : "")} onClick={() => pick("concierge")}>
         <div className="ch-preview ch-chat" aria-hidden="true">
           <span className="ch-mini-top">
             <Avatar size="xs" />
@@ -53,35 +93,80 @@ export function CreateChooser({ onPick, onCancel }: { onPick: (k: "concierge" | 
           </span>
           <span className="cc-ai">{t("Parfait. Vous avez déjà réservé l'hôtel ou les vols ?")}</span>
         </div>
-        <span className="ch-t"><b>{t("Avec le concierge")}</b><small>{t("Racontez votre voyage comme à un ami : texte, voix, captures ou liens. Il pose les bonnes questions.")}</small></span>
+        <span className="ch-t">
+          <span className="ch-name"><b>{t("Avec le concierge")}</b>{last === "concierge" && lastTag}</span>
+          <small>{t("Racontez votre voyage comme à un ami : texte, voix, captures ou liens. Il pose les bonnes questions.")}</small>
+          <span className="ch-for"><CcCheck />{t("Idéal si vous avez des idées en vrac, des liens ou des captures.")}</span>
+        </span>
+        {chat && <span className="ch-resume"><i className="cr-dot" /><span>{t("Conversation en cours")}{chatWhere ? <> · <b>{chatWhere}</b></> : null}</span></span>}
         <CcArrow className="cc-ic ch-go" />
       </button>
-      <button type="button" className="ch-card" onClick={() => onPick("form")}>
+      {chat && forgetBtn("chat")}
+    </div>
+  );
+  const formCard = (
+    <div className="ch-way" key="form">
+      <button type="button" className={"ch-card" + (last === "form" ? " last" : "")} onClick={() => pick("form")}>
         <div className="ch-preview ch-form" aria-hidden="true">
           <span className="ch-bars"><i className="on" /><i /><i /><i /></span>
           <span className="ch-field">{t("Où allez-vous ?")}</span>
           <span className="ch-field">{t("Quand partez-vous ?")}</span>
           <span className="ch-field dim">{t("Ce que vous savez déjà")}</span>
         </div>
-        <span className="ch-t"><b>{t("Le formulaire")}</b><small>{t("4 étapes rapides et précises, à votre rythme.")}</small></span>
+        <span className="ch-t">
+          <span className="ch-name"><b>{t("Le formulaire")}</b>{last === "form" && lastTag}</span>
+          <small>{t("4 étapes rapides et précises, à votre rythme.")}</small>
+          <span className="ch-for"><CcCheck />{t("Idéal si vous connaissez déjà vos villes et vos dates.")}</span>
+        </span>
+        {form && <span className="ch-resume"><i className="cr-dot" /><span>{t("Brouillon")}{formWhere ? <> · <b>{formWhere}</b></> : null} · {t("étape {n} sur {of}", { n: form.step, of: 4 })}</span></span>}
         <CcArrow className="cc-ic ch-go" />
       </button>
+      {form && forgetBtn("form")}
+    </div>
+  );
+  return (
+    <Shell ring={false} top={top} className="cc-chooser">
+      <p className="v3-lbl" style={{ marginTop: 18 }}>{t("Créer un voyage")}</p>
+      <h1 className="v3-d v3-h2">{t("Comment préférez-vous ?")}</h1>
+      <p className="ch-lead">{t("Les deux mènent au même voyage préparé. Vous pouvez passer du concierge au formulaire à tout moment, sans rien perdre.")}</p>
+      <div className={"ch-grid" + (resume ? " resume" : "")}>
+        {formFirst ? [formCard, concierge] : [concierge, formCard]}
+      </div>
     </Shell>
   );
 }
 
 // ---------- the conversation ----------
 
-type Facts = Omit<ConciergeResult, "reply" | "ready"> & { cities: Destination[] };
-type Kind = "city" | "dates" | "who" | "flight" | "hotel" | "place" | "fixed" | "wish" | "interests";
+/** `companions`: the first names of who travels with the person (api/ai.ts since Nov 2026; absent from older saves and answers) */
+type Facts = Omit<ConciergeResult, "reply" | "ready"> & { cities: Destination[]; companions?: string[] };
+type Kind = "city" | "dates" | "who" | "people" | "flight" | "hotel" | "place" | "fixed" | "wish" | "interests";
 type Flight = ExtractResult["flights"][number];
 /** One thing understood, as shown in a card (kept in the conversation, so it survives closing the app) */
 type Card = { kind: Kind; title: string; sub?: string; text: string; must?: boolean; booked?: boolean; list?: string[]; flight?: Flight; src?: string };
-/** `cards` held "icon text" strings before Nov 2026: still read when a saved conversation is resumed */
-type Msg = { from: "concierge" | "me"; text: string; image?: boolean; cards?: (Card | string)[]; shot?: boolean };
-type Saved = { msgs: Msg[]; facts: Facts; ready: boolean };
-const KEY = "orbes.concierge.v1";
-const EMPTY: Facts = { destinations: [], cities: [], start: "", end: "", travel: "", pace: "", hotel: { name: "", address: "" }, flights: [], places: [], fixed: [], wishes: [], interests: [] };
+/** `cards` held "icon text" strings before Nov 2026: still read when a saved conversation is resumed.
+ *  `failed`: the traveller's message did not reach the concierge (kept with « Réessayer », never sent as history) */
+type Msg = { from: "concierge" | "me"; text: string; image?: boolean; cards?: (Card | string)[]; shot?: boolean; id?: string; failed?: "offline" | "error"; err?: string };
+/** `draft`: what was being typed, kept with the conversation */
+type Saved = { msgs: Msg[]; facts: Facts; ready: boolean; draft?: string };
+const KEY = CONCIERGE_KEY;
+const EMPTY: Facts = { destinations: [], cities: [], start: "", end: "", travel: "", pace: "", hotel: { name: "", address: "" }, flights: [], places: [], fixed: [], wishes: [], interests: [], companions: [] };
+/** Travels with others: the moment to ask their first names */
+const GROUP = new Set(["duo", "friends", "family"]);
+const msgId = () => Math.random().toString(36).slice(2, 10);
+/** First names as given: trimmed, one space, 40 characters at most, each once */
+function cleanNames(list: unknown[]): string[] {
+  const seen = new Set<string>();
+  return list
+    .map((x) => String(x ?? "").trim().replace(/\s+/g, " ").slice(0, 40))
+    .filter((x) => {
+      const k = x.toLowerCase();
+      if (!k || seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    })
+    .slice(0, 19);
+}
 
 const load = (): Saved | null => {
   try {
@@ -141,6 +226,10 @@ function items(f: Facts): Item[] {
     const sub = f.pace ? t("rythme {p}", { p: t(label(PACES, f.pace)).toLowerCase() }) : "";
     out.push({ key: "who", kind: "who", title: title || sub, sub: title ? sub : "", text: [title, sub].filter(Boolean).join(" · ") });
   }
+  if (f.companions?.length) {
+    const title = t("Avec {names}", { names: f.companions.join(", ") });
+    out.push({ key: "companions", kind: "people", title, list: f.companions, text: title });
+  }
   f.flights.forEach((x, i) => out.push({ key: `flight:${i}`, kind: "flight", title: `${x.from} – ${x.to}`, sub: [x.code, when(x.departAt)].filter(Boolean).join(" · "), flight: x,
     text: `${x.code} ${x.from} – ${x.to}${x.departAt ? ` · ${x.departAt.slice(8, 10)}/${x.departAt.slice(5, 7)} ${x.departAt.slice(11, 16)}` : ""}` }));
   if (f.hotel.name) out.push({ key: "hotel", kind: "hotel", title: f.hotel.name, sub: f.hotel.address, text: [f.hotel.name, f.hotel.address].filter(Boolean).join(" · ") });
@@ -160,6 +249,7 @@ function without(f: Facts, key: string): Facts {
   if (k === "city") return { ...f, cities: drop(f.cities), destinations: drop(f.destinations) };
   if (k === "dates") return { ...f, start: "", end: "" };
   if (k === "who") return { ...f, travel: "", pace: "" };
+  if (k === "companions") return { ...f, companions: [] };
   if (k === "flight") return { ...f, flights: drop(f.flights) };
   if (k === "hotel") return { ...f, hotel: { name: "", address: "" } };
   if (k === "place") return { ...f, places: drop(f.places) };
@@ -183,7 +273,7 @@ function fromOld(s: string): Card {
 }
 
 const KIND_ICON: Record<Kind, typeof CcPin> = {
-  city: CcPin, dates: CcCal, who: CcPeople, flight: CcPlane, hotel: CcBed, place: CcPin, fixed: CcClock, wish: CcSpark, interests: CcSpark,
+  city: CcPin, dates: CcCal, who: CcPeople, people: CcPeople, flight: CcPlane, hotel: CcBed, place: CcPin, fixed: CcClock, wish: CcSpark, interests: CcSpark,
 };
 /** A booking keeps the clock, an appointment or event at a fixed date the calendar (screen 09) */
 const KindIcon = ({ kind, booked }: { kind: Kind; booked?: boolean }) => {
@@ -216,7 +306,7 @@ function Cards({ cards, shot, onEdit, onFix }: { cards: (Card | string)[]; shot?
   const all = cards.map((c) => (typeof c === "string" ? { ...fromOld(c), old: true } : { ...c, old: false }));
   const fresh = all.filter((c) => !c.old);
   const cities = fresh.filter((c) => c.kind === "city");
-  const trip = fresh.filter((c) => c.kind === "hotel" || c.kind === "dates" || c.kind === "who");
+  const trip = fresh.filter((c) => c.kind === "hotel" || c.kind === "dates" || c.kind === "who" || c.kind === "people");
   const flights = fresh.filter((c) => c.kind === "flight" && c.flight);
   const places = fresh.filter((c) => c.kind === "place");
   const musts = places.filter((c) => c.must);
@@ -317,38 +407,24 @@ function Programme({ f, onPace, onInterest }: { f: Facts; onPace: (k: string) =>
   );
 }
 
-const URL_RE = /https?:\/\/[^\s<>"']+/g;
-/** A link as the mockup shows it: the service's coloured tile, the title, the source underneath */
-function linkCard(u: string): { tile: "lg-x" | "lg-m" | "lg-s"; title: string; small: string } {
-  let h = u;
-  let path = "";
-  try {
-    const x = new URL(u);
-    h = x.hostname.replace(/^www\./, "");
-    path = decodeURIComponent(x.pathname + x.search).replace(/\/$/, "");
-  } catch {
-    /* keep the text */
-  }
-  if (/(^|\.)xiaohongshu\.com$|(^|\.)xhslink\.com$/.test(h)) return { tile: "lg-x", title: t("Lien Xiaohongshu"), small: h };
-  if (/^maps\.google\.|^maps\.app\.goo\.gl$|^goo\.gl$/.test(h) || (/^google\./.test(h) && path.startsWith("/maps"))) return { tile: "lg-m", title: t("Liste Google Maps"), small: h };
-  return { tile: "lg-s", title: h, small: path.length > 42 ? `${path.slice(0, 41)}…` : path };
-}
-/** The traveller's message: a capture shown as a small sheet, links as small cards, then the text */
-function Mine({ m, old, fresh }: { m: Msg; old: boolean; fresh: boolean }) {
+/** The traveller's message: a capture shown as a small sheet, links as small cards, then the text; a message that did
+ *  not leave says so under it, with « Réessayer » */
+function Mine({ m, old, fresh, onRetry, onEdit }: { m: Msg; old: boolean; fresh: boolean; onRetry: () => void; onEdit: () => void }) {
   const links = m.text.match(URL_RE) || [];
   const rest = links.length ? m.text.replace(URL_RE, "").replace(/[ \t]+/g, " ").trim() : m.text;
+  const dim = old && !m.failed;
   return (
     <>
       {m.image && (
-        <span className={"cc-shot" + (old ? " old" : "") + (fresh ? " in" : "")} role="img" aria-label={t("Capture jointe")}><i className="h" /><i /><i style={{ width: "80%" }} /><i className="b" /><i style={{ width: "60%" }} /><i /></span>
+        <span className={"cc-shot" + (dim ? " old" : "") + (fresh ? " in" : "") + (m.failed ? " failed" : "")} role="img" aria-label={t("Capture jointe")}><i className="h" /><i /><i style={{ width: "80%" }} /><i className="b" /><i style={{ width: "60%" }} /><i /></span>
       )}
       {(rest || links.length > 0) && (
-        <div className={"cc-me" + (old ? " old" : "") + (fresh ? " in" : "") + (links.length ? " links" : "")}>
+        <div className={"cc-me" + (dim ? " old" : "") + (fresh ? " in" : "") + (links.length ? " links" : "") + (m.failed ? " failed" : "")}>
           {links.map((u, i) => {
             const l = linkCard(u);
             return (
               <span key={i} className="cc-link">
-                <span className={"lg " + l.tile}>{l.tile === "lg-x" ? "小红书" : l.tile === "lg-m" ? <CcPin className="cc-ic s" /> : <CcLink className="cc-ic s" />}</span>
+                <LinkTile tile={l.tile} />
                 <span className="tx">{l.title}{l.small && <small>{l.small}</small>}</span>
               </span>
             );
@@ -356,10 +432,19 @@ function Mine({ m, old, fresh }: { m: Msg; old: boolean; fresh: boolean }) {
           {rest && <span className={links.length ? "cc-me-tx" : undefined}>{rest}</span>}
         </div>
       )}
+      {m.failed && (
+        <div className="cc-failed" role="alert">
+          <span>{m.failed === "offline" ? t("Pas de connexion : le message n'est pas parti.") : (m.err || "").replace(AGAIN, "").trim() || t("Le message n'est pas parti.")}</span>
+          <button type="button" className="cc-retry" onClick={onRetry}><CcRefresh className="cc-ic s" />{t("Réessayer")}</button>
+          {m.text && <button type="button" className="cc-act" onClick={onEdit}>{t("Modifier")}</button>}
+        </div>
+      )}
     </>
   );
 }
 
+/** « Réessayez. » at the end of a reason: the button under it already says it */
+const AGAIN = /\s*(Réessayez|Try again)\s*\.?\s*$/i;
 const IDEAS = ["Un long week-end à Rome, en mai", "Tokyo au printemps, 6 jours", "Lisbonne, tranquille, à deux"];
 const STEPS = ["Où", "Quand", "Infos", "Programme"];
 
@@ -372,6 +457,7 @@ function toWizard(f: Facts): Wiz {
     places: f.places.map((x) => ({ ...x, keep: true })), fixed: f.fixed.map((x) => ({ ...x, keep: true })), wishes: f.wishes.map((text) => ({ text, keep: true })),
     pace: f.pace || (p.pace as string) || "balanced", interests: f.interests.length ? f.interests : (p.interests as string[]) || [], dayWishes: {},
     mode: f.travel === "business" ? "business" : "leisure",
+    travellers: f.companions || [], from: "concierge",
   };
 }
 
@@ -399,76 +485,120 @@ export default function Concierge({ onCancel, onCreated, onForm }: { onCancel: (
     msgs: [{ from: "concierge", text: name ? t("Bonjour {name}.\nOù aimeriez-vous aller ?", { name }) : t("Bonjour.\nOù aimeriez-vous aller ?") }],
     facts: EMPTY, ready: false,
   });
-  const [text, setText] = useState("");
+  // what was being typed comes back with the conversation
+  const [text, setText] = useState(() => state.draft || "");
   const [shot, setShot] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
+  const [slow, setSlow] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [recap, setRecap] = useState(false);
   const [launching, setLaunching] = useState(false);
   const [listening, setListening] = useState(false);
+  const [mate, setMate] = useState("");
+  // the form already holds another trip's draft: asked once before it is replaced
+  const [replace, setReplace] = useState<Wiz | null>(null);
+  const online = useOnline();
   const end = useRef<HTMLDivElement>(null);
   const file = useRef<HTMLInputElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const rec = useRef<{ stop: () => void } | null>(null);
+  // the image of a message that did not leave, to send it again (on this screen only)
+  const images = useRef(new Map<string, string | undefined>());
   // a resumed conversation appears at once; only what arrives afterwards slides in
   const seen = useRef(state.msgs.length);
   const first = useRef(true);
   useEffect(() => {
-    save(state);
-  }, [state]);
+    save({ ...state, draft: text.trim() ? text : undefined });
+  }, [state, text]);
+  // the end of the exchange, above the composer (which stays over the bottom of the page)
+  const toEnd = (behavior: ScrollBehavior) => {
+    const sc = document.querySelector<HTMLElement>(".v3.v3-concierge");
+    if (sc) sc.scrollTo({ top: sc.scrollHeight, behavior });
+    else end.current?.scrollIntoView({ behavior, block: "end" });
+  };
   useEffect(() => {
-    end.current?.scrollIntoView({ behavior: first.current ? "auto" : "smooth", block: "end" });
+    toEnd(first.current ? "auto" : "smooth");
     first.current = false;
   }, [state.msgs.length, busy, launching]);
   // the on-screen keyboard: the page is fitted to what stays visible, so the composer sits right above the keys
+  useKeyboardFit(".v3.v3-concierge");
+  // the composer grows with what is written (up to five lines or so)
   useEffect(() => {
-    const vv = window.visualViewport;
-    const el = document.querySelector<HTMLElement>(".v3.v3-concierge");
-    if (!vv || !el) {
+    const el = input.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 140)}px`;
+  }, [text]);
+  // a long answer (links being read, a capture) says that it is still coming
+  useEffect(() => {
+    if (!busy) {
+      setSlow(false);
       return;
     }
-    const fit = () => {
-      if (window.innerHeight - vv.height > 80) {
-        el.style.top = `${vv.offsetTop}px`;
-        el.style.height = `${vv.height}px`;
-        el.style.bottom = "auto";
-      } else {
-        el.style.top = "";
-        el.style.height = "";
-        el.style.bottom = "";
-      }
-    };
-    vv.addEventListener("resize", fit);
-    vv.addEventListener("scroll", fit);
-    fit();
-    return () => {
-      vv.removeEventListener("resize", fit);
-      vv.removeEventListener("scroll", fit);
-      el.style.top = "";
-      el.style.height = "";
-      el.style.bottom = "";
-    };
-  }, []);
+    const tm = window.setTimeout(() => setSlow(true), 9000);
+    return () => window.clearTimeout(tm);
+  }, [busy]);
 
   const f = state.facts;
   const all = items(f);
   const canLaunch = f.cities.length > 0 && validDate(f.start) && validDate(f.end) && f.end >= f.start;
+  const companions = f.companions || [];
 
-  /** Sends what is in the composer, or `over` (a quick reply), which leaves what is being typed in place */
+  /** Sends what is in the composer, or `over` (a quick reply), which leaves what is being typed in place.
+   *  The message shows at once; if it cannot leave, it stays in the thread with « Réessayer ». */
   const send = async (over?: string) => {
     const msg = (over ?? text).trim();
     if ((!msg && !shot) || busy) return;
-    setBusy(true);
+    const mine: Msg = { from: "me", text: msg, image: !!shot, id: msgId() };
     setErr(null);
-    const mine: Msg = { from: "me", text: msg, image: !!shot };
-    const history = state.msgs.slice(-8).map((m) => `${m.from === "me" ? "Voyageur" : "Concierge"} : ${m.text}`).join("\n");
     setState((s) => ({ ...s, msgs: [...s.msgs, mine] }));
     if (over === undefined) setText("");
-    const image = shot ? await imageToBase64(shot, 1600, 0.8).catch(() => undefined) : undefined;
+    const pic = shot;
     setShot(null);
+    setBusy(true);
+    const image = pic ? await imageToBase64(pic, 1600, 0.8).catch(() => undefined) : undefined;
+    images.current.set(mine.id!, image);
+    await deliver(mine, image);
+  };
+  /** Sends a message that did not leave, as it was */
+  const retry = async (id: string) => {
+    const m = state.msgs.find((x) => x.id === id);
+    if (!m || busy) return;
+    const image = images.current.get(id);
+    // a capture lost when the app closed: the text leaves alone, else the capture is asked again
+    if (m.image && !image && !m.text) {
+      setState((s) => ({ ...s, msgs: s.msgs.filter((x) => x.id !== id) }));
+      setErr(t("Ajoutez la capture à nouveau."));
+      return;
+    }
+    const again: Msg = { ...m, failed: undefined, err: undefined, image: m.image && !!image };
+    setErr(null);
+    setState((s) => ({ ...s, msgs: [...s.msgs.filter((x) => x.id !== id), again] }));
+    setBusy(true);
+    await deliver(again, image);
+  };
+  /** Puts a message that did not leave back in the composer */
+  const edit = (id: string) => {
+    const m = state.msgs.find((x) => x.id === id);
+    if (!m) return;
+    setState((s) => ({ ...s, msgs: s.msgs.filter((x) => x.id !== id) }));
+    setText(m.text);
+    input.current?.focus();
+  };
+  const deliver = async (mine: Msg, image: string | undefined) => {
+    const msg = mine.text;
+    const fail = (kind: "offline" | "error", e?: string) =>
+      setState((s) => ({ ...s, msgs: s.msgs.map((m) => (m.id === mine.id ? { ...m, failed: kind, err: e } : m)) }));
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      fail("offline");
+      setBusy(false);
+      return;
+    }
+    // the exchange so far, without the messages that never reached the concierge
+    const history = state.msgs.filter((m) => !m.failed && m.id !== mine.id).slice(-8).map((m) => `${m.from === "me" ? "Voyageur" : "Concierge"} : ${m.text}`).join("\n");
     try {
       const { cities: _c, ...known } = f;
-      const r = await ai<ConciergeResult>("concierge", { text: msg, image, facts: JSON.stringify(known), history }, 290_000);
+      const r = await ai<ConciergeResult & { companions?: string[] }>("concierge", { text: msg, image, facts: JSON.stringify({ ...known, companions }), history }, 290_000);
       // the destinations on the map: found once, kept in the order the concierge gives
       const cities: Destination[] = [];
       for (const d of r.destinations || []) {
@@ -485,18 +615,33 @@ export default function Concierge({ onCancel, onCreated, onForm }: { onCancel: (
         destinations: r.destinations || [], cities, start: validDate(r.start) ? r.start : "", end: validDate(r.end) ? r.end : "",
         travel: r.travel || "", pace: r.pace || "", hotel: r.hotel || { name: "", address: "" }, flights: r.flights || [], places: r.places || [],
         fixed: r.fixed || [], wishes: r.wishes || [], interests: r.interests || [],
+        // the first names the concierge heard (a server without the field keeps those already known)
+        companions: Array.isArray(r.companions) ? cleanNames(r.companions) : companions,
       };
       const before = new Set(items(f).map((x) => `${x.kind}${x.text}`));
       const fresh: Card[] = items(facts).filter((x) => !before.has(`${x.kind}${x.text}`)).map(({ key: _k, ...c }) => c);
+      images.current.delete(mine.id || "");
       setState((s) => ({ msgs: [...s.msgs, { from: "concierge", text: r.reply || t("C'est noté."), cards: fresh, shot: !!mine.image }], facts, ready: !!r.ready }));
     } catch (e) {
-      setErr(e instanceof AiError ? e.message : t("Le concierge ne répond pas. Réessayez."));
-      setState((s) => ({ ...s, msgs: s.msgs.filter((m) => m !== mine) }));
-      if (over === undefined) setText(msg);
+      const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+      fail(offline ? "offline" : "error", offline ? undefined : e instanceof AiError ? e.message : t("Le concierge ne répond pas. Réessayez."));
     } finally {
       setBusy(false);
     }
   };
+  // back online: the message that could not leave for want of a network leaves by itself
+  const lastFailed = [...state.msgs].reverse().find((m) => m.from === "me" && m.failed);
+  useEffect(() => {
+    if (online && lastFailed?.failed === "offline" && lastFailed.id && !busy) void retry(lastFailed.id);
+  }, [online]); // eslint-disable-line react-hooks/exhaustive-deps
+  /** Adds a companion's first name (from « Le point »), sent to the concierge with the next message */
+  const addMate = () => {
+    const n = cleanNames([mate])[0];
+    setMate("");
+    if (!n || companions.some((x) => x.toLowerCase() === n.toLowerCase()) || companions.length >= 19) return;
+    setState((s) => ({ ...s, facts: { ...s.facts, companions: [...(s.facts.companions || []), n] } }));
+  };
+  const dropMate = (n: string) => setState((s) => ({ ...s, facts: { ...s.facts, companions: (s.facts.companions || []).filter((x) => x !== n) } }));
   /** Puts the start of an answer in the composer and opens the keyboard */
   const prefill = (s: string) => {
     setText(s);
@@ -539,19 +684,33 @@ export default function Concierge({ onCancel, onCreated, onForm }: { onCancel: (
       const id = await createTripFromWizard(w, w.mode === "business" && (!plan || plan.pro));
       track("trip_created", "concierge", id);
       save(null);
+      // a form draft opened from this conversation is done with too (no second copy of the same trip)
+      if (wizardDraft()?.from === "concierge") clearWizardDraft();
       onCreated(id);
     } catch {
       setErr(t("Le voyage n'a pas pu être créé. Réessayez."));
       setLaunching(false);
     }
   };
-  const toForm = () => {
-    try {
-      localStorage.setItem(WIZARD_KEY, JSON.stringify(toWizard(f)));
-    } catch {
-      /* ignore */
+  // the form opens on everything understood; the conversation stays saved until the trip is created (from either)
+  // a draft the form holds for another trip is never replaced without asking
+  const toForm = (force?: "replace" | "keep") => {
+    const cur = wizardDraft();
+    const same = (a: { name: string }[], b: { name: string }[]) => a.map((c) => c.name.toLowerCase()).join("|") === b.map((c) => c.name.toLowerCase()).join("|");
+    if (!force && cur && wizHasContent(cur) && (cur.from !== "concierge" || !same(cur.cities, f.cities))) {
+      setRecap(false);
+      setReplace(cur);
+      return;
     }
-    save(null);
+    setReplace(null);
+    if (force !== "keep") {
+      try {
+        localStorage.setItem(WIZARD_KEY, JSON.stringify(toWizard(f)));
+      } catch {
+        /* ignore */
+      }
+    }
+    rememberWay("form");
     onForm();
   };
   // the ideal programme, changed by hand: a facts edit (like removing a card), sent to the concierge with the next message
@@ -576,18 +735,25 @@ export default function Concierge({ onCancel, onCreated, onForm }: { onCancel: (
     ? <><Dots />{t("prépare votre voyage")}</>
     : busy
       ? <><Dots />{state.msgs[state.msgs.length - 1]?.image ? t("lit votre capture") : t("écrit…")}</>
-      : <><i className="cc-on" />{validDate(f.start) && validDate(f.end) ? shortDates(f.start, f.end) : t("Brouillon enregistré")}</>;
+      : !online
+        ? <><i className="cc-on off" />{t("Hors ligne")}</>
+        : <><i className="cc-on" />{validDate(f.start) && validDate(f.end) ? shortDates(f.start, f.end) : t("Brouillon enregistré")}</>;
   const lastMe = state.msgs.map((m) => m.from).lastIndexOf("me");
   const lastAi = state.msgs.map((m) => m.from).lastIndexOf("concierge");
   const intro = state.msgs.length === 1 && !busy && !launching;
-  const showCta = state.ready && canLaunch && !busy && !launching;
+  // « Préparer mon voyage » as soon as the destination and the dates are known (in ivory once the concierge has all it asked)
+  const ctaReady = state.ready && canLaunch;
+  // it stays in place while the concierge answers (dimmed), so the bottom of the screen never jumps
+  const showCta = canLaunch && !launching;
+  const lastText = state.msgs[state.msgs.length - 1]?.text || "";
+  const slowLine = (lastText.match(URL_RE) || []).length ? t("Je lis vos liens, cela peut prendre une minute.") : state.msgs[state.msgs.length - 1]?.image ? t("Je lis votre capture…") : t("Encore un instant…");
   const showProg = done[0] && done[1] && (step === 3 || done[2]) && !launching;
 
   // quick replies under the last concierge turn, from what it just brought (screen 07: « C'est parfait », « Ajouter une ville »)
   const lastCards = ((state.msgs[lastAi]?.cards || []).filter((c) => typeof c !== "string") as Card[]).map((c) => c.kind);
   const brought = (...k: Kind[]) => lastCards.some((x) => k.includes(x));
   let quick: Quick[] = [];
-  if (!busy && !launching && !intro && !showCta && lastAi === state.msgs.length - 1) {
+  if (!busy && !launching && !intro && !ctaReady && lastAi === state.msgs.length - 1) {
     const capture = { label: t("Ajouter une capture"), act: () => file.current?.click() };
     if (brought("city")) quick = [{ label: t("C'est parfait"), on: true, act: () => void send(t("C'est parfait")) }, { label: t("Ajouter une ville"), act: () => prefill(t("Ajouter une ville : ")) }];
     else if (brought("dates", "flight", "hotel")) quick = [{ label: t("C'est bien ça"), on: true, act: () => void send(t("C'est bien ça")) }, done[1] ? { label: t("Corriger les dates"), act: () => prefill(t("Corriger les dates : ")) } : capture];
@@ -655,7 +821,7 @@ export default function Concierge({ onCancel, onCreated, onForm }: { onCancel: (
         ) : (
           state.msgs.map((m, i) => (
             m.from === "me"
-              ? <Mine key={i} m={m} old={i < lastMe || launching} fresh={i >= seen.current} />
+              ? <Mine key={m.id || i} m={m} old={i < lastMe || launching} fresh={i >= seen.current} onRetry={() => void retry(m.id || "")} onEdit={() => edit(m.id || "")} />
               : (
                 <div key={i} className={"cc-turn" + (i >= seen.current ? " in" : "")}>
                   <div className={"cc-ai" + (i < lastMe || launching ? " old" : "")}>{m.text}</div>
@@ -670,7 +836,7 @@ export default function Concierge({ onCancel, onCreated, onForm }: { onCancel: (
               )
           ))
         )}
-        {busy && <div className="cc-ai cc-typing in" role="status" aria-label={t("Le concierge écrit…")}><Dots /></div>}
+        {busy && <div className="cc-ai cc-typing in" role="status" aria-label={t("Le concierge écrit…")}><Dots />{slow && <span className="cc-slow">{slowLine}</span>}</div>}
         {launching && (
           <>
             <div className="cc-me old in">{t("Oui, prépare tout")}</div>
@@ -705,21 +871,34 @@ export default function Concierge({ onCancel, onCreated, onForm }: { onCancel: (
           <div className="cc-glass cc-comp quiet"><span className="cc-r"><CcBell /></span><span className="cc-in">{t("La préparation continue dans le voyage")}</span></div>
         ) : (
           <>
-            {showCta && <button type="button" className="v3-btn cc-cta" onClick={() => setRecap(true)}><CcSpark />{t("Préparer mon voyage")}</button>}
+            {replace && (
+              <div className="cc-glass cc-replace" role="alertdialog" aria-label={t("Remplacer le brouillon du formulaire ?")}>
+                <b>{replace.cities.length ? t("Remplacer le brouillon {where} ?", { where: replace.cities.map((c) => c.name).join(" · ") }) : t("Remplacer le brouillon du formulaire ?")}</b>
+                <small>{t("Le formulaire a déjà un brouillon. Cette conversation peut prendre sa place, ou vous pouvez reprendre ce brouillon.")}</small>
+                <span className="cc-replace-acts">
+                  <button type="button" className="v3-chip on" onClick={() => toForm("replace")}>{t("Remplacer")}</button>
+                  <button type="button" className="v3-chip" onClick={() => toForm("keep")}>{t("Reprendre le brouillon")}</button>
+                  <button type="button" className="cc-act" onClick={() => setReplace(null)}>{t("Annuler")}</button>
+                </span>
+              </div>
+            )}
+            {showCta && <button type="button" className={"v3-btn cc-cta" + (ctaReady ? "" : " ghost") + (busy ? " wait" : "")} disabled={busy} onClick={() => setRecap(true)}><CcSpark />{t("Préparer mon voyage")}</button>}
             {shot && (
               <span className="cc-att"><CcImg className="cc-ic s" /><span className="nm">{shot.name}</span><button type="button" onClick={() => setShot(null)} aria-label={t("Retirer la capture")}><CcClose className="cc-ic s" /></button></span>
             )}
             <div className="cc-glass cc-comp">
               <button type="button" className="cc-r" onClick={() => file.current?.click()} aria-label={t("Ajouter une capture ou une photo")}><CcPlus /></button>
-              <textarea ref={input} value={text} onChange={(e) => setText(e.target.value)} rows={1} placeholder={placeholder} aria-label={t("Message au concierge")}
-                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }} />
+              <textarea ref={input} value={text} onChange={(e) => setText(e.target.value)} rows={1} placeholder={placeholder} aria-label={t("Message au concierge")} enterKeyHint="send"
+                onFocus={() => window.setTimeout(() => toEnd("smooth"), 300)}
+                onPaste={(e) => { const img = Array.from(e.clipboardData?.files || []).find((x) => x.type.startsWith("image/")); if (img) { e.preventDefault(); setShot(img); } }}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); } }} />
               <button type="button" className={"cc-r" + (listening ? " on" : "")} onClick={mic} aria-label={listening ? t("Arrêter la dictée") : t("Dicter")} aria-pressed={listening}><CcMic /></button>
               {(text.trim() || shot) && (
                 <button type="button" className="cc-r go" onClick={() => void send()} disabled={busy} aria-label={t("Envoyer")}><CcSend /></button>
               )}
             </div>
             <input ref={file} type="file" accept="image/*" hidden onChange={(e) => { setShot(e.target.files?.[0] || null); e.target.value = ""; }} />
-            {!showCta && <button type="button" className="v3-link cc-switch" onClick={toForm}>{t("Je préfère remplir le formulaire")}</button>}
+            {!showCta && !replace && <button type="button" className="v3-link cc-switch" onClick={() => toForm()}>{t("Je préfère remplir le formulaire")}</button>}
           </>
         )}
       </div>
@@ -734,7 +913,7 @@ export default function Concierge({ onCancel, onCreated, onForm }: { onCancel: (
             </div>
             <h2 className="v3-d cc-recap-title">{f.cities.map((c) => c.name).join(" · ") || t("Votre voyage")}</h2>
             <div className="cc-list">
-              {all.map((x) => (
+              {all.filter((x) => x.kind !== "people").map((x) => (
                 <div key={x.key} className="cc-item">
                   <KindIcon kind={x.kind} booked={x.booked} />
                   <span className="t">{x.title}{x.sub && <small>{x.sub}</small>}</span>
@@ -745,9 +924,29 @@ export default function Concierge({ onCancel, onCreated, onForm }: { onCancel: (
               ))}
               {!all.length && <p className="v3-note">{t("Rien encore : parlez-moi de votre voyage.")}</p>}
             </div>
+            {/* travelling with others: their first names, so the trip lists them and they can be invited while it is prepared */}
+            {(GROUP.has(f.travel) || companions.length > 0) && (
+              <div className="cc-mates">
+                <p className="v3-lbl">{t("Qui part avec vous ?")} <span className="cr-opt">{t("facultatif")}</span></p>
+                <div className="cr-people">
+                  {companions.map((p) => (
+                    <span key={p} className="cr-person">
+                      <span className="ini" aria-hidden="true">{p.charAt(0).toUpperCase()}</span>{p}
+                      <button type="button" onClick={() => dropMate(p)} aria-label={t("Retirer {name}", { name: p })}><CcClose className="cc-ic s" /></button>
+                    </span>
+                  ))}
+                  <form className="cr-person add" onSubmit={(e) => { e.preventDefault(); addMate(); }}>
+                    <input value={mate} onChange={(e) => setMate(e.target.value)} placeholder={t("Prénom")} aria-label={t("Prénom du compagnon")} autoComplete="off" autoCapitalize="words" maxLength={40} enterKeyHint="done" />
+                    <button type="submit" disabled={!mate.trim()} aria-label={t("Ajouter")}><CcPlus className="cc-ic s" /></button>
+                  </form>
+                </div>
+                {!companions.length && <p className="v3-note">{t("Leurs prénoms suffisent. Vous pourrez les inviter pendant la préparation.")}</p>}
+              </div>
+            )}
             {!canLaunch && <p className="v3-note">{t("Il me faut au moins la destination et les dates pour lancer la préparation.")}</p>}
             <button className="v3-btn" style={{ marginTop: 16 }} disabled={!canLaunch || launching} onClick={() => void launch()}><CcSpark />{launching ? t("Création…") : t("Lancer la préparation")}</button>
             <button type="button" className="v3-link" onClick={() => setRecap(false)}>{t("Continuer la conversation")}</button>
+            <button type="button" className="v3-link cc-switch" onClick={() => toForm()}>{t("Je préfère remplir le formulaire")}</button>
           </div>
         </div>
       )}
