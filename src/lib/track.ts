@@ -5,7 +5,8 @@ import { supabase } from "./supabase";
 
 export type Step =
   | "visit" | "signup_email" | "signup_done" | "sign_in" | "app_open" | "trip_created" | "trip_opened" | "trip_validated"
-  | "place_added" | "invite_sent" | "export" | "pro_screen" | "code_redeemed" | "waitlist_join";
+  | "place_added" | "invite_sent" | "export" | "pro_screen" | "code_redeemed" | "waitlist_join"
+  | "link_opened" | "public_view" | "trip_copied";
 
 const VISITOR_KEY = "orbes.vid";
 /** This device's random identifier (made once) */

@@ -11,6 +11,8 @@ import ShareTrip from "./ShareTrip";
 import ProScreen from "./ProScreen";
 import AdminScreen from "./AdminScreen";
 import Legal, { legalKind } from "./Legal";
+import PublicTripPage from "./PublicTripPage";
+import { takeRememberedCopy } from "../../lib/publicTrip";
 import { track } from "../../lib/track";
 
 
@@ -27,8 +29,18 @@ export default function Root() {
   }, [signedIn]);
   const admin = useAdmin();
   // the legal pages have their own address and open without an account
-  const legal = legalKind(new URLSearchParams(location.search).get("p"));
+  const params = new URLSearchParams(location.search);
+  const legal = legalKind(params.get("p"));
   if (legal) return <Legal kind={legal} onClose={() => location.assign(location.pathname)} />;
+  // a trip's public link (?t=…): its programme, without an account
+  const slug = (params.get("t") || "").toLowerCase();
+  if (/^[a-z0-9]{10,24}$/.test(slug))
+    return (
+      <>
+        <PublicTripPage slug={slug} copyNow={params.get("copy") === "1"} />
+        {proAsk && <ProScreen />}
+      </>
+    );
   const screen = <Screen />;
   return (
     <>
@@ -71,6 +83,14 @@ function Screen() {
   if (supabase && !authReady && !hasLocalData && !trips.length) return splash;
   if (supabase && authReady && !session && !hasLocalData) return <Welcome />;
   if (session && member === false && !profile.onboardedAt) return <Onboarding />;
+  // "Copier ce voyage" asked before signing in: back to that programme, its copy sheet open
+  if (session) {
+    const pending = takeRememberedCopy();
+    if (pending) {
+      location.replace(`${location.pathname}?t=${encodeURIComponent(pending)}&copy=1`);
+      return splash;
+    }
+  }
   // signed in, the account not known yet and nothing on this phone: wait (a second) instead of an empty home
   if (session && member === null && !trips.length) return splash;
   if (!trips.length || home || !current)

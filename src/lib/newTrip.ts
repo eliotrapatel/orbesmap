@@ -34,7 +34,7 @@ const parts = (iso: string) => {
   const [y, m, d] = iso.split("-").map(Number);
   return { y, m, d, dow: new Date(Date.UTC(y, m - 1, d, 12)).getUTCDay() };
 };
-const addDays = (iso: string, n: number) => {
+export const addDays = (iso: string, n: number) => {
   const { y, m, d } = parts(iso);
   return new Date(Date.UTC(y, m - 1, d + n, 12)).toISOString().slice(0, 10);
 };

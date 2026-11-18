@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { invite, inviteMessage, invites as listInvites, people as listPeople, removeInvite, removePerson, setRole, type Invite, type Person } from "../../lib/share";
 import { pull, toast, useStore, useTrip } from "../../lib/store";
 import Shell from "./Shell";
+import { closeLink, linkOf, linkUrl, openLink } from "../../lib/publicTrip";
 
 const ROLE = { owner: "Propriétaire", editor: "Peut modifier", viewer: "Lecture seule" } as const;
 
@@ -99,6 +100,7 @@ export default function ShareTrip({ onClose }: { onClose: () => void }) {
         </form>
       )}
       {err && <p className="v3-err">{err}</p>}
+      {canManage && <PublicLink tripId={trip.id} title={trip.title} />}
 
       <p className="v3-lbl" style={{ marginTop: 22 }}>Voyageurs</p>
       {legacy && <p className="v3-note">Ce voyage est partagé entre vous deux depuis le début. Inviter d'autres personnes sera possible plus tard ; vos nouveaux voyages, eux, se partagent dès maintenant.</p>}
@@ -136,5 +138,72 @@ export default function ShareTrip({ onClose }: { onClose: () => void }) {
       )}
       <div className="v3-spacer" />
     </Shell>
+  );
+}
+
+/** The programme's public link: open it, copy or share it, close it */
+function PublicLink({ tripId, title }: { tripId: string; title: string }) {
+  const [link, setLink] = useState<{ slug: string; active: boolean } | null | undefined>(undefined);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    linkOf(tripId).then((l) => live && setLink(l), (e) => live && (setLink(null), setErr((e as Error).message)));
+    return () => {
+      live = false;
+    };
+  }, [tripId]);
+  const run = async (f: () => Promise<void>) => {
+    setBusy(true);
+    setErr(null);
+    try {
+      await f();
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const url = link?.active ? linkUrl(link.slug) : null;
+  const share = async () => {
+    if (!url) return;
+    const text = `Le programme de « ${title} » sur ORBES Trips`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title, text, url });
+        return;
+      } catch {
+        /* closed, or not possible: copied instead */
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      toast("Lien copié");
+    } catch {
+      toast("Copie impossible sur cet appareil");
+    }
+  };
+  return (
+    <div className="v3-glass pub-link">
+      <span className="v3-lbl">Lien public</span>
+      <p className="v3-note" style={{ marginTop: 6 }}>Toute personne qui a le lien voit le programme (jours, lieux, horaires), sans compte, et peut le copier dans ses voyages. Jamais l'hôtel, les vols, les notes, les photos ni les voyageurs.</p>
+      {link === undefined && <p className="v3-note">Chargement…</p>}
+      {url ? (
+        <>
+          <button type="button" className="pub-link-url" onClick={() => void share()}>{url.replace(/^https:\/\//, "")}</button>
+          <div className="pub-link-row">
+            <button type="button" className="v3-btn" disabled={busy} onClick={() => void share()}>Partager le lien</button>
+            <button type="button" className="v3-chip" disabled={busy} onClick={() => void run(async () => { await closeLink(tripId); setLink({ slug: link!.slug, active: false }); toast("Lien désactivé"); })}>Désactiver</button>
+          </div>
+        </>
+      ) : (
+        link !== undefined && (
+          <button type="button" className="v3-btn ghost" style={{ marginTop: 10 }} disabled={busy} onClick={() => void run(async () => { const slug = await openLink(tripId); setLink({ slug, active: true }); })}>
+            {busy ? "Un instant…" : link ? "Réactiver le lien public" : "Créer un lien public"}
+          </button>
+        )
+      )}
+      {err && <p className="v3-err">{err}</p>}
+    </div>
   );
 }
