@@ -8,11 +8,17 @@
   --hair-3: rgba(246, 242, 234, 0.3);
   --cc-glass: rgba(24, 23, 21, 0.55);
   --cc-ground: #070707;
+  /* the column's side padding (.v3-col), so the top band and the composer reach the edges, notch included */
+  --cc-pl: max(20px, env(safe-area-inset-left, 0px));
+  --cc-pr: max(20px, env(safe-area-inset-right, 0px));
 }
 .cc-ic { width: 18px; height: 18px; flex: none; }
 .cc-ic.s { width: 15px; height: 15px; }
 .cc-ic.mute { color: var(--mute); }
-.cc-glass { background: var(--cc-glass); -webkit-backdrop-filter: blur(24px) saturate(160%); backdrop-filter: blur(24px) saturate(160%); border: 1px solid var(--hair); border-radius: 22px; }
+.cc-glass { background: var(--cc-glass); border: 1px solid var(--hair); border-radius: 22px; }
+/* the blur only where something passes behind: the composer (the thread cards sit on the plain ground) */
+.cc-comp { -webkit-backdrop-filter: blur(24px) saturate(160%); backdrop-filter: blur(24px) saturate(160%); }
+.cc-orbit { display: block; color: var(--ink); flex: none; }
 
 /* the avatar: the orbit mark in a dark round */
 .cc-av { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(160deg, #22201d, #121110); border: 1px solid var(--hair); display: grid; place-items: center; flex: none; color: var(--ink); }
@@ -25,8 +31,6 @@
 .cc-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--soft); animation: ccDot 1.3s ease-in-out infinite; }
 .cc-dots i:nth-child(2) { animation-delay: 0.18s; }
 .cc-dots i:nth-child(3) { animation-delay: 0.36s; }
-.cc-dots.sm { gap: 3px; }
-.cc-dots.sm i { width: 4px; height: 4px; }
 @keyframes ccDot { 0%, 60%, 100% { opacity: 0.25; transform: none; } 30% { opacity: 1; transform: translateY(-3px); } }
 
 /* ---------- the page ---------- */
@@ -35,20 +39,23 @@
   radial-gradient(90% 34% at 50% -6%, rgba(216, 196, 126, 0.1), transparent 72%),
   radial-gradient(70% 30% at 100% 100%, rgba(246, 242, 234, 0.04), transparent 70%); }
 .v3-concierge .v3-col { padding-bottom: 0; }
-/* the top stays while the conversation scrolls */
-.v3-concierge .v3-top { position: sticky; top: 0; z-index: 6; margin: calc(-10px - var(--safe-t)) -20px 0; padding: calc(var(--safe-t) + 10px) 20px 0;
-  background: rgba(7, 7, 7, 0.82); -webkit-backdrop-filter: blur(20px) saturate(150%); backdrop-filter: blur(20px) saturate(150%); }
+/* the top stays while the conversation scrolls; no slab over the gold light, the thread fades out underneath */
+.v3-concierge .v3-top { position: sticky; top: 0; z-index: 6; margin: calc(-10px - var(--safe-t)) calc(-1 * var(--cc-pr)) 0 calc(-1 * var(--cc-pl));
+  padding: calc(var(--safe-t) + 10px) var(--cc-pr) 18px var(--cc-pl);
+  /* the page's gold light drawn again on the band (same viewport geometry as .v3-bg), so it stays over the avatar and the title */
+  background:
+    radial-gradient(90vw 34vh at 50% -6vh, rgba(216, 196, 126, 0.1), transparent 72%) top / 100% calc(100% - 18px) no-repeat,
+    linear-gradient(180deg, var(--cc-ground) calc(100% - 18px), rgba(7, 7, 7, 0) 100%); }
 .cc-top { width: 100%; display: flex; flex-direction: column; }
 .cc-bar { height: 56px; display: flex; align-items: center; gap: 10px; }
 .cc-who { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
 .cc-who-t { min-width: 0; }
 .cc-who b { display: block; font: 500 13px/1.1 var(--display); letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cc-who small { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 11.5px; line-height: 1.2; color: var(--mute); white-space: nowrap; overflow: hidden; }
-.cc-point { height: 38px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--hair); background: rgba(246, 242, 234, 0.04); font-size: 13px; color: var(--ink); display: inline-flex; align-items: center; gap: 7px; flex: none; white-space: nowrap; transition: background 0.2s, border-color 0.2s, transform 0.16s var(--ease), opacity 0.2s; }
-.cc-point:hover { background: rgba(246, 242, 234, 0.1); border-color: var(--hair-3); }
-.cc-point:active { transform: scale(0.96); }
-.cc-point:disabled { opacity: 0.4; }
-.cc-point .num { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--ink); color: #0a0a0a; font-size: 11px; font-weight: 700; display: grid; place-items: center; }
+/* « Le point »: a tool like the close button, its count in a small ivory badge */
+.cc-point { position: relative; }
+.cc-point:hover { border-color: var(--hair-3); }
+.cc-point .num { position: absolute; top: -5px; right: -5px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--ink); color: #0a0a0a; font: 700 9.5px/16px var(--font); text-align: center; }
 
 /* où — quand — infos — programme */
 .cc-steps { display: flex; align-items: center; gap: 8px; padding: 4px 0 10px; border-bottom: 1px solid var(--hair-2); font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--mute); }
@@ -59,20 +66,18 @@
 .cc-steps span.done { color: var(--soft); }
 
 /* ---------- the thread ---------- */
-.cc-thread { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; gap: 14px; padding: 18px 0 12px; }
+.cc-thread { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; gap: 14px; padding: 2px 0 12px; }
 .cc-thread > .in, .cc-turn.in > * { animation: ccIn 0.6s var(--ease) both; }
 .cc-turn.in { animation: none; }
 .cc-turn.in > *:nth-child(2) { animation-delay: 0.12s; }
 .cc-turn.in > *:nth-child(3) { animation-delay: 0.24s; }
 .cc-turn.in > *:nth-child(4) { animation-delay: 0.36s; }
-.cc-ideas.in { animation-delay: 0.2s; }
-@keyframes ccIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.cc-ideas.in { animation-delay: 1.1s; }
+@keyframes ccIn { from { opacity: 0; transform: translateY(10px); } to { transform: none; } }
 .cc-turn { display: flex; flex-direction: column; gap: 14px; }
 /* the concierge: no bubble */
 .cc-ai { font-size: 16.5px; line-height: 1.45; max-width: 94%; white-space: pre-wrap; overflow-wrap: anywhere; transition: color 0.4s; }
 .cc-ai.old { color: var(--soft); }
-.cc-by { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--mute); white-space: normal; }
-.cc-by .orbit-mark { color: var(--ink); }
 .cc-typing { padding: 6px 0; }
 /* the traveller: a discreet bubble */
 .cc-me { align-self: flex-end; max-width: 82%; padding: 11px 15px; border-radius: 20px 20px 6px 20px; background: rgba(246, 242, 234, 0.1); border: 1px solid var(--hair-2); font-size: 15px; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; transition: opacity 0.4s; }
@@ -80,7 +85,10 @@
 .cc-me.links { display: flex; flex-direction: column; gap: 6px; padding: 8px; min-width: 0; }
 .cc-me-tx { padding: 4px 6px 2px; }
 .cc-link { display: flex; gap: 10px; align-items: center; padding: 8px; border-radius: 14px; background: rgba(246, 242, 234, 0.06); font-size: 13px; line-height: 1.3; min-width: 0; white-space: normal; }
-.cc-link .lg { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; flex: none; background: rgba(246, 242, 234, 0.08); color: var(--soft); }
+.cc-link .lg { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; flex: none; font-size: 10.5px; font-weight: 700; }
+.cc-link .lg-x { background: #3a1f22; color: #ff8f9a; }
+.cc-link .lg-m { background: #1f2c27; color: var(--ok); }
+.cc-link .lg-s { background: #262420; color: var(--soft); }
 .cc-link .tx { min-width: 0; }
 .cc-link small { display: block; color: var(--mute); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* a capture, drawn as a small sheet */
@@ -91,10 +99,11 @@
 
 /* ---------- the cards ---------- */
 .cc-rc { padding: 14px; }
-.cc-rc.tight { padding: 4px 14px; }
+.cc-rc.tight { padding: 10px 14px; }
 .cc-rc-h { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
 .cc-rc-h .v3-lbl { flex: 1; }
-.cc-rc-h .cc-n { font-size: 13px; font-weight: 600; }
+.cc-act { margin-left: auto; flex: none; font-size: 12.5px; color: var(--soft); padding: 4px 0 4px 8px; transition: color 0.2s; }
+.cc-act:hover { color: var(--ink); }
 .cc-dest { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid var(--hair-2); }
 .cc-dest:first-child, .cc-rc-h + .cc-dest { border-top: 0; }
 .cc-dest > .cc-ic { color: var(--soft); }
@@ -112,18 +121,30 @@
 .cc-fl .ln .cc-ic { position: absolute; left: 50%; top: 1px; width: 16px; height: 16px; margin-left: -8px; transform: rotate(90deg); color: var(--gold); background: transparent; }
 .cc-meta { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--hair); font-size: 12px; color: var(--mute); }
 .cc-meta b { color: var(--ink); font-weight: 600; }
-/* the ideal programme */
+/* the ideal programme (screen 10) */
 .cc-rowk { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--hair-2); font-size: 14px; }
-.cc-rc-h + .cc-rowk { border-top: 0; }
+.cc-rc > .cc-rowk:first-child { border-top: 0; padding-top: 0; }
 .cc-rowk .k { width: 70px; flex: none; font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--mute); }
 .cc-rowk .v { flex: 1; min-width: 0; }
-.cc-tags { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 6px; }
-.cc-tags span { height: 28px; padding: 0 11px; border-radius: 999px; border: 1px solid var(--hair); font-size: 12.5px; color: var(--soft); display: inline-flex; align-items: center; }
+.cc-seg { flex: 1; min-width: 0; display: flex; gap: 2px; padding: 4px; border-radius: 14px; background: rgba(246, 242, 234, 0.05); border: 1px solid var(--hair-2); }
+.cc-seg button { flex: 1; min-width: 0; height: 32px; border-radius: 10px; font-size: 12.5px; color: var(--soft); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: background 0.3s var(--ease), color 0.2s, transform 0.16s var(--ease); }
+.cc-seg button:hover { color: var(--ink); }
+.cc-seg button.on { background: var(--ink); color: #0a0a0a; font-weight: 600; }
+.cc-seg button:active { transform: scale(0.96); }
+.cc-int-h { display: flex; align-items: center; gap: 8px; padding: 10px 0 8px; border-top: 1px solid var(--hair-2); }
+.cc-int-h .v3-lbl { flex: 1; }
+/* chips: the interests, the quick replies */
+.cc-chips, .cc-quick { display: flex; flex-wrap: wrap; gap: 8px; }
+.cc-chips { gap: 7px; }
+.cc-chip { height: 36px; padding: 0 15px; border-radius: 999px; border: 1px solid var(--hair); font-size: 13.5px; color: var(--soft); display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; flex: none; transition: background 0.22s var(--ease), color 0.2s, border-color 0.2s, transform 0.16s var(--ease); }
+.cc-chips .cc-chip { height: 34px; font-size: 13px; }
+.cc-chip:hover { color: var(--ink); border-color: var(--hair-3); }
+.cc-chip.on { background: var(--ink); border-color: var(--ink); color: #0a0a0a; }
+.cc-chip:active { transform: scale(0.96); }
 /* everything else, sorted */
 .cc-sum { list-style: none; margin: 0; padding: 0; }
 .cc-sum li { display: flex; gap: 12px; align-items: flex-start; padding: 9px 0; border-top: 1px solid var(--hair-2); font-size: 13.5px; line-height: 1.35; }
-.cc-sum li:first-child { border-top: 0; padding-top: 0; }
-.cc-sum li:last-child { padding-bottom: 0; }
+.cc-sum li:first-child { border-top: 0; }
 .cc-sum li > .cc-ic { margin-top: 1px; color: var(--soft); }
 .cc-sum .t { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .cc-sum .v3-tag, .cc-item .v3-tag, .cc-dest .v3-tag { flex: none; margin-left: auto; }
@@ -131,6 +152,10 @@
 /* ---------- first screen: the greeting, a few ideas ---------- */
 .cc-thread.intro { justify-content: space-between; gap: 28px; }
 .cc-hero { padding-top: 26px; }
+.cc-hero > * { animation: ccIn 0.7s var(--ease) both; }
+.cc-hero > :nth-child(1) { animation-delay: 0.2s; }
+.cc-hero > :nth-child(2) { animation-delay: 0.55s; }
+.cc-hero > :nth-child(3) { animation-delay: 0.9s; }
 .cc-ai.big { font-size: 24px; line-height: 1.25; margin-top: 20px; max-width: none; }
 .cc-sub { font-size: 14.5px; line-height: 1.45; color: var(--soft); margin-top: 10px; max-width: 40ch; }
 .cc-ideas .v3-lbl { margin-bottom: 8px; }
@@ -141,16 +166,29 @@
 .cc-prompt span { flex: 1; min-width: 0; }
 .cc-prompt .cc-ic.s { color: var(--mute); }
 
-/* ---------- ready, preparing ---------- */
-.cc-ready { margin-top: 2px; }
-.cc-prog { height: 3px; border-radius: 2px; background: var(--hair-2); overflow: hidden; }
+/* ---------- preparing (screen 11) ---------- */
+.cc-prog { height: 3px; border-radius: 2px; background: var(--hair-2); overflow: hidden; margin-bottom: 8px; }
 .cc-prog i { display: block; height: 100%; background: linear-gradient(90deg, rgba(246, 242, 234, 0.15), var(--ink), rgba(246, 242, 234, 0.15)); background-size: 200% 100%; animation: ccShim 1.4s linear infinite; }
 @keyframes ccShim { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.cc-day { display: flex; align-items: center; gap: 12px; padding: 7px 0; font-size: 14px; line-height: 1.3; transition: opacity 0.4s; }
+.cc-day[data-s="wait"] { opacity: 0.42; }
+.cc-day .st { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--hair); flex: none; }
+.cc-day .st b { width: 6px; height: 6px; border-radius: 50%; background: var(--ink); opacity: 0; }
+.cc-day[data-s="live"] .st { border-color: var(--ink); }
+.cc-day[data-s="live"] .st b { opacity: 1; animation: ccBreathe 1.6s ease-in-out infinite; }
+.cc-day .when { min-width: 58px; flex: none; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--mute); white-space: nowrap; }
+.cc-day[data-s="live"] .when { color: var(--ink); }
+.cc-day .dl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cc-day .meter { width: 64px; height: 3px; border-radius: 2px; background: var(--hair-2); overflow: hidden; flex: none; }
+.cc-day .meter i { display: block; height: 100%; width: 0; }
+.cc-day[data-s="live"] .meter i { width: 100%; background: linear-gradient(90deg, rgba(246, 242, 234, 0.15), var(--ink), rgba(246, 242, 234, 0.15)); background-size: 200% 100%; animation: ccShim 1.4s linear infinite; }
+@keyframes ccBreathe { 50% { transform: scale(0.55); opacity: 0.5; } }
+.cc-more { padding: 4px 0 0 36px; font-size: 12px; color: var(--mute); }
 .cc-live { display: flex; gap: 10px; align-items: center; min-height: 20px; font-size: 13px; color: var(--soft); }
 
 /* ---------- the composer ---------- */
 .cc-err { margin: 0 0 4px; }
-.cc-input { position: sticky; bottom: 0; z-index: 5; margin: 0 -20px; padding: 8px 20px calc(8px + var(--safe-b)); display: flex; flex-direction: column; gap: 6px;
+.cc-input { position: sticky; bottom: 0; z-index: 5; margin: 0 calc(-1 * var(--cc-pr)) 0 calc(-1 * var(--cc-pl)); padding: 8px var(--cc-pr) calc(8px + var(--safe-b)) var(--cc-pl); display: flex; flex-direction: column; gap: 6px;
   background: linear-gradient(180deg, rgba(7, 7, 7, 0), var(--cc-ground) 30%); }
 .cc-comp { display: flex; align-items: flex-end; gap: 4px; min-height: 56px; padding: 7px 8px; border-radius: 28px; }
 .cc-comp textarea { flex: 1; min-width: 0; resize: none; background: none; border: 0; outline: 0; color: var(--ink); font: inherit; font-size: 16px; line-height: 1.35; padding: 10px 4px; max-height: 140px; field-sizing: content; }
@@ -169,6 +207,7 @@ button.cc-r:active { transform: scale(0.92); }
 .cc-att button { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; color: var(--ink); flex: none; }
 .cc-att button:hover { background: rgba(246, 242, 234, 0.1); }
 .cc-switch { font-size: 12.5px; }
+.cc-cta { animation: ccIn 0.6s var(--ease) both; }
 
 /* ---------- « Le point » ---------- */
 .cc-recap { max-height: 86vh; overflow-y: auto; }
@@ -215,6 +254,7 @@ button.cc-r:active { transform: scale(0.92); }
 
 @media (max-width: 360px) {
   .cc-steps { gap: 6px; letter-spacing: 0.08em; }
-  .cc-point { padding: 0 10px; }
+  .cc-seg button { font-size: 12px; }
+  .cc-chip { padding: 0 13px; }
   .cc-fl .c { font-size: 24px; }
 }

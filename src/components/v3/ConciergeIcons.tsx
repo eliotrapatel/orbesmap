@@ -1,6 +1,6 @@
 // Line icons of the concierge, ported from the validated mockup's sprite (saas-v3, direction C).
 // Same grid and stroke as src/components/Icons.tsx: 24px, 1.6 stroke, round caps and joins.
-import type { ReactNode, SVGProps } from "react";
+import { useId, type ReactNode, type SVGProps } from "react";
 
 type P = SVGProps<SVGSVGElement>;
 const base = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round", strokeLinejoin: "round" } as const;
@@ -24,3 +24,31 @@ export const CcTrain = mk(<><rect x="6" y="3.5" width="12" height="13" rx="3" />
 export const CcChev = mk(<path d="m9 6 6 6-6 6" />);
 /** Not in the mockup's sprite: who travels (two people), drawn on the same grid */
 export const CcPeople = mk(<><circle cx="9" cy="8.5" r="3" /><path d="M3.5 19.5c0-3.2 2.4-5.5 5.5-5.5s5.5 2.3 5.5 5.5" /><path d="M15.5 5.7a3 3 0 0 1 0 5.6M17.6 14.3c1.8.8 2.9 2.6 2.9 5.2" /></>);
+export const CcBell = mk(<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15zM10 20.5h4" />);
+export const CcClip = mk(<path d="M9 4.5h6M9 4.5a1.5 1.5 0 0 0 0 3h6a1.5 1.5 0 0 0 0-3M8 5.5H6.5A1.5 1.5 0 0 0 5 7v12a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 19V7a1.5 1.5 0 0 0-1.5-1.5H16" />);
+
+// The orbit mark as in the mockup's sprite: #orbit (line 28) for the small avatar, #orbit-lg (line 18) for the large one
+const O = "M511.8 740.1C646.7 740.1 747.5 638.8 747.5 512C747.5 384.8 646.7 283.9 511.8 283.9C377.3 283.9 276.5 384.8 276.5 512C276.5 638.8 377.3 740.1 511.8 740.1ZM511.6 676.3C417.1 676.3 344 605.3 344 512.1C344 418.4 417.1 347.4 511.6 347.4C606.6 347.4 679.6 418.4 679.6 512.1C679.6 605.3 606.6 676.3 511.6 676.3Z";
+/** width x height in px; `thin` is the large avatar's lighter line */
+export function ConciergeOrbit({ thin, w, h }: { thin?: boolean; w: number; h: number }) {
+  const id = useId().replace(/:/g, "");
+  const line = thin ? 18 : 28;
+  return (
+    <svg className="cc-orbit" viewBox="116 279 792 466" width={w} height={h} fill="none" aria-hidden="true" focusable="false">
+      <defs>
+        <mask id={`${id}r`} maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
+          <rect width="1024" height="1024" fill="#fff" />
+          <path d={O} fill="#000" stroke="#000" strokeWidth={thin ? 43.2 : 67.2} />
+        </mask>
+        <mask id={`${id}o`} maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
+          <rect width="1024" height="1024" fill="#fff" />
+          <path d="M199.9 672.3 A400 112 -18 0 0 858.7 458.3" fill="none" stroke="#000" strokeWidth={thin ? 46.8 : 72.8} />
+        </mask>
+      </defs>
+      <ellipse cx="512" cy="512" rx="400" ry="112" transform="rotate(-18 512 512)" stroke="currentColor" strokeWidth={line} mask={`url(#${id}r)`} />
+      <path d={O} fill="currentColor" fillRule="evenodd" mask={`url(#${id}o)`} />
+      <path d="M131.6 635.6 A400 112 -18 0 0 892.4 388.4" stroke="currentColor" strokeWidth={line} />
+      <circle cx="825.6" cy="485.8" r={thin ? 26.1 : 40.6} fill="currentColor" />
+    </svg>
+  );
+}

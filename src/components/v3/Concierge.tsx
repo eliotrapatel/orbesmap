@@ -4,26 +4,25 @@ import { dateLabel, dayCount, searchCities, type Destination } from "../../lib/n
 import { getLang, locale, t } from "../../lib/i18n";
 import { getState, requestPro, useStore } from "../../lib/store";
 import { track } from "../../lib/track";
-import OrbitMark from "../OrbitMark";
 import Shell from "./Shell";
 import { createTripFromWizard, WIZARD_KEY, type Wiz } from "./CreateWizard";
-import { PACES, TRAVEL } from "./Onboarding";
-import { CcArrow, CcBed, CcCal, CcCheck, CcClock, CcClose, CcImg, CcLink, CcMic, CcPeople, CcPin, CcPlane, CcPlus, CcSend, CcSpark } from "./ConciergeIcons";
+import { INTERESTS, PACES, TRAVEL } from "./Onboarding";
+import { CcArrow, CcBed, CcBell, CcCal, CcClip, CcClock, CcClose, CcImg, CcLink, CcMic, CcPeople, CcPin, CcPlane, CcPlus, CcSend, CcSpark, ConciergeOrbit } from "./ConciergeIcons";
 import "../../styles/concierge.css";
 
 // The look follows the validated mockup, direction « C · Concierge » (.claude/mockups/saas-v3, screens 06 to 11):
 // no bubbles on the concierge's side, glass cards inside the exchange, discreet bubbles for the traveller.
 
-/** The concierge's avatar: the orbit mark in a dark round */
+/** The concierge's avatar: the orbit mark in a dark round (the large one uses the mockup's lighter line) */
 function Avatar({ size = "md" }: { size?: "xs" | "md" | "lg" }) {
   return (
     <span className={"cc-av " + size} aria-hidden="true">
-      <OrbitMark size={size === "lg" ? 24 : size === "xs" ? 9 : 13} />
+      {size === "lg" ? <ConciergeOrbit thin w={40} h={24} /> : size === "xs" ? <ConciergeOrbit w={15} h={9} /> : <ConciergeOrbit w={22} h={13} />}
     </span>
   );
 }
 /** Three dots that breathe: the concierge is writing or preparing */
-const Dots = ({ sm }: { sm?: boolean }) => <span className={"cc-dots" + (sm ? " sm" : "")} aria-hidden="true"><i /><i /><i /></span>;
+const Dots = () => <span className="cc-dots" aria-hidden="true"><i /><i /><i /></span>;
 
 // ---------- the choice: the form or the concierge ----------
 
@@ -77,7 +76,7 @@ type Facts = Omit<ConciergeResult, "reply" | "ready"> & { cities: Destination[] 
 type Kind = "city" | "dates" | "who" | "flight" | "hotel" | "place" | "fixed" | "wish" | "interests";
 type Flight = ExtractResult["flights"][number];
 /** One thing understood, as shown in a card (kept in the conversation, so it survives closing the app) */
-type Card = { kind: Kind; title: string; sub?: string; text: string; must?: boolean; booked?: boolean; list?: string[]; flight?: Flight };
+type Card = { kind: Kind; title: string; sub?: string; text: string; must?: boolean; booked?: boolean; list?: string[]; flight?: Flight; src?: string };
 /** `cards` held "icon text" strings before Nov 2026: still read when a saved conversation is resumed */
 type Msg = { from: "concierge" | "me"; text: string; image?: boolean; cards?: (Card | string)[]; shot?: boolean };
 type Saved = { msgs: Msg[]; facts: Facts; ready: boolean };
@@ -142,10 +141,10 @@ function items(f: Facts): Item[] {
     const sub = f.pace ? t("rythme {p}", { p: t(label(PACES, f.pace)).toLowerCase() }) : "";
     out.push({ key: "who", kind: "who", title: title || sub, sub: title ? sub : "", text: [title, sub].filter(Boolean).join(" · ") });
   }
-  f.flights.forEach((x, i) => out.push({ key: `flight:${i}`, kind: "flight", title: `${x.from} → ${x.to}`, sub: [x.code, when(x.departAt)].filter(Boolean).join(" · "), flight: x,
-    text: `${x.code} ${x.from} → ${x.to}${x.departAt ? ` · ${x.departAt.slice(8, 10)}/${x.departAt.slice(5, 7)} ${x.departAt.slice(11, 16)}` : ""}` }));
+  f.flights.forEach((x, i) => out.push({ key: `flight:${i}`, kind: "flight", title: `${x.from} – ${x.to}`, sub: [x.code, when(x.departAt)].filter(Boolean).join(" · "), flight: x,
+    text: `${x.code} ${x.from} – ${x.to}${x.departAt ? ` · ${x.departAt.slice(8, 10)}/${x.departAt.slice(5, 7)} ${x.departAt.slice(11, 16)}` : ""}` }));
   if (f.hotel.name) out.push({ key: "hotel", kind: "hotel", title: f.hotel.name, sub: f.hotel.address, text: [f.hotel.name, f.hotel.address].filter(Boolean).join(" · ") });
-  f.places.forEach((p, i) => out.push({ key: `place:${i}`, kind: "place", title: p.name, sub: [p.city, p.why].filter(Boolean).join(" · "), must: p.mustSee, text: `${p.name}${p.city ? ` (${p.city})` : ""}${p.why ? ` · ${p.why}` : ""}` }));
+  f.places.forEach((p, i) => out.push({ key: `place:${i}`, kind: "place", title: p.name, sub: [p.city, p.why].filter(Boolean).join(" · "), must: p.mustSee, src: p.source || undefined, text: `${p.name}${p.city ? ` (${p.city})` : ""}${p.why ? ` · ${p.why}` : ""}` }));
   f.fixed.forEach((x, i) => {
     const sub = [x.date ? when(x.date) : "", x.time].filter(Boolean).join(" · ");
     out.push({ key: `fixed:${i}`, kind: "fixed", title: x.name, sub, booked: x.kind === "reservation" || x.kind === "billet", text: `${x.name}${x.date ? ` · ${x.date}${x.time ? ` ${x.time}` : ""}` : ""}` });
@@ -186,29 +185,48 @@ function fromOld(s: string): Card {
 const KIND_ICON: Record<Kind, typeof CcPin> = {
   city: CcPin, dates: CcCal, who: CcPeople, flight: CcPlane, hotel: CcBed, place: CcPin, fixed: CcClock, wish: CcSpark, interests: CcSpark,
 };
-const KindIcon = ({ kind }: { kind: Kind }) => {
-  const I = KIND_ICON[kind];
+/** A booking keeps the clock, an appointment or event at a fixed date the calendar (screen 09) */
+const KindIcon = ({ kind, booked }: { kind: Kind; booked?: boolean }) => {
+  const I = kind === "fixed" && !booked ? CcCal : KIND_ICON[kind];
   return <I />;
 };
 
-/** The glass cards a concierge message brings: destinations, the trip, flights, the programme, the rest sorted */
-function Cards({ cards, shot }: { cards: (Card | string)[]; shot?: boolean }) {
+/** The service a place came from, when it is one people know (Xiaohongshu, Google Maps…) */
+function service(s?: string): string | null {
+  if (!s) return null;
+  if (/xiaohongshu|xhslink|\bxhs\b|小红书|rednote/i.test(s)) return "Xiaohongshu";
+  if (/google|maps\.app|goo\.gl/i.test(s)) return "Google Maps";
+  if (/instagram/i.test(s)) return "Instagram";
+  if (/tiktok|douyin/i.test(s)) return "TikTok";
+  return null;
+}
+/** "12 Xiaohongshu · 34 Google Maps" when the sources are known, else the first names */
+function placesLine(places: Card[]): string {
+  const count = new Map<string, number>();
+  for (const p of places) {
+    const s = service(p.src);
+    if (s) count.set(s, (count.get(s) || 0) + 1);
+  }
+  if (count.size) return [...count].map(([s, n]) => `${n} ${s}`).join(" · ");
+  return places.slice(0, 3).map((p) => p.title).join(" · ") + (places.length > 3 ? " …" : "");
+}
+
+/** The glass cards a concierge message brings: destinations, flights, the hotel and dates, the rest sorted (screens 07 to 09) */
+function Cards({ cards, shot, onEdit, onFix }: { cards: (Card | string)[]; shot?: boolean; onEdit: () => void; onFix: () => void }) {
   const all = cards.map((c) => (typeof c === "string" ? { ...fromOld(c), old: true } : { ...c, old: false }));
   const fresh = all.filter((c) => !c.old);
   const cities = fresh.filter((c) => c.kind === "city");
-  const trip = fresh.filter((c) => c.kind === "hotel" || c.kind === "dates");
+  const trip = fresh.filter((c) => c.kind === "hotel" || c.kind === "dates" || c.kind === "who");
   const flights = fresh.filter((c) => c.kind === "flight" && c.flight);
-  const who = fresh.find((c) => c.kind === "who");
-  const interests = fresh.find((c) => c.kind === "interests");
   const places = fresh.filter((c) => c.kind === "place");
-  const rest = [...places.slice(0, 6), ...fresh.filter((c) => c.kind === "fixed" || c.kind === "wish" || (c.kind === "flight" && !c.flight)), ...all.filter((c) => c.old)];
-  const more = Math.max(0, places.length - 6);
+  const musts = places.filter((c) => c.must);
+  const rest = [...fresh.filter((c) => c.kind === "fixed" || c.kind === "wish" || (c.kind === "flight" && !c.flight)), ...all.filter((c) => c.old)];
   const tag = shot ? t("Extrait") : t("Noté");
   return (
     <>
       {cities.length > 0 && (
         <div className="cc-glass cc-rc">
-          <div className="cc-rc-h"><span className="v3-lbl">{t("Destinations")}</span></div>
+          <div className="cc-rc-h"><span className="v3-lbl">{t("Destinations")}</span><button type="button" className="cc-act" onClick={onEdit}>{t("Modifier")}</button></div>
           {cities.map((c, i) => (
             <div key={i} className="cc-dest"><span className="n">{i + 1}</span><span className="t">{c.title}{c.sub && <small>{c.sub}</small>}</span><CcPin className="cc-ic s mute" /></div>
           ))}
@@ -234,31 +252,32 @@ function Cards({ cards, shot }: { cards: (Card | string)[]; shot?: boolean }) {
       {trip.length > 0 && (
         <div className="cc-glass cc-rc tight">
           {trip.map((c, i) => (
-            <div key={i} className="cc-dest"><KindIcon kind={c.kind} /><span className="t">{c.title}{c.sub && <small>{c.sub}</small>}</span>{c.kind === "hotel" && <span className="v3-tag ok">{tag}</span>}</div>
+            <div key={i} className="cc-dest">
+              <KindIcon kind={c.kind} />
+              <span className="t">{c.title}{c.sub && <small>{c.sub}</small>}</span>
+              {c.kind === "hotel" && <span className="v3-tag ok">{tag}</span>}
+              {c.kind === "dates" && <button type="button" className="cc-act" onClick={onFix}>{t("Corriger")}</button>}
+            </div>
           ))}
         </div>
       )}
-      {(who || interests) && (
-        <div className="cc-glass cc-rc">
-          <div className="cc-rc-h"><span className="v3-lbl">{t("Programme idéal")}</span></div>
-          {who && <div className="cc-rowk"><span className="k">{t("Voyage")}</span><span className="v">{[who.title, who.sub].filter(Boolean).join(" · ")}</span></div>}
-          {interests && (
-            <div className="cc-rowk"><span className="k">{t("Envies")}</span><span className="cc-tags">{(interests.list || interests.title.split(", ")).map((x) => <span key={x}>{x}</span>)}</span></div>
-          )}
-        </div>
-      )}
-      {(rest.length > 0 || more > 0) && (
+      {(places.length > 0 || rest.length > 0) && (
         <div className="cc-glass cc-rc">
           <ul className="cc-sum">
+            {places.length > 0 && (
+              <li><CcPin /><span className="t">{places.length > 1 ? t("{n} lieux notés", { n: places.length }) : t("1 lieu noté")}<small>{placesLine(places)}</small></span></li>
+            )}
+            {musts.length > 0 && (
+              <li><CcSpark /><span className="t">{musts.length > 1 ? t("{n} incontournables", { n: musts.length }) : t("1 incontournable")}<small>{musts.slice(0, 4).map((p) => p.title).join(" · ")}</small></span></li>
+            )}
             {rest.map((c, i) => (
               <li key={i}>
-                <KindIcon kind={c.kind} />
+                <KindIcon kind={c.kind} booked={c.booked} />
                 <span className="t">{c.title}{c.sub && <small>{c.sub}</small>}</span>
                 {c.kind === "place" && c.must && <span className="v3-tag gold">{t("Incontournable")}</span>}
                 {c.kind === "fixed" && <span className="v3-tag gold">{c.booked ? t("Réservé") : t("Fixe")}</span>}
               </li>
             ))}
-            {more > 0 && <li><CcPin /><span className="t">{t("+ {n} autres", { n: more })}<small>{t("Dans « Le point »")}</small></span></li>}
           </ul>
         </div>
       )}
@@ -266,14 +285,54 @@ function Cards({ cards, shot }: { cards: (Card | string)[]; shot?: boolean }) {
   );
 }
 
+/** « Programme idéal » (screen 10): the pace and the interests, from the profile until the traveller changes them */
+function Programme({ f, onPace, onInterest }: { f: Facts; onPace: (k: string) => void; onInterest: (x: string) => void }) {
+  const profile = useStore((s) => s.profile);
+  const pPace = typeof profile.pace === "string" ? profile.pace : "";
+  const pInt = Array.isArray(profile.interests) ? (profile.interests as string[]) : [];
+  const pace = f.pace || pPace;
+  const fromProfile = !f.interests.length && pInt.length > 0;
+  const on = f.interests.length ? f.interests : pInt;
+  const known = [...new Set([...pInt, ...f.interests])];
+  const chips = [...new Set([...known, ...INTERESTS])].slice(0, Math.max(6, known.length + 2));
+  const travel = t(label(TRAVEL, f.travel));
+  return (
+    <div className="cc-glass cc-rc">
+      <div className="cc-rowk">
+        <span className="k">{t("Rythme")}</span>
+        <div className="cc-seg" role="group" aria-label={t("Rythme")}>
+          {PACES.map((p) => (
+            <button key={p.key} type="button" className={pace === p.key ? "on" : ""} aria-pressed={pace === p.key} onClick={() => onPace(p.key)}>{t(p.label)}</button>
+          ))}
+        </div>
+      </div>
+      {travel && <div className="cc-rowk"><span className="k">{t("Voyage")}</span><span className="v">{travel}</span></div>}
+      <div className="cc-int-h"><span className="v3-lbl">{t("Centres d'intérêt")}</span>{fromProfile && <span className="v3-tag dim">{t("Profil")}</span>}</div>
+      <div className="cc-chips">
+        {chips.map((x) => (
+          <button key={x} type="button" className={"cc-chip" + (on.includes(x) ? " on" : "")} aria-pressed={on.includes(x)} onClick={() => onInterest(x)}>{t(x)}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const URL_RE = /https?:\/\/[^\s<>"']+/g;
-const host = (u: string) => {
+/** A link as the mockup shows it: the service's coloured tile, the title, the source underneath */
+function linkCard(u: string): { tile: "lg-x" | "lg-m" | "lg-s"; title: string; small: string } {
+  let h = u;
+  let path = "";
   try {
-    return new URL(u).hostname.replace(/^www\./, "");
+    const x = new URL(u);
+    h = x.hostname.replace(/^www\./, "");
+    path = decodeURIComponent(x.pathname + x.search).replace(/\/$/, "");
   } catch {
-    return u;
+    /* keep the text */
   }
-};
+  if (/(^|\.)xiaohongshu\.com$|(^|\.)xhslink\.com$/.test(h)) return { tile: "lg-x", title: t("Lien Xiaohongshu"), small: h };
+  if (/^maps\.google\.|^maps\.app\.goo\.gl$|^goo\.gl$/.test(h) || (/^google\./.test(h) && path.startsWith("/maps"))) return { tile: "lg-m", title: t("Liste Google Maps"), small: h };
+  return { tile: "lg-s", title: h, small: path.length > 42 ? `${path.slice(0, 41)}…` : path };
+}
 /** The traveller's message: a capture shown as a small sheet, links as small cards, then the text */
 function Mine({ m, old, fresh }: { m: Msg; old: boolean; fresh: boolean }) {
   const links = m.text.match(URL_RE) || [];
@@ -285,9 +344,15 @@ function Mine({ m, old, fresh }: { m: Msg; old: boolean; fresh: boolean }) {
       )}
       {(rest || links.length > 0) && (
         <div className={"cc-me" + (old ? " old" : "") + (fresh ? " in" : "") + (links.length ? " links" : "")}>
-          {links.map((u, i) => (
-            <span key={i} className="cc-link"><span className="lg"><CcLink className="cc-ic s" /></span><span className="tx">{host(u)}<small>{u.replace(/^https?:\/\//, "")}</small></span></span>
-          ))}
+          {links.map((u, i) => {
+            const l = linkCard(u);
+            return (
+              <span key={i} className="cc-link">
+                <span className={"lg " + l.tile}>{l.tile === "lg-x" ? "小红书" : l.tile === "lg-m" ? <CcPin className="cc-ic s" /> : <CcLink className="cc-ic s" />}</span>
+                <span className="tx">{l.title}{l.small && <small>{l.small}</small>}</span>
+              </span>
+            );
+          })}
           {rest && <span className={links.length ? "cc-me-tx" : undefined}>{rest}</span>}
         </div>
       )}
@@ -310,14 +375,28 @@ function toWizard(f: Facts): Wiz {
   };
 }
 
+/** Every date of the trip, "2026-11-24" … "2026-11-29" */
+function daysOf(start: string, end: string): string[] {
+  if (!validDate(start) || !validDate(end) || end < start) return [];
+  const out: string[] = [];
+  const d = new Date(`${start}T12:00:00Z`);
+  for (let i = 0; i < 60; i++) {
+    const iso = d.toISOString().slice(0, 10);
+    if (iso > end) break;
+    out.push(iso);
+    d.setUTCDate(d.getUTCDate() + 1);
+  }
+  return out;
+}
+
+type Quick = { label: string; on?: boolean; act: () => void };
+
 /** Creating a trip by talking: the concierge understands each answer, turns it into cards and asks what is missing */
 export default function Concierge({ onCancel, onCreated, onForm }: { onCancel: () => void; onCreated: (id: string) => void; onForm: () => void }) {
   const name = useStore((s) => (s.profile.name as string) || "");
   const plan = useStore((s) => s.plan);
   const [state, setState] = useState<Saved>(() => load() || {
-    msgs: [{ from: "concierge", text: name
-      ? t("Bonjour {name}. Je suis votre concierge. Où partez-vous, et quand ? Vous pouvez aussi m'envoyer vos réservations, des captures ou des liens : je fais le tri.", { name })
-      : t("Bonjour. Je suis votre concierge. Où partez-vous, et quand ? Vous pouvez aussi m'envoyer vos réservations, des captures ou des liens : je fais le tri.") }],
+    msgs: [{ from: "concierge", text: name ? t("Bonjour {name}.\nOù aimeriez-vous aller ?", { name }) : t("Bonjour.\nOù aimeriez-vous aller ?") }],
     facts: EMPTY, ready: false,
   });
   const [text, setText] = useState("");
@@ -375,15 +454,16 @@ export default function Concierge({ onCancel, onCreated, onForm }: { onCancel: (
   const all = items(f);
   const canLaunch = f.cities.length > 0 && validDate(f.start) && validDate(f.end) && f.end >= f.start;
 
-  const send = async () => {
-    const msg = text.trim();
+  /** Sends what is in the composer, or `over` (a quick reply), which leaves what is being typed in place */
+  const send = async (over?: string) => {
+    const msg = (over ?? text).trim();
     if ((!msg && !shot) || busy) return;
     setBusy(true);
     setErr(null);
     const mine: Msg = { from: "me", text: msg, image: !!shot };
     const history = state.msgs.slice(-8).map((m) => `${m.from === "me" ? "Voyageur" : "Concierge"} : ${m.text}`).join("\n");
     setState((s) => ({ ...s, msgs: [...s.msgs, mine] }));
-    setText("");
+    if (over === undefined) setText("");
     const image = shot ? await imageToBase64(shot, 1600, 0.8).catch(() => undefined) : undefined;
     setShot(null);
     try {
@@ -412,10 +492,15 @@ export default function Concierge({ onCancel, onCreated, onForm }: { onCancel: (
     } catch (e) {
       setErr(e instanceof AiError ? e.message : t("Le concierge ne répond pas. Réessayez."));
       setState((s) => ({ ...s, msgs: s.msgs.filter((m) => m !== mine) }));
-      setText(msg);
+      if (over === undefined) setText(msg);
     } finally {
       setBusy(false);
     }
+  };
+  /** Puts the start of an answer in the composer and opens the keyboard */
+  const prefill = (s: string) => {
+    setText(s);
+    input.current?.focus();
   };
 
   const mic = () => {
@@ -469,29 +554,55 @@ export default function Concierge({ onCancel, onCreated, onForm }: { onCancel: (
     save(null);
     onForm();
   };
+  // the ideal programme, changed by hand: a facts edit (like removing a card), sent to the concierge with the next message
+  const setPace = (k: string) => setState((s) => ({ ...s, facts: { ...s.facts, pace: k } }));
+  const toggleInterest = (x: string) => setState((s) => {
+    const p = getState().profile.interests;
+    const cur = s.facts.interests.length ? s.facts.interests : Array.isArray(p) ? (p as string[]) : [];
+    return { ...s, facts: { ...s.facts, interests: cur.includes(x) ? cur.filter((y) => y !== x) : [...cur, x] } };
+  });
 
-  // where the conversation is: où → quand → ce que vous savez → programme idéal
+  // where the conversation is: où – quand (the dates, with the flight and hotel of a capture) – ce que vous savez – programme idéal
   const done = [
     f.cities.length > 0,
     validDate(f.start) && validDate(f.end),
-    !!(f.hotel.name || f.flights.length || f.places.length || f.fixed.length || f.wishes.length),
+    !!(f.places.length || f.fixed.length || f.wishes.length),
     !!(state.ready || f.pace || f.travel || f.interests.length),
   ];
   const open = done.findIndex((d) => !d);
   const step = launching ? 4 : (state.ready && done[0] && done[1]) || open === -1 ? 3 : open;
-  const title = launching ? t("Concierge") : f.cities.map((c) => c.name).join(" · ") || t("Nouveau voyage");
+  const title = launching ? t("Concierge") : f.cities[0]?.name || t("Nouveau voyage");
   const status = launching
-    ? <><Dots sm />{t("prépare votre voyage")}</>
+    ? <><Dots />{t("prépare votre voyage")}</>
     : busy
-      ? <><Dots sm />{state.msgs[state.msgs.length - 1]?.image ? t("lit votre capture") : t("écrit…")}</>
+      ? <><Dots />{state.msgs[state.msgs.length - 1]?.image ? t("lit votre capture") : t("écrit…")}</>
       : <><i className="cc-on" />{validDate(f.start) && validDate(f.end) ? shortDates(f.start, f.end) : t("Brouillon enregistré")}</>;
   const lastMe = state.msgs.map((m) => m.from).lastIndexOf("me");
+  const lastAi = state.msgs.map((m) => m.from).lastIndexOf("concierge");
   const intro = state.msgs.length === 1 && !busy && !launching;
-  // the greeting, large up to its first question, the rest underneath (screen 06 of the mockup)
-  const greet = state.msgs[0]?.text || "";
-  const cut = greet.indexOf("? ");
-  const hi = cut >= 0 ? greet.slice(0, cut + 1) : greet;
-  const sub = cut >= 0 ? greet.slice(cut + 2) : "";
+  const showCta = state.ready && canLaunch && !busy && !launching;
+  const showProg = done[0] && done[1] && (step === 3 || done[2]) && !launching;
+
+  // quick replies under the last concierge turn, from what it just brought (screen 07: « C'est parfait », « Ajouter une ville »)
+  const lastCards = ((state.msgs[lastAi]?.cards || []).filter((c) => typeof c !== "string") as Card[]).map((c) => c.kind);
+  const brought = (...k: Kind[]) => lastCards.some((x) => k.includes(x));
+  let quick: Quick[] = [];
+  if (!busy && !launching && !intro && !showCta && lastAi === state.msgs.length - 1) {
+    const capture = { label: t("Ajouter une capture"), act: () => file.current?.click() };
+    if (brought("city")) quick = [{ label: t("C'est parfait"), on: true, act: () => void send(t("C'est parfait")) }, { label: t("Ajouter une ville"), act: () => prefill(t("Ajouter une ville : ")) }];
+    else if (brought("dates", "flight", "hotel")) quick = [{ label: t("C'est bien ça"), on: true, act: () => void send(t("C'est bien ça")) }, done[1] ? { label: t("Corriger les dates"), act: () => prefill(t("Corriger les dates : ")) } : capture];
+    else if (brought("place", "fixed", "wish")) quick = [{ label: t("C'est tout"), on: true, act: () => void send(t("C'est tout")) }, capture];
+    else if (step === 2) quick = [capture, { label: t("Rien de particulier"), act: () => void send(t("Rien de particulier")) }];
+  }
+  const placeholder = listening ? t("Je vous écoute…") : intro ? t("Écrivez, collez un lien, ou dictez…") : step <= 1 ? t("Répondre…") : step === 2 ? t("Ajouter autre chose…") : t("Écrire…");
+  const days = launching ? daysOf(f.start, f.end) : [];
+  const dayLabel = (d: string, i: number) => {
+    const fixed = f.fixed.filter((x) => (x.date || "").slice(0, 10) === d).map((x) => x.name).join(" · ");
+    if (fixed) return fixed;
+    if (i === 0) return t("Arrivée · {city}", { city: f.cities[0]?.name || "" });
+    if (i === days.length - 1) return t("Départ");
+    return t("Jour {n}", { n: i + 1 });
+  };
 
   const top = (
     <div className="cc-top">
@@ -501,20 +612,22 @@ export default function Concierge({ onCancel, onCreated, onForm }: { onCancel: (
           <Avatar />
           <span className="cc-who-t"><b>{title}</b><small aria-live="polite">{status}</small></span>
         </div>
-        {!launching && (
-          <button type="button" className="cc-point" onClick={() => setRecap(true)} disabled={!all.length}>
-            {t("Le point")}{all.length > 0 && <span className="num">{all.length}</span>}
+        {!launching && all.length > 0 && (
+          <button type="button" className="v3-tool cc-point" onClick={() => setRecap(true)} aria-label={`${t("Le point")} (${all.length})`}>
+            <CcClip /><span className="num">{all.length}</span>
           </button>
         )}
       </div>
-      <div className="cc-steps" aria-label={t("Étape {n} sur {of}", { n: Math.min(4, step + 1), of: 4 })}>
-        {STEPS.map((s, i) => (
-          <Fragment key={s}>
-            {i > 0 && <s className={i <= step ? "on" : ""} />}
-            <span className={i === step ? "on" : i < step || done[i] ? "done" : ""}>{t(s)}</span>
-          </Fragment>
-        ))}
-      </div>
+      {!launching && (
+        <div className="cc-steps" aria-label={t("Étape {n} sur {of}", { n: Math.min(4, step + 1), of: 4 })}>
+          {STEPS.map((s, i) => (
+            <Fragment key={s}>
+              {i > 0 && <s className={i <= step ? "on" : ""} />}
+              <span className={i === step ? "on" : i < step ? "done" : ""}>{t(s)}</span>
+            </Fragment>
+          ))}
+        </div>
+      )}
     </div>
   );
 
@@ -523,17 +636,17 @@ export default function Concierge({ onCancel, onCreated, onForm }: { onCancel: (
       <div className={"cc-thread" + (intro ? " intro" : "")} aria-live="polite">
         {intro ? (
           <>
-            <div className="cc-hero in">
+            <div className="cc-hero">
               <Avatar size="lg" />
-              <p className="cc-ai big">{hi}</p>
-              {sub && <p className="cc-sub">{sub}</p>}
+              <p className="cc-ai big">{name ? t("Bonjour {name}.\nOù aimeriez-vous aller ?", { name }) : t("Bonjour.\nOù aimeriez-vous aller ?")}</p>
+              <p className="cc-sub">{t("Une ville suffit pour commencer. Vous pouvez aussi coller un lien, une liste ou une capture.")}</p>
             </div>
             <div className="cc-ideas in">
               <p className="v3-lbl">{t("Quelques idées")}</p>
               <div className="cc-glass">
                 {IDEAS.map((s) => (
-                  <button key={s} type="button" className="cc-prompt" onClick={() => { setText(t(s)); input.current?.focus(); }}>
-                    <CcSpark className="cc-ic mute" /><span>{t(s)}</span><CcSend className="cc-ic s" />
+                  <button key={s} type="button" className="cc-prompt" onClick={() => prefill(t(s))}>
+                    <CcSpark className="cc-ic mute" /><span>{t("«\u00a0{s}\u00a0»", { s: t(s) })}</span><CcSend className="cc-ic s" />
                   </button>
                 ))}
               </div>
@@ -542,59 +655,71 @@ export default function Concierge({ onCancel, onCreated, onForm }: { onCancel: (
         ) : (
           state.msgs.map((m, i) => (
             m.from === "me"
-              ? <Mine key={i} m={m} old={i < lastMe} fresh={i >= seen.current} />
+              ? <Mine key={i} m={m} old={i < lastMe || launching} fresh={i >= seen.current} />
               : (
                 <div key={i} className={"cc-turn" + (i >= seen.current ? " in" : "")}>
-                  <div className={"cc-ai" + (i < lastMe ? " old" : "")}>
-                    {i === 0 && <span className="cc-by"><OrbitMark size={11} />{t("Concierge")}</span>}
-                    {m.text}
-                  </div>
-                  {m.cards && m.cards.length > 0 && <Cards cards={m.cards} shot={m.shot} />}
+                  <div className={"cc-ai" + (i < lastMe || launching ? " old" : "")}>{m.text}</div>
+                  {m.cards && m.cards.length > 0 && <Cards cards={m.cards} shot={m.shot} onEdit={() => setRecap(true)} onFix={() => prefill(t("Corriger les dates : "))} />}
+                  {i === lastAi && showProg && <Programme f={f} onPace={setPace} onInterest={toggleInterest} />}
+                  {i === lastAi && quick.length > 0 && (
+                    <div className="cc-quick">
+                      {quick.map((q) => <button key={q.label} type="button" className={"cc-chip" + (q.on ? " on" : "")} onClick={q.act}>{q.label}</button>)}
+                    </div>
+                  )}
                 </div>
               )
           ))
         )}
         {busy && <div className="cc-ai cc-typing in" role="status" aria-label={t("Le concierge écrit…")}><Dots /></div>}
         {launching && (
-          <div className="cc-turn in">
-            <div className="cc-ai">{t("Je prépare {city}. Le programme se construit jour par jour : je vous montre où j'en suis.", { city: f.cities.map((c) => c.name).join(" · ") })}</div>
-            <div className="cc-glass cc-rc">
-              <div className="cc-rc-h"><span className="v3-lbl">{t("Préparation")}</span><b className="num cc-n">{t("{n} jours", { n: dayCount(f.start, f.end) })}</b></div>
-              <div className="cc-prog"><i /></div>
-              <div className="cc-meta"><span>{dateLabel(f.start, f.end)}</span><span>{f.places.length > 1 ? t("{n} lieux retenus", { n: f.places.length }) : t("{n} lieu retenu", { n: f.places.length })}</span></div>
+          <>
+            <div className="cc-me old in">{t("Oui, prépare tout")}</div>
+            <div className="cc-turn in">
+              <div className="cc-ai">{t("Je prépare {city}. Le programme se construit jour par jour : je vous montre où j'en suis.", { city: f.cities.map((c) => c.name).join(" · ") })}</div>
+              <div className="cc-glass cc-rc">
+                <div className="cc-rc-h"><span className="v3-lbl">{t("Préparation · {n} jours", { n: days.length })}</span></div>
+                <div className="cc-prog"><i /></div>
+                {days.slice(0, 8).map((d, i) => (
+                  <div key={d} className="cc-day" data-s={i === 0 ? "live" : "wait"}>
+                    <span className="st"><b /></span>
+                    <span className="when">{when(d)}</span>
+                    <span className="dl">{dayLabel(d, i)}</span>
+                    <span className="meter"><i /></span>
+                  </div>
+                ))}
+                {days.length > 8 && <p className="cc-more">{t("+ {n} jours", { n: days.length - 8 })}</p>}
+                <div className="cc-meta">
+                  <span>{dateLabel(f.start, f.end)}</span>
+                  {f.places.length > 0 && <span><b>{f.places.length}</b> {f.places.length > 1 ? t("lieux retenus") : t("lieu retenu")}</span>}
+                </div>
+              </div>
+              <div className="cc-live"><Dots />{t("Je crée le voyage…")}</div>
             </div>
-            <div className="cc-live"><Dots />{t("Je crée le voyage…")}</div>
-          </div>
-        )}
-        {state.ready && canLaunch && !busy && !launching && (
-          <div className="cc-ready in">
-            <button className="v3-btn" onClick={() => setRecap(true)}><CcSpark />{t("Faire le point et lancer la préparation")}</button>
-          </div>
+          </>
         )}
         <div ref={end} />
       </div>
       {err && <p className="v3-err cc-err" role="alert">{err}</p>}
       <div className="cc-input">
         {launching ? (
-          <div className="cc-glass cc-comp quiet"><span className="cc-r"><CcCheck /></span><span className="cc-in">{t("La préparation continue dans le voyage")}</span></div>
+          <div className="cc-glass cc-comp quiet"><span className="cc-r"><CcBell /></span><span className="cc-in">{t("La préparation continue dans le voyage")}</span></div>
         ) : (
           <>
+            {showCta && <button type="button" className="v3-btn cc-cta" onClick={() => setRecap(true)}><CcSpark />{t("Préparer mon voyage")}</button>}
             {shot && (
               <span className="cc-att"><CcImg className="cc-ic s" /><span className="nm">{shot.name}</span><button type="button" onClick={() => setShot(null)} aria-label={t("Retirer la capture")}><CcClose className="cc-ic s" /></button></span>
             )}
             <div className="cc-glass cc-comp">
               <button type="button" className="cc-r" onClick={() => file.current?.click()} aria-label={t("Ajouter une capture ou une photo")}><CcPlus /></button>
-              <textarea ref={input} value={text} onChange={(e) => setText(e.target.value)} rows={1} placeholder={listening ? t("Je vous écoute…") : t("Écrivez, collez un lien, ou dictez…")} aria-label={t("Message au concierge")}
+              <textarea ref={input} value={text} onChange={(e) => setText(e.target.value)} rows={1} placeholder={placeholder} aria-label={t("Message au concierge")}
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }} />
-              {(!text.trim() || listening) && (
-                <button type="button" className={"cc-r" + (listening ? " on" : "")} onClick={mic} aria-label={listening ? t("Arrêter la dictée") : t("Dicter")} aria-pressed={listening}><CcMic /></button>
-              )}
+              <button type="button" className={"cc-r" + (listening ? " on" : "")} onClick={mic} aria-label={listening ? t("Arrêter la dictée") : t("Dicter")} aria-pressed={listening}><CcMic /></button>
               {(text.trim() || shot) && (
                 <button type="button" className="cc-r go" onClick={() => void send()} disabled={busy} aria-label={t("Envoyer")}><CcSend /></button>
               )}
             </div>
             <input ref={file} type="file" accept="image/*" hidden onChange={(e) => { setShot(e.target.files?.[0] || null); e.target.value = ""; }} />
-            <button type="button" className="v3-link cc-switch" onClick={toForm}>{t("Je préfère remplir le formulaire")}</button>
+            {!showCta && <button type="button" className="v3-link cc-switch" onClick={toForm}>{t("Je préfère remplir le formulaire")}</button>}
           </>
         )}
       </div>
@@ -611,7 +736,7 @@ export default function Concierge({ onCancel, onCreated, onForm }: { onCancel: (
             <div className="cc-list">
               {all.map((x) => (
                 <div key={x.key} className="cc-item">
-                  <KindIcon kind={x.kind} />
+                  <KindIcon kind={x.kind} booked={x.booked} />
                   <span className="t">{x.title}{x.sub && <small>{x.sub}</small>}</span>
                   {x.kind === "place" && x.must && <span className="v3-tag gold">{t("Incontournable")}</span>}
                   {x.kind === "fixed" && <span className="v3-tag gold">{x.booked ? t("Réservé") : t("Fixe")}</span>}
