@@ -18,7 +18,7 @@ import { PinForm } from "./components/PinDetail";
 import PlaceDetail from "./components/PlaceDetail";
 import PlaceList, { type Filter } from "./components/PlaceList";
 import TopBar, { TOOLS, type ToolKey } from "./components/TopBar";
-import { openHome } from "./components/v3/nav";
+import { openHome, takeIntent } from "./components/v3/nav";
 import { Converter, ExportPanel, Flights, Phrases, Practical } from "./components/Tools";
 import { Drawer, EscGuard, Toaster } from "./components/ui";
 import type { Place } from "./data/types";
@@ -296,6 +296,22 @@ export default function App() {
     },
     [desktop, fly],
   );
+
+  // opened from the home's "Ouvrir la journée" / "Y aller": today's day on the map, or the route to the next stop (once)
+  useEffect(() => {
+    const it = takeIntent(trip.id);
+    if (!it) return;
+    if (it.kind === "day") {
+      if (trip.days.some((d) => d.key === it.day)) showDay(it.day);
+      return;
+    }
+    const p = trip.places.find((x) => x.id === it.placeId);
+    if (!p) return;
+    if (trip.days.some((d) => d.key === p.day && d.scheduled)) showDay(p.day);
+    const f = getLoc().fix;
+    startNav(p, f && km(f, p) > 2.5 ? "car" : "walk");
+  }, [trip.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const stale = useLoc((s) => s.stale);
   // in a car (> ~15 km/h) the GPS course is the direction; on foot the compass (read inside the map)
   const me = useMemo(
