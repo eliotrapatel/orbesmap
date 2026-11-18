@@ -71,3 +71,23 @@ export const useAdmin = () =>
     },
     () => adminOpen,
   );
+
+// From the home, a way straight into the trip at the right place: today's day on the map, or the next stop with the
+// route started. Set just before opening the trip, read once by the map screen (App) when it opens on that trip.
+export type HomeIntent = { tripId: string; kind: "day"; day: string } | { tripId: string; kind: "go"; placeId: string };
+let intent: (HomeIntent & { at: number }) | null = null;
+export function setIntent(i: HomeIntent) {
+  intent = { ...i, at: Date.now() };
+}
+/** The intent for this trip, once (an old one, over 20 seconds, is dropped) */
+export function takeIntent(tripId: string): HomeIntent | null {
+  const i = intent;
+  if (!i) return null;
+  if (Date.now() - i.at > 20000) {
+    intent = null;
+    return null;
+  }
+  if (i.tripId !== tripId) return null;
+  intent = null;
+  return i;
+}

@@ -1,11 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
-import type { Trip } from "../../data/types";
-import { countable } from "../../lib/plan";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import type { Day, Place, Trip } from "../../data/types";
+import { TYPE_LABEL } from "../../data/trip";
+import { countable, dayStops, isHotel, stopTime } from "../../lib/plan";
 import { liveTrip } from "../../lib/live";
-import { getState, useStore } from "../../lib/store";
-import { clock, countdownParts, dayOfTrip, homeZone, phase, sameHour, tripEndMs, tripStartMs } from "../../lib/time";
+import type { PlaceState } from "../../lib/model";
+import { getState, toast, useStore } from "../../lib/store";
+import { clock, countdownParts, dayOfTrip, fmtDay, fmtMin, homeZone, localDate, phase, sameHour, tripEndMs, tripStartMs } from "../../lib/time";
 import { t } from "../../lib/i18n";
 import { dateLabel } from "../../lib/newTrip";
+import { recapDue, recapImage, recapOf, recapStats, shareRecapBlob } from "../../lib/recap";
+import { track } from "../../lib/track";
+import { setIntent } from "./nav";
 
 /** The trip with the places added / moved in the app (the open one from the store, the others from this phone) */
 function liveOf(trip: Trip): Trip {
@@ -24,6 +29,80 @@ function visitedOf(trip: Trip): number {
   } catch {
     return 0;
   }
+}
+/** The trip's place states (visited, appointments, slots moved) on this phone */
+function statesOf(trip: Trip): Record<string, PlaceState> {
+  try {
+    const raw = trip.id === getState().tripId ? getState().data : JSON.parse(localStorage.getItem("orbes.v2." + trip.id) || "null");
+    return raw?.places || {};
+  } catch {
+    return {};
+  }
+}
+
+/** Minutes since midnight now, in the trip's timezone */
+function minutesIn(timeZone: string, now: number): number {
+  const v = new Intl.DateTimeFormat("en-GB", { timeZone, hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(now));
+  const [h, m] = v.split(":").map(Number);
+  return ((h || 0) % 24) * 60 + (m || 0);
+}
+
+type Today = {
+  day?: Day;
+  /** the next stop of today's programme, not visited yet */
+  next?: Place;
+  when?: number;
+  /** stops left today, the next one included */
+  left: number;
+  /** today had stops in its programme */
+  hadStops: boolean;
+  /** nothing left today: the first stop of the next day of the programme */
+  later?: { day: Day; date: string; place: Place; when?: number; tomorrow: boolean };
+};
+
+/** Today in the programme: the next stop (by planned time, skipping the ones already visited), else the next day's first */
+function todayOf(trip: Trip, states: Record<string, PlaceState>, now: number): Today {
+  const today = localDate(trip.timezone, new Date(now));
+  const nowMin = minutesIn(trip.timezone, now);
+  const sched = trip.days.filter((d) => d.scheduled);
+  const day = sched.find((d) => d.dates?.includes(today));
+  const stops = day ? dayStops(trip, day.key, states).filter((p) => !isHotel(trip, p)) : [];
+  const todo = stops.filter((p) => !states[p.id]?.visited);
+  // a stop more than an hour behind gives way to the next one; the very last one stays up to three hours
+  let i = todo.findIndex((p) => {
+    const w = stopTime(p, states);
+    return w == null || w >= nowMin - 60;
+  });
+  if (i < 0 && todo.length) {
+    const w = stopTime(todo[todo.length - 1], states);
+    if (w != null && w >= nowMin - 180) i = todo.length - 1;
+  }
+  if (i >= 0) return { day, next: todo[i], when: stopTime(todo[i], states) ?? undefined, left: todo.length - i, hadStops: true };
+  const tomorrow = new Date(Date.parse(today + "T12:00:00Z") + 864e5).toISOString().slice(0, 10);
+  let later: Today["later"];
+  for (const d of sched) {
+    const date = (d.dates || []).filter((x) => x > today).sort()[0];
+    if (!date || (later && later.date <= date)) continue;
+    const first = dayStops(trip, d.key, states).find((p) => !isHotel(trip, p) && !states[p.id]?.visited);
+    if (first) later = { day: d, date, place: first, when: stopTime(first, states) ?? undefined, tomorrow: date === tomorrow };
+  }
+  return { day, left: 0, hadStops: stops.length > 0, later };
+}
+
+/** "25 min", "1 h 05", "2 h" */
+function span(min: number): string {
+  if (min < 60) return t("{n} min", { n: min });
+  const h = Math.floor(min / 60), m = min % 60;
+  return m ? t("{h} h {m}", { h, m: String(m).padStart(2, "0") }) : t("{h} h", { h });
+}
+/** How the planned time stands against now: "dans 25 min", "maintenant", "en retard de 10 min" */
+function relative(when: number | undefined, nowMin: number): { text: string; late: boolean } | null {
+  if (when == null) return null;
+  const diff = when - nowMin;
+  if (diff > 0) return { text: t("dans {d}", { d: span(diff) }), late: false };
+  if (diff >= -5) return { text: t("maintenant"), late: false };
+  if (diff >= -180) return { text: t("en retard de {d}", { d: span(-diff) }), late: true };
+  return null;
 }
 
 // where home is on the globe, from the phone's timezone (the arc starts there)
@@ -180,22 +259,48 @@ export default function TripHero({ trip: base, onOpen }: { trip: Trip; onOpen: (
     return () => window.removeEventListener("keydown", k);
   }, [base.id, onOpen]);
 
+  const top = (
+    <span className="v3-hero-top">
+      <span className="v3-tags">
+        {preparing ? (
+          <span className="v3-tag dim">{draft === "preparing" ? t("En préparation") : t("À valider")}</span>
+        ) : (
+          <span className={"v3-tag " + (ph === "during" ? "ok" : ph === "before" ? "gold" : "dim")}>{ph === "during" ? t("En cours") : ph === "before" ? t("À venir") : t("Passé")}</span>
+        )}
+      </span>
+      <span className="v3-clocks">
+        {home && !sameHour(home.zone, trip.timezone, d) && <span><small>{home.city}</small><b>{clock(home.zone, d)}</b></span>}
+        <span><small>{trip.title}</small><b>{clock(trip.timezone, d)}</b></span>
+      </span>
+    </span>
+  );
+  const progress = total > 0 && (
+    <span className="v3-hero-prog">
+      <span className="v3-hero-bar"><i style={{ width: `${(visited / total) * 100}%` }} /></span>
+      <small>{t("{v}/{n} visités", { v: visited, n: total })}</small>
+    </span>
+  );
+
+  // on site: today's programme first; just back: the recap (both are cards with their own buttons)
+  if (ph === "during" && !preparing)
+    return (
+      <TodayCard trip={trip} now={now} top={top} globe={<Globe from={from} to={trip.center} />} onOpen={() => onOpen(base.id)} progress={progress}
+        returnIn={cd.d > 0 ? t("{d} j {h} h", { d: cd.d, h: cd.h }) : t("{h} h {m} min", { h: cd.h, m: String(cd.m).padStart(2, "0") })}
+        facts={
+          <span className="v3-facts">
+            {hotel && <span>{t("Hôtel")} <b>{hotel}</b></span>}
+            {flight?.code && <span><b>{flight.code}</b> {flight.from} → {flight.to}</span>}
+          </span>
+        }
+      />
+    );
+  if (ph === "after" && !preparing && recapDue(trip, now))
+    return <RecapCard trip={trip} from={from} top={top} globe={<Globe from={from} to={trip.center} />} onOpen={() => onOpen(base.id)} />;
+
   return (
     <button className={"v3-hero" + (ph === "during" ? " live" : "")} onClick={() => onOpen(base.id)}>
       <Globe from={from} to={trip.center} />
-      <span className="v3-hero-top">
-        <span className="v3-tags">
-          {preparing ? (
-            <span className="v3-tag dim">{draft === "preparing" ? t("En préparation") : t("À valider")}</span>
-          ) : (
-            <span className={"v3-tag " + (ph === "during" ? "ok" : ph === "before" ? "gold" : "dim")}>{ph === "during" ? t("En cours") : ph === "before" ? t("À venir") : t("Passé")}</span>
-          )}
-        </span>
-        <span className="v3-clocks">
-          {home && !sameHour(home.zone, trip.timezone, d) && <span><small>{home.city}</small><b>{clock(home.zone, d)}</b></span>}
-          <span><small>{trip.title}</small><b>{clock(trip.timezone, d)}</b></span>
-        </span>
-      </span>
+      {top}
 
       <span className="v3-hero-body">
         <b className="v3-d v3-hero-title">{trip.title}</b>
@@ -235,5 +340,170 @@ export default function TripHero({ trip: base, onOpen }: { trip: Trip; onOpen: (
         </span>
       </span>
     </button>
+  );
+}
+
+/** A click on the card's ground opens the trip; its buttons do their own thing */
+const onGround = (open: () => void) => (e: React.MouseEvent) => {
+  if (!(e.target as HTMLElement).closest?.("button,a")) open();
+};
+
+/** On site: "Aujourd'hui", day X of N, the next stop and how its time stands, what is left today, and two ways in */
+function TodayCard({ trip, now, top, globe, onOpen, progress, returnIn, facts }: {
+  trip: Trip; now: number; top: ReactNode; globe: ReactNode; onOpen: () => void; progress: ReactNode; returnIn: string; facts: ReactNode;
+}) {
+  const slot = now - (now % 15000);
+  const states = useStore((s) => (s.tripId === trip.id ? s.data.places : null));
+  const td = useMemo(() => todayOf(trip, states || statesOf(trip), now), [trip, states, slot]); // eslint-disable-line react-hooks/exhaustive-deps
+  const dt = dayOfTrip(trip, now);
+  const nowMin = minutesIn(trip.timezone, now);
+  const rel = relative(td.when, nowMin);
+  const theme = td.day?.theme || "";
+  const open = (i?: { kind: "day"; day: string } | { kind: "go"; placeId: string }) => {
+    if (i) setIntent({ ...i, tripId: trip.id });
+    onOpen();
+  };
+  const kind = (p: Place) => t(TYPE_LABEL[p.type] || p.type);
+  const laterLabel = td.later ? (td.later.tomorrow ? t("Demain") : fmtDay(td.later.date, trip.timezone, { weekday: "long", day: "numeric", month: "long" })) : "";
+
+  return (
+    <div className="v3-hero live static" onClick={onGround(onOpen)}>
+      {globe}
+      {top}
+      <span className="v3-hero-body today">
+        <span className="v3-lbl v3-today-k">{t("Aujourd'hui")} · {t("Jour {i} sur {n}", { i: dt.i, n: dt.n })}</span>
+        <small className="v3-hero-when">{trip.title}{theme ? ` · ${theme}` : ""}</small>
+
+        {td.next ? (
+          <span className="v3-today">
+            <small className="v3-lbl">{t("Prochain arrêt")}</small>
+            <b className="v3-d v3-today-name">{td.next.name}</b>
+            <span className="v3-today-meta">
+              {td.when != null && <b>{fmtMin(td.when)}</b>}
+              <span>{kind(td.next)}</span>
+              {rel && <em className={rel.late ? "late" : ""}>{rel.text}</em>}
+            </span>
+            <small className="v3-today-left">
+              {td.left > 1 ? t("Encore {n} arrêts aujourd'hui", { n: td.left }) : t("Dernier arrêt de la journée")}
+            </small>
+          </span>
+        ) : (
+          <span className="v3-today">
+            <span className="v3-today-none">{td.hadStops ? t("Plus rien de prévu aujourd'hui.") : t("Rien de prévu aujourd'hui.")}</span>
+            {td.later && (
+              <>
+                <small className="v3-lbl" style={{ marginTop: 16 }}>{laterLabel}</small>
+                <b className="v3-d v3-today-name small">{td.later.place.name}</b>
+                <span className="v3-today-meta">
+                  {td.later.when != null && <b>{fmtMin(td.later.when)}</b>}
+                  <span>{kind(td.later.place)}</span>
+                </span>
+              </>
+            )}
+          </span>
+        )}
+
+        <span className="v3-today-acts">
+          {td.next ? (
+            <>
+              <button type="button" className="v3-hero-go" onClick={() => open(td.day ? { kind: "day", day: td.day.key } : undefined)}>
+                {t("Ouvrir la journée")}
+                <span aria-hidden="true">→</span>
+              </button>
+              <button type="button" className="v3-hero-alt" onClick={() => open({ kind: "go", placeId: td.next!.id })}>{t("Y aller")}</button>
+            </>
+          ) : td.later ? (
+            <>
+              <button type="button" className="v3-hero-go" onClick={() => open({ kind: "day", day: td.later!.day.key })}>
+                {td.later.tomorrow ? t("Voir demain") : t("Voir ce jour")}
+                <span aria-hidden="true">→</span>
+              </button>
+              <button type="button" className="v3-hero-alt" onClick={() => open()}>{t("Ouvrir le voyage")}</button>
+            </>
+          ) : (
+            <button type="button" className="v3-hero-go" onClick={() => open()}>
+              {t("Ouvrir le voyage")}
+              <span aria-hidden="true">→</span>
+            </button>
+          )}
+        </span>
+
+        {progress}
+        <small className="v3-today-ret" role="timer" aria-label={t("Temps restant sur place")}>{t("Retour dans {t}", { t: returnIn })}</small>
+        {facts}
+      </span>
+    </div>
+  );
+}
+
+/** Just back: the trip in figures, and its story image to share */
+function RecapCard({ trip, from, top, globe, onOpen }: {
+  trip: Trip; from: [number, number] | null; top: ReactNode; globe: ReactNode; onOpen: () => void;
+}) {
+  const states = useStore((s) => (s.tripId === trip.id ? s.data : null));
+  const draft = useStore((s) => s.trips[trip.id]?.draft);
+  const r = useMemo(() => recapOf(trip), [trip, states, draft]); // eslint-disable-line react-hooks/exhaustive-deps
+  const key = JSON.stringify(r) + (from || []).join(",");
+  // the image is drawn ahead, so the share sheet opens right on the touch (phones refuse it after a wait)
+  const [img, setImg] = useState<{ key: string; blob: Blob } | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let live = true;
+    const id = window.setTimeout(() => {
+      recapImage(r, from).then((blob) => { if (live) setImg({ key, blob }); }, () => undefined);
+    }, 500);
+    return () => {
+      live = false;
+      window.clearTimeout(id);
+    };
+  }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const share = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const blob = img?.key === key ? img.blob : await recapImage(r, from);
+      const res = await shareRecapBlob(r, blob);
+      if (res !== "cancelled") track("export", "recap", trip.id);
+      if (res === "saved") toast(t("Image du récapitulatif enregistrée"));
+    } catch {
+      toast(t("L'image n'a pas pu être préparée. Réessayez."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const stats = recapStats(r);
+  const showCities = r.cities.length > 1 || r.cities[0] !== r.title;
+
+  return (
+    <div className="v3-hero static recap" onClick={onGround(onOpen)}>
+      {globe}
+      {top}
+      <span className="v3-hero-body">
+        <span className="v3-lbl">{t("Récapitulatif")}</span>
+        <b className="v3-d v3-hero-title" style={{ marginTop: 8 }}>{trip.title}</b>
+        <small className="v3-hero-when">{r.dates}</small>
+        <span className="v3-recap-stats">
+          {stats.map(([v, l]) => (
+            <span key={l}>
+              <b>{v}</b>
+              <small>{l}</small>
+            </span>
+          ))}
+        </span>
+        {showCities && (
+          <span className="v3-facts">
+            <span>{r.cities.length > 1 ? t("Villes") : t("Ville")} <b>{r.cities.join(" · ")}</b></span>
+          </span>
+        )}
+        <span className="v3-today-acts col">
+          <button type="button" className="v3-hero-go" onClick={() => void share()} disabled={busy} aria-busy={busy}>
+            {busy ? t("Préparation de l'image…") : t("Partager le récapitulatif")}
+          </button>
+          <button type="button" className="v3-hero-alt" onClick={onOpen}>{t("Ouvrir le voyage")}</button>
+        </span>
+      </span>
+    </div>
   );
 }

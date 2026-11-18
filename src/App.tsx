@@ -18,7 +18,7 @@ import { PinForm } from "./components/PinDetail";
 import PlaceDetail from "./components/PlaceDetail";
 import PlaceList, { type Filter } from "./components/PlaceList";
 import TopBar, { TOOLS, type ToolKey } from "./components/TopBar";
-import { openHome } from "./components/v3/nav";
+import { openHome, takeIntent } from "./components/v3/nav";
 import { Converter, ExportPanel, Flights, Phrases, Practical } from "./components/Tools";
 import { Drawer, EscGuard, Toaster } from "./components/ui";
 import type { Place } from "./data/types";
@@ -28,7 +28,7 @@ import { createPlace, currentAuthor, switchTrip, toast, updateDef, updatePlace, 
 import { noteKey } from "./lib/notes";
 import { pinPlaceId } from "./lib/live";
 import { enrichPlace } from "./lib/enrich";
-import type { Pin } from "./lib/model";
+import type { Pin, PlaceState } from "./lib/model";
 import { ensureCompass, getLoc, onLocateError, resumeLocate, setFollow, startLocate, stopLocate, useLoc } from "./lib/locate";
 import type { Mode } from "./lib/route";
 import { NavCard, PointCard, useNavigation, type NavState, type NavTarget } from "./components/Nav";
@@ -296,6 +296,43 @@ export default function App() {
     },
     [desktop, fly],
   );
+
+  const guessed = useRef<{ target: NavTarget; mode: Mode } | null>(null);
+  // opened from the home's "Ouvrir la journée" / "Y aller": today's day on the map, or the route to the next stop (once)
+  useEffect(() => {
+    const it = takeIntent(trip.id);
+    if (!it) return;
+    if (it.kind === "day") {
+      if (trip.days.some((d) => d.key === it.day)) showDay(it.day);
+      return;
+    }
+    const p = trip.places.find((x) => x.id === it.placeId);
+    if (!p) return;
+    if (trip.days.some((d) => d.key === p.day && d.scheduled)) showDay(p.day);
+    const f = getLoc().fix;
+    if (f) {
+      startNav(p, km(f, p) > 2.5 ? "car" : "walk");
+      return;
+    }
+    // no position yet (opened straight from the home): guessed from the stop before it today, else the hotel,
+    // and picked again from the real position when it arrives, unless the mode was changed by hand
+    const order = dayStops(trip, p.day, data.places as Record<string, PlaceState>);
+    const i = order.findIndex((x) => x.id === p.id);
+    const before = i > 0 ? order[i - 1] : null;
+    const from = before && Number.isFinite(before.lat) && Number.isFinite(before.lng) ? before : trip.hotel;
+    const mode: Mode = from && Number.isFinite(from.lat) && Number.isFinite(from.lng) && km(from, p) > 2.5 ? "car" : "walk";
+    guessed.current = { target: p, mode };
+    startNav(p, mode);
+  }, [trip.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const g = guessed.current;
+    if (!g || !fix) return;
+    guessed.current = null;
+    if (!nav || nav.target !== g.target || nav.mode !== g.mode) return;
+    const mode: Mode = km(fix, g.target) > 2.5 ? "car" : "walk";
+    if (mode !== nav.mode) setNav({ ...nav, mode });
+  }, [fix, nav]);
+
   const stale = useLoc((s) => s.stale);
   // in a car (> ~15 km/h) the GPS course is the direction; on foot the compass (read inside the map)
   const me = useMemo(

@@ -3,6 +3,7 @@ import type { Trip } from "../../data/types";
 import { createTrip, getState, requestPro, signOutChecked, switchTrip, useStore, useTrips } from "../../lib/store";
 import { dateLabel, dayCount, newTripRecord, searchCities, type Destination } from "../../lib/newTrip";
 import { daysLeft, phase } from "../../lib/time";
+import { recapDue } from "../../lib/recap";
 import TripHero from "./TripHero";
 import OrbitMark from "../OrbitMark";
 import Shell, { Steps } from "./Shell";
@@ -37,6 +38,11 @@ export default function Trips({ onOpen, onClose }: { onOpen: (id: string) => voi
     return [...trips].sort((a, b) => rank(a) - rank(b) || (rank(a) === 2 ? b.start.localeCompare(a.start) : a.start.localeCompare(b.start)));
   }, [trips]);
   const [hero, ...rest] = sorted;
+  // no trip to come or under way: "Où allez-vous ensuite ?" comes first; the trip just ended keeps its recap on top
+  // (for RECAP_DAYS after its end), older ones join the past trips
+  const between = !!hero && phase(hero) === "after";
+  const showHero = !!hero && (!between || recapDue(hero));
+  const others = between && !showHero ? sorted : rest;
 
   if (creating === "choose") return <CreateChooser onCancel={() => setCreating(false)} onPick={(k) => { track("tool_opened", `create_${k}`); setCreatingRaw(k); }} />;
   if (creating === "concierge") return <Concierge onCancel={() => setCreating(false)} onForm={() => setCreatingRaw("form")} onCreated={(id) => { setCreating(false); onOpen(id); }} />;
@@ -80,14 +86,21 @@ export default function Trips({ onOpen, onClose }: { onOpen: (id: string) => voi
         <h1 className="v3-d v3-h2" style={{ margin: 0 }}>{t("Mes voyages")}</h1>
         <span>{trips.length}</span>
       </div>
-      {hero && <TripHero trip={hero} onOpen={onOpen} />}
-      {rest.length > 0 && (
+      {showHero && hero && <TripHero trip={hero} onOpen={onOpen} />}
+      {between && (
+        <section className="v3-hero-next" aria-label={t("Prochain voyage")}>
+          <h2 className="v3-d">{t("Où allez-vous ensuite ?")}</h2>
+          <p className="v3-lead">{t("Une destination et des dates suffisent. Le reste se construit avec vous.")}</p>
+          <button className="v3-btn" onClick={() => setCreating(true)}>{t("＋ Créer un voyage")}</button>
+        </section>
+      )}
+      {others.length > 0 && (
         <>
-          <p className="v3-lbl" style={{ marginTop: 26 }}>{t("Autres voyages")}</p>
-          <div className={"v3-grid" + (rest.length === 1 ? " one" : "")}>{rest.map((t) => <TripCard key={t.id} t={t} onOpen={onOpen} />)}</div>
+          <p className="v3-lbl" style={{ marginTop: 26 }}>{between ? t("Voyages passés") : t("Autres voyages")}</p>
+          <div className={"v3-grid" + (others.length === 1 ? " one" : "")}>{others.map((t) => <TripCard key={t.id} t={t} onOpen={onOpen} />)}</div>
         </>
       )}
-      <button className="v3-btn ghost" style={{ marginTop: 18 }} onClick={() => setCreating(true)}>{t("＋ Créer un voyage")}</button>
+      {!between && <button className="v3-btn ghost" style={{ marginTop: 18 }} onClick={() => setCreating(true)}>{t("＋ Créer un voyage")}</button>}
       <div style={{ height: 24 }} />
     </Shell>
   );
