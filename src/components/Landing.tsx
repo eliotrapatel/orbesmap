@@ -1,10 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import OrbitMark from "./OrbitMark";
-import { TRIPS } from "../data/trip";
 import type { Trip } from "../data/types";
 import { countable } from "../lib/plan";
 import { liveTrip } from "../lib/live";
-import { getState } from "../lib/store";
+import { getState, useTrips } from "../lib/store";
 import { clock, countdownParts, phase, tripEndMs, tripStartMs } from "../lib/time";
 
 function visitedOf(t: Trip): number {
@@ -29,6 +28,7 @@ function liveOf(t: Trip, current: Trip): Trip {
 }
 
 export default function Landing({ trip, onPick, onEnter }: { trip: Trip; onPick: (id: string) => void; onEnter: () => void }) {
+  const trips = useTrips();
   const [now, setNow] = useState(Date.now());
   const [out, setOut] = useState(false);
   useEffect(() => {
@@ -79,7 +79,7 @@ export default function Landing({ trip, onPick, onEnter }: { trip: Trip; onPick:
     return () => window.removeEventListener("resize", fit);
   }, [trip.id]);
   const days = trip.days.filter((d) => d.scheduled).reduce((n, d) => n + (d.dates?.length || 0), 0);
-  const ordered = TRIPS.map((t) => liveOf(t, trip)).sort((a, b) => b.start.localeCompare(a.start));
+  const ordered = trips.map((t) => liveOf(t, trip)).sort((a, b) => b.start.localeCompare(a.start));
 
   return (
     <div ref={root} className={"landing" + (out ? " out" : "")} role="dialog" aria-label="Accueil">

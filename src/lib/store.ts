@@ -6,7 +6,8 @@
 // - Data is kept per trip; settings (EUR rate) are shared.
 import { useSyncExternalStore } from "react";
 import type { RealtimeChannel, Session } from "@supabase/supabase-js";
-import { TRIP_BY_ID, defaultTrip } from "../data/trip";
+import { TRIP_BY_ID } from "../data/trip";
+import { tripFromRecord, tripSeedPatch, type TripRec } from "./trips";
 import type { Trip } from "../data/types";
 import { dataUrlToBlob, deletePhotoFile, getPhoto, putPhoto } from "./idb";
 import { LEGACY_MARKER, LEGACY_TRIP, hasLegacyData, importLegacy, legacyPhotoList, readLegacyPhoto } from "./legacy";
@@ -19,11 +20,13 @@ const dataKey = (tripId: string) => "orbes.v2." + tripId;
 const SETTINGS_KEY = "orbes.settings";
 const OUTBOX_KEY = "orbes.outbox.v2";
 const TRIP_KEY = "orbes.trip";
+const TRIPS_KEY = "orbes.trips.v1";
 const PHOTOS_MARKER = LEGACY_MARKER + ".photos";
 
 type Op =
   | { t: "place"; trip: string; id: string }
   | { t: "def"; trip: string; id: string }
+  | { t: "trip"; trip: string; id: string }
   | { t: "contact"; trip: string; id: string }
   | { t: "contact-del"; trip: string; id: string }
   | { t: "pin"; trip: string; id: string }
@@ -36,6 +39,8 @@ export type SyncState = "local" | "idle" | "syncing" | "pending" | "error" | "de
 
 interface State {
   tripId: string;
+  /** every trip's record (table "trips"), whatever the current trip */
+  trips: Record<string, TripRec>;
   data: Data;
   settings: Settings;
   session: Session | null;
@@ -125,16 +130,29 @@ function saveTrip(tripId: string, d: Data): boolean {
   return false;
 }
 
+// ---------- trips (table "trips", see trips.ts) ----------
+const savedTrips = readJSON<Record<string, TripRec>>(TRIPS_KEY) || {};
+const known = (id: string) => !!TRIP_BY_ID[id] || (!!savedTrips[id] && savedTrips[id].deleted !== true);
+
 function initialTrip(): string {
   const fromHash = decodeURIComponent(location.hash.replace(/^#/, ""));
-  if (TRIP_BY_ID[fromHash]) return fromHash;
+  if (known(fromHash)) return fromHash;
   try {
     const saved = localStorage.getItem(TRIP_KEY);
-    if (saved && TRIP_BY_ID[saved]) return saved;
+    if (saved && known(saved)) return saved;
   } catch {
     /* ignore */
   }
-  return defaultTrip().id;
+  return defaultTripId(Object.keys(TRIP_BY_ID).map((id) => tripFromRecord(id, savedTrips[id], TRIP_BY_ID[id])));
+}
+
+/** The trip to open by default: the one in progress, else the next one, else the most recent */
+function defaultTripId(list: Trip[], now = Date.now()): string {
+  const t = (iso: string, end = false) => new Date(iso + (end ? "T23:59:00+08:00" : "T00:00:00+08:00")).getTime();
+  const current = list.find((x) => now >= t(x.start) && now <= t(x.end, true));
+  if (current) return current.id;
+  const next = list.filter((x) => t(x.start) > now).sort((a, b) => t(a.start) - t(b.start))[0];
+  return (next || [...list].sort((a, b) => b.start.localeCompare(a.start))[0] || { id: Object.keys(TRIP_BY_ID)[0] }).id;
 }
 
 // ---------- one-time import of the June 2026 version ----------
@@ -172,6 +190,7 @@ let migrateAtStart = true;
 
 let state: State = {
   tripId: startTrip,
+  trips: savedTrips,
   data: startTrip === LEGACY_TRIP && legacyUnsaved ? legacyUnsaved : loadTrip(startTrip),
   settings: initialSettings,
   session: null,
@@ -220,18 +239,54 @@ export function useStore<T>(sel: (s: State) => T): T {
   );
 }
 export const getState = () => state;
+
+/** The trips written in the code belong to the first shared space: shown signed out (this phone only) or to its members */
+const codeTripsVisible = () => !state.session || state.member !== false;
+
+const baseCache = new Map<string, { rec: TripRec | undefined; trip: Trip }>();
+/** A trip without its places (they come from the places table): its record over the trip of the code */
+export function baseTrip(id: string): Trip {
+  const rec = state.trips[id];
+  const hit = baseCache.get(id);
+  if (hit && hit.rec === rec) return hit.trip;
+  const trip = tripFromRecord(id, rec, TRIP_BY_ID[id]);
+  baseCache.set(id, { rec, trip });
+  return trip;
+}
+/** Trips this person can open */
+export function tripIds(): string[] {
+  const ids = new Set(Object.keys(state.trips).filter((id) => state.trips[id]?.deleted !== true));
+  if (codeTripsVisible()) for (const id of Object.keys(TRIP_BY_ID)) ids.add(id);
+  return [...ids];
+}
+let listCache: { key: string; list: Trip[] } | null = null;
+/** Trips this person can open (without their places), the most recent first */
+export function listTrips(): Trip[] {
+  const list = tripIds().map(baseTrip).sort((a, b) => b.start.localeCompare(a.start));
+  const key = list.map((t) => t.id + ":" + (state.trips[t.id]?.updatedAt ?? 0)).join("|");
+  if (listCache?.key === key) return listCache.list;
+  listCache = { key, list };
+  return list;
+}
+export function useTrips(): Trip[] {
+  useStore((s) => s.trips);
+  useStore((s) => s.session);
+  useStore((s) => s.member);
+  return listTrips();
+}
 /** The current trip as used in the app: the programme plus the places added and moved in the app (see live.ts) */
 export function useTrip(): Trip {
   const id = useStore((s) => s.tripId);
   const places = useStore((s) => s.data.places);
   const pins = useStore((s) => s.data.pins);
   const defs = useStore((s) => s.data.defs);
-  return liveTripCached(TRIP_BY_ID[id], { places, pins, defs });
+  useStore((s) => s.trips[id]);
+  return liveTripCached(baseTrip(id), { places, pins, defs });
 }
-export const currentTrip = (): Trip => liveTripCached(TRIP_BY_ID[state.tripId], state.data);
+export const currentTrip = (): Trip => liveTripCached(baseTrip(state.tripId), state.data);
 
 export function switchTrip(tripId: string) {
-  if (!TRIP_BY_ID[tripId] || tripId === state.tripId) return;
+  if (!tripIds().includes(tripId) || tripId === state.tripId) return;
   try {
     localStorage.setItem(TRIP_KEY, tripId);
   } catch {
@@ -354,7 +409,7 @@ function flush(fromPull = false): Promise<void> {
     try {
       while (canSync()) {
         // place records wait (in the outbox) while the "places" table does not exist on the server yet
-        const op = outbox.find((o) => !(o.t === "def" && defsMissing));
+        const op = outbox.find((o) => !(o.t === "def" && defsMissing) && !(o.t === "trip" && tripsMissing));
         if (!op) break;
         try {
           await run(op);
@@ -368,7 +423,7 @@ function flush(fromPull = false): Promise<void> {
         persistOutbox();
       }
       // place changes still waiting for the "places" table: not "synced"
-      if (outbox.some((o) => o.t === "def")) set({ sync: "pending" });
+      if (outbox.some((o) => o.t === "def" || o.t === "trip")) set({ sync: "pending" });
       else set({ sync: "idle", syncedAt: Date.now() });
     } catch (e) {
       console.warn("[orbes] sync failed, will retry", e);
@@ -393,6 +448,18 @@ async function run(op: Op) {
     check(await sb.from("settings").upsert({ id: 1, eur_rate: state.settings.eurRate }));
     return;
   }
+  if (op.t === "trip") {
+    const { data: merged, error } = await sb.rpc("upsert_trip", { p_trip: op.id, p_data: state.trips[op.id] || {} });
+    if (error) {
+      if (isMissing(error, "trip")) {
+        tripsMissing = true;
+        throw new DefsMissing();
+      }
+      throw error;
+    }
+    if (merged) setTrips({ ...state.trips, [op.id]: mergePlaceState(state.trips[op.id] as PlaceState, merged as PlaceState).merged as TripRec });
+    return;
+  }
   const trip_id = op.trip;
   const d = dataOf(trip_id);
   switch (op.t) {
@@ -400,7 +467,7 @@ async function run(op: Op) {
       const s = d.defs[op.id] || {};
       const { data: merged, error } = await sb.rpc("upsert_place", { p_trip: trip_id, p_place: op.id, p_data: s });
       if (error) {
-        if (isMissing(error)) {
+        if (isMissing(error, "place")) {
           defsMissing = true;
           throw new DefsMissing();
         }
@@ -474,18 +541,19 @@ export async function pull() {
   try {
     await flush(true);
     doneDuringPull = new Set();
-    const [ps, cs, pins, phs, st, pl] = await Promise.all([
+    const [ps, cs, pins, phs, st, pl, tr] = await Promise.all([
       sb.from("place_states").select("place_id,data,updated_at").eq("trip_id", trip),
       sb.from("contacts").select("*").eq("trip_id", trip),
       sb.from("pins").select("*").eq("trip_id", trip),
       sb.from("photos").select("*").eq("trip_id", trip),
       sb.from("settings").select("eur_rate").eq("id", 1).maybeSingle(),
       sb.from("places").select("place_id,data,updated_at").eq("trip_id", trip),
+      sb.from("trips").select("id,data,updated_at"),
     ]);
     for (const r of [ps, cs, pins, phs, st]) if (r.error) throw r.error;
     // the "places" table not created yet on the server: places stay on this phone and wait
     if (pl.error) {
-      if (!isMissing(pl.error)) throw pl.error;
+      if (!isMissing(pl.error, "place")) throw pl.error;
       defsMissing = true;
     } else {
       defsMissing = false;
@@ -587,7 +655,25 @@ export async function pull() {
     if (st.data && !settingsPending) setSettingsLocal({ eurRate: Number(st.data.eur_rate) || state.settings.eurRate });
     else if (!st.data && !settingsPending) toPush.push({ t: "settings" });
 
+    // every trip this person can open (records merged field by field)
+    if (tr.error) {
+      if (!isMissing(tr.error, "trip")) throw tr.error;
+      tripsMissing = true;
+    } else {
+      tripsMissing = false;
+      tripsKnown = true;
+      const merged: Record<string, TripRec> = { ...state.trips };
+      for (const r of tr.data!) {
+        if (pendingUp.has(`trip:${r.id}`) || outbox.some((o) => o.t === "trip" && o.id === r.id)) continue;
+        const remote = { updatedAt: new Date(r.updated_at).getTime(), ...(r.data as PlaceState) };
+        const { merged: m, localNewer } = mergePlaceState(state.trips[r.id] as PlaceState, remote);
+        merged[r.id] = m as TripRec;
+        if (localNewer) toPush.push({ t: "trip", trip: r.id, id: r.id });
+      }
+      setTrips(merged);
+    }
     toPush.forEach(enqueue);
+    seedTrips();
     // what the other phone (maybe still on the previous version) changed, copied into the place records
     migrate(trip, true);
     subscribePlaces();
@@ -681,6 +767,8 @@ function subscribePlaces() {
     liveTimer = window.setTimeout(() => void pull(), 1200);
   };
   ch.on("postgres_changes", { event: "*", schema: "public", table: "places", filter: `trip_id=eq.${trip}` }, onChange);
+  // trips this person can open (a trip renamed or re-dated on the other phone)
+  if (tripsKnown && !tripsMissing) ch.on("postgres_changes", { event: "*", schema: "public", table: "trips" }, onChange);
   ch.subscribe();
   placesChannel = ch;
   placesChannelTrip = trip;
@@ -819,13 +907,51 @@ let defsMissing = false;
 class DefsMissing extends Error {}
 /** the table answered at least once (its live channel can be opened) */
 let placesKnown = false;
-const isMissing = (e: { code?: string; message?: string }) =>
-  ["PGRST202", "PGRST205", "42P01", "42883"].includes(e.code || "") || /(could not find|does not exist).*(places|upsert_place)|(places|upsert_place).*(could not find|does not exist)/i.test(e.message || "");
+/** The table / function of `what` ("place": places + upsert_place, "trip": trips + upsert_trip) is not on the server yet */
+const isMissing = (e: { code?: string; message?: string }, what: "place" | "trip") => {
+  const m = e.message || "";
+  const names = what === "place" ? /\b(public\.)?(places|upsert_place)\b/i : /\b(public\.)?(trips|upsert_trip)\b/i;
+  return (["PGRST202", "PGRST205", "42P01", "42883"].includes(e.code || "") && (names.test(m) || !m)) || (/could not find|does not exist/i.test(m) && names.test(m));
+};
+/** true while the server has no "trips" table yet (supabase/saas.sql not run) */
+let tripsMissing = false;
+let tripsKnown = false;
+
+function setTrips(trips: Record<string, TripRec>) {
+  writeJSON(TRIPS_KEY, trips);
+  set({ trips });
+}
+
+/** Changes fields of a trip's record (title, dates, hotel, days, flights…), shared with its members */
+export function updateTrip(id: string, patch: Record<string, unknown>) {
+  const now = Date.now();
+  const cur = state.trips[id] || {};
+  const fieldsAt = { ...(cur.fieldsAt || {}) };
+  for (const k of Object.keys(patch)) fieldsAt[k] = now;
+  setTrips({ ...state.trips, [id]: { ...cur, ...patch, fieldsAt, updatedAt: now } });
+  enqueue({ t: "trip", trip: id, id });
+}
+
+/** The trips of the code get their record (members of the first shared space only, once signed in) */
+function seedTrips() {
+  if (!canSync() || tripsMissing || !codeTripsVisible()) return;
+  const next = { ...state.trips };
+  const ids: string[] = [];
+  for (const [id, code] of Object.entries(TRIP_BY_ID)) {
+    const p = tripSeedPatch(code, next[id]);
+    if (!p) continue;
+    next[id] = mergePlaceState(next[id] as PlaceState, p as PlaceState).merged as TripRec;
+    ids.push(id);
+  }
+  if (!ids.length) return;
+  setTrips(next);
+  ids.forEach((id) => enqueue({ t: "trip", trip: id, id }));
+}
 
 /** Brings the trip's place records up to date (first programme, places added before, previous version's changes) */
 function migrate(tripId: string, pinsSynced: boolean) {
-  const base = TRIP_BY_ID[tripId];
-  if (!base) return;
+  if (!tripIds().includes(tripId)) return;
+  const base = baseTrip(tripId);
   const patches = migrationPatches(base, dataOf(tripId), pinsSynced);
   const ids = Object.keys(patches);
   if (!ids.length) return;

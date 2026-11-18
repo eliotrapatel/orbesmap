@@ -1,7 +1,7 @@
 // Read-only snapshot of the whole notebook for the "Demander" assistant, in two parts:
 // - stable: everything in the notebook (no time, no position) → identical between questions, so DeepSeek caches it
 // - live: current time, position (with its age), weather, sync state, what is open now and distances
-import { TRIPS } from "../data/trip";
+import { listTrips } from "./store";
 import type { Trip } from "../data/types";
 import { km } from "./geo";
 import { checkVisit, hoursLine, liveStatus } from "./hours";
@@ -130,7 +130,7 @@ function tripBlock(trip: Trip, data: Data, detailed: boolean, cap: number) {
 function buildStableAt(trip: Trip, data: Data, settings: Settings, cap: number): string {
   const ins = (data.places["_info:insurance"] || {}) as Record<string, unknown>;
   const hist = readJSON<{ at: number; r: { kind: string; title: string; summary: string; material: string; contact: Record<string, string>; lines: { zh: string; fr: string; price: number }[] } }[]>("orbes.photo.history") || [];
-  const others = TRIPS.filter((t) => t.id !== trip.id).map((t) => {
+  const others = listTrips().filter((t) => t.id !== trip.id).map((t) => {
     const d = readJSON<Data>("orbes.v2." + t.id);
     const od = d ? { places: d.places || {}, defs: d.defs || {}, contacts: d.contacts || [], pins: d.pins || [], photos: d.photos || [] } : null;
     return od

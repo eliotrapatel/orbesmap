@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import OrbitMark from "./OrbitMark";
-import { TRIPS } from "../data/trip";
 import type { Trip } from "../data/types";
 import { clock, phase } from "../lib/time";
 import { useWeather } from "../lib/weather";
@@ -8,7 +7,7 @@ import { useSyncState } from "./Account";
 import { ICal, IChat, IChevron, IDownload, IGrid, IInfo, IPlane, ISearch, IUser, ICheck, ITranslate, IChecklist, ISos, IAsk } from "./Icons";
 import { WxIcon } from "./WxIcon";
 import { useChecklist } from "./Checklist";
-import { useStore } from "../lib/store";
+import { useStore, useTrips } from "../lib/store";
 import { supabaseConfigured } from "../lib/supabase";
 import { useEscape } from "./ui";
 
@@ -40,6 +39,7 @@ function useNow(ms = 30_000) {
 
 export function TripMenu({ trip, onPick, onClose, anchor }: { trip: Trip; onPick: (id: string) => void; onClose: () => void; anchor: DOMRect | null }) {
   const ref = useRef<HTMLDivElement>(null);
+  const trips = useTrips();
   useEscape(onClose);
   useEffect(() => {
     const f = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && onClose();
@@ -48,7 +48,7 @@ export function TripMenu({ trip, onPick, onClose, anchor }: { trip: Trip; onPick
   }, [onClose]);
   return (
     <div ref={ref} className="menu glass" role="menu" style={{ top: (anchor?.bottom ?? 60) + 8, left: Math.max(8, Math.min(anchor?.left ?? 12, window.innerWidth - 316)) }}>
-      {TRIPS.map((t) => {
+      {trips.map((t) => {
         const ph = phase(t);
         return (
           <button key={t.id} role="menuitemradio" aria-checked={t.id === trip.id} className={"menu-item" + (t.id === trip.id ? " on" : "")} onClick={() => onPick(t.id)}>

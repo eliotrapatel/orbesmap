@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { TRIPS, TYPE_LABEL } from "../data/trip";
+import { TYPE_LABEL } from "../data/trip";
 import type { Place, Trip } from "../data/types";
 import type { Pin } from "../lib/model";
 import { ICube, ILocate, IPin, IPinPlus, ISearch, ISpeaker } from "./Icons";
 import { TOOLS, type ToolKey } from "./TopBar";
-import { getState } from "../lib/store";
+import { getState, listTrips } from "../lib/store";
 import { notesText } from "../lib/notes";
 
 const TOOL_WORDS: Partial<Record<ToolKey, string>> = {
@@ -61,7 +61,7 @@ export default function CommandPalette(p: {
     out.push({ id: "a:loc", section: "Actions", title: "Ma position", icon: <span className="ic"><ILocate /></span>, run: p.onLocate, text: norm("ma position localisation gps ou suis je") });
     out.push({ id: "a:pin", section: "Actions", title: "Ajouter un lieu sur la carte", icon: <span className="ic"><IPinPlus /></span>, run: p.onAddPin, text: norm("ajouter lieu epingle pin") });
     out.push({ id: "a:link", section: "Actions", title: "Ajouter un lieu : lien, nom ou description", icon: <span className="ic"><IPinPlus /></span>, run: p.onAddLink, text: norm("ajouter lien xiaohongshu dianping instagram capture adresse chercher proposer suggestion bar restaurant boutique") });
-    for (const t of TRIPS) if (t.id !== p.trip.id) out.push({ id: "trip:" + t.id, section: "Voyages", title: `Ouvrir ${t.title}`, sub: t.dateLabel, icon: <span className="ic"><ISearch /></span>, run: () => p.onTrip(t.id), text: norm(`voyage ${t.title} ${t.code}`) });
+    for (const t of listTrips()) if (t.id !== p.trip.id) out.push({ id: "trip:" + t.id, section: "Voyages", title: `Ouvrir ${t.title}`, sub: t.dateLabel, icon: <span className="ic"><ISearch /></span>, run: () => p.onTrip(t.id), text: norm(`voyage ${t.title} ${t.code}`) });
     for (const g of p.trip.phrases) for (const ph of g.items) out.push({ id: "ph:" + g.title + ph.zh, section: "Phrases", title: ph.fr, sub: `${ph.zh} · ${ph.pinyin}`, icon: <span className="ic"><ISpeaker /></span>, run: () => speak(ph.zh), text: norm(ph.fr + " " + ph.pinyin) + " " + ph.zh });
     return out;
   }, [p]);
