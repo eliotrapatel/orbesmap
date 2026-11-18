@@ -47,27 +47,30 @@ async function account(token: string): Promise<{ email: string; member: boolean 
 
 /** AI requests an account (outside the shared space) may make per 24 h, everything being free for now */
 const DAILY_CAP = 40;
-/** The account's AI requests over the last 24 h (table ai_usage); unknown = the cap (refused, never free spending) */
-async function callsToday(token: string, f: typeof fetch): Promise<number> {
+/** Requests per 24 h for the whole service outside the shared space (a ceiling on total spending) */
+const GLOBAL_CAP = Number(process.env.AI_GLOBAL_DAILY_CAP) || 1500;
+/** Books one request for the account before the AI is called (server function, atomic); null = refused or unknown */
+async function reserve(token: string, task: string, f: typeof fetch): Promise<number | null> {
   try {
-    const since = new Date(Date.now() - 864e5).toISOString();
-    const r = await f(`${SUPA_URL}/rest/v1/ai_usage?select=id&at=gte.${encodeURIComponent(since)}`, {
-      headers: { apikey: SUPA_KEY, authorization: `Bearer ${token}`, Prefer: "count=exact", Range: "0-0" },
+    const r = await f(`${SUPA_URL}/rest/v1/rpc/reserve_ai_call`, {
+      method: "POST",
+      headers: { apikey: SUPA_KEY, authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({ p_task: task, p_cap: DAILY_CAP, p_global_cap: GLOBAL_CAP }),
     });
-    if (!r.ok && r.status !== 416) return DAILY_CAP;
-    const n = Number((r.headers.get("content-range") || "").split("/")[1]);
-    return Number.isFinite(n) ? n : DAILY_CAP;
+    if (!r.ok) return null;
+    const id = await r.json();
+    return typeof id === "number" ? id : null;
   } catch {
-    return DAILY_CAP;
+    return null;
   }
 }
-/** One row per AI request in the account's own usage (best effort, after the answer) */
-async function logAccount(token: string, row: Json, f: typeof fetch): Promise<void> {
+/** After the answer: its cost and whether it worked (best effort) */
+async function finish(token: string, id: number, usd: number, ok: boolean, f: typeof fetch): Promise<void> {
   try {
-    await f(`${SUPA_URL}/rest/v1/ai_usage`, {
+    await f(`${SUPA_URL}/rest/v1/rpc/finish_ai_call`, {
       method: "POST",
-      headers: { apikey: SUPA_KEY, authorization: `Bearer ${token}`, "content-type": "application/json", Prefer: "return=minimal" },
-      body: JSON.stringify(row),
+      headers: { apikey: SUPA_KEY, authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({ p_id: id, p_usd: usd, p_ok: ok }),
     });
   } catch {
     /* best effort */
@@ -538,10 +541,14 @@ export async function handle(req: Request, deps: Deps = {}): Promise<Response> {
     return json({ error: "bad", message: "Requête illisible." }, 400, origin);
   }
 
-  // accounts outside the first shared space: a daily cap (everything is free for now, the AI is not)
+  // accounts outside the first shared space: each request is booked first (daily cap per account and for the
+  // whole service; everything is free for now, the AI is not)
+  let booked: number | null = null;
   if (!acc.member) {
     if (body.task === "balance") return json({ error: "auth", message: "Réservé à l'espace partagé." }, 403, origin);
-    if ((await callsToday(token, f)) >= DAILY_CAP) return json({ error: "busy", message: `Limite du jour atteinte (${DAILY_CAP} demandes à l'IA). Elle repart dans les 24 heures.` }, 429, origin);
+    if (body.task === "ask" && typeof body.context === "string" && body.context.length > 150_000) return json({ error: "bad", message: "Carnet trop gros pour une question." }, 400, origin);
+    booked = await reserve(token, String(body.task || ""), f);
+    if (booked == null) return json({ error: "busy", message: `Limite du jour atteinte (${DAILY_CAP} demandes à l'IA). Elle repart dans les 24 heures.` }, 429, origin);
   }
 
   // DeepSeek balance (official API) + our own spending log (DeepSeek has no history API)
@@ -655,13 +662,15 @@ export async function handle(req: Request, deps: Deps = {}): Promise<Response> {
     const started = Date.now();
     // the log is written after the answer has left (the function stays alive until it is done)
     const log = (ok: boolean) => {
-      // every account's own count (the daily cap), then the shared space's detailed spending log
-      const mine = logAccount(token, { task: job.task, usd: Math.round(usage.usd * 1e6) / 1e6, ok }, f);
-      try {
-        if (deps.fetch) void mine;
-        else waitUntil(mine);
-      } catch {
-        void mine;
+      // the account's booked request gets its cost, then the shared space's detailed spending log
+      if (booked != null) {
+        const mine = finish(token, booked, Math.round(usage.usd * 1e6) / 1e6, ok, f);
+        try {
+          if (deps.fetch) void mine;
+          else waitUntil(mine);
+        } catch {
+          void mine;
+        }
       }
       if (!acc.member || provider !== "deepseek" || usage.hit + usage.miss + usage.out + usage.search + usage.fetch === 0) return;
       const p = logUsage(token, { at: started, task: job.task, by, model: DS_MODEL, ...usage, usd: Math.round(usage.usd * 1e6) / 1e6, ok, ms: Date.now() - started }, f);

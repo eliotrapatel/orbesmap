@@ -153,7 +153,7 @@ function initialTrip(): string {
 }
 
 /** The trip to open by default: the one in progress, else the next one, else the most recent */
-function defaultTripId(list: Trip[], now = Date.now()): string {
+export function defaultTripId(list: Trip[], now = Date.now()): string {
   const t = (iso: string, end = false) => new Date(iso + (end ? "T23:59:00+08:00" : "T00:00:00+08:00")).getTime();
   const current = list.find((x) => now >= t(x.start) && now <= t(x.end, true));
   if (current) return current.id;
@@ -431,7 +431,13 @@ function flush(fromPull = false): Promise<void> {
     try {
       while (canSync()) {
         // place records wait (in the outbox) while the "places" table does not exist on the server yet
-        const op = outbox.find((o) => !(o.t === "def" && defsMissing) && !(o.t === "trip" && tripsMissing));
+        const ready = (o: Op) =>
+          !(o.t === "def" && defsMissing) &&
+          !(o.t === "trip" && tripsMissing) &&
+          // the shared space's trips: their changes wait for one of its members (never sent by another account)
+          !("trip" in o && TRIP_BY_ID[o.trip] && state.member !== true);
+        // a trip's record first: its places, notes and photos need it to exist on the server
+        const op = outbox.find((o) => o.t === "trip" && ready(o)) || outbox.find(ready);
         if (!op) break;
         try {
           await run(op);
@@ -439,7 +445,8 @@ function flush(fromPull = false): Promise<void> {
           // the op stays in the outbox; the other changes keep going
           if (e instanceof DefsMissing) continue;
           // refused for this account (a trip it cannot write): dropped, so it never blocks the other changes
-          if ((e as { code?: string })?.code === "42501") {
+          const err = e as { code?: string; statusCode?: string | number; message?: string };
+          if (err?.code === "42501" || String(err?.statusCode) === "403" || /row-level security|permission denied/i.test(err?.message || "")) {
             console.warn("[orbes] change refused for this account, dropped", op, e);
             outbox = outbox.filter((o) => o !== op);
             persistOutbox();
@@ -451,8 +458,8 @@ function flush(fromPull = false): Promise<void> {
         doneDuringPull?.add(opKey(op) + (op.t.endsWith("-del") ? ":del" : ""));
         persistOutbox();
       }
-      // place changes still waiting for the "places" table: not "synced"
-      if (outbox.some((o) => o.t === "def" || o.t === "trip")) set({ sync: "pending" });
+      // changes still waiting (a table not created yet, or the shared space's trips for a member): not "synced"
+      if (outbox.length) set({ sync: "pending" });
       else set({ sync: "idle", syncedAt: Date.now() });
     } catch (e) {
       console.warn("[orbes] sync failed, will retry", e);
@@ -481,7 +488,8 @@ async function run(op: Op) {
   }
   if (op.t === "profile") {
     const uid = state.session?.user.id;
-    if (!uid) return;
+    // a profile change of another account (signed out since) is never written into this account
+    if (!uid || (state.profile.uid && state.profile.uid !== uid)) return;
     const { error } = await sb.from("profiles").upsert({ id: uid, data: state.profile, updated_at: new Date().toISOString() });
     if (error && !isMissing(error, "profile")) throw error;
     return;
@@ -568,6 +576,11 @@ async function run(op: Op) {
 let pullAgain = false;
 export async function pull() {
   if (!canSync()) return;
+  // a trip this account cannot open (the shared space's, seen by another account): nothing to fetch or merge
+  if (!tripIds().includes(state.tripId)) {
+    void pullTripsOnly();
+    return;
+  }
   if (pulling) {
     pullAgain = true;
     return;
@@ -834,6 +847,8 @@ async function checkMembership() {
     const { data, error } = await supabase.rpc("is_member");
     if (error) throw error;
     memberDelay = 15_000;
+    // the profile first: an account that already did its onboarding on another phone never sees it again
+    if (!data) await pullProfile().catch(() => undefined);
     // outside the first shared space = an ORBES Trips account with its own trips
     set({ member: Boolean(data), sync: "idle" });
     subscribeRealtime();
@@ -851,12 +866,39 @@ const retryMembership = () => {
   if (state.session && state.member === null) void checkMembership();
 };
 
+// ---------- one account per phone at a time ----------
+const ACCOUNT_KEY = "orbes.account";
+/**
+ * Another account signs in on this phone: what the previous account left here (its trips, notes, places,
+ * profile, unsent changes) is cleared, so the new account never sees it and nothing is sent under its name.
+ * The first sign-in on a phone (no account noted yet) keeps everything: that is the phone's owner.
+ */
+function adoptAccount(uid: string) {
+  let prev: string | null = null;
+  try {
+    prev = localStorage.getItem(ACCOUNT_KEY);
+    localStorage.setItem(ACCOUNT_KEY, uid);
+  } catch {
+    return;
+  }
+  if (!prev || prev === uid) return;
+  try {
+    for (const k of Object.keys(localStorage)) if (k.startsWith("orbes.v2.") || k === OUTBOX_KEY || k === TRIPS_KEY || k === PROFILE_KEY || k.startsWith("orbes.ask.")) localStorage.removeItem(k);
+  } catch {
+    /* ignore */
+  }
+  outbox = [];
+  baseCache.clear();
+  set({ trips: {}, profile: {}, data: emptyData(), pending: 0 });
+}
+
 export async function initAuth() {
   void loadPhotoUrls();
   void importLegacyPhotos();
   window.addEventListener("storage", onStorage);
   if (!supabase) return;
   const { data } = await supabase.auth.getSession();
+  if (data.session) adoptAccount(data.session.user.id);
   set({ session: data.session, authReady: true });
   if (data.session) await checkMembership();
   supabase.auth.onAuthStateChange((_event, session) => {
@@ -869,6 +911,7 @@ export async function initAuth() {
       return;
     }
     if (before !== session.user.id) {
+      adoptAccount(session.user.id);
       set({ member: null });
       void checkMembership();
     } else retryMembership();
@@ -973,6 +1016,31 @@ let tripsKnown = false;
 function setTrips(trips: Record<string, TripRec>) {
   writeJSON(TRIPS_KEY, trips);
   set({ trips });
+}
+
+/** Fetches only the list of trips (when the current trip is not one this account can open) */
+async function pullTripsOnly() {
+  if (!canSync() || !supabase) return;
+  const { data, error } = await supabase.from("trips").select("id,data,updated_at");
+  if (error) {
+    if (isMissing(error, "trip")) tripsMissing = true;
+    return;
+  }
+  tripsMissing = false;
+  tripsKnown = true;
+  const merged: Record<string, TripRec> = { ...state.trips };
+  let changed = false;
+  for (const r of data || []) {
+    if (outbox.some((o) => o.t === "trip" && o.id === r.id)) continue;
+    const m = mergePlaceState(state.trips[r.id] as PlaceState, { updatedAt: new Date(r.updated_at).getTime(), ...(r.data as PlaceState) }).merged;
+    if (JSON.stringify(m) !== JSON.stringify(state.trips[r.id])) {
+      merged[r.id] = m as TripRec;
+      changed = true;
+    }
+  }
+  if (changed) setTrips(merged);
+  void pullProfile();
+  scheduleFlush(0);
 }
 
 // ---------- profile (table "profiles") ----------
