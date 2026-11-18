@@ -1,17 +1,20 @@
 // Preparing a new trip with the AI, day by day: the trame (outline), the essentials of the destination, then
 // one research per day (real places, checked, with their time slots). Each step is saved in the trip's record
 // ("draft"), so a closed app picks up where it stopped. One request at a time (the AI is capped per account).
-// The preparation only writes into its own trip: it stops as soon as another trip is opened or the screen
-// closes, and only one phone (or tab) prepares a trip at a time.
+// The preparation runs on the server (api/prepare.ts): it goes on when the screen closes or the app is closed, and the
+// app only shows its progress (the trip's record and places, synced as usual). When the server cannot be reached, the
+// app prepares the trip itself as before: then it only writes into its own trip, stops as soon as another trip is
+// opened or the screen closes, and only one phone (or tab) prepares a trip at a time.
 import { track } from "./track";
 import { useSyncExternalStore } from "react";
 import type { Trip } from "../data/types";
 import { TYPE_LABEL } from "../data/trip";
-import { ai, AiError, type AdjustResult, type DayResult, type EssentialsResult, type FixedItem, type OutlineResult, type PlacesResult } from "./ai";
+import { ai, aiContext, AiError, apiUrl, type AdjustResult, type DayResult, type EssentialsResult, type FixedItem, type OutlineResult, type PlacesResult } from "./ai";
 import { km, toWgs } from "./geo";
 import { geocode } from "./placeSearch";
 import { slotText } from "./slots";
-import { createPlace, currentTrip, getState, updateDef, updateTrip } from "./store";
+import { createPlace, currentTrip, getState, pull, requestPro, updateDef, updateTrip } from "./store";
+import { supabase } from "./supabase";
 import { t } from "./i18n";
 
 /** What the creation wizard collected, kept in the trip's record */
@@ -30,14 +33,16 @@ export type Draft = {
   essentials?: boolean;
   days?: Record<string, "done" | "error">;
   error?: string;
-  /** which phone is preparing, and when it last showed signs of life (only one at a time) */
-  lease?: { by: string; at: number };
+  /** which phone is preparing ("server": api/prepare.ts), and when it last showed signs of life (only one at a time);
+   *  the server also says its step ("outline", "essentials", "day:<date>", "place:<date>") */
+  lease?: { by: string; at: number; hold?: string | null; step?: string };
   /** when the trip was validated (ms): later changes to its programme need Pro on a free account */
   doneAt?: number;
 };
 
-type Run = { tripId: string; busy: boolean; step: string; found: number; placed: number; err: string | null };
-let run: Run = { tripId: "", busy: false, step: "", found: 0, placed: 0, err: null };
+/** busy / step / found / placed: the app's own run; mode: who prepares this trip ("server", "local", "" not known yet) */
+type Run = { tripId: string; busy: boolean; step: string; found: number; placed: number; err: string | null; mode: "" | "server" | "local" };
+let run: Run = { tripId: "", busy: false, step: "", found: 0, placed: 0, err: null, mode: "" };
 const subs = new Set<() => void>();
 const setRun = (p: Partial<Run>) => {
   run = { ...run, ...p };
@@ -54,7 +59,7 @@ export function useDraftRun(tripId: string): Run {
     },
     () => run,
   );
-  return r.tripId === tripId ? r : { tripId, busy: false, step: "", found: 0, placed: 0, err: null };
+  return r.tripId === tripId ? { ...r, mode: modes.get(tripId) || "" } : { tripId, busy: false, step: "", found: 0, placed: 0, err: null, mode: modes.get(tripId) || "" };
 }
 
 export const draftOf = (tripId: string): Draft | undefined => getState().trips[tripId]?.draft as Draft | undefined;
@@ -148,8 +153,171 @@ export function stopPrepare() {
   ctl?.abort();
 }
 
-/** Prepares (or resumes) the trip: outline, essentials, then each day not done yet */
+// ---------- the server's preparation (api/prepare.ts) ----------
+const modes = new Map<string, "server" | "local">();
+const setMode = (tripId: string, m: "server" | "local") => {
+  if (modes.get(tripId) === m) return;
+  modes.set(tripId, m);
+  setRun({});
+};
+/** A server lease older than this: its call is gone (the server restarts it, the app can too) */
+const SERVER_STALE = 6 * 60_000;
+/** The server is working on this trip right now */
+export const serverBusy = (tripId: string, now = Date.now()) => {
+  const d = draftOf(tripId);
+  const l = d?.lease;
+  return d?.status === "preparing" && !!l && l.by === "server" && now - l.at < SERVER_STALE;
+};
+const starting = new Set<string>();
+
+type Answer =
+  | { kind: "ok"; body: Record<string, unknown> }
+  | { kind: "refused"; message: string; pro: boolean }
+  | { kind: "notready" | "busy" | "elsewhere" | "down" };
+/** One request to the server's preparation; "down" = not reachable (the app prepares the trip itself) */
+async function askServer(action: string, tripId: string, extra: Record<string, unknown> = {}): Promise<Answer> {
+  if (!navigator.onLine) return { kind: "down" };
+  const token = supabase ? (await supabase.auth.getSession()).data.session?.access_token : null;
+  if (!token) return { kind: "refused", message: t("Connectez-vous dans l'onglet Compte pour utiliser cette fonction."), pro: false };
+  const ctl = new AbortController();
+  const tm = window.setTimeout(() => ctl.abort(), 25_000);
+  try {
+    const res = await fetch(apiUrl("prepare"), {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+      // who the AI helps (the preparation screen only shows the open trip)
+      body: JSON.stringify({ action, trip: tripId, ...(currentTrip().id === tripId ? { ctx: aiContext() } : {}), ...extra }),
+      signal: ctl.signal,
+    });
+    const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (res.ok) return { kind: "ok", body };
+    if (res.status === 409) return { kind: body.error === "notready" ? "notready" : body.error === "elsewhere" ? "elsewhere" : "busy" };
+    if (res.status === 401 || res.status === 403 || res.status === 429) {
+      return { kind: "refused", message: body.message ? t(String(body.message)) : t("Le service ne répond pas, réessayez."), pro: body.error === "pro" };
+    }
+    return { kind: "down" };
+  } catch {
+    return { kind: "down" };
+  } finally {
+    window.clearTimeout(tm);
+  }
+}
+
+/** Asks the server to prepare the trip: "server" (it does), "stop" (refused, said on the screen), "local" (not reachable) */
+async function startServer(tripId: string): Promise<"server" | "stop" | "local"> {
+  if (starting.has(tripId)) return "stop";
+  starting.add(tripId);
+  setRun({});
+  try {
+    for (let i = 0; i < 6; i++) {
+      const a = await askServer("start", tripId);
+      if (a.kind === "ok") {
+        setMode(tripId, "server");
+        setRun({ tripId, err: null, mode: "server" });
+        void refreshUntil(tripId, Number(a.body.at) || 0);
+        return "server";
+      }
+      if (a.kind === "refused") {
+        setMode(tripId, "server");
+        setRun({ tripId, err: a.message, mode: "server" });
+        // the free trip of the month already used, or a validated trip: the Pro screen opens (as with the app's own run)
+        if (a.pro) requestPro(/voyage offert|free trip/i.test(a.message) ? "prep" : "edit");
+        void pull();
+        return "stop";
+      }
+      if (a.kind === "elsewhere" || a.kind === "busy") return "stop";
+      if (a.kind === "down") break;
+      // a trip just created here may not have reached the server yet: asked again in a moment
+      await new Promise((r) => window.setTimeout(r, 1500 + i * 500));
+    }
+  } finally {
+    starting.delete(tripId);
+    setRun({});
+  }
+  setMode(tripId, "local");
+  return "local";
+}
+/** The server is being asked to start (the screen shows the preparation as starting) */
+export const serverStarting = (tripId: string) => starting.has(tripId);
+
+/** Brings the server's writes here quickly (the live channel also does, this is in case it is late) */
+async function refreshUntil(tripId: string, at: number) {
+  for (let i = 0; i < 5; i++) {
+    await pull();
+    const rec = getState().trips[tripId] as { fieldsAt?: Record<string, number> } | undefined;
+    if (!at || (rec?.fieldsAt?.draft || 0) >= at) return;
+    await new Promise((r) => window.setTimeout(r, 1200));
+  }
+}
+
+/** Waits until the server's run that began at `at` is over (a day prepared again from the review) */
+async function waitServer(tripId: string, at: number) {
+  const until = Date.now() + 9 * 60_000;
+  await refreshUntil(tripId, at);
+  while (Date.now() < until && modes.get(tripId) === "server") {
+    const rec = getState().trips[tripId] as { fieldsAt?: Record<string, number> } | undefined;
+    const d = draftOf(tripId);
+    if (!d || ((rec?.fieldsAt?.draft || 0) >= at && d.status !== "preparing")) return;
+    await new Promise((r) => window.setTimeout(r, 1000));
+  }
+}
+
+/**
+ * While the preparation screen shows: the server's progress is fetched every few seconds (the live channel may be
+ * late or closed), and a server run that stopped showing signs of life is started again (twice at most, then the
+ * app prepares the trip itself). Returns the stop function.
+ */
+export function watchServer(tripId: string): () => void {
+  let kicks = 0;
+  let lastKick = 0;
+  const step = () => {
+    if (document.visibilityState !== "visible" || modes.get(tripId) !== "server") return;
+    const d = draftOf(tripId);
+    if (!d) return;
+    const now = Date.now();
+    if (d.status === "preparing") void pull();
+    if (d.status !== "preparing" || d.error || run.busy || starting.has(tripId)) return;
+    const l = d.lease;
+    const stale = !l || (l.by === "server" && now - l.at > SERVER_STALE);
+    if (!stale) {
+      kicks = 0;
+      return;
+    }
+    if (now - lastKick < 60_000) return;
+    lastKick = now;
+    if (kicks >= 2) {
+      setMode(tripId, "local");
+      void prepareHere(tripId);
+      return;
+    }
+    kicks++;
+    void askServer("start", tripId).then((a) => {
+      if (a.kind === "down") kicks = Math.max(kicks, 2);
+    });
+  };
+  const timer = window.setInterval(step, 7000);
+  const onVis = () => step();
+  document.addEventListener("visibilitychange", onVis);
+  return () => {
+    window.clearInterval(timer);
+    document.removeEventListener("visibilitychange", onVis);
+  };
+}
+
+/** Prepares (or resumes) the trip: on the server when it answers, else here (outline, essentials, each day not done) */
 export async function prepare(tripId: string): Promise<void> {
+  if (run.busy || starting.has(tripId)) return;
+  const d0 = draftOf(tripId);
+  if (!d0 || d0.status !== "preparing") return;
+  if (modes.get(tripId) !== "local") {
+    const r = await startServer(tripId);
+    if (r !== "local") return;
+  }
+  await prepareHere(tripId);
+}
+
+/** The app's own run (the server could not be reached): it stops when the screen closes */
+async function prepareHere(tripId: string): Promise<void> {
   if (run.busy) return;
   const d0 = draftOf(tripId);
   if (!d0 || d0.status !== "preparing" || preparedElsewhere(tripId)) return;
@@ -158,7 +326,7 @@ export async function prepare(tripId: string): Promise<void> {
   // everything written must go into this trip, which must stay the open one
   const mine = () => !signal.aborted && currentTrip().id === tripId && getState().tripId === tripId;
   const beat = () => saveDraft(tripId, { lease: { by: DEVICE, at: Date.now() } });
-  setRun({ tripId, busy: true, step: t("Trame du voyage"), err: null, found: 0, placed: 0 });
+  setRun({ tripId, busy: true, step: t("Trame du voyage"), err: null, found: 0, placed: 0, mode: "local" });
   try {
     if (!mine()) throw new AiError(t("Ouvrez ce voyage pour continuer sa préparation."));
     beat();
@@ -281,16 +449,68 @@ export async function prepare(tripId: string): Promise<void> {
 }
 
 /** Stops waiting: the review opens with the days that are ready (the others can be prepared from there) */
-export function reviewNow(tripId: string) {
+export async function reviewNow(tripId: string): Promise<void> {
+  if (modes.get(tripId) === "server") {
+    const a = await askServer("review", tripId);
+    if (a.kind === "ok") return refreshUntil(tripId, Number(a.body.at) || 0);
+    if (a.kind === "refused") {
+      setRun({ tripId, err: a.message });
+      return;
+    }
+  }
   stopPrepare();
   saveDraft(tripId, { status: "review", error: undefined, lease: undefined });
 }
 
-/** Prepares one day again; the day's current places stay until the new research has succeeded */
-export async function regenerateDay(tripId: string, date: string) {
+/** The missing days prepared from the review (the review comes back after) */
+export async function prepareAgain(tripId: string): Promise<void> {
+  const d = draftOf(tripId);
+  if (!d || run.busy) return;
+  if (modes.get(tripId) !== "local") {
+    const r = await startServer(tripId);
+    if (r !== "local") return;
+  }
+  const cur = draftOf(tripId);
+  if (cur) updateTrip(tripId, { draft: { ...cur, status: "preparing", error: undefined } });
+}
+
+/** "Une envie à ajouter ?": read by each day not prepared yet */
+export async function addWish(tripId: string, text: string): Promise<void> {
+  const s = text.trim().slice(0, 300);
+  if (!s) return;
+  if (modes.get(tripId) === "server") {
+    // the server merges it into its run (the app never writes the draft while the server prepares)
+    const a = await askServer("wish", tripId, { text: s });
+    if (a.kind === "ok") {
+      void pull();
+      return;
+    }
+  }
+  const d = draftOf(tripId);
+  if (d) updateTrip(tripId, { draft: { ...d, wishes: [...d.wishes, s] } });
+}
+
+/** Prepares one day again; the day's current places stay until the new research has succeeded. Returns why it
+ *  could not start, when the server refused it */
+export async function regenerateDay(tripId: string, date: string): Promise<string | void> {
   track("day_redone", date, tripId);
   const d = draftOf(tripId);
   if (!d || run.busy) return;
+  if (modes.get(tripId) !== "local") {
+    const a = await askServer("day", tripId, { date });
+    if (a.kind === "ok") {
+      setMode(tripId, "server");
+      // back to the review when the server has finished that day (or stopped)
+      await waitServer(tripId, Number(a.body.at) || 0);
+      return;
+    }
+    if (a.kind === "refused") {
+      if (a.pro) requestPro("edit");
+      return a.message;
+    }
+    if (a.kind === "busy" || a.kind === "elsewhere") return t("Ce voyage est en cours de préparation sur un autre appareil.");
+    setMode(tripId, "local");
+  }
   const days = { ...(d.days || {}) };
   delete days[date];
   updateTrip(tripId, { draft: { ...d, days, status: "preparing", error: undefined } });

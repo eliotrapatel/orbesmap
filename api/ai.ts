@@ -50,11 +50,11 @@ const DAILY_CAP = Number(process.env.AI_FREE_DAILY_CAP) || 25;
 const PRO_CAP = Number(process.env.AI_PRO_DAILY_CAP) || 400;
 /** Requests per 24 h for the whole service outside the shared space (a ceiling on total spending) */
 const GLOBAL_CAP = Number(process.env.AI_GLOBAL_DAILY_CAP) || 1500;
-type Booking = { id: number } | { refused: "cap" | "pro" | "prep" | "auth" | "error" };
+export type Booking = { id: number } | { refused: "cap" | "pro" | "prep" | "auth" | "error" };
 /** Books one request for the account before the AI is called (server function, atomic, with the plan's rules:
  * daily cap, the free trip of the month, a validated trip's programme reserved to Pro). Falls back to the lot 2
  * function while supabase/saas-4.sql has not run. */
-async function reserve(token: string, task: string, trip: string | null, f: typeof fetch): Promise<Booking> {
+export async function reserve(token: string, task: string, trip: string | null, f: typeof fetch): Promise<Booking> {
   const call = (fn: string, args: Json) =>
     f(`${SUPA_URL}/rest/v1/rpc/${fn}`, {
       method: "POST",
@@ -95,7 +95,7 @@ async function finish(token: string, id: number, usd: number, ok: boolean, f: ty
 }
 
 // ---------- spending log (DeepSeek has a balance API but no usage history API) ----------
-type Usage = { hit: number; miss: number; out: number; search: number; fetch: number; usd: number };
+export type Usage = { hit: number; miss: number; out: number; search: number; fetch: number; usd: number };
 const newUsage = (): Usage => ({ hit: 0, miss: 0, out: 0, search: 0, fetch: 0, usd: 0 });
 /** DeepSeek V4.1 Flash list prices (USD / 1M tokens), half price off-peak; Search/Fetch 0.75 $ / 1000 */
 function costUsd(u: Omit<Usage, "usd">, at = new Date()): number {
@@ -766,7 +766,99 @@ async function runDeepSeek(key: string, job: Job, f: typeof fetch, deadline: num
   throw new Upstream("bad_output");
 }
 
+/** The creation tasks (lot 3): their job is built the same way for the relay and for the server preparation */
+const CREATION_TASKS = ["extract", "intake", "concierge", "outline", "day", "adjust", "essentials"];
+function creationJob(body: Json): Job | { bad: string } {
+  const p = personaOf(body);
+  const head = tripLines(body, p);
+  const image = b64ok(body.image) ? body.image : undefined;
+  const text = cut(body.text, 12_000);
+  if (body.task === "extract") {
+    if (!text && !image) return { bad: "Collez une confirmation ou ajoutez une capture." };
+    return { task: "extract", system: EXTRACT_SYSTEM, text: `Confirmation à lire :\n${text || "(capture d'écran jointe)"}`, image, schema: EXTRACT_SCHEMA, effort: "low", maxTokens: 3000 };
+  } else if (body.task === "intake") {
+    if (!text && !image) return { bad: "Collez du texte, des liens ou une capture." };
+    return { task: "intake", system: INTAKE_SYSTEM, text: `${head}\n\nCe que le voyageur sait déjà :\n${text || "(capture d'écran jointe)"}`, image, schema: INTAKE_SCHEMA, effort: "medium", research: /https?:\/\//.test(text), maxTokens: 6000 };
+  } else if (body.task === "concierge") {
+    if (!text && !image) return { bad: "Écrivez un message ou ajoutez une capture." };
+    const facts = typeof body.facts === "string" ? body.facts.slice(0, 12_000) : "{}";
+    const history = typeof body.history === "string" ? body.history.slice(0, 6_000) : "";
+    const who = personaOf(body);
+    const today = new Date().toISOString().slice(0, 10);
+    return {
+      task: "concierge",
+      system: `${CONCIERGE_SYSTEM}\nLe voyageur : ${who.intro} Aujourd'hui : ${today}.`,
+      text: `COMPRIS : ${facts}\n\n${history ? `Derniers échanges :\n${history}\n\n` : ""}Nouveau message : ${text || "(capture d'écran jointe)"}`,
+      image, schema: CONCIERGE_SCHEMA, effort: "medium", research: /https?:\/\//.test(text), maxTokens: 6000,
+    };
+  } else if (body.task === "outline") {
+    const days = cut(body.days, 2000);
+    if (!days) return { bad: "Dates du voyage manquantes." };
+    return { task: "outline", system: OUTLINE_SYSTEM, text: `${head}\nDates du séjour : ${days}\nLieux du voyageur : ${cut(body.places, 6000) || "aucun"}\nRéservations et rendez-vous fixes : ${cut(body.fixed, 3000) || "aucun"}`, schema: OUTLINE_SCHEMA, effort: "medium", maxTokens: 5000 };
+  } else if (body.task === "day") {
+    const day = cut(body.day, 3000);
+    if (!day) return { bad: "Journée manquante." };
+    return { task: "day", system: DAY_SYSTEM, text: `${head}\n\nJournée à préparer :\n${day}\nDéjà prévus les autres jours (ne pas reprendre) : ${cut(body.used, 3000) || "aucun"}`, schema: DAY_SCHEMA, effort: "medium", research: true, maxTokens: 8000 };
+  } else if (body.task === "adjust") {
+    const ask = cut(body.request, 600);
+    if (!ask) return { bad: "Dites ce qu'il faut changer." };
+    return { task: "adjust", system: ADJUST_SYSTEM, text: `${head}\n\nProgramme actuel :\n${cut(body.programme, 12_000)}\n\nDemande : ${ask}`, schema: ADJUST_SCHEMA, effort: "medium", maxTokens: 3000 };
+  } else {
+    return { task: "essentials", system: ESSENTIALS_SYSTEM, text: `${head}\nPays : ${cut(body.country, 80) || "à déduire des villes"}`, schema: ESSENTIALS_SCHEMA, effort: "medium", research: true, maxTokens: 8000 };
+  }
+}
+
 const b64ok = (s: unknown): s is string => typeof s === "string" && s.length > 100 && s.length < 6_000_000 && /^[A-Za-z0-9+/=]+$/.test(s);
+
+/** The provider that answers: Claude when forced (and available), else DeepSeek when its key is set, else Claude */
+function pickProvider(env: Record<string, string | undefined>, client?: Anthropic): { provider: "deepseek" | "claude" | null; dsKey: string; claudeKey: string } {
+  const dsKey = (env.DEEPSEEK_API_KEY || env.DEEPSEEK_KEY || "").trim();
+  const claudeKey = (env.ANTHROPIC_API_KEY || "").trim();
+  const forced = (env.AI_PROVIDER || "").toLowerCase();
+  const provider = forced === "claude" && (claudeKey || client) ? "claude" : dsKey ? "deepseek" : claudeKey || client ? "claude" : null;
+  return { provider, dsKey, claudeKey };
+}
+
+/** One creation task run on the server, without HTTP (the trip preparation of api/prepare.ts) */
+export type TaskRun = { out: Json; usage: Usage; provider: "deepseek" | "claude"; model: string; ms: number };
+/** Why a task run failed: "config" (no AI key), "bad" (request), or the provider's error; with what it cost */
+export class TaskFailure extends Error {
+  kind: "config" | "bad" | "busy" | "upstream" | "refusal" | "bad_output" | "bad_request";
+  usage: Usage;
+  provider: string;
+  model: string;
+  ms: number;
+  constructor(kind: TaskFailure["kind"], usage: Usage, provider: string, model: string, ms: number) {
+    super(kind);
+    this.kind = kind;
+    this.usage = usage;
+    this.provider = provider;
+    this.model = model;
+    this.ms = ms;
+  }
+}
+/** Runs "outline", "essentials" or "day" with the same instructions as the relay; the body is the app's request */
+export async function runTask(task: "outline" | "essentials" | "day", body: Json, opts: { env?: Record<string, string | undefined>; fetch?: typeof fetch; client?: Anthropic; deadlineMs?: number } = {}): Promise<TaskRun> {
+  const env = opts.env || process.env;
+  const f = opts.fetch || fetch;
+  const { provider, dsKey, claudeKey } = pickProvider(env, opts.client);
+  const usage = newUsage();
+  const started = Date.now();
+  if (!provider) throw new TaskFailure("config", usage, "", "", 0);
+  const model = provider === "deepseek" ? DS_MODEL : "claude";
+  const cj = creationJob({ ...body, task });
+  if ("bad" in cj) throw new TaskFailure("bad", usage, provider, model, 0);
+  const job = cj;
+  // same rule as the relay: an English-speaking account gets every text in English
+  if (englishAccount(body)) job.system += EN_ANSWER;
+  const deadline = Date.now() + (opts.deadlineMs ?? (job.research ? 250_000 : 90_000));
+  try {
+    const out = provider === "deepseek" ? await runDeepSeek(dsKey, job, f, deadline, usage) : await runClaude(opts.client || new Anthropic({ apiKey: claudeKey, maxRetries: 1 }), job, deadline);
+    return { out, usage, provider, model, ms: Date.now() - started };
+  } catch (e) {
+    throw new TaskFailure(e instanceof Upstream ? e.kind : "upstream", usage, provider, model, Date.now() - started);
+  }
+}
 
 type Deps = { client?: Anthropic; member?: (t: string) => Promise<boolean>; fetch?: typeof fetch; env?: Record<string, string | undefined> };
 
@@ -788,10 +880,7 @@ export async function handle(req: Request, deps: Deps = {}): Promise<Response> {
   const by = acc.email ? acc.email.split("@")[0] : "membre";
   const f = deps.fetch || fetch;
 
-  const dsKey = (env.DEEPSEEK_API_KEY || env.DEEPSEEK_KEY || "").trim();
-  const claudeKey = (env.ANTHROPIC_API_KEY || "").trim();
-  const forced = (env.AI_PROVIDER || "").toLowerCase();
-  const provider = forced === "claude" && (claudeKey || deps.client) ? "claude" : dsKey ? "deepseek" : claudeKey || deps.client ? "claude" : null;
+  const { provider, dsKey, claudeKey } = pickProvider(env, deps.client);
   if (!provider) return json({ error: "config", message: "La clé IA n'est pas configurée sur Vercel (DEEPSEEK_API_KEY)." }, 503, origin);
 
   let body: Json;
@@ -917,44 +1006,10 @@ export async function handle(req: Request, deps: Deps = {}): Promise<Response> {
       field("note", 500) && `Note ${member ? "d'Eliot" : "du voyageur"} : ${field("note", 500)}`,
     ].filter(Boolean).join("\n");
     job = { task: "enrich", system: member ? ENRICH_SYSTEM : enrichSystem(personaOf(body)), text: `Lieu à décrire :\n${known}`, schema: ENRICH_SCHEMA, example: ENRICH_EXAMPLE, effort: "medium", research: true, maxTokens: 6000 };
-  } else if (["extract", "intake", "concierge", "outline", "day", "adjust", "essentials"].includes(String(body.task))) {
-    const p = personaOf(body);
-    const head = tripLines(body, p);
-    const image = b64ok(body.image) ? body.image : undefined;
-    const text = cut(body.text, 12_000);
-    if (body.task === "extract") {
-      if (!text && !image) return json({ error: "bad", message: "Collez une confirmation ou ajoutez une capture." }, 400, origin);
-      job = { task: "extract", system: EXTRACT_SYSTEM, text: `Confirmation à lire :\n${text || "(capture d'écran jointe)"}`, image, schema: EXTRACT_SCHEMA, effort: "low", maxTokens: 3000 };
-    } else if (body.task === "intake") {
-      if (!text && !image) return json({ error: "bad", message: "Collez du texte, des liens ou une capture." }, 400, origin);
-      job = { task: "intake", system: INTAKE_SYSTEM, text: `${head}\n\nCe que le voyageur sait déjà :\n${text || "(capture d'écran jointe)"}`, image, schema: INTAKE_SCHEMA, effort: "medium", research: /https?:\/\//.test(text), maxTokens: 6000 };
-    } else if (body.task === "concierge") {
-      if (!text && !image) return json({ error: "bad", message: "Écrivez un message ou ajoutez une capture." }, 400, origin);
-      const facts = typeof body.facts === "string" ? body.facts.slice(0, 12_000) : "{}";
-      const history = typeof body.history === "string" ? body.history.slice(0, 6_000) : "";
-      const who = personaOf(body);
-      const today = new Date().toISOString().slice(0, 10);
-      job = {
-        task: "concierge",
-        system: `${CONCIERGE_SYSTEM}\nLe voyageur : ${who.intro} Aujourd'hui : ${today}.`,
-        text: `COMPRIS : ${facts}\n\n${history ? `Derniers échanges :\n${history}\n\n` : ""}Nouveau message : ${text || "(capture d'écran jointe)"}`,
-        image, schema: CONCIERGE_SCHEMA, effort: "medium", research: /https?:\/\//.test(text), maxTokens: 6000,
-      };
-    } else if (body.task === "outline") {
-      const days = cut(body.days, 2000);
-      if (!days) return json({ error: "bad", message: "Dates du voyage manquantes." }, 400, origin);
-      job = { task: "outline", system: OUTLINE_SYSTEM, text: `${head}\nDates du séjour : ${days}\nLieux du voyageur : ${cut(body.places, 6000) || "aucun"}\nRéservations et rendez-vous fixes : ${cut(body.fixed, 3000) || "aucun"}`, schema: OUTLINE_SCHEMA, effort: "medium", maxTokens: 5000 };
-    } else if (body.task === "day") {
-      const day = cut(body.day, 3000);
-      if (!day) return json({ error: "bad", message: "Journée manquante." }, 400, origin);
-      job = { task: "day", system: DAY_SYSTEM, text: `${head}\n\nJournée à préparer :\n${day}\nDéjà prévus les autres jours (ne pas reprendre) : ${cut(body.used, 3000) || "aucun"}`, schema: DAY_SCHEMA, effort: "medium", research: true, maxTokens: 8000 };
-    } else if (body.task === "adjust") {
-      const ask = cut(body.request, 600);
-      if (!ask) return json({ error: "bad", message: "Dites ce qu'il faut changer." }, 400, origin);
-      job = { task: "adjust", system: ADJUST_SYSTEM, text: `${head}\n\nProgramme actuel :\n${cut(body.programme, 12_000)}\n\nDemande : ${ask}`, schema: ADJUST_SCHEMA, effort: "medium", maxTokens: 3000 };
-    } else {
-      job = { task: "essentials", system: ESSENTIALS_SYSTEM, text: `${head}\nPays : ${cut(body.country, 80) || "à déduire des villes"}`, schema: ESSENTIALS_SCHEMA, effort: "medium", research: true, maxTokens: 8000 };
-    }
+  } else if (CREATION_TASKS.includes(String(body.task))) {
+    const cj = creationJob(body);
+    if ("bad" in cj) return json({ error: "bad", message: cj.bad }, 400, origin);
+    job = cj;
   } else if (body.task === "ask") {
     // read-only notebook assistant: no tools at all, it can only read the notebook sent by the app
     const question = String(body.question || "").slice(0, 2000).trim();

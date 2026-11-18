@@ -1,21 +1,38 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
-import { adjustProgramme, confirmTrip, draftOf, prepare, preparedElsewhere, regenerateDay, reviewNow, stopPrepare, useDraftRun } from "../../lib/draft";
+import { addWish, adjustProgramme, confirmTrip, draftOf, prepare, prepareAgain, preparedElsewhere, regenerateDay, reviewNow, serverBusy, serverStarting, stopPrepare, useDraftRun, watchServer } from "../../lib/draft";
 import { AiError } from "../../lib/ai";
 import { parseTime } from "../../lib/time";
 import { useStore, useTrip } from "../../lib/store";
 import { TYPE_LABEL } from "../../data/trip";
 import Shell from "./Shell";
 import InviteTravellers from "./InviteTravellers";
-import { getState, updateTrip } from "../../lib/store";
-import { locale, t } from "../../lib/i18n";
-import { CcBell, CcCheck, CcClose, CcRefresh, CcSpark, ConciergeOrbit } from "./ConciergeIcons";
+import { locale, t, tk } from "../../lib/i18n";
+import { CcBell, CcCheck, CcClose, CcRefresh, CcSpark } from "./ConciergeIcons";
 import "../../styles/creation.css";
+import "../../styles/prep.css";
 
-/** The days not prepared yet are prepared from the review (the review comes back after) */
-async function prepareMissing(tripId: string) {
-  const d = getState().trips[tripId]?.draft as Record<string, unknown> | undefined;
-  if (!d) return;
-  updateTrip(tripId, { draft: { ...d, status: "preparing", error: undefined } });
+/** A preparation's message in the language shown (the server writes the French text, the app translates it) */
+function errText(s?: string | null): string {
+  if (!s) return "";
+  const m = /^(\d+) (?:jours n'ont pas pu être préparés|jour n'a pas pu être préparé)\.$/.exec(s);
+  if (m) return +m[1] > 1 ? t("{n} jours n'ont pas pu être préparés.", { n: m[1] }) : t("{n} jour n'a pas pu être préparé.", { n: m[1] });
+  return t(s);
+}
+
+/** "43.77° N · 11.26° E" */
+function coords(lat?: number, lng?: number): string {
+  if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) return "";
+  return `${Math.abs(lat).toFixed(2)}° ${lat >= 0 ? "N" : "S"} · ${Math.abs(lng).toFixed(2)}° ${lng >= 0 ? "E" : tk("coord.west", "O")}`;
+}
+
+/** Re-renders every few seconds (a server's sign of life gets old without any change in the store) */
+function useClock(ms: number): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), ms);
+    return () => window.clearInterval(id);
+  }, [ms]);
+  return now;
 }
 
 // One day prepared again from the review: the review stays on screen (the run is the same as a preparation's)
@@ -95,7 +112,7 @@ export default function DraftScreen({ onClose }: { onClose: () => void }) {
   useStore((s) => s.trips[trip.id]);
   const d = draftOf(trip.id);
   const run = useDraftRun(trip.id);
-  // the preparation starts (or resumes) as soon as this screen shows, and stops when it closes
+  // the preparation starts (or resumes) as soon as this screen shows; on the server it goes on after the screen closes
   useEffect(() => {
     if (d?.status !== "preparing") return;
     const t = window.setTimeout(() => {
@@ -103,6 +120,11 @@ export default function DraftScreen({ onClose }: { onClose: () => void }) {
     }, 50);
     return () => window.clearTimeout(t);
   }, [trip.id, d?.status]); // eslint-disable-line react-hooks/exhaustive-deps
+  // the server's progress while this screen shows (and a run that stopped answering is started again)
+  useEffect(() => {
+    return watchServer(trip.id);
+  }, [trip.id]);
+  // the app's own run (no server) stops with the screen
   useEffect(() => () => stopPrepare(), [trip.id]);
   const redo = useRedoing(trip.id);
   if (!d) return null;
@@ -115,12 +137,18 @@ function Preparing({ onClose }: { onClose: () => void }) {
   const trip = useTrip();
   const d = draftOf(trip.id)!;
   const run = useDraftRun(trip.id);
-  const elsewhere = !run.busy && preparedElsewhere(trip.id);
+  const now = useClock(5000);
+  const onServer = run.mode === "server";
+  // working now: the app's own run, or the server (its lease is fresh), or the server being asked to start
+  const serverOn = serverBusy(trip.id, now) || serverStarting(trip.id);
+  const busy = run.busy || serverOn;
+  const elsewhere = !busy && preparedElsewhere(trip.id) && d.lease?.by !== "server";
+  const [stopping, setStopping] = useState(false);
   const days = trip.days.filter((x) => x.scheduled && x.dates?.length);
   const stateOf = (x: (typeof days)[number]) => d.days?.[x.dates![0]];
   const done = days.filter((x) => stateOf(x) === "done").length;
   const pct = Math.round(((d.outline ? 1 : 0) + (d.essentials ? 1 : 0) + done) / (days.length + 2) * 100);
-  const liveIdx = days.findIndex((x) => stateOf(x) !== "done");
+  const liveIdx = days.findIndex((x) => stateOf(x) !== "done" && stateOf(x) !== "error");
   const onDays = !!d.outline && !!d.essentials;
   // what is already on the map, read from the trip itself (also right after a resume, when this run counted nothing yet)
   const keys = new Set(days.map((x) => x.key));
@@ -135,13 +163,23 @@ function Preparing({ onClose }: { onClose: () => void }) {
   const toPlace = trip.places.filter((p) => p.day === "ideas" && (defs[p.id] as { fromDraft?: string } | undefined)?.fromDraft).length;
   const found = Math.max(run.found, placed + toPlace);
   const shown = Math.max(run.placed, placed);
+  // the step in progress: the app's own run says it; the server writes a code in its lease
+  const serverStep = (() => {
+    const code = d.lease?.by === "server" ? d.lease.step || "" : "";
+    if (code === "outline") return t("Trame du voyage");
+    if (code === "essentials") return t("L'essentiel pratique");
+    const m = /^(?:day|place):(.+)$/.exec(code);
+    const x = m ? days.find((y) => y.dates?.[0] === m[1]) : undefined;
+    return x ? `${x.short} · ${d.outline?.find((o) => o.date === m![1])?.theme || x.theme || x.title}` : "";
+  })();
+  const step = run.busy ? run.step : serverOn ? serverStep : "";
   const phase = (k: 0 | 1 | 2) => {
     const ok = k === 0 ? !!d.outline : k === 1 ? !!d.essentials : done === days.length;
     if (ok) return "done";
     const first = k === 0 || (k === 1 ? !!d.outline : onDays);
-    return first && run.busy ? "live" : "";
+    return first && busy ? "live" : "";
   };
-  const stopped = !!(run.err || d.error);
+  const stopped = !busy && !!(run.err || d.error);
   const awake = useWakeLock(run.busy);
   const cities = d.cities.map((c) => c.name);
   const facts = [
@@ -152,74 +190,92 @@ function Preparing({ onClose }: { onClose: () => void }) {
     d.places.length ? (d.places.length > 1 ? t("{n} lieux de votre liste", { n: d.places.length }) : t("1 lieu de votre liste")) : "",
     d.fixed.length ? (d.fixed.length > 1 ? t("{n} réservations", { n: d.fixed.length }) : t("1 réservation")) : "",
   ].filter(Boolean).join(" · ");
+  const where = d.cities[0] ? coords(d.cities[0].lat, d.cities[0].lng) : "";
+  const state = busy ? "live" : elsewhere ? "away" : stopped ? "stop" : "pause";
+  const stateLabel = busy ? t("En cours") : elsewhere ? t("Sur un autre appareil") : stopped ? t("Arrêtée") : t("En pause");
+  const counter = onDays && days.length ? t("Jour {n} sur {of}", { n: Math.min(days.length, done + (done < days.length ? 1 : 0)), of: days.length }) : d.outline ? t("L'essentiel") : t("La trame");
+  const stopNow = async () => {
+    if (stopping) return;
+    setStopping(true);
+    try {
+      await reviewNow(trip.id);
+    } finally {
+      setStopping(false);
+    }
+  };
   const top = (
     <div className="v3-bar">
-      <button className="v3-tool" onClick={onClose} aria-label={t("Fermer (la préparation reprendra à votre retour)")}><CcClose /></button>
+      <button className="v3-tool" onClick={onClose} aria-label={onServer ? t("Fermer (la préparation continue)") : t("Fermer (la préparation reprendra à votre retour)")}><CcClose /></button>
       <span className="dr-ttl">{t("Préparation")}</span>
       <span className="v3-tool ghost" />
     </div>
   );
   return (
-    <Shell ring={false} top={top} className="dr-screen">
-      <div className="v3-orb dr-orb" aria-hidden="true">
-        <svg viewBox="0 0 200 200">
-          <circle cx="100" cy="100" r="92" fill="none" stroke="currentColor" strokeOpacity=".12" />
-          <g className="v3-spin"><ellipse cx="100" cy="100" rx="96" ry="30" transform="rotate(-18 100 100)" fill="none" stroke="currentColor" strokeOpacity=".5" /><circle cx="191" cy="70" r="3.5" fill="currentColor" /></g>
-          <g className="v3-spin rev"><ellipse cx="100" cy="100" rx="70" ry="22" transform="rotate(24 100 100)" fill="none" stroke="currentColor" strokeOpacity=".22" /></g>
-        </svg>
-        <span className="v3-pct">
-          <b>{t("{pct} %", { pct })}</b>
-          <small>{run.busy ? (onDays && days.length ? t("Jour {n} sur {of}", { n: Math.min(days.length, done + (done < days.length ? 1 : 0)), of: days.length }) : t("La trame")) : elsewhere ? t("Sur un autre appareil") : stopped ? t("Arrêtée") : t("En pause")}</small>
-        </span>
+    <Shell ring={false} top={top} className="dr-screen pp-screen">
+      <div className="pp-head">
+        <span className={"pp-state " + state}><i aria-hidden="true" />{stateLabel}</span>
+        {where && <span className="pp-geo">{where}</span>}
       </div>
-      <p className="sr" aria-live="polite">{t("{pct} %", { pct })}. {run.step}</p>
-      <h1 className="v3-d dr-h">{t("Nous préparons {title}.", { title: trip.title })}</h1>
-      <p className="dr-facts">{facts}</p>
+      <p className="pp-pct" aria-hidden="true"><span key={pct} className="pp-num">{pct}</span><span className="pp-sign">%</span></p>
+      <p className="sr" aria-live="polite">{t("{pct} %", { pct })}. {step}</p>
+      <div className="pp-step">
+        <b>{counter}</b>
+        <span key={step}>{step || (stopped ? t("La préparation s'est arrêtée.") : " ")}</span>
+      </div>
+      <div className={"pp-rule" + (busy ? "" : " off")} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label={t("Préparation")}>
+        <i style={{ transform: `scaleX(${Math.max(0.02, pct / 100)})` }} />
+      </div>
+      <ol className="pp-phases">
+        {[t("La trame"), t("L'essentiel"), t("Les jours")].map((label, k) => (
+          <li key={k} className={phase(k as 0 | 1 | 2)}>
+            <span className="pp-n">{String(k + 1).padStart(2, "0")}</span>
+            <span className="pp-l">{label}</span>
+            <span className="pp-mk" aria-hidden="true">{phase(k as 0 | 1 | 2) === "done" && <CcCheck />}</span>
+          </li>
+        ))}
+      </ol>
 
-      <div className={"dr-bar" + (stopped && !run.busy ? " off" : "")} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label={t("Préparation")}><i style={{ width: `${Math.max(3, pct)}%` }} /></div>
-      {stopped && !run.busy && !elsewhere && (
-        <p className="dr-stop" role="alert">{t("La préparation s'est arrêtée.")}<button type="button" onClick={() => void prepare(trip.id)}>{t("Reprendre")}</button></p>
-      )}
-      <div className="dr-phases">
-        <span className={"dr-phase " + phase(0)}><i><CcCheck /></i><span>{t("La trame")}</span></span>
-        <span className={"dr-phase " + phase(1)}><i><CcCheck /></i><span>{t("L'essentiel")}</span></span>
-        <span className={"dr-phase " + phase(2)}><i><CcCheck /></i><span>{t("Les jours · {n}/{of}", { n: done, of: days.length })}</span></span>
-      </div>
-      {run.busy && run.step && <p key={run.step} className="dr-now">{t("En cours")} · <b>{run.step}</b></p>}
+      <h1 className="v3-d pp-title">{t("Nous préparons {title}.", { title: trip.title })}</h1>
+      {facts && <p className="pp-facts">{facts}</p>}
 
-      <div className="v3-glass v3-days dr-days">
-        {days.map((x, i) => {
-          const s = stateOf(x);
-          const st = s === "done" ? "done" : s === "error" ? "err" : i === liveIdx && run.busy && onDays ? "live" : "wait";
-          const names = placedByDay.get(x.key) || [];
-          return (
-            <div key={x.key} className={"v3-day " + st}>
-              <span className="v3-st">{st === "done" ? <CcCheck /> : st === "err" ? "!" : ""}</span>
-              <span className="v3-when">{x.short}</span>
-              <span className="dr-dl">
-                {d.outline?.find((o) => o.date === x.dates![0])?.theme || x.theme || x.title}
-                {st === "done" && names.length > 0 && <small><b>{names.length > 1 ? t("{n} lieux", { n: names.length }) : t("{n} lieu", { n: names.length })}</b> · {names.slice(0, 3).join(" · ")}</small>}
-                {st === "err" && <small>{t("À reprendre")}</small>}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-      <div className="v3-count">
-        <div><span className="v3-lbl">{t("Lieux trouvés")}</span><b>{found || "—"}</b></div>
-        <div><span className="v3-lbl">{t("Placés sur la carte")}</span><b>{shown || "—"}</b></div>
-      </div>
-      {elsewhere && <p className="v3-note" style={{ textAlign: "center" }}>{t("Ce voyage est en cours de préparation sur un autre appareil.")}</p>}
-      {(run.err || d.error) && !run.busy && (
-        <div className="v3-glass" style={{ padding: 14, marginTop: 12 }}>
-          <p className="v3-err" style={{ marginTop: 0 }}>{run.err || d.error}</p>
-          <button className="v3-btn ghost" style={{ marginTop: 10 }} onClick={() => void prepare(trip.id)}>{t("Reprendre la préparation")}</button>
+      <dl className="pp-stats">
+        <div><dt>{t("Lieux trouvés")}</dt><dd>{found || "—"}</dd></div>
+        <div><dt>{t("Sur la carte")}</dt><dd>{shown || "—"}</dd></div>
+        <div><dt>{t("Jours prêts")}</dt><dd>{done}<small>/{days.length}</small></dd></div>
+      </dl>
+
+      {stopped && !elsewhere && (
+        <div className="pp-alert" role="alert">
+          <p>{errText(run.err || d.error)}</p>
+          <button type="button" onClick={() => void prepare(trip.id)}>{t("Reprendre la préparation")}</button>
         </div>
       )}
+      {elsewhere && <p className="pp-aside">{t("Ce voyage est en cours de préparation sur un autre appareil.")}</p>}
+
+      <ol className="pp-days">
+        {days.map((x, i) => {
+          const s = stateOf(x);
+          const st = s === "done" ? "done" : s === "error" ? "err" : i === liveIdx && busy && onDays ? "live" : "wait";
+          const names = placedByDay.get(x.key) || [];
+          return (
+            <li key={x.key} className={st}>
+              <span className="pp-mk" aria-hidden="true">{st === "done" ? <CcCheck /> : st === "err" ? "!" : null}</span>
+              <span className="pp-when">{x.short}</span>
+              <span className="pp-what">
+                <b>{d.outline?.find((o) => o.date === x.dates![0])?.theme || x.theme || x.title}</b>
+                {st === "done" && names.length > 0 && <small>{names.slice(0, 3).join(" · ")}</small>}
+                {st === "err" && <small className="warn">{t("À reprendre")}</small>}
+                {st === "live" && <small>{t("En cours")}</small>}
+              </span>
+              <span className="pp-cnt">{st === "done" ? names.length : ""}</span>
+            </li>
+          );
+        })}
+      </ol>
       {/* while it runs, looking now stops the day in progress: the link says so */}
       {done > 0 && done < days.length && (
-        <button className="v3-link" style={{ marginTop: 12 }} onClick={() => reviewNow(trip.id)}>
-          {!run.busy ? t("Voir le programme avec ce qui est prêt") : done > 1 ? t("Arrêter et voir les {n} jours prêts", { n: done }) : t("Arrêter et voir le jour prêt")}
+        <button className="v3-link pp-review" disabled={stopping} onClick={() => void stopNow()}>
+          {!busy ? t("Voir le programme avec ce qui est prêt") : done > 1 ? t("Arrêter et voir les {n} jours prêts", { n: done }) : t("Arrêter et voir le jour prêt")}
         </button>
       )}
 
@@ -229,7 +285,11 @@ function Preparing({ onClose }: { onClose: () => void }) {
         <InviteTravellers />
         {done < days.length && <AddWish />}
       </section>
-      <p className="dr-note"><CcBell /><span>{t("La préparation avance tant que cet écran reste ouvert. Si vous le quittez, elle reprendra là où elle s'est arrêtée à votre retour sur ce voyage.")}{awake && <> {t("L'écran reste allumé pendant la préparation.")}</>}</span></p>
+      {run.mode === "server" ? (
+        <p className="dr-note"><CcBell /><span>{t("La préparation continue sans vous : vous pouvez quitter cet écran ou fermer l'application. Nous vous prévenons dès que le programme est prêt.")}</span></p>
+      ) : run.mode === "local" ? (
+        <p className="dr-note"><CcBell /><span>{t("La préparation avance tant que cet écran reste ouvert. Si vous le quittez, elle reprendra là où elle s'est arrêtée à votre retour sur ce voyage.")}{awake && <> {t("L'écran reste allumé pendant la préparation.")}</>}</span></p>
+      ) : null}
       <div className="dr-end" />
     </Shell>
   );
@@ -242,19 +302,18 @@ function AddWish() {
   const [added, setAdded] = useState<string[]>([]);
   const add = () => {
     const s = v.trim().slice(0, 300);
-    const d = draftOf(trip.id);
-    if (!s || !d) return;
-    updateTrip(trip.id, { draft: { ...d, wishes: [...d.wishes, s] } });
+    if (!s || !draftOf(trip.id)) return;
+    void addWish(trip.id, s);
     setAdded((a) => [...a, s]);
     setV("");
   };
   return (
     <div className="v3-glass dr-add">
-      <b>{t("Une envie à ajouter ?")}</b>
+      <b>{t("Une envie à ajouter ?")}</b>
       <small>{t("Elle sera prise en compte pour les jours suivants.")}</small>
       <form onSubmit={(e) => { e.preventDefault(); add(); }}>
         <label className="v3-field">
-          <span className="sr">{t("Une envie à ajouter ?")}</span>
+          <span className="sr">{t("Une envie à ajouter ?")}</span>
           <input value={v} onChange={(e) => setV(e.target.value)} placeholder={t("ex. un rooftop un soir")} autoComplete="off" maxLength={300} enterKeyHint="done" />
         </label>
         <button className="v3-chip on" disabled={!v.trim()}>{t("Ajouter")}</button>
@@ -321,15 +380,16 @@ function Review({ onClose }: { onClose: () => void }) {
     if (run.busy || redo) return;
     setRedoFail(null);
     setRedoing({ tripId: trip.id, date });
+    let refused: string | void = undefined;
     try {
-      await regenerateDay(trip.id, date);
+      refused = await regenerateDay(trip.id, date);
     } finally {
       setRedoing(null);
     }
     const after = draftOf(trip.id);
-    if (after?.days?.[date] !== "done") {
-      const err = after?.error && !/n'a pas pu être préparé|n'ont pas pu être préparés|could not be prepared|couldn't be prepared/i.test(after.error) ? after.error : "";
-      setRedoFail({ date, msg: err || t("Ce jour n'a pas pu être préparé. Ses lieux sont gardés.") });
+    if (refused || after?.days?.[date] !== "done") {
+      const err = after?.error && !/n'a pas pu être préparé|n'ont pas pu être préparés|could not be prepared|couldn't be prepared/i.test(after.error) ? errText(after.error) : "";
+      setRedoFail({ date, msg: refused || err || t("Ce jour n'a pas pu être préparé. Ses lieux sont gardés.") });
     }
   };
   const adjust = async () => {
@@ -356,7 +416,7 @@ function Review({ onClose }: { onClose: () => void }) {
     return (
       <div className="dr-final" role="status" aria-live="assertive">
         <div>
-          <span className="dr-final-mark" aria-hidden="true"><ConciergeOrbit thin w={40} h={24} /></span>
+          <span className="dr-final-mark" aria-hidden="true"><CcCheck /></span>
           <h2 className="v3-d">{trip.title}</h2>
           <p>{missing > 0 ? t("Votre voyage est ouvert.") : t("Votre voyage est prêt.")}</p>
           {missing > 0 && <small>{missing > 1 ? t("{n} jours restent libres.", { n: missing }) : t("1 jour reste libre.")}</small>}
@@ -440,7 +500,7 @@ function Review({ onClose }: { onClose: () => void }) {
       {!ask && !busy && <div className="dr-ideas">{IDEAS.map((s) => <button key={s} type="button" onClick={() => setAsk(t(s))}>{t(s)}</button>)}</div>}
       {msg && !busy && <p className="dr-msg" role="status">{msg}</p>}
       {missing > 0 && !run.busy && !redo && (
-        <button className="v3-btn ghost" style={{ marginTop: 12 }} onClick={() => { const dd0 = draftOf(trip.id); if (dd0) void prepareMissing(trip.id); }}>
+        <button className="v3-btn ghost" style={{ marginTop: 12 }} onClick={() => void prepareAgain(trip.id)}>
           {missing === 1 ? t("Préparer le jour manquant") : t("Préparer les {n} jours manquants", { n: missing })}
         </button>
       )}
