@@ -1015,11 +1015,13 @@ export async function signInWithPassword(email: string, password: string) {
  * onAuthStateChange); "confirm": the project asks to confirm the address first (an e-mail with a link left);
  * "exists": an account already has this address (Supabase hides it when confirmation is on: no identity returned).
  */
-export async function signUpWithPassword(email: string, password: string): Promise<"signed_in" | "confirm" | "exists"> {
+export async function signUpWithPassword(email: string, password: string, meta?: Record<string, unknown>, redirectQuery?: string): Promise<"signed_in" | "confirm" | "exists"> {
   if (!supabase) throw new Error("not configured");
-  const redirect = window.location.origin + window.location.pathname;
-  // the account's language goes with it: the e-mails are written in it (supabase/email-templates.md)
-  const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { lang: getLang() }, emailRedirectTo: redirect } });
+  // redirectQuery: what the confirmation link brings back (e.g. "?copyof=<slug>", the trip to copy)
+  const redirect = window.location.origin + window.location.pathname + (redirectQuery || "");
+  // the account's language goes with it: the e-mails are written in it (supabase/email-templates.md); meta: what the
+  // visitor asked for before having an account (the intent, src/lib/intent.ts)
+  const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { ...(meta || {}), lang: getLang() }, emailRedirectTo: redirect } });
   if (error) throw error;
   if (data.session) return "signed_in";
   if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) return "exists";
@@ -1027,9 +1029,9 @@ export async function signUpWithPassword(email: string, password: string): Promi
 }
 
 /** Sends the confirmation e-mail of a new account again (when the project asks to confirm addresses) */
-export async function resendSignupEmail(email: string) {
+export async function resendSignupEmail(email: string, redirectQuery?: string) {
   if (!supabase) throw new Error("not configured");
-  const { error } = await supabase.auth.resend({ type: "signup", email, options: { emailRedirectTo: window.location.origin + window.location.pathname } });
+  const { error } = await supabase.auth.resend({ type: "signup", email, options: { emailRedirectTo: window.location.origin + window.location.pathname + (redirectQuery || "") } });
   if (error) throw error;
 }
 

@@ -3,9 +3,11 @@
 // - around 7:30 local time on a trip day: the day by e-mail (Resend) and as a notification, with the places closed that day;
 // - 30 minutes before each place at a set time: a notification (Web Push);
 // - two days after a trip ends (lot retention): one "welcome back" e-mail, with a few figures of the trip and a way to the next one.
+// - once, 2 to 36 hours after a sign-up never confirmed (lot acquisition): the confirmation e-mail again (api/_confirm.ts).
 // Needs on Vercel: SUPABASE_SERVICE_ROLE_KEY, VAPID_PRIVATE_KEY, RESEND_API_KEY (MAIL_FROM optional).
 import webpush from "web-push";
 import { kickStale } from "./prepare.js";
+import { confirmReminders, REMIND, type Unconfirmed } from "./_confirm.js";
 
 type Json = Record<string, unknown>;
 const SUPA_URL = process.env.SUPABASE_URL || "https://ifugaqjneprbtigvegeb.supabase.co";
@@ -113,6 +115,7 @@ export async function POST(req: Request): Promise<Response> {
 }
 
 async function run(req: Request): Promise<Response> {
+  const t0 = Date.now();
   const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
   if (!key) return json({ error: "SUPABASE_SERVICE_ROLE_KEY missing" }, 503);
   // only the database's own wake-up may run this
@@ -247,7 +250,49 @@ ${FOOTER}</div>`;
   } catch (e) {
     warnings.push(`return: ${String((e as Error)?.message || e).slice(0, 120)}`);
   }
-  return json({ ok: true, trips: trips.length, ...sent, ...(restarted ? { restarted } : {}), ...(warnings.length ? { warnings } : {}), ...(resend ? {} : { warning_mail: "RESEND_API_KEY missing" }) });
+  // the single reminder of a sign-up never confirmed (lot acquisition, R07), only with time left in this run; a failure
+  // here never touches what was sent above
+  let reminders = 0;
+  try {
+    reminders = (await confirmReminders(reminderDeps(key, now, t0))).sent;
+  } catch (e) {
+    warnings.push(`confirm: ${String((e as Error)?.message || e).slice(0, 120)}`);
+  }
+  return json({ ok: true, trips: trips.length, ...sent, ...(reminders ? { reminders } : {}), ...(restarted ? { restarted } : {}), ...(warnings.length ? { warnings } : {}), ...(resend ? {} : { warning_mail: "RESEND_API_KEY missing" }) });
+}
+
+/** The real database, Auth and clock for the reminder of api/_confirm.ts */
+function reminderDeps(key: string, now: Date, t0: number) {
+  const h = { apikey: key, authorization: `Bearer ${key}`, "content-type": "application/json" };
+  return {
+    now,
+    elapsed: () => Date.now() - t0,
+    listSql: async (): Promise<Unconfirmed[] | "missing"> => {
+      const r = await fetch(`${SUPA_URL}/rest/v1/rpc/unconfirmed_signups`, { method: "POST", headers: h, body: JSON.stringify({ p_min_hours: REMIND.minHours, p_max_hours: REMIND.maxHours, p_limit: 50 }) });
+      if (r.status === 404) return "missing";
+      if (!r.ok) throw new Error(`db ${r.status} unconfirmed_signups`);
+      return ((await r.json()) as Unconfirmed[]) || [];
+    },
+    listAdmin: async (page: number): Promise<Unconfirmed[]> => {
+      const r = (await db(`/auth/v1/admin/users?page=${page}&per_page=200`, key)) as { users?: Unconfirmed[] } | null;
+      return Array.isArray(r?.users) ? r.users : [];
+    },
+    claims: async () => ((await db("/rest/v1/alert_log?key=like.confirm:*&select=key,at", key)) as { key: string; at: string }[]) || [],
+    claim: async (k: string) => {
+      const r = (await db("/rest/v1/alert_log", key, { method: "POST", headers: { prefer: "resolution=ignore-duplicates,return=representation" }, body: JSON.stringify({ key: k }) })) as unknown[];
+      return Array.isArray(r) && r.length > 0;
+    },
+    unclaim: async (k: string) => {
+      await db(`/rest/v1/alert_log?key=eq.${encodeURIComponent(k)}`, key, { method: "DELETE" });
+    },
+    resend: async (email: string) => {
+      const r = await fetch(`${SUPA_URL}/auth/v1/resend?redirect_to=${encodeURIComponent(`${APP_URL}/`)}`, { method: "POST", headers: h, body: JSON.stringify({ type: "signup", email }) }).catch(() => null);
+      return r ? r.status : 0;
+    },
+    log: async (userId: string, detail: string) => {
+      await fetch(`${SUPA_URL}/rest/v1/events`, { method: "POST", headers: { ...h, prefer: "return=minimal" }, body: JSON.stringify({ user_id: userId, name: "confirm_resent", detail }) });
+    },
+  };
 }
 
 function addDays(iso: string, n: number) {

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { track } from "../../lib/track";
 import OrbitMark from "../OrbitMark";
 import { legalHref } from "./Legal";
-import AuthBox, { type AuthMode } from "./AuthBox";
+import AuthBox, { pendingSignup, type AuthMode } from "./AuthBox";
 import ProMark from "./ProMark";
 import LandingHero from "./LandingMap";
 import { locale, t, tk, getLang, setLang } from "../../lib/i18n";
@@ -43,6 +43,13 @@ export default function Welcome() {
   }, []);
 
   useReveal();
+
+  // a sign-up waiting for its confirmation in this tab (the page was reloaded): back to « Vérifiez vos e-mails »
+  useEffect(() => {
+    if (!pendingSignup()) return;
+    const id = window.setTimeout(() => document.getElementById("compte")?.scrollIntoView({ block: "center" }), 80);
+    return () => window.clearTimeout(id);
+  }, []);
 
   /** Smooth scroll to an element (the address is left as it is: the store reads the hash as a trip) */
   const scrollToId = (id: string, block: ScrollLogicalPosition = "start") => document.getElementById(id)?.scrollIntoView({ behavior: reducedMotion() ? "auto" : "smooth", block });

@@ -171,6 +171,146 @@ check((await route("app_redirect", ["track_step", "track_event:11"])) === "track
 check((await route("visit", [])) === "track_event:11", "any other name: track_event, as today");
 check((await route("visit", ["track_event:11"])) === "track_event:11 → track_event:6", "any other name before saas-8.sql: as today");
 
+// ---------------------------------------------------------------- R07: the « Vérifiez vos e-mails » screen
+section("R07 · mailbox buttons and the 60 s before « Renvoyer »");
+const C = await import("../src/lib/confirmData.ts");
+const ids = (e, apple = false) => C.mailersFor(e, apple).map((m) => m.id).join(",");
+check(ids("a@gmail.com") === "gmail" && ids("a@googlemail.com") === "gmail", "Gmail for a Gmail address");
+check(ids("a@outlook.fr") === "outlook" && ids("a@hotmail.com") === "outlook" && ids("a@live.co.uk") === "outlook" && ids("a@msn.com") === "outlook", "Outlook for Outlook / Hotmail / Live / MSN");
+check(ids("a@icloud.com", true) === "mail,icloud" && ids("a@me.com") === "icloud", "iCloud (and Mail on an iPhone)");
+check(ids("a@yahoo.fr") === "yahoo", "Yahoo Mail for Yahoo");
+check(ids("a@orange.fr") === "gmail,outlook" && ids("a@orange.fr", true) === "gmail,outlook,mail", "an unknown domain: Gmail + Outlook (+ Mail on an iPhone)");
+check(C.resendLeft(0, Date.now()) === 0 && C.resendLeft(1000, 1000) === 60 && C.resendLeft(1000, 19_500) === 42 && C.resendLeft(1000, 61_000) === 0, "« Renvoyer dans 42 s », then the button works again");
+
+section("R07 · the single reminder of the cron (api/_confirm.ts)");
+const R = await import("../api/_confirm.ts");
+/** A fake world: accounts, the alert log, Supabase's resend answers, a clock */
+function remindWorld({ at = "2026-11-18T10:05:00Z", users = [], sql = true, resend = () => 200, elapsed = 1000, claims = [] } = {}) {
+  const now = new Date(at);
+  const log = new Map(claims.map((c) => [c.key, c.at]));
+  const calls = { sent: [], events: [], admin: 0, sql: 0 };
+  const deps = {
+    now,
+    elapsed: () => elapsed,
+    listSql: async () => {
+      calls.sql++;
+      return sql ? users.filter((u) => !u.email_confirmed_at) : "missing";
+    },
+    listAdmin: async (page) => {
+      calls.admin++;
+      return page === 1 ? users : [];
+    },
+    claims: async () => [...log.entries()].filter(([k]) => k.startsWith("confirm:")).map(([key, a]) => ({ key, at: a })),
+    claim: async (k) => (log.has(k) ? false : (log.set(k, now.toISOString()), true)),
+    unclaim: async (k) => void log.delete(k),
+    resend: async (email) => {
+      const st = resend(email);
+      if (st >= 200 && st < 300) calls.sent.push(email);
+      return st;
+    },
+    log: async (id, d) => void calls.events.push(`${id}:${d}`),
+  };
+  return { deps, log, calls, now };
+}
+const hoursAgo = (now, h) => new Date(Date.parse(now) - h * 3600e3).toISOString();
+const NOW = "2026-11-18T10:05:00Z"; // 11:05 in Paris (winter)
+const acct = (id, h, o = {}) => ({ id, email: `${id}@x.fr`, created_at: hoursAgo(NOW, h), confirmation_sent_at: hoursAgo(NOW, h), ...o });
+{
+  const w = remindWorld({ users: [acct("a", 1.5), acct("b", 3), acct("c", 40), acct("d", 5, { email_confirmed_at: hoursAgo(NOW, 4) }), acct("e", 5, { confirmation_sent_at: hoursAgo(NOW, 1) })] });
+  const r = await R.confirmReminders(w.deps);
+  check(r.sent === 1 && w.calls.sent.join() === "b@x.fr", "only the account created 2–36 h ago, never confirmed, last e-mail > 2 h ago");
+  check(w.calls.events.join() === "b:reminder", "the reminder is recorded for that account (confirm_resent reminder)");
+  const again = await R.confirmReminders(w.deps);
+  check(again.sent === 0 && w.calls.sent.length === 1, "never twice: the next run sends nothing");
+}
+{
+  const many = Array.from({ length: 9 }, (_, i) => acct(`u${i}`, 3 + i));
+  const w = remindWorld({ users: many });
+  const r1 = await R.confirmReminders(w.deps);
+  check(r1.sent === 2, "at most 2 per run");
+  for (const k of [...w.log.keys()]) w.log.set(k, hoursAgo(NOW, 0.5));
+  w.log.set("confirm:old1", hoursAgo(NOW, 0.2));
+  w.log.set("confirm:old2", hoursAgo(NOW, 0.2));
+  w.log.set("confirm:old3", hoursAgo(NOW, 0.2));
+  const r2 = await R.confirmReminders(w.deps);
+  check(r2.sent === 1, "at most 6 per hour (5 in the last hour: one more)");
+  const order = remindWorld({ users: [acct("young", 3), acct("old", 30)] });
+  await R.confirmReminders(order.deps);
+  check(order.calls.sent[0] === "old@x.fr", "the oldest sign-up first");
+}
+{
+  let n = 0;
+  const w = remindWorld({ users: [acct("a", 3), acct("b", 4)], resend: () => (++n === 1 ? 429 : 200) });
+  const r = await R.confirmReminders(w.deps);
+  check(r.sent === 0 && !w.log.has("confirm:b") && !w.log.has("confirm:a"), "Supabase answers 429: the claim is given back and the run stops");
+  const r2 = await R.confirmReminders(w.deps);
+  check(r2.sent === 2, "…and the next run sends it");
+  const f = remindWorld({ users: [acct("a", 3)], resend: () => 422 });
+  const rf = await R.confirmReminders(f.deps);
+  check(rf.failed === 1 && f.log.has("confirm:a") && f.calls.events.join() === "a:reminder_failed", "another refusal: recorded, never tried again");
+  const z = remindWorld({ users: [acct("a", 3)], resend: () => 0 });
+  await R.confirmReminders(z.deps);
+  check(!z.log.has("confirm:a"), "no answer at all: given back for a later run");
+}
+for (const [at, ok, what] of [
+  ["2026-11-18T07:59:00Z", false, "8:59 in Paris (winter): nothing"],
+  ["2026-11-18T08:00:00Z", true, "9:00 in Paris (winter): sent"],
+  ["2026-11-18T19:00:00Z", false, "20:00 in Paris (winter): nothing"],
+  ["2026-07-15T06:59:00Z", false, "8:59 in Paris (summer): nothing"],
+  ["2026-07-15T07:00:00Z", true, "9:00 in Paris (summer): sent"],
+  ["2026-07-15T17:59:00Z", true, "19:59 in Paris (summer): sent"],
+]) {
+  const u = { id: "a", email: "a@x.fr", created_at: hoursAgo(at, 3), confirmation_sent_at: hoursAgo(at, 3) };
+  const w = remindWorld({ at, users: [u] });
+  const r = await R.confirmReminders(w.deps);
+  check((r.sent === 1) === ok, what);
+}
+{
+  const w = remindWorld({ users: [acct("a", 3)], sql: false });
+  const r = await R.confirmReminders(w.deps);
+  check(r.sent === 1 && w.calls.admin === 1, "before saas-15.sql: the Auth admin API, filtered the same way");
+  const late = remindWorld({ at: "2026-11-18T10:25:00Z", users: [acct("a", 3)], sql: false });
+  const rl = await R.confirmReminders(late.deps);
+  check(rl.sent === 0 && late.calls.admin === 0, "…read only at the first run of each hour");
+  const conf = remindWorld({ users: [acct("a", 3, { email_confirmed_at: hoursAgo(NOW, 1) })], sql: false });
+  check((await R.confirmReminders(conf.deps)).sent === 0, "…never a confirmed account");
+  const slow = remindWorld({ users: [acct("a", 3)], elapsed: 41_000 });
+  const rs = await R.confirmReminders(slow.deps);
+  check(rs.sent === 0 && slow.calls.sql === 0, "the run has used 40 s: nothing is read or sent");
+}
+{
+  // the cron itself: a failing reminder never stops the alerts (the call is in its own try/catch, after the e-mails)
+  const cron = read("api/cron.ts");
+  const iReturn = cron.indexOf("sent.returns = await welcomeBack");
+  const iRemind = cron.indexOf("confirmReminders(reminderDeps(");
+  const block = cron.slice(cron.lastIndexOf("try {", iRemind), iRemind);
+  check(iReturn > 0 && iRemind > iReturn && block.length < 40, "the reminder runs after the alerts and the welcome-back e-mails, inside its own try/catch");
+  check(/redirect_to=\$\{encodeURIComponent\(`\$\{APP_URL\}\/`\)\}/.test(cron) && /type: "signup"/.test(cron), "the same « Confirm signup » e-mail, back to orbesmap.vercel.app");
+  check(!/autoconfirm|email_confirm:\s*true|confirm_email/i.test(cron + read("api/_confirm.ts")), "nothing confirms an account: the confirmation stays on");
+}
+
+// ---------------------------------------------------------------- texts: every new French text has its English
+section("Texts · English for every t(\"…\") added by this lot");
+{
+  const { execSync } = await import("node:child_process");
+  const EN = {};
+  for (const f of readdirSync(new URL("src/i18n/en/", ROOT))) Object.assign(EN, (await import(new URL(`src/i18n/en/${f}`, ROOT))).default);
+  let diff = "";
+  try {
+    const base = execSync("git merge-base HEAD refonte", { cwd: ROOT, encoding: "utf8" }).trim();
+    diff = execSync(`git diff ${base} -- src`, { cwd: ROOT, encoding: "utf8", maxBuffer: 1 << 26 });
+  } catch {
+    diff = "";
+  }
+  const added = diff.split("\n").filter((l) => l.startsWith("+") && !l.startsWith("+++")).join("\n");
+  const found = new Set();
+  for (const m of added.matchAll(/\bt\("((?:[^"\\]|\\.)*)"/g)) found.add(JSON.parse(`"${m[1]}"`));
+  // the mailbox labels are given to t() from confirmData.ts
+  for (const m of read("src/lib/confirmData.ts").matchAll(/label: "([^"]+)"/g)) found.add(m[1]);
+  const missing = [...found].filter((k) => !(k in EN));
+  check(found.size > 0 && missing.length === 0, `${found.size} new texts, each with its English${missing.length ? ` — missing: ${missing.join(" | ")}` : ""}`);
+}
+
 // ---------------------------------------------------------------- the end
 console.log(`\n${passed} ok, ${failed} failed`);
 if (failed) process.exit(1);
