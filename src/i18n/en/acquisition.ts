@@ -16,4 +16,10 @@ export default {
   "Renvoyer dans {n} s": "Send again in {n}s",
   "Ce n'est pas la bonne adresse": "Not the right address",
   "Pas encore confirmé\u00a0: touchez le lien dans l'e-mail, puis revenez ici.": "Not confirmed yet: tap the link in the email, then come back here.",
+  // R14: where and when
+  "Où et quand\u00a0?": "Where and when?",
+  "Une ville": "A city",
+  "Préparer ce voyage": "Plan this trip",
+  "Créez votre compte pour préparer {trip}": "Create your account to plan {trip}",
+  "La date de départ suit l'arrivée.": "The departure date comes after arrival.",
 };

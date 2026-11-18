@@ -289,6 +289,50 @@ for (const [at, ok, what] of [
   check(!/autoconfirm|email_confirm:\s*true|confirm_email/i.test(cron + read("api/_confirm.ts")), "nothing confirms an account: the confirmation stays on");
 }
 
+// ---------------------------------------------------------------- R14 / R10: the intent kept until after the confirmation
+section("Intent · read back defensively, fresh, used once");
+const I = await import("../src/lib/intentData.ts");
+{
+  const now = Date.parse("2026-11-19T10:00:00Z");
+  const dest = { v: 1, kind: "dest", at: now - 3600e3, dest: { name: "Shanghai", country: "cn", countryName: "Chine", lat: 31.23, lng: 121.47 }, start: "2027-03-12", end: "2027-03-18" };
+  const ok = I.parseIntent(dest, now);
+  check(!!ok && ok.dest.name === "Shanghai" && ok.start === "2027-03-12", "a city with its dates is read back");
+  check(I.parseIntent({ v: 1, kind: "copy", at: now, copy: "ABCDEFGHIJKL" }, now)?.copy === "abcdefghijkl", "a copy keeps its slug");
+  for (const [what, bad] of [
+    ["a wrong slug", { v: 1, kind: "copy", at: now, copy: "../etc" }],
+    ["a short slug", { v: 1, kind: "copy", at: now, copy: "abc" }],
+    ["no city name", { ...dest, dest: { ...dest.dest, name: "  " } }],
+    ["a latitude out of range", { ...dest, dest: { ...dest.dest, lat: 91 } }],
+    ["coordinates that are not numbers", { ...dest, dest: { ...dest.dest, lng: "x" } }],
+    ["a date in the future of the clock", { ...dest, at: now + 3600e3 }],
+    ["an unknown kind", { ...dest, kind: "pay" }],
+    ["another version", { ...dest, v: 2 }],
+    ["not an object", "shanghai"],
+  ]) check(I.parseIntent(bad, now) === null, `rejected: ${what}`);
+  const swapped = I.parseIntent({ ...dest, start: "2027-03-18", end: "2027-03-12" }, now);
+  check(!!swapped && !swapped.start && !swapped.end, "dates in the wrong order are dropped, the city kept");
+  const long = I.parseIntent({ ...dest, start: "2027-03-01", end: "2027-05-30" }, now);
+  check(!!long && !long.start, "more than 60 days: dates dropped");
+  check(!I.parseIntent({ ...dest, start: "2027-02-30", end: "2027-03-02" }, now)?.start, "an impossible date is dropped");
+  check(I.parseIntent({ ...dest, dest: { ...dest.dest, name: "<b>Paris</b>" } }, now)?.dest.name === "bParis/b", "markup is stripped from the name");
+  const past = I.usableIntent(I.parseIntent({ ...dest, start: "2026-11-01", end: "2026-11-05" }, now), now, "2026-11-19", "account");
+  check(!!past && !past.start && past.dest.name === "Shanghai", "dates already past are dropped (the form opens at « Quand »)");
+  check(!!I.usableIntent(ok, now + 13 * 864e5, "2026-11-19", "account") && !I.usableIntent(ok, now + 15 * 864e5, "2026-11-19", "account"), "on the account: 14 days");
+  check(!!I.usableIntent(ok, now + 20 * 3600e3, "2026-11-19", "device") && !I.usableIntent(ok, now + 26 * 3600e3, "2026-11-19", "device"), "on a device: 24 hours");
+  check(I.usableIntent({ ...ok, used: now }, now, "2026-11-19", "account") === null, "an intent already used is never used again");
+  check(I.intentKey(ok) === I.intentKey({ ...ok, used: now }), "the device mark is the same before and after the account update");
+  check(I.intentLabel(ok, "fr") === "Shanghai · 12–18 mars" && I.intentLabel(ok, "en") === "Shanghai · 12–18 Mar", "« Shanghai · 12–18 mars »");
+  check(I.datesLabel("2027-02-28", "2027-03-03", "fr") === "28 févr. – 3 mars" && I.intentLabel({ dest: ok.dest }, "fr") === "Shanghai", "across two months, and without dates");
+}
+{
+  // the prefilled form: only with no trip on the server, never past the free plan's limit, never for members
+  const trips = read("src/components/v3/Trips.tsx");
+  check(/from\("trips"\)\s*\.select\("id"\)\s*\.limit\(1\)/.test(trips) && /error \|\| !Array\.isArray\(data\) \|\| data\.length \|\| tripCount\.current/.test(trips), "the form opens by itself only when the server says the account has no trip at all");
+  check(/p && !p\.pro && p\.prepLeft <= 0\) return;/.test(trips.slice(trips.indexOf("takeIntent("))), "…and never past the free plan's limit");
+  check(/step: 4, maxStep: 4, cities: \[dest\], start: intent\.start, end: intent\.end/.test(trips) && /step: 2, maxStep: 2, cities: \[dest\]/.test(trips), "city + dates → « Programme »; city only → « Quand »");
+  check(/wizardDraft\(\) \|\| \{[\s\S]*?\.\.\.\(initial \|\| \{\}\),\s*\}\);/.test(read("src/components/v3/CreateWizard.tsx")), "a draft already kept wins over the prefill");
+}
+
 // ---------------------------------------------------------------- texts: every new French text has its English
 section("Texts · English for every t(\"…\") added by this lot");
 {

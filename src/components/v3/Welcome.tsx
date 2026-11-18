@@ -6,6 +6,9 @@ import AuthBox, { pendingSignup, type AuthMode } from "./AuthBox";
 import ProMark from "./ProMark";
 import LandingHero from "./LandingMap";
 import { locale, t, tk, getLang, setLang } from "../../lib/i18n";
+import { searchCities } from "../../lib/newTrip";
+import { deviceIntent, saveDeviceIntent } from "../../lib/intent";
+import { INTENT_MAX_DAYS, intentLabel, usableIntent, type Intent, type IntentDest } from "../../lib/intentData";
 import "../../styles/landing.css";
 
 /**
@@ -25,6 +28,16 @@ export default function Welcome() {
   useEffect(() => {
     track("visit");
   }, []);
+  // « Où et quand ? » (lot acquisition, R14): the city and the dates, kept with the account once it is created; a
+  // destination already chosen on this device (the last 24 hours) is there again
+  const [kept] = useState(() => {
+    const i = usableIntent(deviceIntent(), Date.now(), isoToday(), "device");
+    return i?.kind === "dest" ? i : null;
+  });
+  const [dest, setDest] = useState<IntentDest | null>(kept?.dest || null);
+  const [start, setStart] = useState(kept?.start || "");
+  const [end, setEnd] = useState(kept?.end || "");
+  const [intent, setIntent] = useState<Intent | null>(kept);
 
   // the header gets its glass once the page has moved
   useEffect(() => {
@@ -67,6 +80,19 @@ export default function Welcome() {
     if (wide) scrollToId("compte", "center");
     else scrollToId("compte-top");
   };
+  /** « Préparer ce voyage »: the city and the dates kept (this device now, the account at sign-up), then the sign-up */
+  const datesBad = !!start && !!end && (end < start || dayDiff(start, end) + 1 > INTENT_MAX_DAYS);
+  const prepare = () => {
+    if (!dest) return goTo("signup");
+    const withDates = !!start && !!end && !datesBad;
+    const i: Intent = { v: 1, kind: "dest", at: Date.now(), dest, ...(withDates ? { start, end } : {}) };
+    saveDeviceIntent(i);
+    setIntent(i);
+    track("landing_destination", withDates ? "dest_dates" : "dest");
+    goTo("signup");
+  };
+  const mainLabel = dest ? t("Préparer ce voyage") : t("Créer mon compte");
+  const context = intent?.dest ? t("Créez votre compte pour préparer {trip}", { trip: intentLabel(intent, getLang()) }) : null;
   const other = getLang() === "fr" ? "en" : "fr";
   const langBtn = (cls: string) => (
     <button type="button" className={cls} onClick={() => setLang(other)} lang={other}>
@@ -110,9 +136,10 @@ export default function Welcome() {
           <p className="v3-lbl lp2-rise" style={{ ["--d" as string]: 0 }}>{t("Carnet de voyage · préparé par IA")}</p>
           <h1 className="lp2-h1 lp2-rise" id="lp2-h1" style={{ ["--d" as string]: 1 }}>{t("Vos voyages, préparés au détail près.")}</h1>
           <p className="lp2-sub lp2-rise" style={{ ["--d" as string]: 2 }}>{t("Dites où et quand. ORBES Trips prépare chaque journée et vérifie chaque lieu : horaires, fermetures, trajets.")}</p>
+          <WhereWhen dest={dest} onDest={setDest} start={start} end={end} onStart={setStart} onEnd={setEnd} bad={datesBad} onGo={prepare} />
           <div className="lp2-ctas lp2-rise" style={{ ["--d" as string]: 3 }}>
-            <button type="button" className="lp2-btn" onClick={() => goTo("signup")}>
-              {t("Créer mon compte")} <IArrow />
+            <button type="button" className="lp2-btn" onClick={prepare}>
+              {mainLabel} <IArrow />
             </button>
             <button type="button" className="lp2-quiet" onClick={() => goTo("signin")}>{t("Se connecter")}</button>
           </div>
@@ -254,15 +281,15 @@ export default function Welcome() {
             <p className="lp2-lead">{mode === "signup" ? t("Un e-mail, un mot de passe, et votre premier voyage se prépare. Un voyage préparé par l'IA est offert chaque mois.") : t("Content de vous revoir. Vos voyages vous attendent, sur ce téléphone comme sur un ordinateur.")}</p>
           </div>
           <div className="lp2-end-box rv" id="compte">
-            <AuthBox mode={mode} onMode={setMode} focusKey={focusKey} />
+            <AuthBox mode={mode} onMode={setMode} focusKey={focusKey} intent={intent} context={context} />
           </div>
         </section>
       </main>
 
       {/* phones: the account always within thumb reach, once the hero has gone and until the form shows */}
       <div className={"lp2-dock" + (scrolled && !atForm ? " on" : "")} aria-hidden={!(scrolled && !atForm)}>
-        <button type="button" className="lp2-btn" onClick={() => goTo("signup")} tabIndex={scrolled && !atForm ? 0 : -1}>
-          {t("Créer mon compte")} <IArrow />
+        <button type="button" className="lp2-btn" onClick={prepare} tabIndex={scrolled && !atForm ? 0 : -1}>
+          {mainLabel} <IArrow />
         </button>
       </div>
 
@@ -280,6 +307,155 @@ export default function Welcome() {
         <small>© 2026 ORBES Trips</small>
       </footer>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------- « Où et quand ? »
+
+const isoToday = () => new Date().toISOString().slice(0, 10);
+const dayDiff = (a: string, b: string) => Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / 864e5);
+const addIso = (a: string, n: number) => new Date(Date.parse(`${a}T12:00:00Z`) + n * 864e5).toISOString().slice(0, 10);
+
+/**
+ * A line like a boarding pass, above the buttons: the city (the form's own search: OpenStreetMap, one request a
+ * second) and the dates (optional). Phone: the city on its own line, arrival | departure under it; computer: one row.
+ * The results open above the field (the copy sits at the bottom of the hero, which clips what overflows it).
+ */
+function WhereWhen({ dest, onDest, start, end, onStart, onEnd, bad, onGo }: {
+  dest: IntentDest | null;
+  onDest: (d: IntentDest | null) => void;
+  start: string;
+  end: string;
+  onStart: (v: string) => void;
+  onEnd: (v: string) => void;
+  bad: boolean;
+  onGo: () => void;
+}) {
+  const [q, setQ] = useState(dest?.name || "");
+  const [res, setRes] = useState<IntentDest[]>([]);
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const box = useRef<HTMLDivElement>(null);
+  const s = q.trim();
+  useEffect(() => {
+    if (s.length < 2 || (dest && s === dest.name)) {
+      setRes([]);
+      return;
+    }
+    const c = new AbortController();
+    const tm = window.setTimeout(async () => {
+      const r = await searchCities(s, c.signal);
+      if (!c.signal.aborted) {
+        setRes(r);
+        setActive(0);
+        setOpen(true);
+      }
+    }, 350);
+    return () => {
+      window.clearTimeout(tm);
+      c.abort();
+    };
+  }, [s]); // eslint-disable-line react-hooks/exhaustive-deps
+  // a press outside closes the list
+  useEffect(() => {
+    if (!open) return;
+    const off = (e: PointerEvent) => {
+      if (!box.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", off);
+    return () => document.removeEventListener("pointerdown", off);
+  }, [open]);
+  const pick = (d: IntentDest) => {
+    onDest(d);
+    setQ(d.name);
+    setRes([]);
+    setOpen(false);
+  };
+  const today = isoToday();
+  const shown = open && res.length > 0;
+  return (
+    <>
+    <div className="lp2-where lp2-rise" style={{ ["--d" as string]: 3 }} role="group" aria-labelledby="lp2-where-l">
+      <p className="v3-lbl lp2-where-lbl" id="lp2-where-l">{t("Où et quand\u00a0?")}</p>
+      <div className="lp2-where-row">
+        <div className="lp2-cell lp2-cell-dest" ref={box}>
+          <label htmlFor="lp2-dest">{t("Destination")}</label>
+          <input
+            id="lp2-dest"
+            type="text"
+            value={q}
+            placeholder={t("Une ville")}
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
+            enterKeyHint="go"
+            role="combobox"
+            aria-expanded={shown}
+            aria-controls="lp2-dest-list"
+            aria-autocomplete="list"
+            aria-activedescendant={shown ? `lp2-dest-${active}` : undefined}
+            onChange={(e) => {
+              setQ(e.target.value);
+              if (dest && e.target.value.trim() !== dest.name) onDest(null);
+            }}
+            onFocus={() => res.length > 0 && setOpen(true)}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowDown" && res.length) {
+                e.preventDefault();
+                setOpen(true);
+                setActive((a) => Math.min(res.length - 1, a + 1));
+              } else if (e.key === "ArrowUp" && res.length) {
+                e.preventDefault();
+                setActive((a) => Math.max(0, a - 1));
+              } else if (e.key === "Escape") setOpen(false);
+              else if (e.key === "Enter") {
+                e.preventDefault();
+                if (shown && res[active]) pick(res[active]);
+                else if (dest) onGo();
+              }
+            }}
+          />
+          {shown && (
+            <ul className="lp2-results" id="lp2-dest-list" role="listbox" aria-label={t("Destination")}>
+              {res.map((r, i) => (
+                <li key={`${r.name}|${r.country}|${i}`} id={`lp2-dest-${i}`} role="option" aria-selected={i === active}>
+                  <button type="button" className={i === active ? "on" : ""} onMouseEnter={() => setActive(i)} onClick={() => pick(r)}>
+                    <b>{r.name}</b>
+                    {r.countryName && <span>{r.countryName}</span>}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </div>
+    {/* the dates: beside the city on a computer, under it on a phone (under the button on a short phone, so the
+        button always shows on the first screen) */}
+    <div className="lp2-when lp2-rise" style={{ ["--d" as string]: 3 }} role="group" aria-labelledby="lp2-where-l">
+      <div className="lp2-where-row lp2-when-row">
+        <div className="lp2-cell lp2-cell-date">
+          <label htmlFor="lp2-start">{t("Arrivée")}</label>
+          <input
+            id="lp2-start"
+            type="date"
+            value={start}
+            min={today}
+            onChange={(e) => {
+              const v = e.target.value;
+              onStart(v);
+              if (v && end && end < v) onEnd("");
+            }}
+          />
+        </div>
+        <div className="lp2-cell lp2-cell-date">
+          <label htmlFor="lp2-end">{t("Départ")}</label>
+          <input id="lp2-end" type="date" value={end} min={start || today} max={start ? addIso(start, INTENT_MAX_DAYS - 1) : undefined} onChange={(e) => onEnd(e.target.value)} aria-invalid={bad || undefined} aria-describedby={bad ? "lp2-where-err" : undefined} />
+        </div>
+      </div>
+      {bad && <p className="lp2-where-err" id="lp2-where-err" role="alert">{end < start ? t("La date de départ suit l'arrivée.") : t("{n} jours au plus pour un voyage.", { n: INTENT_MAX_DAYS })}</p>}
+    </div>
+    </>
   );
 }
 
