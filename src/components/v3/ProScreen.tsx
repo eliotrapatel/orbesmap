@@ -1,8 +1,9 @@
 import "../../styles/pricing.css";
+import "../../styles/plans.css";
 import { Fragment, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import { track } from "../../lib/track";
 import { closePro, useStore, type ProReason } from "../../lib/store";
-import { joinWaitlist, proDate, redeemCode, type SalePlan } from "../../lib/pro";
+import { clearOffer, getCapInfo, joinWaitlist, pendingOffer, proDate, redeemCode, rememberOffer, type SalePlan } from "../../lib/pro";
 import Shell from "./Shell";
 import ProMark from "./ProMark";
 import { ICheck, IClose } from "../Icons";
@@ -14,12 +15,13 @@ const WHY: Record<ProReason, string> = {
   export: "La carte hors ligne et les exports font partie de Pro.",
   business: "Le mode affaires (fournisseurs, rendez-vous, comptes-rendus) fait partie de Pro.",
   info: "",
+  cap: "Vous avez atteint la limite d'IA de la formule gratuite.",
 };
 
 /** The plan selected when the screen opens: the one that answers why it opened.
  *  A locked trip or an export concern one trip: the Pass voyage covers exactly that, at the lowest price.
  *  The free trip of the month used means more trips: only Pro annuel prepares them without a monthly limit. */
-const FIRST: Record<ProReason, SalePlan> = { edit: "pass", export: "pass", prep: "annual", business: "business", info: "annual" };
+const FIRST: Record<ProReason, SalePlan> = { edit: "pass", export: "pass", prep: "annual", business: "business", info: "annual", cap: "annual" };
 
 /** A price in euros, written the language's way: "9,99 €" / "€9.99", "39 €" / "€39" */
 const eur = (n: number) =>
@@ -152,7 +154,11 @@ export default function ProScreen() {
   const first = useStore((s) => ((s.profile.name as string) || "").trim().split(/\s+/)[0] || "");
   /** with no first name, a member's card carries the e-mail's local part ("camille" from camille@…) */
   const local = useStore((s) => (s.session?.user?.email || "").split("@")[0] || "");
-  const [sel, setSel] = useState<SalePlan>(FIRST[why]);
+  // the offer chosen before signing in ("Créer un compte / Se connecter" below) is the one selected again
+  const [sel, setSel] = useState<SalePlan>(() => pendingOffer() || FIRST[why]);
+  const firstWhy = useRef(why);
+  /** the current trip's Pro, by a Pass or by its owner (supabase/saas-13.sql) */
+  const tripPass = useStore((s) => s.plan?.passes?.[s.tripId]);
   const [chosen, setChosen] = useState<SalePlan | null>(null);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
@@ -174,8 +180,23 @@ export default function ProScreen() {
     track("pro_screen", why);
   }, [why]);
   useEffect(() => {
+    clearOffer();
+  }, []);
+  useEffect(() => {
+    if (why === firstWhy.current) return;
+    firstWhy.current = why;
     setSel(FIRST[why]);
   }, [why]);
+  /** the free limit with its numbers, when the server told them */
+  const cap = why === "cap" ? getCapInfo() : null;
+  const lead = cap && cap.limit && cap.pro ? t("Vous avez atteint la limite d'IA de la formule gratuite. Avec Pro : {pro} demandes par jour au lieu de {n}.", { pro: cap.pro, n: cap.limit }) : WHY[why] ? t(WHY[why]) : "";
+  /** signed out: to the account form, in that mode; the offer chosen is kept on this device */
+  const toAccount = (mode: "signup" | "signin") => {
+    rememberOffer(sel);
+    track("tool_opened", mode === "signup" ? "pro_signup" : "pro_signin");
+    closePro();
+    location.assign(`${location.pathname}?auth=${mode}`);
+  };
   const offer = OFFERS.find((o) => o.id === sel) || OFFERS[1];
   /** The plan cards are one radio group: one tab stop (the selected card), the arrow keys move the selection */
   const cards = useRef<Partial<Record<SalePlan, HTMLButtonElement | null>>>({});
@@ -242,7 +263,16 @@ export default function ProScreen() {
         <div className="pm-grid">
           <div className="pm-hero">
             <h1 className="v3-d v3-h1 pm-rise" style={rise(40)}>{t("Votre voyage, sans limite.")}</h1>
-            {WHY[why] && <p className="v3-lead pm-lead pm-rise" style={rise(100)}>{t(WHY[why])}</p>}
+            {tripPass && (tripPass.kind === "pass" || !tripPass.mine) && (
+              <p className="pm-trip pm-rise" style={rise(70)}>
+                <span className="pro-tag">PRO</span>
+                <span>
+                  <b>{tripPass.kind === "pass" && tripPass.until ? t("Pass voyage jusqu'au {date}", { date: proDate(tripPass.until) }) : tripPass.by ? t("Pro sur ce voyage, offert par {name}", { name: tripPass.by }) : t("Pro sur ce voyage")}</b>{" "}
+                  {t("Vos autres voyages restent en formule gratuite.")}
+                </span>
+              </p>
+            )}
+            {lead && <p className="v3-lead pm-lead pm-rise" style={rise(100)}>{lead}</p>}
             <MemberCard preview delay={160} name={session ? first : ""} facts={[{ k: t("Formule"), v: t(offer.name) }, { k: t("Prix"), v: priceOf(offer) }]} />
           </div>
 
@@ -281,6 +311,10 @@ export default function ProScreen() {
             {!session ? (
               <div className="pm-honest pm-rise" style={rise(320)}>
                 <p className="v3-msg">{t("Connectez-vous pour activer un code ou être prévenu à l'ouverture des ventes.")}</p>
+                <div className="pm-auth">
+                  <button type="button" className="v3-btn" onClick={() => toAccount("signup")}>{t("Créer un compte")}</button>
+                  <button type="button" className="v3-btn ghost" onClick={() => toAccount("signin")}>{t("Se connecter")}</button>
+                </div>
                 {err && <p className="v3-err" role="alert">{err}</p>}
               </div>
             ) : (
@@ -380,7 +414,7 @@ export default function ProScreen() {
             </div>
             <p className="pm-free pm-rise" style={rise(440)}>
               {session && <span className="v3-tag dim">{t("Votre formule")}</span>}
-              <b>{t("Gratuit")}</b> {t("1 voyage préparé par l'IA par mois, programme complet utilisable, partage et voyageurs invités.")}
+              <b>{t("Gratuit")}</b> {t("1 voyage préparé par l'IA par mois, programme complet, consultable et partageable, voyageurs invités.")}
             </p>
 
             {session && (

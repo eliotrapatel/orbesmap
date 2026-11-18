@@ -16,6 +16,7 @@ import { migrationPatches } from "./defs";
 import { emptyData, mergePlaceState, uid, type Contact, type Data, type Photo, type Pin, type PlaceDef, type PlaceState, type Settings } from "./model";
 import { PHOTO_BUCKET, supabase } from "./supabase";
 import { linkVisitor, track } from "./track";
+import { tripPro } from "./planRules";
 import { t as tr, getLang } from "./i18n";
 
 const dataKey = (tripId: string) => "orbes.v2." + tripId;
@@ -70,8 +71,14 @@ interface State {
 }
 
 /** Pro = the paid version (opened by codes for now): see supabase/saas-4.sql */
-export type Plan = { uid: string; pro: boolean; until: string | null; granted: boolean; admin: boolean; waitlisted: boolean; prepLeft: number; proTrips: string[] };
-export type ProReason = "edit" | "prep" | "export" | "info" | "business";
+export type Plan = {
+  uid: string; pro: boolean; until: string | null; granted: boolean; admin: boolean; waitlisted: boolean; prepLeft: number; proTrips: string[];
+  /** the account's trips that are Pro by a Pass or by their owner (supabase/saas-13.sql; absent before it runs) */
+  passes?: Record<string, TripPass>;
+};
+/** Why a trip is Pro: its Pass (until a date) or its owner's Pro; `by`: the first name of who offers it; `mine`: this account */
+export type TripPass = { kind: "pass" | "owner"; until: string | null; by: string | null; mine: boolean };
+export type ProReason = "edit" | "prep" | "export" | "info" | "business" | "cap";
 
 // ---------- toasts (queued until the UI subscribes) ----------
 type ToastListener = (msg: string) => void;
@@ -1382,7 +1389,66 @@ export async function pullPlan() {
     return;
   }
   const d = (data || {}) as Partial<Plan>;
-  setPlan({ uid, pro: !!d.pro, until: d.until ?? null, granted: !!d.granted, admin: !!d.admin, waitlisted: !!d.waitlisted, prepLeft: Number(d.prepLeft ?? 1), proTrips: Array.isArray(d.proTrips) ? d.proTrips.map(String) : [] });
+  const plan: Plan = { uid, pro: !!d.pro, until: d.until ?? null, granted: !!d.granted, admin: !!d.admin, waitlisted: !!d.waitlisted, prepLeft: Number(d.prepLeft ?? 1), proTrips: Array.isArray(d.proTrips) ? d.proTrips.map(String) : [] };
+  // the Passes as they were known, until they are read again (never a flash of "no Pass")
+  const known = state.plan?.uid === uid ? state.plan.passes : undefined;
+  setPlan(known ? { ...plan, passes: known } : plan);
+  // a free account back from "Créer un compte / Se connecter" on the Pro screen: the offer it had chosen opens again
+  if (!plan.pro && pendingOffer()) requestPro("info");
+  else if (plan.pro) clearOffer();
+  // who offers Pro on a trip (supabase/saas-13.sql): only read when a trip other than the code trips is Pro
+  if (!plan.proTrips.some((id) => !TRIP_BY_ID[id])) {
+    if (known) setPlan(plan);
+    return;
+  }
+  const passes: Record<string, TripPass> = {};
+  try {
+    const r = await supabase.rpc("my_trip_passes");
+    // missing on the server (before saas-13.sql) or any error: no Pass shown, nothing else changes
+    if (!r.error && Array.isArray(r.data))
+      for (const x of r.data as Record<string, unknown>[]) {
+        if (typeof x?.trip !== "string") continue;
+        passes[x.trip] = { kind: x.kind === "pass" ? "pass" : "owner", until: typeof x.until === "string" ? x.until : null, by: typeof x.by === "string" && x.by ? x.by : null, mine: x.mine === true };
+      }
+  } catch {
+    /* no Pass shown */
+  }
+  if (state.session?.user.id !== uid || state.plan?.uid !== uid) return;
+  setPlan({ ...(state.plan as Plan), passes });
+}
+/** This trip has Pro for this account: its own Pro, a code trip, or the trip's Pro (its owner's Pro or a Pass), for
+ *  every traveller of it; unknown = treated as Pro so nothing is blocked by mistake */
+export const tripHasPro = (tripId: string) => tripPro(state.plan, tripId, !!TRIP_BY_ID[tripId]);
+export const useTripHasPro = (tripId: string) => useStore((s) => tripPro(s.plan, tripId, !!TRIP_BY_ID[tripId]));
+
+// The offer chosen on the Pro screen by someone signed out, kept on this device while they create an account or
+// sign in (7 days at most): the Pro screen opens again on it once signed in.
+const OFFER_KEY = "orbes.offer";
+type Offer = "pass" | "annual" | "business";
+export function rememberOffer(sel: Offer) {
+  try {
+    localStorage.setItem(OFFER_KEY, JSON.stringify({ sel, at: Date.now() }));
+  } catch {
+    /* ignore */
+  }
+}
+/** The offer remembered, if recent (read only) */
+export function pendingOffer(): Offer | null {
+  try {
+    const o = JSON.parse(localStorage.getItem(OFFER_KEY) || "null") as { sel?: string; at?: number } | null;
+    if (!o || !["pass", "annual", "business"].includes(o.sel || "") || !(Number(o.at) > Date.now() - 7 * 864e5)) return null;
+    return o.sel as Offer;
+  } catch {
+    return null;
+  }
+}
+/** Forgets the offer once the Pro screen has shown it */
+export function clearOffer() {
+  try {
+    localStorage.removeItem(OFFER_KEY);
+  } catch {
+    /* ignore */
+  }
 }
 /** This account has Pro (its own); unknown = treated as Pro so nothing is blocked by mistake */
 export const hasPro = () => !state.plan || state.plan.pro;

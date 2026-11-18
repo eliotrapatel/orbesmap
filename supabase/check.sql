@@ -63,3 +63,8 @@ select * from (values
      (select (select count(*) from auth.users) || ' / ' || (select count(*) from public.trips)),
      true)
 ) as c(verification, resultat, ok);
+
+-- After supabase/saas-13.sql (Pass per trip, AI budget), each one alone:
+--   select public.trip_pro('sha-2026');                          → true (Shanghai stays Pro)
+--   select public.my_plan();                                      → no error
+--   select public.reserve_ai2('ask', null, 25, 400, 1500, 1, 5);  → {"refused": "auth"} (no session: books nothing)

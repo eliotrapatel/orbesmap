@@ -1,7 +1,9 @@
 // Calls the ORBES AI relay (api/ai.ts on Vercel). Only members of the shared space can use it.
 import { supabase } from "./supabase";
 import { currentTrip, getState, pullPlan, requestPro } from "./store";
-import { t as tr } from "./i18n";
+import { getLang, locale, t as tr } from "./i18n";
+import { nextMonthStart, refusal } from "./planRules";
+import { setCapInfo } from "./pro";
 
 /** Who the AI helps and for which trip (profile + current trip), sent with every request */
 export function aiContext() {
@@ -137,8 +139,20 @@ export async function ai<T>(task: AiTask, payload: Record<string, unknown>, time
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
-      // a validated trip's programme, or the free trip of the month already used: the Pro screen opens
-      if (body.error === "pro") requestPro(task === "outline" ? "prep" : "edit");
+      const why = refusal(body);
+      // the free account's own daily limit: the Pro screen opens, with the numbers (supabase/saas-13.sql)
+      if (why.kind === "free-cap" && why.limit) {
+        setCapInfo({ limit: why.limit, pro: why.pro, slowed: why.slowed });
+        requestPro("cap");
+        const back = new Date(`${nextMonthStart(Date.now())}T12:00:00Z`).toLocaleDateString(locale(), { day: "numeric", month: "long", timeZone: "UTC" }).replace(/^1 (?=\D)/, getLang() === "fr" ? "1er " : "1 ");
+        throw new AiError(why.slowed
+          ? tr("Vous avez beaucoup utilisé l'IA ce mois-ci : {n} demandes par jour jusqu'au {date}. Pro en permet {pro}.", { n: why.limit, date: back, pro: why.pro || 400 })
+          : tr("Limite du jour atteinte : {n} demandes à l'IA en 24 h avec la formule gratuite. Pro en permet {pro}.", { n: why.limit, pro: why.pro || 400 }));
+      }
+      // the whole service's limit: nobody's plan changes it
+      if (why.kind === "global") throw new AiError(tr("Le service IA est très demandé aujourd'hui. Réessayez dans quelques heures."));
+      // a validated trip's programme, the free trip of the month already used, or a trip created by hand: the Pro screen opens
+      if (body.error === "pro") requestPro(why.kind === "manual" || task === "outline" ? "prep" : "edit");
       throw new AiError(body.message ? tr(String(body.message)) : tr("Le service ne répond pas, réessayez."));
     }
     // the free trip of the month is now used: the account's plan says so

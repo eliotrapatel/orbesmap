@@ -60,6 +60,14 @@ export default function Welcome() {
     if (wide) scrollToId("compte", "center");
     else scrollToId("compte-top");
   };
+  // "Créer un compte / Se connecter" from the Pro screen (?auth=signup|signin): straight to the account form, in that mode
+  useEffect(() => {
+    const m = new URLSearchParams(location.search).get("auth");
+    if (m !== "signup" && m !== "signin") return;
+    history.replaceState(history.state, "", location.pathname + location.hash);
+    const tm = window.setTimeout(() => goTo(m), 120);
+    return () => window.clearTimeout(tm);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const other = getLang() === "fr" ? "en" : "fr";
   const langBtn = (cls: string) => (
     <button type="button" className={cls} onClick={() => setLang(other)} lang={other}>
@@ -73,7 +81,7 @@ export default function Welcome() {
     return i < 0 ? [s, ""] : [s.slice(0, i), "/ " + s.slice(i + 3)];
   };
   const plans = [
-    { name: t("Gratuit"), price: eur(0), unit: t("Sans carte bancaire"), line: t("1 voyage préparé par l'IA par mois, programme complet utilisable, partage et voyageurs invités."), pro: false },
+    { name: t("Gratuit"), price: eur(0), unit: t("Sans carte bancaire"), line: t("1 voyage préparé par l'IA par mois, programme complet, consultable et partageable, voyageurs invités."), pro: false },
     { name: t("Pass voyage"), price: eur(9.99), unit: t("une fois"), line: t("Pro pour un voyage, jusqu'à 30 jours après le retour."), pro: true },
     { name: t("Pro annuel"), price: split(t("{price} / an", { price: eur(39) }))[0], unit: split(t("{price} / an", { price: eur(39) }))[1], line: t("Tout Pro, pour tous vos voyages."), pro: true },
     { name: t("Business"), price: split(t("{price} / mois", { price: eur(19) }))[0], unit: `${split(t("{price} / mois", { price: eur(19) }))[1]} · ${t("par personne")}`, line: t("Pour les voyages professionnels : sourcing, salons, rendez-vous."), pro: true },

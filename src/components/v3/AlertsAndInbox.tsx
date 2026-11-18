@@ -4,9 +4,10 @@ import { createPortal } from "react-dom";
 import { addInbound, attachToNewTrip, detectedTrip, dismissInbound, inboundItems, type DetectedTrip, type InboundItem } from "../../lib/alerts";
 import { t } from "../../lib/i18n";
 import { dateLabel, searchCities, type Destination } from "../../lib/newTrip";
-import { currentTrip, getState, requestPro, switchTrip, toast, useStore } from "../../lib/store";
+import { currentTrip, getState, switchTrip, toast, useStore } from "../../lib/store";
 import { track } from "../../lib/track";
 import CreateWizard, { WIZARD_KEY, type Wiz } from "./CreateWizard";
+import CreateOptions, { type Prefill } from "./CreateOptions";
 import { openHome } from "./nav";
 
 /** "Lisbonne, 12 – 19 mars 2027" */
@@ -53,17 +54,14 @@ function coveringTrip(it: InboundItem): { id: string; title: string } | null {
   return id ? pick(id) : null;
 }
 
-/** Fills the trip creation form with the booking: destination, dates, flights, hotel, bookings. False = not opened. */
-async function prefillWizard(it: InboundItem): Promise<boolean> {
+/** Fills the trip creation form with the booking: destination, dates, flights, hotel, bookings. False = not opened.
+ *  The free trip of the month already used: what the booking says, for the creation options (as from "Créer un voyage"). */
+async function prefillWizard(it: InboundItem): Promise<boolean | Prefill> {
   const d = detectedTrip(it);
   if (!d) return false;
-  // the free trip of the month already used: the Pro screen, as from "Créer un voyage"
   const plan = getState().plan;
-  if (plan && !plan.pro && plan.prepLeft <= 0) {
-    requestPro("prep");
-    return false;
-  }
-  try {
+  const quotaUsed = !!plan && !plan.pro && plan.prepLeft <= 0;
+  if (!quotaUsed) try {
     const cur = JSON.parse(localStorage.getItem(WIZARD_KEY) || "null") as Partial<Wiz> | null;
     if (cur?.step && (cur.cities?.length || cur.start) && !confirm(t("Un voyage est déjà en cours de création. Le remplacer par celui-ci ?"))) return false;
   } catch {
@@ -75,6 +73,7 @@ async function prefillWizard(it: InboundItem): Promise<boolean> {
     if (!city && d.country) city = (await searchCities(d.city))[0];
   }
   const x = it.extracted || {};
+  if (quotaUsed) return { dest: city, start: d.start, end: d.end && d.end >= d.start ? d.end : d.start, hotel: x.hotel?.name || "" };
   const profile = getState().profile;
   const w: Wiz = {
     // the city found: straight to the dates and bookings, to check them; else the city to pick first
@@ -105,31 +104,44 @@ async function prefillWizard(it: InboundItem): Promise<boolean> {
 /** "Créer ce voyage": the creation form, filled from the booking, over the current screen; the booking joins the new trip */
 function useTripFromBooking(onDone: (id: number) => void): { busy: number | null; start: (it: InboundItem) => void; overlay: ReactNode } {
   const [open, setOpen] = useState<InboundItem | null>(null);
+  // the free trip of the month used: the creation options, filled from the booking, instead of the form
+  const [options, setOptions] = useState<Prefill | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
   const start = (it: InboundItem) => {
     setBusy(it.id);
     void prefillWizard(it)
       .then((go) => {
         if (!go) return;
+        if (go !== true) {
+          track("tool_opened", "create_options");
+          setOptions(go);
+          setOpen(it);
+          return;
+        }
+        setOptions(null);
         track("tool_opened", "next_trip");
         setOpen(it);
       })
       .finally(() => setBusy(null));
   };
+  const created = (id: string) => {
+    const it = open;
+    setOpen(null);
+    setOptions(null);
+    if (!it) return;
+    onDone(it.id);
+    const trip = currentTrip();
+    if (trip.id === id) void attachToNewTrip(it, trip).catch(() => undefined);
+    openHome(false);
+  };
   const overlay = open
     ? createPortal(
         <div className="rt-wizard">
-          <CreateWizard
-            onCancel={() => setOpen(null)}
-            onCreated={(id) => {
-              const it = open;
-              setOpen(null);
-              onDone(it.id);
-              const trip = currentTrip();
-              if (trip.id === id) void attachToNewTrip(it, trip).catch(() => undefined);
-              openHome(false);
-            }}
-          />
+          {options ? (
+            <CreateOptions prefill={options} onCancel={() => { setOpen(null); setOptions(null); }} onCreated={created} />
+          ) : (
+            <CreateWizard onCancel={() => setOpen(null)} onCreated={created} />
+          )}
         </div>,
         document.body,
       )
