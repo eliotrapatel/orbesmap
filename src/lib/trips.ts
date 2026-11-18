@@ -1,7 +1,8 @@
 // Trips as data (table "trips"): a trip's content — title, dates, time zone, hotel, days, flights, phrases,
 // zones, practical info, emergency info, checklist — is one record, merged field by field like places.
-// The two trips written in the code (Shanghai, Guangzhou) are only the seed of their record: every field is
-// stamped at 1 ms, so it never overwrites a real change. Their places come from the places table (defs.ts).
+// The two trips written in the code (Shanghai, Guangzhou): their record holds only what was changed in the app,
+// every other field comes from the code (so the code can still be corrected). New trips are records only.
+// Their places come from the places table (defs.ts).
 import type { Trip } from "../data/types";
 import type { PlaceDef } from "./model";
 

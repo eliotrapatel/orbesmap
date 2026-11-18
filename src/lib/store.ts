@@ -7,7 +7,7 @@
 import { useSyncExternalStore } from "react";
 import type { RealtimeChannel, Session } from "@supabase/supabase-js";
 import { TRIP_BY_ID } from "../data/trip";
-import { tripFromRecord, tripSeedPatch, type TripRec } from "./trips";
+import { tripFromRecord, type TripRec } from "./trips";
 import type { Trip } from "../data/types";
 import { dataUrlToBlob, deletePhotoFile, getPhoto, putPhoto } from "./idb";
 import { LEGACY_MARKER, LEGACY_TRIP, hasLegacyData, importLegacy, legacyPhotoList, readLegacyPhoto } from "./legacy";
@@ -655,25 +655,29 @@ export async function pull() {
     if (st.data && !settingsPending) setSettingsLocal({ eurRate: Number(st.data.eur_rate) || state.settings.eurRate });
     else if (!st.data && !settingsPending) toPush.push({ t: "settings" });
 
-    // every trip this person can open (records merged field by field)
+    // every trip this person can open (records merged field by field); a failed read never stops the sync
     if (tr.error) {
-      if (!isMissing(tr.error, "trip")) throw tr.error;
-      tripsMissing = true;
+      if (isMissing(tr.error, "trip")) tripsMissing = true;
+      else console.warn("[orbes] trips read failed", tr.error);
     } else {
       tripsMissing = false;
       tripsKnown = true;
       const merged: Record<string, TripRec> = { ...state.trips };
+      let changed = false;
       for (const r of tr.data!) {
         if (pendingUp.has(`trip:${r.id}`) || outbox.some((o) => o.t === "trip" && o.id === r.id)) continue;
         const remote = { updatedAt: new Date(r.updated_at).getTime(), ...(r.data as PlaceState) };
         const { merged: m, localNewer } = mergePlaceState(state.trips[r.id] as PlaceState, remote);
-        merged[r.id] = m as TripRec;
+        // the same record stays the same object: nothing is rebuilt for an unchanged trip
+        if (JSON.stringify(m) !== JSON.stringify(state.trips[r.id])) {
+          merged[r.id] = m as TripRec;
+          changed = true;
+        }
         if (localNewer) toPush.push({ t: "trip", trip: r.id, id: r.id });
       }
-      setTrips(merged);
+      if (changed) setTrips(merged);
     }
     toPush.forEach(enqueue);
-    seedTrips();
     // what the other phone (maybe still on the previous version) changed, copied into the place records
     migrate(trip, true);
     subscribePlaces();
@@ -754,8 +758,11 @@ function subscribeRealtime() {
 // a channel could stop the live updates of everything else
 let placesChannel: RealtimeChannel | null = null;
 let placesChannelTrip = "";
+let placesChannelTrips = false;
 function subscribePlaces() {
-  if (placesChannel && (placesChannelTrip !== state.tripId || !canSync() || defsMissing)) {
+  const withTrips = tripsKnown && !tripsMissing;
+  // reopened when the trips table appears (SQL run while the app was open)
+  if (placesChannel && (placesChannelTrip !== state.tripId || !canSync() || defsMissing || placesChannelTrips !== withTrips)) {
     void supabase?.removeChannel(placesChannel);
     placesChannel = null;
   }
@@ -768,10 +775,11 @@ function subscribePlaces() {
   };
   ch.on("postgres_changes", { event: "*", schema: "public", table: "places", filter: `trip_id=eq.${trip}` }, onChange);
   // trips this person can open (a trip renamed or re-dated on the other phone)
-  if (tripsKnown && !tripsMissing) ch.on("postgres_changes", { event: "*", schema: "public", table: "trips" }, onChange);
+  if (withTrips) ch.on("postgres_changes", { event: "*", schema: "public", table: "trips" }, onChange);
   ch.subscribe();
   placesChannel = ch;
   placesChannelTrip = trip;
+  placesChannelTrips = withTrips;
 }
 
 // ---------- auth ----------
@@ -932,21 +940,7 @@ export function updateTrip(id: string, patch: Record<string, unknown>) {
   enqueue({ t: "trip", trip: id, id });
 }
 
-/** The trips of the code get their record (members of the first shared space only, once signed in) */
-function seedTrips() {
-  if (!canSync() || tripsMissing || !codeTripsVisible()) return;
-  const next = { ...state.trips };
-  const ids: string[] = [];
-  for (const [id, code] of Object.entries(TRIP_BY_ID)) {
-    const p = tripSeedPatch(code, next[id]);
-    if (!p) continue;
-    next[id] = mergePlaceState(next[id] as PlaceState, p as PlaceState).merged as TripRec;
-    ids.push(id);
-  }
-  if (!ids.length) return;
-  setTrips(next);
-  ids.forEach((id) => enqueue({ t: "trip", trip: id, id }));
-}
+
 
 /** Brings the trip's place records up to date (first programme, places added before, previous version's changes) */
 function migrate(tripId: string, pinsSynced: boolean) {

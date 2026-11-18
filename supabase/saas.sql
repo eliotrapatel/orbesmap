@@ -5,8 +5,9 @@
 -- title, dates, hotel, days, flights, checklist, phrases, emergency info…). Who sees a trip is in
 -- "trip_members" (owner / editor / viewer). Places, notes, photos, contacts and pins of a trip are readable
 -- and writable by that trip's members only.
--- The shared space used so far (public.members + is_member()) keeps working: its members keep access to
--- every trip that is not someone else's trip, and they become co-owners of the two existing trips.
+-- The shared space used so far (public.members + is_member()) keeps working exactly as before: its members keep
+-- access to every trip that is not another user's trip (removing an e-mail from members still removes access).
+-- A new trip always has a random id (uuid) chosen by the app: no one can claim an id that already holds data.
 
 -- 1. Tables ----------------------------------------------------------------
 create table if not exists public.trips (
@@ -76,6 +77,41 @@ set search_path = public
 as $$
   select coalesce(public.trip_role(t) in ('owner', 'editor'), false) or public.legacy_access(t);
 $$;
+
+-- ids of my trips / trips I can edit / trips of the SaaS that are not the shared space's (computed once per query)
+create or replace function public.my_trip_ids()
+returns setof text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select trip_id from public.trip_members where user_id = auth.uid();
+$$;
+create or replace function public.my_writable_trip_ids()
+returns setof text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select trip_id from public.trip_members where user_id = auth.uid() and role in ('owner', 'editor');
+$$;
+create or replace function public.saas_trip_ids()
+returns setof text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select id from public.trips where id not in ('sha-2026', 'gz-2026');
+$$;
+revoke all on function public.my_trip_ids() from public, anon;
+revoke all on function public.my_writable_trip_ids() from public, anon;
+revoke all on function public.saas_trip_ids() from public, anon;
+grant execute on function public.my_trip_ids() to authenticated;
+grant execute on function public.my_writable_trip_ids() to authenticated;
+grant execute on function public.saas_trip_ids() to authenticated;
 
 revoke all on function public.trip_role(text) from public, anon;
 revoke all on function public.legacy_access(text) from public, anon;
@@ -159,11 +195,17 @@ drop policy if exists "trip create" on public.trips;
 drop policy if exists "trip update" on public.trips;
 drop policy if exists "trip delete" on public.trips;
 create policy "trip read" on public.trips for select to authenticated using ((select public.can_read_trip(id)));
+-- a new trip: a random uuid id (never an id that could already hold someone's data), owned by its creator;
+-- the two trips of the shared space only by its members
 create policy "trip create" on public.trips for insert to authenticated
-  with check (owner = auth.uid() or (id in ('sha-2026', 'gz-2026') and (select public.is_member())));
+  with check (
+    (id ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' and owner = auth.uid())
+    or (id in ('sha-2026', 'gz-2026') and (select public.is_member()))
+  );
 create policy "trip update" on public.trips for update to authenticated
   using ((select public.can_write_trip(id))) with check ((select public.can_write_trip(id)));
-create policy "trip delete" on public.trips for delete to authenticated using ((select public.trip_role(id)) = 'owner');
+create policy "trip delete" on public.trips for delete to authenticated
+  using (id not in ('sha-2026', 'gz-2026') and (select public.trip_role(id)) = 'owner');
 
 alter table public.trip_members enable row level security;
 drop policy if exists "members of my trips" on public.trip_members;
@@ -200,10 +242,11 @@ begin
     execute format('drop policy if exists "trip insert" on public.%I', t);
     execute format('drop policy if exists "trip update" on public.%I', t);
     execute format('drop policy if exists "trip delete" on public.%I', t);
-    execute format('create policy "trip read" on public.%I for select to authenticated using ((select public.can_read_trip(trip_id)))', t);
-    execute format('create policy "trip insert" on public.%I for insert to authenticated with check ((select public.can_write_trip(trip_id)))', t);
-    execute format('create policy "trip update" on public.%I for update to authenticated using ((select public.can_write_trip(trip_id))) with check ((select public.can_write_trip(trip_id)))', t);
-    execute format('create policy "trip delete" on public.%I for delete to authenticated using ((select public.can_write_trip(trip_id)))', t);
+    -- written with sets computed once per query (fast even on thousands of rows)
+    execute format('create policy "trip read" on public.%I for select to authenticated using (trip_id in (select public.my_trip_ids()) or ((select public.is_member()) and trip_id not in (select public.saas_trip_ids())))', t);
+    execute format('create policy "trip insert" on public.%I for insert to authenticated with check (trip_id in (select public.my_writable_trip_ids()) or ((select public.is_member()) and trip_id not in (select public.saas_trip_ids())))', t);
+    execute format('create policy "trip update" on public.%I for update to authenticated using (trip_id in (select public.my_writable_trip_ids()) or ((select public.is_member()) and trip_id not in (select public.saas_trip_ids()))) with check (trip_id in (select public.my_writable_trip_ids()) or ((select public.is_member()) and trip_id not in (select public.saas_trip_ids())))', t);
+    execute format('create policy "trip delete" on public.%I for delete to authenticated using (trip_id in (select public.my_writable_trip_ids()) or ((select public.is_member()) and trip_id not in (select public.saas_trip_ids())))', t);
   end loop;
 end $$;
 
@@ -225,19 +268,11 @@ create policy "trip update photos" on storage.objects for update to authenticate
 create policy "trip delete photos" on storage.objects for delete to authenticated
   using (bucket_id = 'photos' and (select public.can_write_trip(split_part(name, '/', 1))));
 
--- 6. The two existing trips: rows + their members as co-owners --------------
+-- 6. The two existing trips get their row (access stays with the shared space, see legacy_access) --
 insert into public.trips (id, owner)
 select t, (select u.id from public.members m join auth.users u on lower(u.email) = lower(m.email) order by m.created_at, m.email limit 1)
 from unnest(array['sha-2026', 'gz-2026']) as t
 on conflict (id) do nothing;
-
-insert into public.trip_members (trip_id, user_id, role)
-select x.id, u.id, 'owner'
-from public.trips x
-cross join public.members m
-join auth.users u on lower(u.email) = lower(m.email)
-where x.id in ('sha-2026', 'gz-2026')
-on conflict (trip_id, user_id) do nothing;
 
 -- 7. Live updates -----------------------------------------------------------
 do $$
