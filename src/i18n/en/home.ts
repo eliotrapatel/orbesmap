@@ -25,7 +25,6 @@ export default {
   "Préparation de l'image…": "Preparing the image…",
   "Image du récapitulatif enregistrée": "Recap image saved",
   "L'image n'a pas pu être préparée. Réessayez.": "The image could not be prepared. Please try again.",
-  "Préparé avec ORBES Trips": "Planned with ORBES Trips",
   // between trips
   "Prochain voyage": "Next trip",
   "Où allez-vous ensuite ?": "Where to next?",
