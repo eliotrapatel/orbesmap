@@ -25,24 +25,26 @@ const FIRST: Record<ProReason, SalePlan> = { edit: "pass", export: "pass", prep:
 const eur = (n: number) =>
   new Intl.NumberFormat(locale(), { style: "currency", currency: "EUR", minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 }).format(n);
 
-/** A plan on sale: the figure (display capitals) and its period (body type) are kept apart, like the comparison */
-type Offer = { id: SalePlan; name: string; amount: number; period: string; per: string; line: string; tag?: string; value?: string; cta: string };
+/** A plan on sale: the figure (display capitals) with its period beside it on one baseline ("par an"),
+ *  a short period for the card and the button ("/ an"), the line that says what it is, and why it is worth it */
+type Offer = { id: SalePlan; name: string; amount: number; period: string; short: string; line: string; tag?: string; value: string; cta: string };
 const OFFERS: Offer[] = [
   {
     id: "pass",
     name: "Pass voyage",
     amount: 9.99,
-    period: "",
-    per: "une fois",
+    period: "par voyage",
+    short: "",
     line: "Pro pour un voyage, jusqu'à 30 jours après le retour.",
+    value: "Un paiement unique, sans abonnement.",
     cta: "Choisir le Pass voyage",
   },
   {
     id: "annual",
     name: "Pro annuel",
     amount: 39,
-    period: "/ an",
-    per: "",
+    period: "par an",
+    short: "/ an",
     line: "Tout Pro, pour tous vos voyages.",
     tag: "Voyageurs fréquents",
     value: "Dès 4 voyages par an, moins cher que 4 Pass voyage.",
@@ -52,23 +54,23 @@ const OFFERS: Offer[] = [
     id: "business",
     name: "Business",
     amount: 19,
-    period: "/ mois",
-    per: "par personne",
+    period: "par mois et par personne",
+    short: "/ mois",
     line: "Pour les voyages professionnels : sourcing, salons, rendez-vous.",
     value: "Tout Pro, et en plus : note de frais, plusieurs voyageurs, facture.",
     cta: "Choisir Business",
   },
 ];
-/** "39 € / an", "9,99 €" */
-const priceOf = (o: Offer) => eur(o.amount) + (o.period ? " " + t(o.period) : "");
+/** The card's price fact: "39 € / an", "19 € / mois", "9,99 € · une fois" */
+const priceOf = (o: Offer) => eur(o.amount) + (o.short ? " " + t(o.short) : " · " + t("une fois"));
 
-/** The comparison's columns: the free plan for reference, then the three plans on sale (short name, price, period) */
+/** The comparison's columns: the free plan for reference, then the three plans on sale (short names: the prices are on the plans) */
 type Col = "free" | SalePlan;
-const COLS: { id: Col; name: string; price: () => string; per: string; per2?: string }[] = [
-  { id: "free", name: "Gratuit", price: () => eur(0), per: "" },
-  { id: "pass", name: "Pass", price: () => eur(9.99), per: "une fois" },
-  { id: "annual", name: "Annuel", price: () => eur(39), per: "/ an" },
-  { id: "business", name: "Business", price: () => eur(19), per: "/ mois", per2: "par pers." },
+const COLS: { id: Col; name: string }[] = [
+  { id: "free", name: "Gratuit" },
+  { id: "pass", name: "Pass" },
+  { id: "annual", name: "Annuel" },
+  { id: "business", name: "Business" },
 ];
 type Cell = boolean | string;
 /** What each plan gives, in one glance (true = included, false = not included, text = how much).
@@ -92,16 +94,13 @@ const UNLOCKED = [
 /** The staged reveal on enter: each block rises a little after the one before */
 const rise = (ms: number) => ({ "--d": ms + "ms" }) as CSSProperties;
 
-/** The membership card: the mark, the account's first name, two facts (plan and price, or access and validity).
+/** The membership card, at a bank card's proportions: the mark, the account's first name, two facts (plan and price, or access and validity).
+ *  Deep black with a fine blue edge; nothing on it moves once it has risen into place.
  *  preview = a visitor or a free account: the card is marked "Votre future carte" and the name stays dimmed, so it never reads as owned.
- *  A changed value cross-fades (keyed); the gold sheen passes once, when the card appears. */
+ *  A changed value cross-fades (keyed). */
 function MemberCard({ name, facts, preview, delay = 0 }: { name: string; facts: { k: string; v: string }[]; preview?: boolean; delay?: number }) {
   return (
     <div className={"pm-card pm-rise" + (preview ? " is-preview" : " is-member")} style={rise(delay)}>
-      <svg className="pm-card-orbit" viewBox="0 0 700 300" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
-        <ellipse cx="350" cy="150" rx="330" ry="88" transform="rotate(-18 350 150)" />
-        <ellipse cx="350" cy="150" rx="236" ry="58" transform="rotate(-18 350 150)" />
-      </svg>
       <div className="pm-card-top">
         <ProMark size="md" />
         <span className="pm-card-brand">{preview ? t("Votre future carte") : "ORBES Trips"}</span>
@@ -119,7 +118,7 @@ function MemberCard({ name, facts, preview, delay = 0 }: { name: string; facts: 
   );
 }
 
-/** One cell of the comparison: a gold check, a hairline dash, or a short quantity */
+/** One cell of the comparison: a blue check, a hairline dash, or a short quantity */
 function Mark({ v }: { v: Cell }) {
   if (v === true)
     return (
@@ -138,7 +137,7 @@ function Mark({ v }: { v: Cell }) {
   return <span className="pm-qty">{t(v)}</span>;
 }
 
-/** ORBES Trips Pro: a membership card, the plans compared in one glance, "choose this plan" until it goes on sale, a code to activate it.
+/** ORBES Trips Pro: a membership card, the plans, "choose this plan" until it goes on sale, the plans compared in one glance, a code to activate it.
  *  A member sees their card (first name, validity) and what is unlocked. */
 export default function ProScreen() {
   useLang();
@@ -212,207 +211,203 @@ export default function ProScreen() {
   return (
     <Shell className={"v3-pro pm" + (pro ? " pm-member" : " prc")} top={top} ring={false}>
       {pro ? (
-        <>
-          <h1 className="v3-d v3-h1 pm-rise" style={rise(40)}>{t("Vous êtes Pro.")}</h1>
-          <MemberCard name={first || local} delay={140} facts={[origin, { k: t("Validité"), v: validity }]} />
-          <p className="v3-lbl pm-sec pm-rise" style={rise(220)}>{t("Ce qui est débloqué")}</p>
-          <ul className="pm-unlocked pm-rise" style={rise(280)}>
-            {UNLOCKED.map((u) => (
-              <li key={u}>
-                <ICheck className="pm-yes" />
-                <span>{t(u)}</span>
-              </li>
-            ))}
-          </ul>
-          <div className="v3-spacer" />
-        </>
-      ) : (
-        <>
-          <div className="pm-grid">
-            <div className="pm-hero">
-              <MemberCard preview name={session ? first : ""} facts={[{ k: t("Formule"), v: t(offer.name) }, { k: t("Prix"), v: priceOf(offer) + (offer.per ? " · " + t(offer.per) : "") }]} />
-              <h1 className="v3-d v3-h1 pm-rise" style={rise(120)}>{t("Votre voyage, sans limite.")}</h1>
-              {WHY[why] && <p className="v3-lead pm-rise" style={rise(180)}>{t(WHY[why])}</p>}
-            </div>
-
-            <div className="pm-main">
-              <div className="pm-cmp-wrap pm-rise" style={rise(260)}>
-                <table className="pm-cmp">
-                  <caption className="sr">{t("Ce que comprend chaque formule")}</caption>
-                  <colgroup>
-                    <col className="pm-c0" />
-                    {COLS.map((c) => <col key={c.id} />)}
-                  </colgroup>
-                  <thead>
-                    <tr>
-                      <td />
-                      {COLS.map((c) => {
-                        const head = (
-                          <>
-                            <span className="pm-cn">{t(c.name)}</span>
-                            <span className="pm-cp">{c.price()}</span>
-                            <span className="pm-cper">{c.per ? t(c.per) : "\u00a0"}</span>
-                            {c.per2 && <span className="pm-cper">{t(c.per2)}</span>}
-                          </>
-                        );
-                        return (
-                          <th key={c.id} scope="col" className={(c.id === sel ? "on" : "") + (c.id !== "free" ? " pick" : "")}>
-                            {c.id === "free" ? (
-                              <span className="pm-colhead">{head}</span>
-                            ) : (
-                              <button type="button" className="pm-colhead pm-colbtn" aria-pressed={c.id === sel} onClick={() => setSel(c.id as SalePlan)}>
-                                {head}
-                              </button>
-                            )}
-                          </th>
-                        );
-                      })}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ROWS.map((r) => (
-                      <tr key={r.label}>
-                        <th scope="row">{t(r.label)}</th>
-                        {r.cells.map((v, i) => (
-                          <td key={COLS[i].id} className={(COLS[i].id === sel ? "on" : "") + (i === 0 ? " free" : "")}>
-                            <Mark v={v} />
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <p className="pm-free pm-rise" style={rise(300)}>
-                {session && <span className="v3-tag dim">{t("Votre formule")}</span>}
-                <b>{t("Gratuit")}</b> {t("1 voyage préparé par l'IA par mois, programme complet utilisable, partage et voyageurs invités.")}
-              </p>
-
-              <p className="v3-lbl prc-lbl pm-rise" style={rise(320)}>{t("Choisissez votre formule")}</p>
-              <div className="prc-list pm-rise" style={rise(340)} role="radiogroup" aria-label={t("Les formules")} onKeyDown={onArrows}>
-                {OFFERS.map((o) => {
-                  const on = o.id === sel;
-                  return (
-                    <button
-                      key={o.id}
-                      ref={(el) => {
-                        cards.current[o.id] = el;
-                      }}
-                      type="button"
-                      tabIndex={on ? 0 : -1}
-                      role="radio"
-                      aria-checked={on}
-                      className={"prc-card" + (on ? " on" : "")}
-                      onClick={() => setSel(o.id)}
-                    >
-                      <span className="prc-dot" aria-hidden="true" />
-                      <span className="prc-body">
-                        <span className="prc-row">
-                          <b>{t(o.name)}</b>
-                          <span className="prc-amount">
-                            <span className="prc-price">{eur(o.amount)}</span>
-                            {o.period && <span className="prc-period">{t(o.period)}</span>}
-                          </span>
-                        </span>
-                        <span className="prc-row prc-sub">
-                          <span>{t(o.line)}</span>
-                          {o.per && <span className="prc-per">{t(o.per)}</span>}
-                        </span>
-                        {o.tag && <span className="v3-tag gold prc-tag">{t(o.tag)}</span>}
-                        {on && o.value && (
-                          <span className="prc-more">
-                            <span className="prc-value">{t(o.value)}</span>
-                          </span>
-                        )}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {!session ? (
-                <div className="v3-glass v3-auth prc-buy pm-rise" style={rise(380)}>
-                  <p className="v3-msg">{t("Connectez-vous pour activer un code ou être prévenu à l'ouverture des ventes.")}</p>
-                  {err && <p className="v3-err" role="alert">{err}</p>}
-                </div>
-              ) : (
-                <>
-                  <div className="pm-honest pm-rise" style={rise(380)} role="status" aria-live="polite">
-                    {chosen === sel ? (
-                      <p className="v3-msg prc-ok">
-                        <ICheck className="prc-ok-ic" />
-                        <span>
-                          <b>{t("C'est noté : {plan}.", { plan: t(offer.name) })}</b> {t("Les paiements ouvrent très bientôt. Nous vous prévenons par e-mail dès l'ouverture, avec ce plan.")}
-                        </span>
-                      </p>
-                    ) : plan?.waitlisted ? (
-                      <p className="v3-msg prc-ok">
-                        <ICheck className="prc-ok-ic" />
-                        <span>{t("Vous serez prévenu à l'ouverture des ventes.")} {t("Vous pouvez encore choisir votre formule.")}</span>
-                      </p>
-                    ) : (
-                      <p className="v3-msg">{t("Les paiements ne sont pas encore ouverts. Choisissez votre formule : nous vous prévenons par e-mail dès l'ouverture.")}</p>
-                    )}
-                  </div>
-                  {/* the action stays under the thumb: docked at the bottom of the screen until its place in the page scrolls into view */}
-                  <div className="pm-dock pm-rise" style={rise(420)}>
-                    {/* an error stays in view with the action, wherever the page is scrolled */}
-                    {err && <p className="v3-err pm-dock-err" role="alert">{err}</p>}
-                    {chosen === sel ? (
-                      <p key="done" className="pm-dock-done">
-                        <ICheck className="prc-ok-ic" />
-                        <span>{t("C'est noté : {plan}.", { plan: t(offer.name) })}</span>
-                      </p>
-                    ) : (
-                      <button key="cta" type="button" className="v3-btn pm-cta" disabled={busy} onClick={choose}>
-                        {busy ? (
-                          t("Un instant…")
-                        ) : (
-                          <>
-                            <span className="pm-cta-l">{t(offer.cta)}</span>
-                            <span key={sel} className="pm-cta-p">
-                              {eur(offer.amount)}
-                              {offer.period && <span className="pm-cta-per">{t(offer.period)}</span>}
-                            </span>
-                          </>
-                        )}
-                      </button>
-                    )}
-                  </div>
-                  <div className="pm-codebox pm-rise" style={rise(440)}>
-                    <details className="prc-code">
-                      <summary>{t("J'ai un code d'accès")}</summary>
-                      <form
-                        onSubmit={(e) => {
-                          e.preventDefault();
-                          if (!code.trim()) return;
-                          void run(async () => {
-                            const until = await redeemCode(code);
-                            setDone(until ? t("Pro activé jusqu'au {date}.", { date: proDate(until) }) : t("Pro activé à vie."));
-                            setCode("");
-                          });
-                        }}
-                      >
-                        <label className="v3-field">
-                          <span className="sr">{t("Code d'accès Pro")}</span>
-                          <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} autoCapitalize="characters" autoComplete="off" spellCheck={false} placeholder={t("Code d'accès (ORB-…)")} maxLength={32} />
-                        </label>
-                        <button className="v3-btn ghost" disabled={busy || !code.trim()}>{busy ? t("Vérification…") : t("Activer Pro")}</button>
-                      </form>
-                    </details>
-                  </div>
-                </>
-              )}
-            </div>
+        <div className="pm-grid">
+          <div className="pm-hero">
+            <p className="pm-eyebrow pm-rise" style={rise(20)}>
+              <ProMark size="sm" />
+              <span>ORBES Trips</span>
+            </p>
+            <h1 className="v3-d v3-h1 pm-rise" style={rise(60)}>{t("Vous êtes Pro.")}</h1>
+            <MemberCard name={first || local} delay={140} facts={[origin, { k: t("Validité"), v: validity }]} />
           </div>
-        </>
+          <div className="pm-main">
+            <p className="v3-lbl pm-sec pm-rise" style={rise(220)}>{t("Ce qui est débloqué")}</p>
+            <ul className="pm-unlocked pm-rise" style={rise(280)}>
+              {UNLOCKED.map((u) => (
+                <li key={u}>
+                  <ICheck className="pm-yes" />
+                  <span>{t(u)}</span>
+                </li>
+              ))}
+            </ul>
+            <button className="v3-btn pm-continue pm-rise" style={rise(340)} onClick={closePro}>{t("Continuer")}</button>
+          </div>
+        </div>
+      ) : (
+        <div className="pm-grid">
+          <div className="pm-hero">
+            <p className="pm-eyebrow pm-rise" style={rise(20)}>
+              <ProMark size="sm" />
+              <span>ORBES Trips</span>
+            </p>
+            <h1 className="v3-d v3-h1 pm-rise" style={rise(60)}>{t("Votre voyage, sans limite.")}</h1>
+            {WHY[why] && <p className="v3-lead pm-lead pm-rise" style={rise(100)}>{t(WHY[why])}</p>}
+            <MemberCard preview delay={160} name={session ? first : ""} facts={[{ k: t("Formule"), v: t(offer.name) }, { k: t("Prix"), v: priceOf(offer) }]} />
+          </div>
+
+          <div className="pm-main">
+            <p className="v3-lbl pm-sec pm-rise" style={rise(240)}>{t("Choisissez votre formule")}</p>
+            <div className="prc-list pm-rise" style={rise(280)} role="radiogroup" aria-label={t("Les formules")} onKeyDown={onArrows}>
+              {OFFERS.map((o) => {
+                const on = o.id === sel;
+                return (
+                  <button
+                    key={o.id}
+                    ref={(el) => {
+                      cards.current[o.id] = el;
+                    }}
+                    type="button"
+                    tabIndex={on ? 0 : -1}
+                    role="radio"
+                    aria-checked={on}
+                    className={"prc-card" + (on ? " on" : "")}
+                    onClick={() => setSel(o.id)}
+                  >
+                    <span className="prc-dot" aria-hidden="true" />
+                    <span className="prc-name">{t(o.name)}</span>
+                    {o.tag && <span className="v3-tag pro prc-tag">{t(o.tag)}</span>}
+                    <span className="prc-amount">
+                      <span className="prc-price">{eur(o.amount)}</span>
+                      <span className="prc-period">{t(o.period)}</span>
+                    </span>
+                    <span className="prc-line">{t(o.line)}</span>
+                    <span className="prc-value">{t(o.value)}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {!session ? (
+              <div className="pm-honest pm-rise" style={rise(320)}>
+                <p className="v3-msg">{t("Connectez-vous pour activer un code ou être prévenu à l'ouverture des ventes.")}</p>
+                {err && <p className="v3-err" role="alert">{err}</p>}
+              </div>
+            ) : (
+              <>
+                <div className="pm-honest pm-rise" style={rise(320)} role="status" aria-live="polite">
+                  {chosen === sel ? (
+                    <p className="v3-msg prc-ok">
+                      <ICheck className="prc-ok-ic" />
+                      <span>
+                        <b>{t("C'est noté : {plan}.", { plan: t(offer.name) })}</b> {t("Les paiements ouvrent très bientôt. Nous vous prévenons par e-mail dès l'ouverture, avec ce plan.")}
+                      </span>
+                    </p>
+                  ) : plan?.waitlisted ? (
+                    <p className="v3-msg prc-ok">
+                      <ICheck className="prc-ok-ic" />
+                      <span>{t("Vous serez prévenu à l'ouverture des ventes.")} {t("Vous pouvez encore choisir votre formule.")}</span>
+                    </p>
+                  ) : (
+                    <p className="v3-msg">{t("Les paiements ne sont pas encore ouverts. Choisissez votre formule : nous vous prévenons par e-mail dès l'ouverture.")}</p>
+                  )}
+                </div>
+                {/* the action stays under the thumb: docked at the bottom of the screen until its place in the page scrolls into view */}
+                <div className="pm-dock pm-rise" style={rise(360)}>
+                  {/* an error stays in view with the action, wherever the page is scrolled */}
+                  {err && <p className="v3-err pm-dock-err" role="alert">{err}</p>}
+                  {chosen === sel ? (
+                    <p key="done" className="pm-dock-done">
+                      <ICheck className="prc-ok-ic" />
+                      <span>{t("C'est noté : {plan}.", { plan: t(offer.name) })}</span>
+                    </p>
+                  ) : (
+                    <button key="cta" type="button" className="v3-btn pm-cta" disabled={busy} onClick={choose}>
+                      {busy ? (
+                        t("Un instant…")
+                      ) : (
+                        <>
+                          <span className="pm-cta-l">{t(offer.cta)}</span>
+                          <span key={sel} className="pm-cta-p">
+                            {eur(offer.amount)}
+                            {offer.short && <span className="pm-cta-per">{t(offer.short)}</span>}
+                          </span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+
+            <p className="v3-lbl pm-sec pm-rise" style={rise(400)}>{t("Ce que comprend chaque formule")}</p>
+            <div className="pm-cmp-wrap pm-rise" style={rise(420)}>
+              <table className="pm-cmp">
+                <caption className="sr">{t("Ce que comprend chaque formule")}</caption>
+                <colgroup>
+                  <col className="pm-c0" />
+                  {COLS.map((c) => <col key={c.id} />)}
+                </colgroup>
+                <thead>
+                  <tr>
+                    <td className="pm-corner" />
+                    {COLS.map((c) => (
+                      <th key={c.id} scope="col" className={(c.id === sel ? "on" : "") + (c.id === "free" ? " free" : " pick")}>
+                        {c.id === "free" ? (
+                          <span className="pm-colhead">
+                            <span className="pm-cn">{t(c.name)}</span>
+                          </span>
+                        ) : (
+                          <button type="button" className="pm-colhead pm-colbtn" aria-pressed={c.id === sel} onClick={() => setSel(c.id as SalePlan)}>
+                            <span className="pm-cn">{t(c.name)}</span>
+                          </button>
+                        )}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {ROWS.map((r) => (
+                    <tr key={r.label}>
+                      <th scope="row">{t(r.label)}</th>
+                      {r.cells.map((v, i) => (
+                        <td key={COLS[i].id} className={(COLS[i].id === sel ? "on" : "") + (i === 0 ? " free" : "")}>
+                          <Mark v={v} />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="pm-free pm-rise" style={rise(440)}>
+              {session && <span className="v3-tag dim">{t("Votre formule")}</span>}
+              <b>{t("Gratuit")}</b> {t("1 voyage préparé par l'IA par mois, programme complet utilisable, partage et voyageurs invités.")}
+            </p>
+
+            {session && (
+              <div className="pm-codebox pm-rise" style={rise(460)}>
+                <details className="prc-code">
+                  <summary>{t("J'ai un code d'accès")}</summary>
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (!code.trim()) return;
+                      void run(async () => {
+                        const until = await redeemCode(code);
+                        setDone(until ? t("Pro activé jusqu'au {date}.", { date: proDate(until) }) : t("Pro activé à vie."));
+                        setCode("");
+                      });
+                    }}
+                  >
+                    <label className="v3-field">
+                      <span className="sr">{t("Code d'accès Pro")}</span>
+                      <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} autoCapitalize="characters" autoComplete="off" spellCheck={false} placeholder={t("Code d'accès (ORB-…)")} maxLength={32} />
+                    </label>
+                    <button className="v3-btn ghost" disabled={busy || !code.trim()}>{busy ? t("Vérification…") : t("Activer Pro")}</button>
+                  </form>
+                </details>
+              </div>
+            )}
+          </div>
+        </div>
       )}
-      {(pro || done) && (
+      {done && !pro && (
         <>
-          {done && <p className="sr" role="status">{done}</p>}
+          <p className="sr" role="status">{done}</p>
           <button className="v3-btn pm-continue" onClick={closePro}>{t("Continuer")}</button>
         </>
       )}
+      {done && pro && <p className="sr" role="status">{done}</p>}
     </Shell>
   );
 }

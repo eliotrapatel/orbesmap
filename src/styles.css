@@ -29,6 +29,10 @@
   --warn: #e8b07a;
   --bad: #ee8f8f;
   --gold: #d8c47e;
+  /* Pro: a vibrant blue (fills, strokes, large marks), its light tint for small text on black, a selected field */
+  --pro: #2f6bff;
+  --pro-ink: #8fb0ff;
+  --pro-soft: rgba(47, 107, 255, 0.14);
 
   --font: "Helvetica Neue", HelveticaNeue, Helvetica, Arial, sans-serif;
   --display: "Gravesend Sans", var(--font);

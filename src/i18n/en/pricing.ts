@@ -68,4 +68,9 @@ export default {
   "par pers.": "per user",
   "Le mode affaires : fournisseurs, rendez-vous, comptes-rendus": "Business mode: suppliers, meetings, meeting notes",
   "Modifier le programme à tout moment : ajouter, déplacer, retirer des lieux": "Change the itinerary anytime: add, move or remove places",
+  // lot "pro", blue membership: each price's period, the Pass voyage's reason
+  "par voyage": "per trip",
+  "par an": "per year",
+  "par mois et par personne": "per month, per person",
+  "Un paiement unique, sans abonnement.": "One payment, no subscription.",
 } satisfies Record<string, string>;

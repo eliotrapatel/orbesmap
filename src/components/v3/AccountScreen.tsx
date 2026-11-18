@@ -12,6 +12,7 @@ import AiCredit from "../AiCredit";
 import { openAdmin, useAdmin } from "./nav";
 import { legalHref } from "./Legal";
 import { InboundInbox } from "./AlertsAndInbox";
+import ProChip from "./ProMark";
 
 // ---------- the account: one structure for the trip's "Compte" panel and the "Mes voyages" account screen ----------
 
@@ -124,8 +125,8 @@ function PlanCard() {
   );
 }
 
-/** The Pro mark: a gold hairline frame around PRO */
-export const ProMark = () => <span className="ac-promark">PRO</span>;
+/** The Pro mark: the same blue chip as the Pro screen (white "PRO" on solid blue) */
+export const ProMark = () => <ProChip size="md" className="ac-promark" />;
 
 function AccountHeader({ status }: { status?: ReactNode }) {
   const email = useStore((s) => s.session?.user.email) || "";
