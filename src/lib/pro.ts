@@ -35,13 +35,16 @@ export async function redeemCode(code: string): Promise<string | null> {
   return r.until ?? null;
 }
 
-/** "Prévenez-moi": this account is told when Pro goes on sale */
-export async function joinWaitlist() {
+/** The plans on sale soon (the Pro screen); the one chosen is recorded as purchase intent */
+export type SalePlan = "pass" | "annual" | "business";
+
+/** "Prévenez-moi": this account is told when Pro goes on sale; `plan`: the plan it chose (recorded with the step) */
+export async function joinWaitlist(plan?: SalePlan) {
   const s = getState().session;
   if (!s?.user.email) throw new Error(t("Connectez-vous d'abord."));
   const { error } = await sb().from("waitlist").upsert({ user_id: s.user.id, email: s.user.email.toLowerCase(), lang: (getState().profile.lang as string) || "fr" }, { onConflict: "user_id", ignoreDuplicates: true });
   fail(error, "L'inscription");
-  track("waitlist_join");
+  track("waitlist_join", plan ?? null);
   await pullPlan();
 }
 
