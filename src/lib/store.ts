@@ -15,6 +15,7 @@ import { liveTripCached } from "./live";
 import { migrationPatches } from "./defs";
 import { emptyData, mergePlaceState, uid, type Contact, type Data, type Photo, type Pin, type PlaceDef, type PlaceState, type Settings } from "./model";
 import { PHOTO_BUCKET, supabase } from "./supabase";
+import { linkVisitor, track } from "./track";
 
 const dataKey = (tripId: string) => "orbes.v2." + tripId;
 const SETTINGS_KEY = "orbes.settings";
@@ -321,6 +322,7 @@ export const currentTrip = (): Trip => liveTripCached(baseTrip(state.tripId), st
 
 export function switchTrip(tripId: string) {
   if (!tripIds().includes(tripId) || tripId === state.tripId) return;
+  track("trip_opened", null, tripId);
   try {
     localStorage.setItem(TRIP_KEY, tripId);
   } catch {
@@ -925,7 +927,7 @@ export async function initAuth() {
   if (data.session) adoptAccount(data.session.user.id);
   set({ session: data.session, authReady: true });
   if (data.session) await checkMembership();
-  supabase.auth.onAuthStateChange((_event, session) => {
+  supabase.auth.onAuthStateChange((event, session) => {
     const before = state.session?.user.id;
     set({ session });
     if (!session) {
@@ -935,6 +937,7 @@ export async function initAuth() {
       return;
     }
     if (before !== session.user.id) {
+      if (event === "SIGNED_IN") track("sign_in");
       adoptAccount(session.user.id);
       set({ member: null });
       void checkMembership();
@@ -1296,6 +1299,7 @@ function setPlan(plan: Plan | null) {
 export async function pullPlan() {
   const uid = state.session?.user.id;
   if (!uid || !supabase) return;
+  linkVisitor(uid);
   const { data, error } = await supabase.rpc("my_plan");
   if (error) {
     if (["PGRST202", "42883"].includes(error.code || "")) setPlan(null);

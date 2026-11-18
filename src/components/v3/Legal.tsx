@@ -77,7 +77,7 @@ function Privacy() {
     <>
       <h1 className="v3-d v3-h2">Confidentialité</h1>
       <Sec t="En bref">
-        <p>Nous utilisons vos données pour faire fonctionner votre carnet de voyage, rien d'autre. Pas de publicité, pas de revente, pas de cookie de suivi.</p>
+        <p>Nous utilisons vos données pour faire fonctionner votre carnet de voyage et pour l'améliorer. Pas de publicité, pas de revente, aucun partage avec des annonceurs.</p>
         <p>Responsable : {EDITOR}. Contact : <a href={`mailto:${CONTACT}`}>{CONTACT}</a>.</p>
       </Sec>
       <Sec t="Ce que nous enregistrons">
@@ -86,11 +86,11 @@ function Privacy() {
           <li><b>Vos voyages</b> : destinations, dates, vols et hôtel, lieux, notes, photos, contacts et check-lists que vous ajoutez, et les personnes que vous invitez.</li>
           <li><b>Votre position</b>, seulement si vous l'autorisez : elle sert à afficher les distances sur votre téléphone, et accompagne une question posée à l'assistant pour qu'il réponde depuis où vous êtes.</li>
           <li><b>L'usage de l'IA</b> : le nombre de demandes et leur coût, pour appliquer les limites.</li>
-          <li><b>Des chiffres anonymes</b> : quelques étapes du parcours (page vue, inscription, voyage créé…), sans compte, sans adresse IP et sans identifiant.</li>
+          <li><b>Votre utilisation de l'application</b> : les étapes de votre parcours (page d'accueil vue, inscription, connexions, voyages créés, ouverts et validés, lieux ajoutés, invitations, exports, écran Pro), avec la date, le type d'appareil (téléphone ou ordinateur) et le site d'où vous venez. Elles sont liées à votre compte ; avant l'inscription, elles sont liées à un identifiant aléatoire gardé sur votre appareil, puis rattachées à votre compte quand vous vous connectez.</li>
         </ul>
       </Sec>
       <Sec t="Pourquoi">
-        <p>Pour fournir le service que vous demandez (préparer et afficher vos voyages, les synchroniser entre vos appareils, les partager), pour appliquer les limites et Pro, et pour améliorer l'application à partir des chiffres anonymes.</p>
+        <p>Pour fournir le service que vous demandez (préparer et afficher vos voyages, les synchroniser entre vos appareils, les partager), pour appliquer les limites et Pro, pour vous aider si vous nous écrivez, et pour comprendre comment l'application est utilisée afin de l'améliorer.</p>
       </Sec>
       <Sec t="Avec qui">
         <p>Uniquement avec les prestataires nécessaires au service, qui traitent les données pour notre compte :</p>
@@ -103,10 +103,10 @@ function Privacy() {
         <p>Ces prestataires peuvent se trouver hors de l'Union européenne, notamment aux États-Unis et, pour DeepSeek, en Chine.</p>
       </Sec>
       <Sec t="Sur votre téléphone">
-        <p>L'application garde une copie de vos voyages et votre session sur votre appareil, pour fonctionner sans réseau. Ce stockage est nécessaire au service ; il n'y a aucun cookie publicitaire ni de mesure d'audience par cookie.</p>
+        <p>L'application garde sur votre appareil une copie de vos voyages et votre session, pour fonctionner sans réseau, ainsi que l'identifiant aléatoire qui relie votre utilisation à votre compte. Il n'y a aucun cookie publicitaire ni outil de suivi d'un autre site.</p>
       </Sec>
       <Sec t="Combien de temps">
-        <p>Tant que votre compte existe. Quand vous le supprimez, votre compte et les voyages que vous avez créés sont effacés. Les chiffres anonymes sont gardés 13 mois.</p>
+        <p>Tant que votre compte existe. Quand vous le supprimez, votre compte, les voyages que vous avez créés et votre historique d'utilisation sont effacés. L'historique d'utilisation est gardé au plus 13 mois.</p>
       </Sec>
       <Sec t="Vos droits">
         <p>Vous pouvez accéder à vos données, les corriger, les exporter (menu du compte, « Exporter mes données ») et les supprimer (« Supprimer mon compte »), ou vous opposer à un traitement. Pour toute demande : <a href={`mailto:${CONTACT}`}>{CONTACT}</a>. Si vous résidez dans l'Union européenne, vous pouvez aussi vous adresser à l'autorité de protection des données de votre pays (en France, la CNIL).</p>

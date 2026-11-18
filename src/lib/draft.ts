@@ -302,7 +302,7 @@ export async function regenerateDay(tripId: string, date: string) {
 export function confirmTrip(tripId: string) {
   // the moment of the validation: after it, a free account's changes to the programme need Pro (saas-4.sql)
   saveDraft(tripId, { status: "done", doneAt: Date.now(), lease: undefined });
-  track("trip_validated");
+  track("trip_validated", null, tripId);
 }
 
 const MAX_ADDS = 3;

@@ -343,7 +343,7 @@ function Programme({ w, set, top, onCreated }: StepProps & { onCreated: (id: str
       draft,
     });
     switchTrip(id);
-    track("trip_created");
+    track("trip_created", null, id);
     onCreated(id);
   };
   const goSafe = () => go().catch(() => setBusy(false));

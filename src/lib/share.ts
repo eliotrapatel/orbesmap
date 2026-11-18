@@ -1,6 +1,7 @@
 // Sharing a trip: its travellers (owner, editors, readers) and the invitations by e-mail waiting for someone
 // to sign in with that address (supabase/saas-3.sql). Online only: these lists are read from the server.
 import { supabase } from "./supabase";
+import { track } from "./track";
 
 export type Person = { user_id: string; email: string; name: string; role: "owner" | "editor" | "viewer" };
 export type Invite = { email: string; role: "editor" | "viewer"; created_at: string };
@@ -33,6 +34,7 @@ export async function invite(tripId: string, email: string, role: Invite["role"]
   const uid = (await sb().auth.getSession()).data.session?.user.id;
   const { error } = await sb().from("trip_invites").upsert({ trip_id: tripId, email: e, role, invited_by: uid });
   fail(error, "L'invitation");
+  track("invite_sent", role, tripId);
 }
 export async function removeInvite(tripId: string, email: string) {
   const { error } = await sb().from("trip_invites").delete().eq("trip_id", tripId).eq("email", email);

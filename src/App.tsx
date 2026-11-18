@@ -31,6 +31,7 @@ import type { Pin } from "./lib/model";
 import { ensureCompass, getLoc, onLocateError, resumeLocate, setFollow, startLocate, stopLocate, useLoc } from "./lib/locate";
 import type { Mode } from "./lib/route";
 import { NavCard, PointCard, useNavigation, type NavState, type NavTarget } from "./components/Nav";
+import { track } from "./lib/track";
 
 type Sel = { kind: "place" | "pin"; id: string } | null;
 type Snap = "peek" | "half" | "full";
@@ -322,6 +323,7 @@ export default function App() {
         why: f.why, hoursText: f.hours, price: f.price, source: f.source, day: f.day, slot: "", type: f.type,
       });
       if (!id) return null;
+      track("place_added", "link", trip.id);
       const pin = { id, lng: ll[0], lat: ll[1] };
       // the full sheet (highlights, tip, metro, hours…) is written right away in the background
       void enrichPlace(id, true);
@@ -712,6 +714,7 @@ export default function App() {
           onSave={(name, note) => {
             const id = createPlace({ name, lng: pendingPin[0], lat: pendingPin[1], slot: "" });
             if (!id) return setPendingPin(null);
+            track("place_added", "map", trip.id);
             // the note goes into my own note (signed in) or the shared one (signed out)
             if (note) updatePlace(id, { [noteKey(currentAuthor()) || "note"]: note });
             setPendingPin(null);

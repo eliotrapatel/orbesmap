@@ -55,7 +55,22 @@ export type Overview = {
 export type AccountRow = {
   user_id: string; email: string; name: string; created_at: string; last_seen: string | null;
   pro: boolean; until: string | null; granted: boolean; admin: boolean; trips: number; ai30: number; waitlisted: boolean;
+  last_active?: string | null; steps30?: number;
 };
+export type UserSheet = {
+  email: string; created_at: string; last_seen: string | null; confirmed: boolean; profile: Record<string, unknown>;
+  pro: boolean; grant: { until: string | null; source: string | null } | null; admin: boolean; waitlisted: boolean;
+  trips: { id: string; title: string | null; dates: string | null; role: string; status: string; created_at: string; places: number }[];
+  ai: { calls30: number; usd30: number; calls: number; usd: number; tasks: Record<string, number> };
+  firstSeen: string | null; firstRef: string | null; visitsBefore: number; counts: Record<string, number>;
+  events: { at: string; name: string; detail: string | null; device: string | null; trip: string | null; ref: string | null }[];
+};
+/** One account's sheet (supabase/saas-5.sql) */
+export async function adminUser(userId: string): Promise<UserSheet> {
+  const { data, error } = await sb().rpc("admin_user", { p_user: userId });
+  fail(error, "La lecture du compte");
+  return data as UserSheet;
+}
 export type CodeRow = { code: string; days: number | null; max_uses: number; uses: number; active: boolean; note: string | null; created_at: string };
 export type WaitRow = { email: string; lang: string | null; created_at: string };
 
@@ -65,7 +80,7 @@ export async function adminOverview(): Promise<Overview> {
   return data as Overview;
 }
 export type Funnel = {
-  steps: Record<string, { now: number; before: number }>; phones: number; computers: number;
+  steps: Record<string, { now: number; before: number; people: number }>; active: number; active7: number; phones: number; computers: number;
   refs: { ref: string; n: number }[]; pro: Record<string, number>;
 };
 /** The anonymous path figures (supabase/saas-5.sql); null while that file has not run */
@@ -109,6 +124,7 @@ export async function adminWaitlist(): Promise<WaitRow[]> {
 /** Everything this account holds on this phone (profile, trips, places, notes, contacts, pins), as a JSON file */
 export function exportMyData() {
   const st = getState();
+  track("export", "data");
   const trips = listTrips().map((t) => {
     let data: unknown = null;
     try {

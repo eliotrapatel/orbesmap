@@ -9,6 +9,7 @@ import { phase } from "../lib/time";
 import { ICalPlus, ICopy, IDownload, IOffline, IPlane, ISpeaker } from "./Icons";
 import { cancelOffline, deleteOffline, offlineSupported, prepareOffline, useOffline, verifyOffline } from "../lib/offline";
 import { ShowScreen, copy, speak } from "./ui";
+import { track } from "../lib/track";
 
 const fmt = (n: number) => (Number.isFinite(n) ? (Math.round(n * 100) / 100).toLocaleString("fr-FR", { maximumFractionDigits: 2 }) : "");
 const parse = (s: string) => parseFloat(s.replace(/\s/g, "").replace(",", "."));
@@ -196,7 +197,7 @@ function OfflineCard({ trip }: { trip: Trip }) {
         {st.state === "running" ? (
           <button className="btn-sm" onClick={cancelOffline}>Arrêter</button>
         ) : (
-          <button className="btn-sm on" onClick={() => (hasPro() ? prepareOffline(points) : requestPro("export"))}>{st.state === "ready" ? "Mettre à jour" : "Préparer hors ligne"}</button>
+          <button className="btn-sm on" onClick={() => { if (!hasPro()) return requestPro("export"); track("export", "offline", trip.id); prepareOffline(points); }}>{st.state === "ready" ? "Mettre à jour" : "Préparer hors ligne"}</button>
         )}
         {st.state === "ready" && <button className="btn-sm" onClick={() => { if (confirm("Supprimer la carte hors ligne de ce téléphone ?")) deleteOffline(); }}>Supprimer</button>}
       </div>
@@ -247,17 +248,17 @@ export function ExportPanel({ trip }: { trip: Trip }) {
     <div>
       <p style={{ color: "var(--soft)", fontSize: 13.5, marginBottom: 16 }}>Tout le carnet {trip.title} : lieux, statuts, notes, fiches fournisseurs, contacts{ph !== "before" ? " et visites" : ""}.</p>
       <div className="cards">
-        <button className="card" style={{ textAlign: "left" }} onClick={() => { if (!hasPro()) return requestPro("export"); if (!exportPdf(trip, getState().data)) toast("Autorisez les fenêtres pop-up pour imprimer le PDF"); }}>
+        <button className="card" style={{ textAlign: "left" }} onClick={() => { if (!hasPro()) return requestPro("export"); track("export", "pdf", trip.id); if (!exportPdf(trip, getState().data)) toast("Autorisez les fenêtres pop-up pour imprimer le PDF"); }}>
           <IDownload width={20} height={20} />
           <h4 style={{ marginTop: 10 }}>PDF</h4>
           <p>Carnet imprimable, jour par jour.</p>
         </button>
-        <button className="card" style={{ textAlign: "left" }} onClick={() => { if (!hasPro()) return requestPro("export"); exportCsv(trip, getState().data); toast("Fichier CSV téléchargé"); }}>
+        <button className="card" style={{ textAlign: "left" }} onClick={() => { if (!hasPro()) return requestPro("export"); track("export", "csv", trip.id); exportCsv(trip, getState().data); toast("Fichier CSV téléchargé"); }}>
           <IDownload width={20} height={20} />
           <h4 style={{ marginTop: 10 }}>Tableur (CSV)</h4>
           <p>Pour Excel ou Numbers.</p>
         </button>
-        <button className="card" style={{ textAlign: "left" }} onClick={() => { if (!hasPro()) return requestPro("export"); exportIcs(trip, getState().data.places); toast("Calendrier téléchargé"); }}>
+        <button className="card" style={{ textAlign: "left" }} onClick={() => { if (!hasPro()) return requestPro("export"); track("export", "ics", trip.id); exportIcs(trip, getState().data.places); toast("Calendrier téléchargé"); }}>
           <ICalPlus width={20} height={20} />
           <h4 style={{ marginTop: 10 }}>Calendrier (.ics)</h4>
           <p>Le programme et les vols dans Calendrier ou Google Agenda.</p>

@@ -11,6 +11,7 @@ import ShareTrip from "./ShareTrip";
 import ProScreen from "./ProScreen";
 import AdminScreen from "./AdminScreen";
 import Legal, { legalKind } from "./Legal";
+import { track } from "../../lib/track";
 
 
 /**
@@ -20,6 +21,10 @@ import Legal, { legalKind } from "./Legal";
  */
 export default function Root() {
   const proAsk = useStore((s) => s.proAsk);
+  const signedIn = useStore((s) => !!s.session);
+  useEffect(() => {
+    if (signedIn) track("app_open");
+  }, [signedIn]);
   const admin = useAdmin();
   // the legal pages have their own address and open without an account
   const legal = legalKind(new URLSearchParams(location.search).get("p"));

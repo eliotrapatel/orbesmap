@@ -1220,3 +1220,17 @@ button.v3-av { cursor: pointer; color: var(--ink); }
 .adm-step > * { position: relative; }
 .adm-step b { font-weight: 500; font-variant-numeric: tabular-nums; min-width: 34px; text-align: right; }
 .adm-step small { color: var(--mute); font-size: 12px; font-variant-numeric: tabular-nums; min-width: 34px; text-align: right; }
+.adm-sheet { position: fixed; inset: 0; z-index: 125; background: #050505; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.adm-sheet-in { max-width: 560px; margin: 0 auto; padding: calc(var(--safe-t) + 10px) 20px calc(var(--safe-b) + 32px); }
+.adm-sheet-in > .v3-bar { min-height: 52px; }
+.adm-facts { margin-top: 16px; border-top: 1px solid var(--hair); }
+.adm-facts > div { display: grid; grid-template-columns: 132px 1fr; gap: 10px; padding: 9px 0; border-bottom: 1px solid rgba(246, 242, 234, 0.08); font-size: 13.5px; }
+.adm-facts dt { color: var(--mute); }
+.adm-facts dd { color: var(--ink); overflow-wrap: anywhere; }
+.adm-sub { display: block; margin-top: 24px; }
+.adm-counts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.adm-counts .v3-tag { text-transform: none; letter-spacing: 0; font-weight: 500; height: 26px; }
+.adm-timeline { margin-top: 8px; }
+.adm-ev { display: flex; gap: 10px; align-items: baseline; padding: 8px 0; border-bottom: 1px solid rgba(246, 242, 234, 0.06); font-size: 13px; }
+.adm-ev-at { width: 92px; flex: none; color: var(--mute); font-size: 12px; font-variant-numeric: tabular-nums; }
+.adm-ev small { color: var(--mute); font-size: 11.5px; flex: none; }
