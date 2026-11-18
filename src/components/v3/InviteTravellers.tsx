@@ -1,7 +1,8 @@
 import "../../styles/invite.css";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invite, invites as listInvites, people as listPeople, sendInviteMessage, whatsappInviteUrl, type Invite, type Person } from "../../lib/share";
 import { currentAuthor, toast, useStore, useTrip } from "../../lib/store";
+import { setTravellers, travellersOf } from "../../lib/business";
 import { t } from "../../lib/i18n";
 
 // Which address each companion of the wizard was invited with, and "Plus tard", on this phone only.
@@ -27,6 +28,9 @@ function writeSaved(tripId: string, v: Saved) {
 
 const norm = (s: string) => s.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 const EMAIL = /^\S+@\S+\.\S+$/;
+// the rows whose field can be open besides a companion's: someone else's address, a companion's first name
+const OTHER = "\u0000other";
+const NAME = "\u0000name";
 
 /**
  * "Qui part avec vous ?": while the trip is being prepared (and in its review), each companion named in the wizard
@@ -44,9 +48,13 @@ export default function InviteTravellers() {
   const [saved, setSaved] = useState<Saved>(() => readSaved(trip.id));
   const [people, setPeople] = useState<Person[]>([]);
   const [pending, setPending] = useState<Invite[]>([]);
-  // the row whose e-mail field is open: a companion's name, "+" for someone else
+  // the server's lists were read at least once: from then on they, not this phone, say who is invited
+  const [loaded, setLoaded] = useState(false);
+  const seq = useRef(0);
+  // the row whose field is open: a companion's name, OTHER for someone else's address, NAME for a new companion
   const [open, setOpen] = useState<string | null>(null);
   const [email, setEmail] = useState("");
+  const [first, setFirst] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
@@ -55,13 +63,27 @@ export default function InviteTravellers() {
 
   useEffect(() => {
     setSaved(readSaved(trip.id));
+    setLoaded(false);
   }, [trip.id]);
 
   const load = useCallback(async () => {
+    const n = ++seq.current;
     try {
       const [p, i] = await Promise.all([listPeople(trip.id), listInvites(trip.id)]);
+      // an older reading that comes back after a newer one (an invitation just sent) is ignored
+      if (n !== seq.current) return;
       setPeople(p);
       setPending(i);
+      setLoaded(true);
+      // an address no longer waiting (cancelled in "Partager") and not among the travellers is forgotten
+      const live = new Set([...i.map((x) => x.email.toLowerCase()), ...p.map((x) => (x.email || "").toLowerCase())]);
+      setSaved((cur) => {
+        const kept = Object.fromEntries(Object.entries(cur.emails).filter(([, e]) => live.has(e.toLowerCase())));
+        if (Object.keys(kept).length === Object.keys(cur.emails).length) return cur;
+        const next = { ...cur, emails: kept };
+        writeSaved(trip.id, next);
+        return next;
+      });
     } catch {
       /* offline, or the trip not on the server yet: the rows show what this phone knows */
     }
@@ -91,17 +113,40 @@ export default function InviteTravellers() {
 
   // the travellers who joined (not the owner), and the companion each one is
   const joined = people.filter((p) => p.role !== "owner");
-  const first = (s: string) => norm(s.split(/\s+/)[0] || "");
+  const firstOf = (s: string) => norm(s.split(/\s+/)[0] || "");
+  const pendingSet = new Set(pending.map((i) => i.email.toLowerCase()));
+  // each companion's address: the one saved on this phone, else a waiting invitation whose address starts
+  // with the companion's first name (made in "Partager" or on another phone), each address given once
+  const emailOf: Record<string, string> = {};
+  const claimed = new Set(Object.values(saved.emails).map((e) => e.toLowerCase()));
+  for (const name of companions) {
+    const e = saved.emails[name];
+    if (e) {
+      emailOf[name] = e;
+      continue;
+    }
+    const f = firstOf(name);
+    const hit = f && pending.find((i) => !claimed.has(i.email.toLowerCase()) && norm(i.email.split("@")[0].split(/[._+\-\d]/)[0] || "") === f);
+    if (hit) {
+      emailOf[name] = hit.email;
+      claimed.add(hit.email.toLowerCase());
+    }
+  }
   const joinedAs = (name: string) => {
-    const e = saved.emails[name]?.toLowerCase();
-    return joined.find((p) => (e && p.email.toLowerCase() === e) || (p.name && first(p.name) === first(name)));
+    const e = emailOf[name]?.toLowerCase();
+    return joined.find((p) => (e && (p.email || "").toLowerCase() === e) || (p.name && firstOf(p.name) === firstOf(name)));
   };
-  const stateOf = (name: string): "joined" | "invited" | "none" => (joinedAs(name) ? "joined" : saved.emails[name] ? "invited" : "none");
+  // once the server has answered, "invited" means an invitation still waiting there
+  const stateOf = (name: string): "joined" | "invited" | "none" => {
+    if (joinedAs(name)) return "joined";
+    const e = emailOf[name];
+    return e && (!loaded || pendingSet.has(e.toLowerCase())) ? "invited" : "none";
+  };
   // invited or joined without a companion's name (from here or from "Partager"): shown as "someone else"
-  const mapped = new Set(Object.values(saved.emails).map((e) => e.toLowerCase()));
+  const mapped = new Set(Object.values(emailOf).map((e) => e.toLowerCase()));
   const matched = new Set(companions.map(joinedAs).filter(Boolean).map((p) => p!.user_id));
   const others = pending.filter((i) => !mapped.has(i.email.toLowerCase()));
-  const othersJoined = joined.filter((p) => !matched.has(p.user_id) && !mapped.has(p.email.toLowerCase()));
+  const othersJoined = joined.filter((p) => !matched.has(p.user_id) && !mapped.has((p.email || "").toLowerCase()));
   const invitedCount = companions.filter((n) => stateOf(n) !== "none").length + others.length + othersJoined.length;
 
   const submit = async (name: string | null) => {
@@ -112,7 +157,7 @@ export default function InviteTravellers() {
     try {
       await invite(trip.id, to, "editor");
       if (name) save({ ...saved, emails: { ...saved.emails, [name]: to } });
-      else setPending((l) => (l.some((i) => i.email === to) ? l : [...l, { email: to, role: "editor", created_at: new Date().toISOString() }]));
+      setPending((l) => (l.some((i) => i.email === to) ? l : [...l, { email: to, role: "editor", created_at: new Date().toISOString() }]));
       setJust(name || to);
       toast(t("Invitation enregistrée"));
       setOpen(null);
@@ -127,8 +172,44 @@ export default function InviteTravellers() {
   const openRow = (key: string | null) => {
     setOpen(key);
     setEmail("");
+    setFirst("");
     setErr(null);
   };
+  // a companion named here joins the trip's travellers (the list Expenses and the checklist share),
+  // with the account's owner kept in it; their row then opens on the e-mail field
+  const addCompanion = () => {
+    const name = first.trim().replace(/\s+/g, " ").slice(0, 40);
+    if (!name) return;
+    const k = norm(name);
+    const known = companions.find((n) => norm(n) === k);
+    if (known) {
+      openRow(stateOf(known) === "none" ? known : null);
+      return;
+    }
+    const list = travellersOf(trip);
+    if (list.some((n) => norm(n) === k)) {
+      openRow(null);
+      return;
+    }
+    if (list.length >= 20) {
+      setErr(t("20 voyageurs au plus."));
+      return;
+    }
+    setTravellers(trip, [...list, name]);
+    openRow(name);
+  };
+  const nameForm = (
+    <form className="inv-form" onSubmit={(e) => { e.preventDefault(); addCompanion(); }}>
+      <label className="v3-field">
+        <span className="sr">{t("Prénom du compagnon")}</span>
+        <input value={first} onChange={(e) => setFirst(e.target.value)} placeholder={t("Prénom du compagnon")} autoComplete="off" autoCapitalize="words" autoFocus maxLength={40} />
+      </label>
+      <div className="inv-form-row">
+        <button type="button" className="v3-chip" onClick={() => openRow(null)}>{t("Annuler")}</button>
+        <button className="v3-chip on" disabled={!first.trim()}>{t("Ajouter")}</button>
+      </div>
+    </form>
+  );
 
   const form = (name: string | null) => (
     <form className="inv-form" onSubmit={(e) => { e.preventDefault(); void submit(name); }}>
@@ -163,7 +244,7 @@ export default function InviteTravellers() {
   // nobody named in the wizard (or only you): one compact entry
   if (!companions.length && !expanded) {
     return (
-      <button type="button" className="v3-glass inv-entry" onClick={() => { setExpanded(true); openRow("+"); }}>
+      <button type="button" className="v3-glass inv-entry" onClick={() => { setExpanded(true); openRow(NAME); }}>
         <span className="v3-grow">
           <b>{t("Partager avec vos compagnons de voyage")}</b>
           <small>{invitedCount > 0 ? (invitedCount > 1 ? t("{n} personnes invitées", { n: invitedCount }) : t("1 personne invitée")) : t("Ils voient le programme, la carte et les notes.")}</small>
@@ -195,7 +276,7 @@ export default function InviteTravellers() {
 
       {companions.map((name) => {
         const st = stateOf(name);
-        const to = saved.emails[name];
+        const to = st === "none" ? undefined : emailOf[name];
         return (
           <div key={name} className="inv-row">
             <div className="inv-line">
@@ -235,10 +316,18 @@ export default function InviteTravellers() {
         </div>
       ))}
 
-      {open === "+" ? (
+      {open === NAME ? (
+        <div className="inv-row">
+          <p className="v3-note inv-add-hint">{t("Son prénom suffit : vous l'inviterez ensuite par e-mail.")}</p>
+          {nameForm}
+        </div>
+      ) : open === OTHER ? (
         <div className="inv-row">{form(null)}</div>
       ) : (
-        <button type="button" className="v3-link inv-more" onClick={() => openRow("+")}>{t("Inviter quelqu'un d'autre")}</button>
+        <div className="inv-more-row">
+          <button type="button" className="v3-link inv-more" onClick={() => openRow(NAME)}>{t("Ajouter un compagnon")}</button>
+          <button type="button" className="v3-link inv-more" onClick={() => openRow(OTHER)}>{t("Inviter quelqu'un d'autre")}</button>
+        </div>
       )}
       {err && <p className="v3-err">{err}</p>}
     </section>

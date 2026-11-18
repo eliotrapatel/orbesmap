@@ -16,4 +16,8 @@ export default {
   "Prévenez cette personne : le voyage apparaîtra dès sa connexion avec cette adresse.": "Let them know: the trip will appear as soon as they sign in with this address.",
   "{n} personnes invitées": "{n} people invited",
   "1 personne invitée": "1 person invited",
+  "Ajouter un compagnon": "Add a companion",
+  "Prénom du compagnon": "Companion's first name",
+  "Son prénom suffit : vous l'inviterez ensuite par e-mail.": "Their first name is enough: you'll invite them by email next.",
+  "20 voyageurs au plus.": "20 travelers at most.",
 } satisfies Record<string, string>;
