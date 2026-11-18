@@ -73,4 +73,5 @@ export default {
   "{n} jours ne sont pas encore prêts.": "{n} days aren't ready yet.", "1 jour n'est pas encore prêt.": "1 day isn't ready yet.", "Tout est prêt.": "Everything is ready.",
   "Valider le voyage": "Confirm trip",
   "Un jour plus calme": "A calmer day", "Un rooftop un soir": "A rooftop one evening", "Plus de cuisine locale": "More local food",
+  "ex. Un marché le samedi matin, un restaurant réservé mercredi à 19 h, le musée à ne pas manquer. https://…": "e.g. A market on Saturday morning, a restaurant booked Wednesday at 7 pm, the museum not to miss. https://…",
 } satisfies Record<string, string>;

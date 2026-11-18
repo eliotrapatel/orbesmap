@@ -791,7 +791,7 @@ function Know({ w, set, go, nextRef, sorter }: StepProps) {
         <div className={"cr-drop big" + (busy ? " busy" : "")} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); addFiles(Array.from(e.dataTransfer.files || [])); }}>
           <textarea ref={area} value={w.know} onChange={(e) => set({ know: e.target.value })} rows={5} aria-label={t("Ce que vous savez déjà")}
             onPaste={(e) => { const imgs = Array.from(e.clipboardData?.files || []).filter((f) => f.type.startsWith("image/")); if (imgs.length) { e.preventDefault(); addFiles(imgs); } }}
-            placeholder={t("ex. Le Bund de nuit, des xiaolongbao près de Yuyuan. Restaurant réservé mercredi 19 h. https://…")} />
+            placeholder={t("ex. Un marché le samedi matin, un restaurant réservé mercredi à 19 h, le musée à ne pas manquer. https://…")} />
           <div className="cr-drop-bar">
             <button type="button" className="cr-tool" onClick={() => area.current?.focus()}><CcLink className="cc-ic s" />{t("Lien")}</button>
             <button type="button" className="cr-tool" onClick={() => file.current?.click()}><CcImg className="cc-ic s" />{t("Captures")}</button>
