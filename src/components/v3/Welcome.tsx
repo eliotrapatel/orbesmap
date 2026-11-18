@@ -15,6 +15,8 @@ export default function Welcome() {
   const [mode, setMode] = useState<AuthMode>("signup");
   const [focusKey, setFocusKey] = useState(0);
   const [scrolled, setScrolled] = useState(false);
+  // the account form is on screen: the phone's bottom bar steps aside
+  const [atForm, setAtForm] = useState(false);
   const top = useRef<HTMLDivElement>(null);
   useEffect(() => {
     track("visit");
@@ -28,15 +30,35 @@ export default function Welcome() {
     io.observe(el);
     return () => io.disconnect();
   }, []);
+  useEffect(() => {
+    const el = document.getElementById("compte-sec");
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(([e]) => setAtForm(e.isIntersecting), { threshold: 0, rootMargin: "0px 0px -15% 0px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
 
   useReveal();
 
-  /** "Se connecter" / "Créer un compte": to the account form, in that mode, the e-mail field ready */
+  /** Smooth scroll to an element (the address is left as it is: the store reads the hash as a trip) */
+  const scrollToId = (id: string, block: ScrollLogicalPosition = "start") => document.getElementById(id)?.scrollIntoView({ behavior: reducedMotion() ? "auto" : "smooth", block });
+  /** "Se connecter" / "Créer un compte": to the account form, in that mode, the e-mail field ready. On a computer the
+   *  form is centred beside its title; on a phone the title comes first, just under the header. */
   const goTo = (m: AuthMode) => {
     setMode(m);
     setFocusKey((k) => k + 1);
-    document.getElementById("compte")?.scrollIntoView({ behavior: reducedMotion() ? "auto" : "smooth", block: "center" });
+    let wide = false;
+    try {
+      wide = window.matchMedia("(min-width: 900px)").matches;
+    } catch {
+      /* ignore */
+    }
+    if (wide) scrollToId("compte", "center");
+    else scrollToId("compte-top");
   };
+  const howBtn = (cls: string) => (
+    <button type="button" className={cls} onClick={() => scrollToId("comment")}>{t("Voir comment ça marche")}</button>
+  );
   const other = getLang() === "fr" ? "en" : "fr";
   const langBtn = (
     <button type="button" className="v3-toplink" onClick={() => setLang(other)} lang={other}>
@@ -56,7 +78,7 @@ export default function Welcome() {
   );
 
   return (
-    <Shell className={"v3-public lp" + (scrolled ? " lp-scrolled" : "")} top={header}>
+    <Shell className={"v3-public lp" + (scrolled ? " lp-scrolled" : "")} top={header} ring={false}>
       <div ref={top} className="lp-sentinel" aria-hidden="true" />
 
       {/* ---------- hero: the promise beside the product at work ---------- */}
@@ -64,12 +86,19 @@ export default function Welcome() {
         <div className="lp-hero-text">
           <p className="v3-lbl lp-rise" style={{ ["--d" as string]: 0 }}>{t("Carnet de voyage · préparé par IA")}</p>
           <h1 className="v3-d v3-h1 lp-rise" style={{ ["--d" as string]: 1 }}>{t("Vos voyages, préparés au détail près.")}</h1>
-          <p className="v3-lead lp-rise" style={{ ["--d" as string]: 2 }}>{t("Dites où vous allez et ce que vous savez déjà. ORBES Trips construit votre programme jour par jour et vérifie chaque lieu.")}</p>
+          {/* on a phone, only the second sentence: the demo comes up sooner */}
+          <p className="v3-lead lp-rise" style={{ ["--d" as string]: 2 }}>
+            <span className="lp-lead-pre">{t("Dites où vous allez et ce que vous savez déjà.")} </span>
+            {t("ORBES Trips construit votre programme jour par jour et vérifie chaque lieu.")}
+          </p>
           <div className="lp-ctas lp-rise" style={{ ["--d" as string]: 3 }}>
             <button type="button" className="v3-btn" onClick={() => goTo("signup")}>{t("Créer un compte gratuit")} <IArrow /></button>
-            <a className="v3-btn ghost" href="#comment">{t("Voir comment ça marche")}</a>
+            {howBtn("v3-btn ghost lp-how-btn")}
           </div>
-          <p className="lp-reassure lp-rise" style={{ ["--d" as string]: 4 }}>{t("Gratuit pour commencer · sans carte bancaire")}</p>
+          <p className="lp-reassure lp-rise" style={{ ["--d" as string]: 4 }}>
+            <span>{t("Gratuit pour commencer · sans carte bancaire")}</span>
+            {howBtn("lp-how-link")}
+          </p>
         </div>
         <div className="lp-hero-demo lp-rise" style={{ ["--d" as string]: 3 }}>
           <LiveDemo />
@@ -176,7 +205,7 @@ export default function Welcome() {
                 <span className="v3-d">{p.price.split(" / ")[0]}</span>
                 {p.price.includes(" / ") && <small>/ {p.price.split(" / ").slice(1).join(" / ")}</small>}
               </span>
-              <small className={"lp-per" + (p.per ? "" : " empty")}>{p.per ? t(p.per) : " "}</small>
+              <small className={"lp-per" + (p.per ? "" : " lp-per-none")}>{p.per ? t(p.per) : " "}</small>
               <p>{t(p.line)}</p>
             </div>
           ))}
@@ -209,8 +238,8 @@ export default function Welcome() {
         ))}
       </section>
 
-      <section className="lp-sec lp-end" aria-labelledby="lp-end-h">
-        <div className="lp-end-text rv">
+      <section className="lp-sec lp-end" id="compte-sec" aria-labelledby="lp-end-h">
+        <div className="lp-end-text rv" id="compte-top">
           <p className="v3-lbl">{mode === "signup" ? t("Créer un compte") : t("Se connecter")}</p>
           <h2 className="v3-d pub-h2" id="lp-end-h">{t("Votre prochain voyage commence ici.")}</h2>
           <p className="v3-lead">{mode === "signup" ? t("Un e-mail, un mot de passe, et votre premier voyage se prépare. Un voyage préparé par l'IA est offert chaque mois.") : t("Content de vous revoir. Vos voyages vous attendent, sur ce téléphone comme sur un ordinateur.")}</p>
@@ -219,6 +248,11 @@ export default function Welcome() {
           <AuthBox mode={mode} onMode={setMode} focusKey={focusKey} />
         </div>
       </section>
+
+      {/* phones: the account always within thumb reach, once the hero has gone and until the form shows */}
+      <div className={"lp-dock" + (scrolled && !atForm ? " on" : "")} aria-hidden={!(scrolled && !atForm)}>
+        <button type="button" className="v3-btn" onClick={() => goTo("signup")} tabIndex={scrolled && !atForm ? 0 : -1}>{t("Créer un compte gratuit")} <IArrow /></button>
+      </div>
 
       <footer className="lp-foot">
         <span className="v3-brand"><OrbitMark size={16} /><span>ORBES Trips</span></span>
@@ -314,7 +348,7 @@ const scenes = (): Scene[] => [
     slots: [
       [hm(8, 30), "Fushimi Inari", t("Ouvert jour et nuit · avant la foule")],
       [hm(11), "Kiyomizu-dera", t("Ouvert {a}–{b} · 20 min à pied", { a: hm(6), b: hm(18) })],
-      [hm(13), t("Déjeuner à Gion"), t("Réservé · table pour deux")],
+      [hm(13), t("Déjeuner à Gion"), t("Votre réservation · table pour deux")],
       [hm(16), t("Cérémonie du thé"), t("Fermé le mercredi · placé un mardi")],
     ],
   },
@@ -523,16 +557,16 @@ function MiniGlobe({ from, to }: { from: LL; to: LL }) {
     <svg viewBox="-150 -150 300 300" aria-hidden="true">
       <defs>
         <radialGradient id="ld-sphere" cx="0.68" cy="0.28" r="0.9">
-          <stop offset="0" stopColor="#1d1c1a" />
+          <stop offset="0" stopColor="#24221f" />
           <stop offset="0.55" stopColor="#0c0c0d" />
           <stop offset="1" stopColor="#050505" />
         </radialGradient>
       </defs>
       <circle r={R} fill="url(#ld-sphere)" stroke="rgba(246,242,234,0.16)" strokeWidth="0.8" />
-      <g fill="none" stroke="rgba(246,242,234,0.09)" strokeWidth="0.6">
+      <g fill="none" stroke="rgba(246,242,234,0.12)" strokeWidth="0.6">
         {g.grid.map((d, i) => <path key={i} d={d} />)}
       </g>
-      <path className="ld-arc" d={g.arc} pathLength={1} fill="none" stroke="var(--gold)" strokeWidth="2.2" strokeLinecap="round" />
+      <path className="ld-arc" d={g.arc} pathLength={1} fill="none" stroke="var(--gold)" strokeWidth="3" strokeLinecap="round" />
       {g.start.vis > 0 && <circle cx={g.start.x} cy={g.start.y} r="3.2" fill="rgba(246,242,234,0.75)" />}
       {g.end.vis > 0 && (
         <g className="ld-end" transform={`translate(${g.end.x.toFixed(1)} ${g.end.y.toFixed(1)})`}>
@@ -623,10 +657,10 @@ const FEATURES: [string, string][] = [
 
 /** China and Asia: only what the app really does (map without Google, offline with Pro, the driver screen, phrases + translator, the departure checklist) */
 const ASIA: [string, string][] = [
-  ["Une carte sans Google", "La carte du voyage n'utilise pas Google. Avec Pro, activez le mode hors ligne : elle marche aussi sans réseau, dans le métro ou sans données."],
+  ["Une carte sans Google", "La carte du voyage n'utilise pas Google. Avec Pro, activez le mode hors ligne : elle marche aussi sans réseau, dans le métro ou sans données."],
   ["L'adresse pour le chauffeur", "Le nom et l'adresse de chaque lieu dans l'écriture locale, en grand à l'écran, avec lecture à voix haute."],
   ["Phrases utiles et traducteur", "Des phrases avec leur prononciation (pinyin, romaji) à écouter, et un traducteur pour parler avec quelqu'un."],
-  ["Une check-list de départ", "Visa, eSIM, paiements locaux, applis utiles : ce qu'il faut régler avant de partir, avec des dates conseillées."],
+  ["Une check-list de départ", "Visa, eSIM, paiements locaux, applis utiles : ce qu'il faut régler avant de partir, avec des dates conseillées."],
 ];
 
 /** The plans and their prices, as on the Pro screen (payments open soon) */

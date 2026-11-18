@@ -11,7 +11,7 @@ export default {
   "Masquer le mot de passe": "Hide password",
   "Afficher le mot de passe": "Show password",
   "Confirmez votre adresse : nous vous avons envoyé un e-mail.": "Confirm your address: we've sent you an email.",
-  "Ouvrez le lien qu'il contient, puis connectez-vous ici.": "Open the link inside, then sign in here.",
+  "Ouvrez le lien qu'il contient : votre compte s'ouvre. Sur un autre appareil, connectez-vous ici.": "Open the link inside: your account opens. On another device, sign in here.",
   "C'est renvoyé. Regardez aussi dans les courriers indésirables.": "Sent again. Check your spam folder too.",
   "Créer un compte": "Create an account",
   "Regardez vos e-mails": "Check your email",
@@ -41,4 +41,8 @@ export default {
   "Il remplace l'ancien sur tous vos appareils.": "It replaces the old one on all your devices.",
   "Nouveau mot de passe": "New password",
   "Enregistrer le mot de passe": "Save password",
+  "Indiquez votre adresse e-mail.": "Enter your email address.",
+  "Indiquez votre mot de passe.": "Enter your password.",
+  "Le mot de passe doit faire {n} caractères minimum.": "Your password must be at least {n} characters.",
+  "Choisir un mot de passe": "Choose a password",
 } satisfies Record<string, string>;

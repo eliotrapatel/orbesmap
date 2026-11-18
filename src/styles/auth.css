@@ -17,6 +17,10 @@
 /* fields: a visible label above the value */
 .v3-field.col.auth-field { min-height: 60px; padding: 9px 14px 0; cursor: text; }
 .v3-field.col.auth-field input { height: 38px; }
+.v3-field.col.auth-field > label { display: block; cursor: text; }
+.v3-field.col.auth-field.bad { border-color: rgba(232, 140, 122, 0.6); }
+/* what is not right in a field, right under it */
+.auth-ferr { margin: -4px 2px 0; font-size: 12.5px; line-height: 1.4; color: var(--bad); animation: auth-swap 0.3s var(--ease) backwards; }
 .v3-field.col .auth-pw { display: flex; align-items: center; font-size: inherit; letter-spacing: normal; text-transform: none; color: inherit; }
 .v3-field.col .auth-pw input { flex: 1; min-width: 0; }
 .auth-eye { width: 42px; height: 38px; margin-right: -12px; display: grid; place-items: center; flex: none; border-radius: 10px; color: var(--mute); transition: color 0.2s; }
@@ -33,10 +37,11 @@
 .auth-strength.s3 .auth-bars i.on { background: var(--ok); }
 .auth-strength.s3 small { color: var(--ok); }
 
-.auth-row { display: flex; justify-content: flex-end; margin-top: -2px; }
-.auth-forgot { font-size: 13px; color: var(--soft); padding: 4px 2px; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--hair-strong); transition: color 0.2s; }
+.auth-row { display: flex; justify-content: flex-end; margin: -8px 0 -6px; }
+.auth-forgot { min-height: 44px; display: inline-flex; align-items: center; font-size: 13px; color: var(--soft); padding: 0 4px; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--hair-strong); transition: color 0.2s; }
 .auth-forgot:hover { color: var(--ink); }
 .auth-go { margin-top: 4px; }
+.auth-box .auth-go:disabled { opacity: 0.72; }
 .auth-title { font: 500 20px/1.05 var(--display); text-transform: uppercase; margin-top: 2px; }
 .auth-sub { font-size: 12.5px; color: var(--mute); line-height: 1.5; }
 .auth-first { text-align: center; padding: 2px 8px 0; }
@@ -44,8 +49,11 @@
 .auth-note b { color: var(--ink); font-weight: 600; }
 .auth-badge { width: 46px; height: 46px; border-radius: 50%; border: 1px solid rgba(127, 209, 185, 0.4); color: var(--ok); display: grid; place-items: center; }
 .auth-badge svg { width: 20px; height: 20px; }
-.auth-err { line-height: 1.45; }
-.auth-inline { color: var(--ink); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; padding: 0; }
+.auth-err { margin: 0; padding: 0 2px; line-height: 1.45; }
+/* the way out of an error ("Choisir un mot de passe", "Renvoyer l'e-mail"): a real target, on the error's line */
+.auth-inline { display: inline-flex; align-items: center; min-height: 44px; margin: -12px 0; vertical-align: middle; color: var(--ink); font-size: 13px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--hair-strong); padding: 0 2px; }
+.auth-inline:hover { text-decoration-color: currentColor; }
+.auth-back { min-height: 44px; }
 .auth-fine { margin-top: 14px; line-height: 1.5; }
 
 /* "Choisissez un nouveau mot de passe": full screen, over every screen of the app */

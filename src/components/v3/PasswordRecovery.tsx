@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { getState, updatePassword, useStore } from "../../lib/store";
 import { t, useLang } from "../../lib/i18n";
@@ -32,6 +32,23 @@ function cleanUrl(dropHash: boolean) {
   }
 }
 
+/** While the full-screen dialog is shown, the app behind it is out of reach (Tab, screen readers) */
+function useInertBehind(ref: React.RefObject<HTMLDivElement | null>, shown: boolean) {
+  useEffect(() => {
+    const el = ref.current;
+    if (!shown || !el || !el.parentElement) return;
+    const others = Array.from(el.parentElement.children).filter((c): c is HTMLElement => c !== el && c instanceof HTMLElement && !c.inert);
+    others.forEach((c) => {
+      c.inert = true;
+    });
+    return () => {
+      others.forEach((c) => {
+        c.inert = false;
+      });
+    };
+  }, [ref, shown]);
+}
+
 /**
  * "Choisissez un nouveau mot de passe": over every screen when the page opens from a password reset link
  * (event PASSWORD_RECOVERY, or ?reset=1 with a session). Saves the password, then the app continues.
@@ -46,6 +63,9 @@ export default function PasswordRecovery() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  const shown = failed || (open && (!!session || done));
+  useInertBehind(box, shown);
 
   useEffect(() => {
     if (!supabase) return;
@@ -74,7 +94,7 @@ export default function PasswordRecovery() {
 
   if (failed)
     return (
-      <div className="v3 auth-recovery" role="dialog" aria-modal="true" aria-labelledby="auth-rec-h">
+      <div ref={box} className="v3 auth-recovery" role="dialog" aria-modal="true" aria-labelledby="auth-rec-h">
         <div className="v3-bg" aria-hidden="true" />
         <div className="auth-rec-col">
           <OrbitMark size={22} title="ORBES Trips" />
@@ -85,6 +105,7 @@ export default function PasswordRecovery() {
             <button
               type="button"
               className="v3-btn"
+              autoFocus
               onClick={() => {
                 cleanUrl(true);
                 setFailed(false);
@@ -121,7 +142,7 @@ export default function PasswordRecovery() {
   };
 
   return (
-    <div className="v3 auth-recovery" role="dialog" aria-modal="true" aria-labelledby="auth-rec-h">
+    <div ref={box} className="v3 auth-recovery" role="dialog" aria-modal="true" aria-labelledby="auth-rec-h">
       <div className="v3-bg" aria-hidden="true" />
       <div className="auth-rec-col">
         <OrbitMark size={22} title="ORBES Trips" />
@@ -146,7 +167,7 @@ export default function PasswordRecovery() {
             <p className="v3-lead">{t("Il remplace l'ancien sur tous vos appareils.")}</p>
             {/* the account's e-mail, for the password manager */}
             <input type="email" name="email" autoComplete="username" value={session?.user.email || ""} readOnly hidden />
-            <PasswordField id="auth-rec-pw" value={password} onChange={setPassword} label={t("Nouveau mot de passe")} autoComplete="new-password" />
+            <PasswordField id="auth-rec-pw" value={password} onChange={setPassword} label={t("Nouveau mot de passe")} autoComplete="new-password" autoFocus />
             <StrengthHint value={password} />
             <button className="v3-btn" disabled={!ok || busy}>{busy ? t("Un instant…") : t("Enregistrer le mot de passe")}</button>
             {err && <p className="v3-err" role="alert">{err}</p>}

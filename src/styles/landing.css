@@ -30,7 +30,7 @@
 .lp.lp-scrolled .v3-top::before { opacity: 1; }
 .lp .lp-head { width: 100%; min-width: 0; }
 .lp .lp-head > span:nth-child(2) { white-space: nowrap; }
-.lp .lp-head .v3-toplink { white-space: nowrap; }
+.lp .lp-head .v3-toplink { white-space: nowrap; min-height: 44px; display: inline-flex; align-items: center; }
 .lp .lp-headcta { display: none; }
 .lp-sentinel { height: 1px; margin-bottom: -1px; }
 
@@ -42,13 +42,24 @@
 
 /* ---------- hero ---------- */
 .lp .lp-hero { display: flex; flex-direction: column; gap: 40px; padding: 14px 0 0; }
-.lp .lp-hero .v3-h1 { margin: 14px 0 16px; }
+.lp .lp-hero .v3-h1 { margin: 18px 0 26px; }
 .lp .lp-hero .v3-lead { max-width: 36ch; }
 .lp .lp-ctas { display: flex; flex-direction: column; gap: 10px; margin-top: 28px; }
 .lp .lp-ctas .v3-btn { text-decoration: none; }
 .lp .lp-arrow { width: 18px; height: 18px; transition: transform 0.3s var(--ease); }
 .lp .v3-btn:hover .lp-arrow { transform: translateX(3px); }
 .lp .lp-reassure { margin-top: 14px; font-size: 12.5px; color: var(--mute); text-align: center; letter-spacing: 0.01em; }
+/* "Voir comment ça marche": a ghost button beside the main one; on a phone, a text link on the reassurance line */
+.lp .lp-how-link { display: none; }
+@media (max-width: 559.98px) {
+  .lp .lp-hero { gap: 28px; }
+  .lp .lp-hero .v3-h1 { font-size: 34px; line-height: 1.02; margin: 14px 0 18px; }
+  .lp .lp-lead-pre { display: none; }
+  .lp .lp-how-btn { display: none; }
+  .lp .lp-ctas { margin-top: 22px; }
+  .lp .lp-reassure { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 4px; text-align: left; }
+  .lp .lp-how-link { display: inline-flex; align-items: center; min-height: 44px; flex: none; font-size: 12.5px; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--hair-strong); }
+}
 
 /* ---------- the living demo ---------- */
 .ld { position: relative; padding: 16px; border-radius: 26px; overflow: hidden; box-shadow: 0 50px 90px -50px rgba(0, 0, 0, 0.9); }
@@ -105,7 +116,7 @@
 
 /* ---------- sections ---------- */
 .lp .lp-sec { padding-top: 96px; }
-.lp .lp-sec > .v3-lead, .lp .pub-asia .v3-lead { margin-top: 14px; }
+.lp .lp-sec > .v3-lead, .lp .pub-asia .v3-lead { margin-top: 20px; }
 .lp .pub-h2 { max-width: 20ch; }
 
 .lp .lp-steps { list-style: none; padding: 0; margin: 30px 0 0; display: grid; gap: 10px; }
@@ -157,7 +168,7 @@
 .lp .lp-price { font-size: 22px; line-height: 1; white-space: nowrap; text-align: right; }
 .lp .lp-price small { font-size: 13px; color: var(--soft); margin-left: 5px; font-family: var(--font); letter-spacing: 0; }
 .lp .lp-per { grid-column: 2; color: var(--mute); font-size: 12px; margin-top: 4px; text-align: right; }
-.lp .lp-per.empty { display: none; }
+.lp .lp-per.lp-per-none { display: none; }
 .lp .lp-plan p { grid-column: 1 / -1; color: var(--soft); font-size: 13px; line-height: 1.45; margin-top: 8px; }
 
 .lp .pub-faq { margin-top: 14px; }
@@ -171,13 +182,25 @@
 
 .lp .lp-end { display: flex; flex-direction: column; gap: 26px; }
 .lp .lp-end-box { scroll-margin: 96px; }
+.lp .lp-end-text { scroll-margin-top: 92px; }
 .lp .lp-end-text .v3-lead { margin-top: 16px; }
 
 .lp .lp-foot { margin-top: 96px; padding: 24px 0 6px; border-top: 1px solid var(--hair); display: flex; flex-direction: column; align-items: flex-start; gap: 14px; color: var(--mute); font-size: 12.5px; }
 .lp .lp-foot .v3-brand { font-size: 11.5px; color: var(--soft); gap: 8px; }
 .lp .lp-foot-links { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 20px; }
-.lp .lp-foot-links a, .lp .lp-foot-links .v3-toplink { color: var(--soft); font-size: 12.5px; text-decoration: none; padding: 8px 0; }
+.lp .lp-foot-links a, .lp .lp-foot-links .v3-toplink { color: var(--soft); font-size: 12.5px; text-decoration: none; padding: 12px 0; }
 .lp .lp-foot-links a:hover, .lp .lp-foot-links .v3-toplink:hover { color: var(--ink); }
+
+/* phones: "Créer un compte gratuit" docked at the bottom, once the hero has gone and until the form shows */
+.lp .lp-dock { position: fixed; z-index: 30; left: 0; right: 0; bottom: 0; padding: 12px max(16px, env(safe-area-inset-right, 0px)) calc(12px + var(--safe-b)) max(16px, env(safe-area-inset-left, 0px)); background: linear-gradient(180deg, rgba(3, 3, 3, 0), rgba(3, 3, 3, 0.86) 34%); opacity: 0; transform: translateY(16px); pointer-events: none; transition: opacity 0.35s var(--ease), transform 0.35s var(--ease); }
+.lp .lp-dock.on { opacity: 1; transform: none; pointer-events: auto; }
+.lp .lp-dock .v3-btn { height: 52px; max-width: 480px; margin: 0 auto; box-shadow: 0 18px 40px -14px rgba(0, 0, 0, 0.9); }
+@media (max-width: 699.98px) {
+  .lp .lp-foot { padding-bottom: calc(84px + var(--safe-b)); }
+}
+@media (min-width: 700px) {
+  .lp .lp-dock { display: none; }
+}
 
 /* ---------- wider phones and tablets ---------- */
 @media (min-width: 560px) {
@@ -189,8 +212,10 @@
   .lp .lp-plan { display: flex; flex-direction: column; align-items: stretch; padding: 18px; }
   .lp .lp-plan-top { justify-content: space-between; }
   .lp .lp-price { text-align: left; font-size: 26px; margin-top: 20px; }
-  .lp .lp-per { text-align: left; }
-  .lp .lp-per.empty { display: block; }
+  .lp .lp-per { text-align: left; flex: none; min-height: 18px; }
+  .lp .lp-per.lp-per-none { display: block; visibility: hidden; }
+  .lp .lp-plan { justify-content: flex-start; }
+  .lp .lp-plan p { margin-top: 14px; }
   .lp .lp-bento { grid-template-columns: 1fr 1fr; }
 }
 @media (min-width: 700px) {
@@ -204,15 +229,15 @@
 /* ---------- computer: the demo beside the text ---------- */
 @media (min-width: 900px) {
   .lp .lp-hero { display: grid; grid-template-columns: minmax(0, 1fr) 452px; gap: 64px; align-items: center; min-height: calc(100vh - 84px); padding: 8px 0 48px; }
-  .lp .lp-hero .v3-h1 { font-size: 62px; }
+  .lp .lp-hero .v3-h1 { font-size: 62px; margin-bottom: 30px; }
   .lp .lp-hero .v3-lead { font-size: 17px; max-width: 40ch; }
   .lp .lp-ctas { margin-top: 34px; }
   .ld { padding: 22px 22px 20px; border-radius: 30px; }
   .ld-field { height: 50px; }
   .ld-v { font-size: 15px; }
   .ld-k { width: 96px; }
-  .ld-mid { grid-template-columns: 132px minmax(0, 1fr); gap: 18px; margin-top: 18px; }
-  .ld-globe svg { width: 132px; height: 132px; }
+  .ld-mid { grid-template-columns: 168px minmax(0, 1fr); gap: 18px; margin-top: 18px; }
+  .ld-globe svg { width: 168px; height: 168px; }
   .ld-card { height: 42px; }
   .ld-card-t b { font-size: 13px; }
   .ld-day { margin-top: 18px; padding: 12px 16px 4px; }
@@ -225,9 +250,10 @@
   .lp .lp-sec { padding-top: 140px; }
   .lp .pub-h2 { font-size: 48px; max-width: 22ch; }
   .lp .lp-sec > .v3-lead { font-size: 17px; max-width: 52ch; }
+  .lp .lp-sec > .v3-lead, .lp .pub-asia .v3-lead { margin-top: 24px; }
   .lp .lp-steps { grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 40px; }
   .lp .lp-steps li { padding: 26px 26px 30px; }
-  .lp .lp-steps b { font-size: 20px; margin-top: 28px; }
+  .lp .lp-steps b { font-size: 20px; margin-top: 28px; min-height: 2.1em; text-wrap: balance; }
   .lp .lp-bento { gap: 14px; margin-top: 40px; }
   .lp .lp-tile { padding: 18px 18px 28px; }
   .lp .lp-tile > b { font-size: 20px; margin: 26px 10px 0; }
@@ -264,4 +290,5 @@
   .lp .rv { opacity: 1; transform: none; transition: none; }
   .ld *, .ld *::before { transition: none !important; animation: none !important; }
   .ld-body { animation: none; }
+  .lp .lp-dock { transition: none; }
 }

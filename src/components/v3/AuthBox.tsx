@@ -41,32 +41,45 @@ export function strength(p: string): 0 | 1 | 2 | 3 {
 }
 const STRENGTH = ["{n} caractères minimum", "Correct", "Bon", "Solide"];
 
-/** A password field with its show / hide button */
-export function PasswordField({ value, onChange, label, autoComplete, id, invalid }: { value: string; onChange: (v: string) => void; label: string; autoComplete: string; id: string; invalid?: boolean }) {
+/** A password field with its show / hide button (the field's name is its label only, never the button's) */
+export function PasswordField({ value, onChange, label, autoComplete, id, invalid, describedBy, inputRef, autoFocus }: { value: string; onChange: (v: string) => void; label: string; autoComplete: string; id: string; invalid?: boolean; describedBy?: string; inputRef?: React.RefObject<HTMLInputElement | null>; autoFocus?: boolean }) {
   const [shown, setShown] = useState(false);
+  const own = useRef<HTMLInputElement>(null);
+  const ref = inputRef || own;
   return (
-    <label className="v3-field col auth-field" htmlFor={id}>
-      <span>{label}</span>
+    <div
+      className={"v3-field col auth-field" + (invalid ? " bad" : "")}
+      onMouseDown={(e) => {
+        // a press anywhere in the field (outside the input and the eye) puts the cursor in it
+        const el = e.target as HTMLElement;
+        if (el.closest("input, button")) return;
+        e.preventDefault();
+        ref.current?.focus();
+      }}
+    >
+      <label htmlFor={id}><span>{label}</span></label>
       <span className="auth-pw">
-        <input id={id} name="password" type={shown ? "text" : "password"} value={value} onChange={(e) => onChange(e.target.value)} autoComplete={autoComplete} autoCapitalize="none" autoCorrect="off" spellCheck={false} aria-invalid={invalid || undefined} />
-        <button type="button" className="auth-eye" onClick={() => setShown((s) => !s)} aria-label={shown ? t("Masquer le mot de passe") : t("Afficher le mot de passe")} aria-pressed={shown}>
+        <input ref={ref} id={id} name="password" type={shown ? "text" : "password"} value={value} onChange={(e) => onChange(e.target.value)} autoComplete={autoComplete} autoCapitalize="none" autoCorrect="off" spellCheck={false} aria-invalid={invalid || undefined} aria-describedby={describedBy} autoFocus={autoFocus} />
+        <button type="button" className="auth-eye" onClick={() => setShown((s) => !s)} aria-label={shown ? t("Masquer le mot de passe") : t("Afficher le mot de passe")} aria-pressed={shown} aria-controls={id}>
           {shown ? <IEyeOff /> : <IEye />}
         </button>
       </span>
-    </label>
+    </div>
   );
 }
 
-/** The strength of a new password, in four quiet bars and a word */
+/** The strength of a new password, in three quiet bars and a word */
 export function StrengthHint({ value }: { value: string }) {
   const s = strength(value);
   return (
     <div className={"auth-strength s" + s} aria-live="polite">
       <span className="auth-bars" aria-hidden="true">{[1, 2, 3].map((i) => <i key={i} className={s >= i ? "on" : ""} />)}</span>
-      <small>{s === 0 ? t(STRENGTH[0], { n: MIN_PASSWORD }) : t(STRENGTH[s])}</small>
+      <small>{s === 0 ? t(STRENGTH[0], { n: MIN_PASSWORD }) : t(STRENGTH[s])}</small>
     </div>
   );
 }
+
+type Field = "email" | "password";
 
 /**
  * The account form of the public page: "Créer un compte" (e-mail + password) and "Se connecter" (e-mail + password),
@@ -78,12 +91,14 @@ export default function AuthBox({ mode, onMode, focusKey }: { mode: AuthMode; on
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // what went wrong: a wrong password offers "Choisir un mot de passe" (accounts created with a link have none yet)
+  const [errKind, setErrKind] = useState<"" | "credentials" | "unconfirmed">("");
+  const [fieldErr, setFieldErr] = useState<{ field: Field; msg: string } | null>(null);
   const [note, setNote] = useState<ReactNode>(null);
-  const [unconfirmed, setUnconfirmed] = useState(false);
   const emailRef = useRef<HTMLInputElement>(null);
+  const pwRef = useRef<HTMLInputElement>(null);
   const mail = email.trim();
   const validEmail = /^\S+@\S+\.\S+$/.test(mail);
-  const canSubmit = validEmail && (mode === "signup" ? password.length >= MIN_PASSWORD : password.length > 0);
 
   // asked from the page ("Se connecter", "Créer un compte"): back to the form, the e-mail field ready
   useEffect(() => {
@@ -93,25 +108,39 @@ export default function AuthBox({ mode, onMode, focusKey }: { mode: AuthMode; on
     return () => window.clearTimeout(id);
   }, [focusKey]);
 
+  const clearErr = () => {
+    setErr(null);
+    setErrKind("");
+    setFieldErr(null);
+  };
+  const onEmail = (v: string) => {
+    setEmail(v);
+    if (err || fieldErr) clearErr();
+  };
+  const onPassword = (v: string) => {
+    setPassword(v);
+    if (err || fieldErr) clearErr();
+  };
+
   const switchMode = (m: AuthMode) => {
     if (m === mode && view === "form") return;
     setView("form");
-    setErr(null);
-    setUnconfirmed(false);
+    clearErr();
     if (m !== mode) setNote(null);
     onMode(m);
   };
 
   const run = async (f: () => Promise<void>) => {
     setBusy(true);
-    setErr(null);
+    clearErr();
     try {
       await f();
     } catch (e) {
       setErr(authMessage(e));
       const code = String((e as { code?: string })?.code || "");
       const msg = String((e as Error)?.message || "");
-      setUnconfirmed(code === "email_not_confirmed" || /Email not confirmed/i.test(msg));
+      if (code === "email_not_confirmed" || /Email not confirmed/i.test(msg)) setErrKind("unconfirmed");
+      else if (code === "invalid_credentials" || /Invalid login credentials/i.test(msg)) setErrKind("credentials");
       // an account already has this address: the sign-in is the way, ready with the same e-mail
       if (code === "user_already_exists" || code === "email_exists" || /already registered|already exists/i.test(msg)) {
         setNote(null);
@@ -121,8 +150,20 @@ export default function AuthBox({ mode, onMode, focusKey }: { mode: AuthMode; on
     setBusy(false);
   };
 
+  /** Says which field is not right, beside it, and puts the cursor there */
+  const invalidField = (field: Field, msg: string) => {
+    setErr(null);
+    setErrKind("");
+    setFieldErr({ field, msg });
+    (field === "email" ? emailRef : pwRef).current?.focus();
+  };
+
   const submit = () => {
-    if (!canSubmit || busy) return;
+    if (busy) return;
+    if (!mail) return invalidField("email", t("Indiquez votre adresse e-mail."));
+    if (!validEmail) return invalidField("email", t("Cette adresse e-mail n'est pas valide."));
+    if (mode === "signup" && password.length < MIN_PASSWORD) return invalidField("password", t("Le mot de passe doit faire {n} caractères minimum.", { n: MIN_PASSWORD }));
+    if (mode === "signin" && !password) return invalidField("password", t("Indiquez votre mot de passe."));
     if (mode === "signin") {
       void run(async () => {
         await signInWithPassword(mail, password);
@@ -144,7 +185,7 @@ export default function AuthBox({ mode, onMode, focusKey }: { mode: AuthMode; on
         onMode("signin");
         setNote(
           <>
-            <b>{t("Confirmez votre adresse : nous vous avons envoyé un e-mail.")}</b> {t("Ouvrez le lien qu'il contient, puis connectez-vous ici.")}
+            <b>{t("Confirmez votre adresse : nous vous avons envoyé un e-mail.")}</b> {t("Ouvrez le lien qu'il contient : votre compte s'ouvre. Sur un autre appareil, connectez-vous ici.")}
           </>,
         );
       }
@@ -154,7 +195,6 @@ export default function AuthBox({ mode, onMode, focusKey }: { mode: AuthMode; on
   const resend = () =>
     void run(async () => {
       await resendSignupEmail(mail);
-      setUnconfirmed(false);
       setNote(<b>{t("C'est renvoyé. Regardez aussi dans les courriers indésirables.")}</b>);
     });
 
@@ -163,13 +203,39 @@ export default function AuthBox({ mode, onMode, focusKey }: { mode: AuthMode; on
       await sendPasswordReset(mail);
       setView("forgot-sent");
     });
+  const toForgot = () => {
+    setView("forgot");
+    clearErr();
+    setNote(null);
+  };
+
+  const errLine = err && (
+    <p className="v3-err auth-err" role="alert">
+      {err}
+      {errKind === "unconfirmed" && validEmail && (
+        <>
+          {" "}
+          <button type="button" className="auth-inline" onClick={resend} disabled={busy}>{t("Renvoyer l'e-mail")}</button>
+        </>
+      )}
+      {errKind === "credentials" && mode === "signin" && (
+        <>
+          {" "}
+          <button type="button" className="auth-inline" onClick={toForgot}>{t("Choisir un mot de passe")}</button>
+        </>
+      )}
+    </p>
+  );
+  const emailErr = fieldErr?.field === "email" ? fieldErr.msg : null;
+  const pwErr = fieldErr?.field === "password" ? fieldErr.msg : null;
 
   return (
     <div className="v3-glass auth-box">
-      <div className="auth-tabs" role="tablist" aria-label={t("Compte")}>
+      {/* two modes: a segmented control (two pressed / not pressed buttons) */}
+      <div className="auth-tabs" role="group" aria-label={t("Compte")}>
         <span className="auth-ink" aria-hidden="true" data-on={mode} />
-        <button type="button" role="tab" aria-selected={mode === "signup"} className={mode === "signup" ? "on" : ""} onClick={() => switchMode("signup")}>{t("Créer un compte")}</button>
-        <button type="button" role="tab" aria-selected={mode === "signin"} className={mode === "signin" ? "on" : ""} onClick={() => switchMode("signin")}>{t("Se connecter")}</button>
+        <button type="button" aria-pressed={mode === "signup" && view === "form"} className={mode === "signup" ? "on" : ""} onClick={() => switchMode("signup")}>{t("Créer un compte")}</button>
+        <button type="button" aria-pressed={mode === "signin" || view !== "form"} className={mode === "signin" ? "on" : ""} onClick={() => switchMode("signin")}>{t("Se connecter")}</button>
       </div>
 
       {view === "forgot-sent" ? (
@@ -184,54 +250,51 @@ export default function AuthBox({ mode, onMode, focusKey }: { mode: AuthMode; on
         <form
           className="auth-swap"
           key="forgot"
+          noValidate
           onSubmit={(e) => {
             e.preventDefault();
-            if (validEmail && !busy) forgot();
+            if (busy) return;
+            if (!mail) return invalidField("email", t("Indiquez votre adresse e-mail."));
+            if (!validEmail) return invalidField("email", t("Cette adresse e-mail n'est pas valide."));
+            forgot();
           }}
         >
           <p className="auth-title">{t("Mot de passe oublié")}</p>
           <p className="auth-sub">{t("Indiquez votre adresse : nous vous envoyons un lien pour choisir un nouveau mot de passe.")}</p>
-          <EmailField value={email} onChange={setEmail} inputRef={emailRef} />
-          <button className="v3-btn" disabled={busy || !validEmail}>{busy ? t("Un instant…") : t("Recevoir le lien")}</button>
-          <button type="button" className="v3-link" onClick={() => switchMode("signin")}>{t("Retour à la connexion")}</button>
+          <EmailField value={email} onChange={onEmail} inputRef={emailRef} error={emailErr} autoFocus={!validEmail} />
+          {errLine}
+          <button className="v3-btn" disabled={busy}>{busy ? t("Un instant…") : t("Recevoir le lien")}</button>
+          <button type="button" className="v3-link auth-back" onClick={() => switchMode("signin")}>{t("Retour à la connexion")}</button>
         </form>
       ) : (
         <form
           className="auth-swap"
           key={mode}
+          noValidate
           onSubmit={(e) => {
             e.preventDefault();
             submit();
           }}
         >
           {note && <p className="auth-note" role="status">{note}</p>}
-          <EmailField value={email} onChange={setEmail} inputRef={emailRef} />
-          <PasswordField id={"auth-pw-" + mode} value={password} onChange={setPassword} label={mode === "signup" ? t("Choisissez un mot de passe") : t("Mot de passe")} autoComplete={mode === "signup" ? "new-password" : "current-password"} />
+          <EmailField value={email} onChange={onEmail} inputRef={emailRef} error={emailErr} />
+          <PasswordField id={"auth-pw-" + mode} inputRef={pwRef} value={password} onChange={onPassword} label={mode === "signup" ? t("Choisissez un mot de passe") : t("Mot de passe")} autoComplete={mode === "signup" ? "new-password" : "current-password"} invalid={!!pwErr} describedBy={pwErr ? "auth-pw-err" : undefined} />
+          {pwErr && <p className="auth-ferr" id="auth-pw-err">{pwErr}</p>}
           {mode === "signup" ? (
             <StrengthHint value={password} />
           ) : (
             <div className="auth-row">
-              <button type="button" className="auth-forgot" onClick={() => { setView("forgot"); setErr(null); setNote(null); }}>{t("Mot de passe oublié ?")}</button>
+              <button type="button" className="auth-forgot" onClick={toForgot}>{t("Mot de passe oublié ?")}</button>
             </div>
           )}
-          <button className="v3-btn auth-go" disabled={busy || !canSubmit}>
+          {errLine}
+          <button className="v3-btn auth-go" disabled={busy} aria-busy={busy || undefined}>
             {busy ? <span className="auth-wait">{t("Un instant…")}</span> : mode === "signup" ? t("Créer mon compte") : t("Se connecter")}
           </button>
           {mode === "signin" && <p className="auth-sub auth-first">{t("Première connexion avec mot de passe ? Touchez « Mot de passe oublié » pour en choisir un.")}</p>}
         </form>
       )}
 
-      {err && (
-        <p className="v3-err auth-err" role="alert">
-          {err}
-          {unconfirmed && validEmail && (
-            <>
-              {" "}
-              <button type="button" className="auth-inline" onClick={resend} disabled={busy}>{t("Renvoyer l'e-mail")}</button>
-            </>
-          )}
-        </p>
-      )}
       {view === "form" && (
         <p className="v3-fine auth-fine">
           {mode === "signup" ? t("Gratuit · sans carte bancaire · en créant un compte, vous acceptez les") : t("En vous connectant, vous acceptez les")} <a href={legalHref("cgu")}>{t("conditions")}</a> {t("et la")} <a href={legalHref("confidentialite")}>{t("politique de confidentialité")}</a>
@@ -241,12 +304,15 @@ export default function AuthBox({ mode, onMode, focusKey }: { mode: AuthMode; on
   );
 }
 
-function EmailField({ value, onChange, inputRef }: { value: string; onChange: (v: string) => void; inputRef: React.RefObject<HTMLInputElement | null> }) {
+function EmailField({ value, onChange, inputRef, error, autoFocus }: { value: string; onChange: (v: string) => void; inputRef: React.RefObject<HTMLInputElement | null>; error?: string | null; autoFocus?: boolean }) {
   return (
-    <label className="v3-field col auth-field" htmlFor="v3-email">
-      <span>{t("Adresse e-mail")}</span>
-      <input ref={inputRef} id="v3-email" name="email" type="email" value={value} onChange={(e) => onChange(e.target.value)} autoComplete="username email" inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} />
-    </label>
+    <>
+      <label className={"v3-field col auth-field" + (error ? " bad" : "")} htmlFor="v3-email">
+        <span>{t("Adresse e-mail")}</span>
+        <input ref={inputRef} id="v3-email" name="email" type="email" value={value} onChange={(e) => onChange(e.target.value)} autoComplete="username email" inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} aria-invalid={error ? true : undefined} aria-describedby={error ? "auth-email-err" : undefined} autoFocus={autoFocus} />
+      </label>
+      {error && <p className="auth-ferr" id="auth-email-err">{error}</p>}
+    </>
   );
 }
 

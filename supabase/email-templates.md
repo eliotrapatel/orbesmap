@@ -56,7 +56,7 @@ Body:
   <p style="font-size:13px;letter-spacing:.2em;text-transform:uppercase;margin:0 0 28px">ORBES Trips</p>
   <p style="font-size:16px;line-height:1.5;margin:0 0 24px">Welcome. To confirm your address and open your account, tap this button:</p>
   <p style="margin:0 0 28px"><a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#0a0a0a;color:#f6f2ea;text-decoration:none;padding:14px 22px;border-radius:12px;font-size:15px">Confirm my address</a></p>
-  <p style="font-size:15px;line-height:1.5;margin:0 0 28px">Afterwards, sign in with your email and the password you chose.</p>
+  <p style="font-size:15px;line-height:1.5;margin:0 0 28px">The button opens your account. On another device, sign in with your email and your password.</p>
   <p style="font-size:12.5px;color:#6f6b65;line-height:1.5;margin:0">If you didn't create an account, simply ignore this email.</p>
 </div>
 {{ else }}
@@ -64,7 +64,7 @@ Body:
   <p style="font-size:13px;letter-spacing:.2em;text-transform:uppercase;margin:0 0 28px">ORBES Trips</p>
   <p style="font-size:16px;line-height:1.5;margin:0 0 24px">Bienvenue. Pour confirmer votre adresse et ouvrir votre compte, touchez ce bouton :</p>
   <p style="margin:0 0 28px"><a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#0a0a0a;color:#f6f2ea;text-decoration:none;padding:14px 22px;border-radius:12px;font-size:15px">Confirmer mon adresse</a></p>
-  <p style="font-size:15px;line-height:1.5;margin:0 0 28px">Ensuite, connectez-vous avec votre e-mail et le mot de passe choisi.</p>
+  <p style="font-size:15px;line-height:1.5;margin:0 0 28px">Le bouton ouvre votre compte. Sur un autre appareil, connectez-vous avec votre e-mail et votre mot de passe.</p>
   <p style="font-size:12.5px;color:#6f6b65;line-height:1.5;margin:0">Si vous n'avez pas créé de compte, ignorez simplement cet e-mail.</p>
 </div>
 {{ end }}
@@ -74,8 +74,11 @@ Body:
 
 Sent from "Mot de passe oublié ?" on the sign-in form. The button opens the app (…?reset=1), which asks for a new
 password. Accounts created with a link (before passwords) choose their first password this way. The return address
-must be listed in Authentication → URL Configuration → Redirect URLs (https://orbesmap.vercel.app/** and
-https://theorbes.com/maps/**).
+must be listed in Authentication → URL Configuration → Redirect URLs: https://orbesmap.vercel.app/** and
+https://theorbes.com/maps** (no "/" before "**": the app is served at /maps, with no trailing slash, so the reset link
+returns to https://theorbes.com/maps?reset=1). Keep the Site URL on the app (https://orbesmap.vercel.app): if a
+return address is ever refused, Supabase falls back to the Site URL, and the app still opens "Choisissez un nouveau
+mot de passe" from the link's #…&type=recovery.
 
 Subject:
 ```
