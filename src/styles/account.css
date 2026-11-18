@@ -1,5 +1,5 @@
 /* Account (lot account): one settings-list structure for the trip's "Compte" panel and the account screen of "Mes voyages".
-   Vault language: hairlines, one gold accent for Pro, display face for names and the plan. Motion = staged entry only. */
+   Vault language: hairlines, one blue accent for Pro, display face for names and the plan. Motion = staged entry only. */
 
 .ac { container-type: inline-size; display: flex; flex-direction: column; gap: 30px; padding-bottom: 8px; }
 .ac.is-v3 { padding-top: 14px; }
@@ -10,7 +10,7 @@
 .ac-who { padding-top: 6px; }
 .ac-mono { width: 64px; height: 64px; flex: none; border-radius: 50%; display: grid; place-items: center; font: 500 26px/1 var(--display); color: var(--ink);
   background: radial-gradient(120% 120% at 30% 18%, rgba(246, 242, 234, 0.11), rgba(246, 242, 234, 0.02) 62%); border: 1px solid var(--hair-strong); }
-.ac-mono.is-pro { color: var(--gold); border-color: rgba(216, 196, 126, 0.62); outline: 1px solid rgba(216, 196, 126, 0.22); outline-offset: 3px; }
+.ac-mono.is-pro { color: var(--pro-ink, #8fb0ff); border: 1.5px solid var(--pro, #2f6bff); outline: none; }
 .ac-who { min-width: 0; flex: 1; }
 .ac-name { font-size: clamp(26px, 7.6vw, 32px); line-height: 0.95; margin: 0; overflow-wrap: anywhere; }
 .ac-mail { margin-top: 7px; font-size: 13.5px; color: var(--soft); overflow-wrap: anywhere; line-height: 1.35; }
@@ -31,14 +31,16 @@
 .ac-plan-cta { flex: none; display: inline-flex; align-items: center; gap: 2px; font-size: 13px; color: var(--ink); white-space: nowrap; }
 .ac-plan-cta .ac-chev { color: currentColor; }
 .ac-plan:hover .ac-chev { transform: translateX(2px); }
-.ac-plan.is-pro { border-color: rgba(216, 196, 126, 0.34); background: linear-gradient(180deg, rgba(216, 196, 126, 0.075), rgba(216, 196, 126, 0.012)); }
-.ac-plan.is-pro:hover { border-color: rgba(216, 196, 126, 0.5); }
-.ac-plan.is-pro .ac-plan-k, .ac-plan.is-pro .ac-plan-cta { color: var(--gold); }
+.ac-plan.is-pro { border-color: rgba(47, 107, 255, 0.5); background: linear-gradient(180deg, rgba(47, 107, 255, 0.1), rgba(47, 107, 255, 0.02)); }
+.ac-plan.is-pro:hover { border-color: rgba(47, 107, 255, 0.75); background: linear-gradient(180deg, rgba(47, 107, 255, 0.13), rgba(47, 107, 255, 0.03)); }
+.ac-plan.is-pro .ac-plan-k, .ac-plan.is-pro .ac-plan-cta { color: var(--pro-ink, #8fb0ff); }
+.ac-plan.is-pro:focus-visible { outline-color: var(--pro, #2f6bff); }
 .ac-plan.is-wait { cursor: default; }
 .ac-plan.is-wait:hover { border-color: var(--hair); background: rgba(246, 242, 234, 0.03); }
 .ac-plan.is-wait:active { transform: none; }
 .ac-plan-bar { display: block; width: 92px; height: 20px; border-radius: 6px; background: rgba(246, 242, 234, 0.06); }
-.ac-promark { display: inline-flex; align-items: center; height: 22px; padding: 0 7px 0 9px; border: 1px solid rgba(216, 196, 126, 0.62); border-radius: 6px; font: 500 11px/1 var(--display); letter-spacing: 0.24em; color: var(--gold); }
+/* the Pro mark in the plan card: the shared blue chip (pricing.css), its centre lowered onto the title's capitals, which sit 0.13 em low in their line box */
+.ac-plan-t .ac-promark { transform: translateY(2.6px); }
 
 /* ---------- groups and rows ---------- */
 .ac-group { display: flex; flex-direction: column; min-width: 0; }
@@ -149,7 +151,7 @@
   .ac .ac-seg button { flex: 1; height: 44px; }
   .ac-plan { flex-wrap: wrap; row-gap: 12px; }
   .ac-plan-cta { width: 100%; justify-content: space-between; padding-top: 12px; border-top: 1px solid var(--hair); }
-  .ac-plan.is-pro .ac-plan-cta { border-top-color: rgba(216, 196, 126, 0.22); }
+  .ac-plan.is-pro .ac-plan-cta { border-top-color: rgba(47, 107, 255, 0.3); }
 }
 
 /* ---------- the account screen over "Mes voyages" ---------- */
@@ -177,7 +179,8 @@
 .ac-av { transition: border-color 0.2s var(--ease), background 0.2s, transform 0.16s var(--ease); }
 .ac-av:hover { border-color: var(--hair-strong); background: var(--plate-3); }
 .ac-av:active { transform: scale(0.95); }
-.ac-av.is-pro { color: var(--gold); border-color: rgba(216, 196, 126, 0.6); box-shadow: 0 0 0 2px #030303, 0 0 0 3px rgba(216, 196, 126, 0.24); }
+.ac-av.is-pro { color: var(--pro-ink, #8fb0ff); border-color: var(--pro, #2f6bff); box-shadow: none; }
+.ac-av.is-pro:focus-visible { outline-color: var(--pro, #2f6bff); }
 
 @media (prefers-reduced-motion: reduce) {
   .ac > *, .ac-pw, .ac-trip-body, .ac-screen, .ac-screen.is-leaving { animation: none; }

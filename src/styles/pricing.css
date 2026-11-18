@@ -1,242 +1,252 @@
-/* The Pro screen's plans (lot "pricing"): free reference, three selectable plan cards, the details of the selected one */
-.prc .v3-h1 { font-size: clamp(34px, 10vw, 44px); margin: 12px 0 12px; }
-.prc .v3-lead { margin: 0; }
-.prc-lbl { margin: 26px 0 10px; }
+/* ORBES Trips Pro (lots "pricing" + "pro"): the mark, the membership card, the plans, the comparison, the member state.
+   One language: near-black ground, hairlines, the display capitals for names and figures, one vibrant blue for Pro.
+   var(--pro) fills and strokes, var(--pro-ink) small text on black, var(--pro-soft) a selected field.
+   One grid: a 16 px inner padding everywhere (cards, table, card), so the dots, the row labels and the card's content share one x. */
 
-.prc-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-width: 0; }
-.prc-row b { font-weight: 600; font-size: 15.5px; color: var(--ink); }
-.prc-price { font: 500 16px/1.2 var(--display); letter-spacing: 0.01em; color: var(--ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
-
-.prc-free { padding: 12px 16px 14px; border: 1px solid var(--hair); border-radius: 16px; background: rgba(246, 242, 234, 0.02); }
-.prc-free .prc-row b, .prc-free .prc-price { color: var(--soft); }
-.prc-free p { margin: 4px 0 0; font-size: 13px; line-height: 1.45; color: var(--mute); }
-.prc-free .v3-tag { margin-top: 8px; }
-
-.prc-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
-.prc-card {
-  display: flex; gap: 12px; align-items: flex-start; width: 100%; text-align: left; color: var(--ink); font: inherit;
-  padding: 14px 16px; border-radius: 16px; border: 1px solid var(--hair); background: rgba(20, 19, 17, 0.55);
-  transition: border-color 0.25s var(--ease), background 0.25s var(--ease), transform 0.16s var(--ease);
-}
-.prc-card:hover { background: rgba(246, 242, 234, 0.05); }
-.prc-card:active { transform: scale(0.99); }
-.prc-card:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
-.prc-card.on { border-color: rgba(216, 196, 126, 0.6); background: linear-gradient(180deg, rgba(216, 196, 126, 0.09), rgba(20, 19, 17, 0.6) 70%); }
-.prc-dot { flex: none; width: 18px; height: 18px; margin-top: 2px; border-radius: 50%; border: 1px solid var(--hair-strong); display: grid; place-items: center; transition: border-color 0.2s; }
-.prc-dot::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--gold); transform: scale(0); transition: transform 0.25s var(--ease); }
-.prc-card.on .prc-dot { border-color: var(--gold); }
-.prc-card.on .prc-dot::after { transform: scale(1); }
-.prc-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.prc-sub { margin-top: 3px; align-items: flex-start; }
-.prc-sub > span:first-child { font-size: 13px; line-height: 1.4; color: var(--soft); min-width: 0; }
-.prc-per { flex: none; font-size: 11.5px; color: var(--mute); white-space: nowrap; padding-top: 1px; }
-.prc-tag { align-self: flex-start; margin-top: 8px; }
-.prc-more { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--hair); animation: prc-in 0.3s var(--ease); }
-.prc-value { font-size: 13px; line-height: 1.4; color: var(--gold); }
-.prc-items { display: flex; flex-direction: column; gap: 7px; }
-.prc-item { position: relative; padding-left: 20px; font-size: 13.5px; line-height: 1.4; color: var(--ink); }
-.prc-item::before { content: ""; position: absolute; left: 2px; top: 5px; width: 8px; height: 4px; border-left: 1.5px solid var(--gold); border-bottom: 1.5px solid var(--gold); transform: rotate(-45deg); }
-@keyframes prc-in { from { opacity: 0; } to { opacity: 1; } }
-
-.prc-buy { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
-.prc-buy .v3-msg { margin: 0; font-size: 13.5px; }
-.prc-ok b { color: var(--ok); }
-.prc-code { border-top: 1px solid var(--hair); padding-top: 2px; }
-.prc-code summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: 13.5px; color: var(--soft); }
-.prc-code summary::-webkit-details-marker { display: none; }
-.prc-code summary::after { content: "›"; margin-left: auto; color: var(--mute); transition: transform 0.2s var(--ease); }
-.prc-code[open] summary::after { transform: rotate(90deg); }
-.prc-code form { display: flex; flex-direction: column; gap: 10px; padding: 4px 0 2px; }
-.prc-code .v3-btn { height: 48px; font-size: 14.5px; }
-
-@media (max-width: 360px) {
-  .prc-card { padding: 13px 13px; gap: 10px; }
-  .prc-free { padding: 12px 13px 13px; }
-  .prc-price { font-size: 15px; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .prc-more { animation: none; }
-  .prc-card, .prc-dot::after { transition: none; }
+.pm {
+  --pm-pad: 16px;
+  /* the button's blue: var(--pro-fill), var(--pro) taken 4 % deeper, so white text passes WCAG AA (4.95:1; the token itself is 4.50:1) */
+  --pm-btn: var(--pro-fill, #2b64f5);
+  --pm-btn-down: #2156e0;
+  --pm-edge: rgba(47, 107, 255, 0.5);
 }
 
-/* =================== Pro identity (lot "pro"): the mark, the membership card, the comparison, the member state =================== */
-
-/* The mark: "PRO" in the display capitals inside a gold hairline frame; lg adds an inner hairline, like a hallmark */
+/* =================== the mark: "PRO", white display capitals on a solid blue chip =================== */
 .pro-mark {
   display: inline-flex; align-items: center; justify-content: center; flex: none; box-sizing: border-box;
-  font-family: var(--display); font-weight: 500; text-transform: uppercase; line-height: 1; color: var(--gold);
-  border: 1px solid rgba(216, 196, 126, 0.62); background: rgba(216, 196, 126, 0.05); vertical-align: middle;
+  font-family: var(--display); font-weight: 500; text-transform: uppercase; line-height: 1; color: #fff;
+  background: var(--pro-fill, #2b64f5); vertical-align: middle; letter-spacing: 0;
 }
-.pro-mark > span { display: block; margin-right: -0.24em; letter-spacing: 0.24em; transform: translateY(0.04em); }
-.pro-mark-sm { height: 19px; padding: 0 6px; border-radius: 4px; font-size: 10px; }
-.pro-mark-md { height: 26px; padding: 0 9px; border-radius: 6px; font-size: 11.5px; }
-.pro-mark-lg { height: 40px; padding: 0 15px; border-radius: 9px; font-size: 17px; box-shadow: inset 0 0 0 3px #050505, inset 0 0 0 4px rgba(216, 196, 126, 0.3); }
+/* optical centre: the trailing tracking is taken back (margin), and the capitals, which sit low in the font's line box
+   (ascent 1.06, descent 0.14, caps 0.65), are lifted onto the chip's centre */
+.pro-mark > span { display: block; letter-spacing: 0.2em; margin-right: -0.2em; transform: translateY(-0.13em); }
+.pro-mark-sm { height: 18px; padding: 0 6px; border-radius: 4px; font-size: 9.5px; }
+.pro-mark-md { height: 24px; padding: 0 8px; border-radius: 5px; font-size: 11.5px; }
+.pro-mark-lg { height: 34px; padding: 0 12px; border-radius: 7px; font-size: 16px; }
 
-/* Existing "PRO" tags across the app take the mark's look (doubled class: wins over the base rule wherever it loads) */
+/* Existing "PRO" tags across the app take the mark's look (doubled class: wins over the base rule wherever it loads).
+   The text node is the tag's only child, so the lift is a padding difference instead of a transform. */
 .pro-tag.pro-tag {
-  height: 19px; padding: 0 calc(6px - 0.2em) 0 6px; border-radius: 4px; box-sizing: border-box;
-  font: 500 10px/1 var(--display); letter-spacing: 0.2em; color: var(--gold);
-  background: rgba(216, 196, 126, 0.05); border: 1px solid rgba(216, 196, 126, 0.62); vertical-align: 1px;
+  height: 18px; padding: 0 calc(6px - 0.2em) 0.26em 6px; border-radius: 4px; box-sizing: border-box; border: 0;
+  font: 500 9.5px/1 var(--display); letter-spacing: 0.2em; color: #fff; background: var(--pro-fill, #2b64f5); vertical-align: 1px;
 }
-/* on the gold-tinted Pro note the frame is drawn stronger, so the hairline holds against its ground */
-.pro-note .pro-tag.pro-tag { border-color: rgba(216, 196, 126, 0.8); }
-/* on an ivory selected segment the frame turns ink so it stays legible */
-.v3-seg button.on .pro-tag.pro-tag { color: #0a0a0a; border-color: rgba(10, 10, 10, 0.55); background: transparent; }
+.v3-seg button.on .pro-tag.pro-tag { color: #fff; background: var(--pro-fill, #2b64f5); border: 0; }
+/* the note "réservé à Pro" (place sheet): a fine blue edge on a faint blue field */
+.pro-note.pro-note { border-color: rgba(47, 107, 255, 0.4); background: rgba(47, 107, 255, 0.07); }
+.pro-note.pro-note:hover { border-color: rgba(47, 107, 255, 0.65); }
+/* a Pro tag in lists (plan cards, the admin's accounts) */
+.v3-tag.pro { color: var(--pro-ink, #8fb0ff); background: var(--pro-soft, rgba(47, 107, 255, 0.14)); }
 
-/* ---- the Pro screen frame ---- */
-/* doubled with .v3-pro: wins over styles.css's ".v3-pro .v3-bg", which loads after this file */
-.v3-pro.pm .v3-bg { background:
-  radial-gradient(70% 34% at 50% -2%, rgba(216, 196, 126, 0.14), transparent 72%),
-  radial-gradient(60% 34% at 110% 70%, rgba(246, 242, 234, 0.05), transparent 70%); }
+/* =================== the screen frame =================== */
+/* doubled with .v3-pro: wins over styles.css's ".v3-pro .v3-bg" (a gold light), which loads after this file */
+.v3-pro.pm .v3-bg { background: none; }
 .pm .pm-close { width: 44px; height: 44px; border-radius: 14px; }
 .pm-close svg { width: 18px; height: 18px; }
+.pm :focus-visible { outline-color: var(--pro, #2f6bff); }
 
 /* staged reveal on enter: opacity + a short rise, once */
-.pm-rise { animation: pm-rise 0.8s var(--ease) both; animation-delay: var(--d, 0ms); }
-@keyframes pm-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+.pm-rise { animation: pm-rise 0.7s var(--ease) both; animation-delay: var(--d, 0ms); }
+@keyframes pm-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 
-/* ---- the membership card ---- */
+/* the title opens the screen under the close button (the card below carries the only mark) */
+.pm .v3-h1 { font-size: clamp(36px, 10.6vw, 46px); margin: 22px 0 0; }
+.pm-lead.v3-lead { margin: 14px 0 0; font-size: 15px; }
+.pm-sec { margin: 34px 0 12px; }
+
+/* =================== the membership card =================== */
 .pm-card {
-  position: relative; isolation: isolate; overflow: hidden; width: 100%; max-width: none; margin: 14px 0 0;
-  aspect-ratio: 1.72 / 1; border-radius: 20px; padding: 18px 20px 17px; display: flex; flex-direction: column;
-  border: 1px solid rgba(216, 196, 126, 0.42);
-  background:
-    radial-gradient(90% 70% at 100% 0%, rgba(216, 196, 126, 0.16), transparent 62%),
-    radial-gradient(70% 60% at 0% 100%, rgba(246, 242, 234, 0.05), transparent 70%),
-    linear-gradient(150deg, #17150f 0%, #0b0a08 46%, #060606 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 242, 210, 0.1), 0 28px 60px -28px rgba(0, 0, 0, 0.95), 0 2px 0 rgba(0, 0, 0, 0.6);
-  animation-name: pm-card-in; animation-duration: 1s;
+  position: relative; overflow: hidden; width: 100%; margin: 26px 0 0;
+  aspect-ratio: 1.586 / 1; border-radius: 18px; padding: 18px var(--pm-pad) 16px; display: flex; flex-direction: column;
+  border: 1px solid var(--pm-edge);
+  background: linear-gradient(158deg, #0e1424 0%, #080a11 44%, #050506 100%);
+  box-shadow: inset 0 1px 0 rgba(143, 176, 255, 0.14), 0 30px 60px -30px rgba(0, 0, 0, 0.95);
 }
-@keyframes pm-card-in { from { opacity: 0; transform: translateY(14px) scale(0.985); } to { opacity: 1; transform: none; } }
-/* one slow sheen across the card when it appears, then nothing moves */
-.pm-card::after {
-  content: ""; position: absolute; inset: -2px; z-index: 2; pointer-events: none;
-  background: linear-gradient(104deg, transparent 34%, rgba(255, 240, 205, 0.07) 45%, rgba(255, 240, 205, 0.16) 50%, rgba(255, 240, 205, 0.07) 55%, transparent 66%);
-  transform: translateX(-110%); animation: pm-sheen 2.2s cubic-bezier(0.45, 0, 0.2, 1) 0.55s 1 both;
-}
-@keyframes pm-sheen { from { transform: translateX(-110%); } to { transform: translateX(110%); } }
-.pm-card-orbit { position: absolute; z-index: -1; left: -18%; top: 4%; width: 136%; height: 100%; fill: none; stroke: rgba(216, 196, 126, 0.22); stroke-width: 1; pointer-events: none; }
-.pm-card-orbit ellipse + ellipse { stroke: rgba(246, 242, 234, 0.08); stroke-width: 0.8; }
-.pm-card-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.pm-card-brand { font: 500 10.5px/1 var(--display); letter-spacing: 0.3em; margin-right: -0.3em; text-transform: uppercase; color: var(--soft); white-space: nowrap; }
-/* scoped under .pm-card: wins over ".v3-d" (tighter tracking, 0.94 line box) which loads later; the padding keeps the capitals clear of the clip */
-.pm-card .pm-card-name { margin-top: auto; padding: 0.06em 0 0.04em; font-size: clamp(24px, 7.4vw, 30px); line-height: 1.04; letter-spacing: 0.04em; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: color 0.6s var(--ease); }
+.pm-card-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 24px; }
+.pm-card-brand { font: 500 10px/1 var(--display); letter-spacing: 0.3em; margin-right: -0.3em; text-transform: uppercase; color: var(--soft); white-space: nowrap; }
+/* scoped under .pm-card: wins over ".v3-d" (0.94 line box) which loads later; the padding keeps the capitals clear of the clip */
+.pm-card .pm-card-name { margin-top: auto; padding: 0.06em 0 0.04em; font-size: clamp(24px, 7.6vw, 32px); line-height: 1.04; letter-spacing: 0.04em; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: color 0.6s var(--ease); }
 /* a preview (not yet a member): the name stays at reading grey, so becoming a member visibly brightens the card */
 .pm-card.is-preview .pm-card-name { color: var(--soft); }
-.pm-card-foot { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(216, 196, 126, 0.2); }
-.pm-fact { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+/* the left fact is short (a plan, an access): it takes its width, the right one (price, validity) takes the rest */
+.pm-card-foot { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: end; gap: 14px; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(47, 107, 255, 0.28); }
+.pm-fact { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .pm-fact.r { text-align: right; align-items: flex-end; }
 .pm-k { font-size: 9.5px; line-height: 1; letter-spacing: 0.16em; text-transform: uppercase; color: var(--mute); }
-.pm-v { font-size: 13.5px; line-height: 1.2; font-weight: 500; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; font-variant-numeric: tabular-nums; animation: pm-swap 0.45s var(--ease) both; }
-.pm-fact.r .pm-v { color: var(--gold); }
-@keyframes pm-swap { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+.pm-v { font-size: 13.5px; line-height: 1.2; font-weight: 500; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; font-variant-numeric: tabular-nums; animation: pm-swap 0.4s var(--ease) both; }
+.pm-fact.r .pm-v { color: var(--pro-ink, #8fb0ff); }
+@keyframes pm-swap { from { opacity: 0; } to { opacity: 1; } }
 
-.pm .v3-h1 { margin: 26px 0 12px; }
-
-/* ---- the comparison, in one glance ---- */
-.pm-cmp-wrap { margin-top: 2px; border: 1px solid var(--hair); border-radius: 18px; background: rgba(14, 13, 12, 0.6); padding: 4px 6px 6px; }
-.pm-cmp { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
-.pm-c0 { width: 35%; }
-.pm-cmp th, .pm-cmp td { padding: 0; font-weight: 400; text-align: center; vertical-align: middle; }
-.pm-cmp thead th { padding: 0; vertical-align: top; border-radius: 12px 12px 0 0; }
-.pm-colhead { display: block; width: 100%; min-height: 44px; padding: 12px 2px 11px; text-align: center; }
-/* a plan's column head is a button: it selects that plan, like its card below */
-.pm-colbtn { font: inherit; color: inherit; background: none; border: 0; border-radius: 12px 12px 0 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.pm-colbtn:hover .pm-cn { color: var(--ink); }
-.pm-cmp thead th.on .pm-colbtn:hover .pm-cn { color: var(--gold); }
-.pm-colbtn:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
-.pm-cn { display: block; font-size: 9.5px; line-height: 1.1; letter-spacing: 0.06em; text-transform: uppercase; color: var(--soft); white-space: nowrap; transition: color 0.3s var(--ease); }
-.pm-cp { display: block; margin-top: 6px; font: 500 14px/1 var(--display); color: var(--ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.pm-cper { display: block; margin-top: 3px; font-size: 9.5px; line-height: 1.1; color: var(--mute); white-space: nowrap; }
-.pm-cmp tbody th { text-align: left; padding: 10px 8px 10px 8px; font-size: 12px; line-height: 1.3; color: var(--soft); }
-.pm-cmp tbody td { padding: 10px 2px; }
-.pm-cmp tbody tr > * { border-top: 1px solid rgba(246, 242, 234, 0.07); }
-.pm-cmp tbody tr:first-child > * { border-top-color: var(--hair); }
-/* the selected plan's column: a faint gold field, gold name */
-.pm-cmp .on { background: rgba(216, 196, 126, 0.075); transition: background 0.35s var(--ease); }
-.pm-cmp thead th.on .pm-cn { color: var(--gold); }
-.pm-cmp tbody tr:last-child td.on { border-radius: 0 0 12px 12px; }
-.pm-cmp td:not(.on), .pm-cmp thead th:not(.on) { transition: background 0.35s var(--ease); }
-.pm-yes { width: 15px; height: 15px; color: var(--gold); stroke-width: 2; vertical-align: middle; }
-.pm-cmp td.free .pm-yes { color: var(--soft); }
-.pm-no { display: inline-block; width: 9px; height: 1px; background: rgba(246, 242, 234, 0.22); vertical-align: middle; }
-.pm-qty { font-size: 11.5px; line-height: 1.2; color: var(--ink); display: inline-block; }
-.pm-cmp td.free .pm-qty { color: var(--soft); }
-
-.pm-free { margin: 12px 2px 0; font-size: 12.5px; line-height: 1.45; color: var(--mute); }
-.pm-free b { font-weight: 600; color: var(--soft); }
-.pm-free .v3-tag { margin-right: 8px; vertical-align: 1px; height: 19px; font-size: 9.5px; }
-
-/* the confirmation line with its check */
-.prc-buy .prc-ok { display: flex; gap: 10px; align-items: flex-start; }
-.prc-ok-ic { flex: none; width: 16px; height: 16px; margin-top: 2px; color: var(--ok); stroke-width: 2; }
-
-/* ---- the member state ---- */
-.pm-member .v3-h1 { margin: 22px 0 6px; }
-.pm-member .pm-card { margin-top: 18px; }
-.pm-sec { margin: 30px 0 4px; }
-.pm-unlocked { list-style: none; margin: 0; padding: 0; }
-.pm-unlocked li { display: flex; gap: 14px; align-items: flex-start; padding: 13px 2px; border-bottom: 1px solid rgba(246, 242, 234, 0.08); font-size: 14px; line-height: 1.4; color: var(--ink); }
-.pm-unlocked li:first-child { border-top: 1px solid var(--hair); }
-.pm-unlocked .pm-yes { flex: none; margin-top: 2px; }
-.pm-continue { margin-top: 18px; }
-
-@media (max-width: 360px) {
-  .pm-card { padding: 15px 16px 14px; border-radius: 18px; }
-  .pm-card-brand { font-size: 9.5px; letter-spacing: 0.26em; margin-right: -0.26em; }
-  .pm-cmp-wrap { padding: 2px 3px 4px; }
-  .pm-c0 { width: 31%; }
-  .pm-cn { letter-spacing: 0.02em; }
-  .pm-cp { font-size: 12.5px; }
-  .pm-cmp tbody th { font-size: 11.5px; padding-left: 6px; padding-right: 4px; }
-  .pm-qty { font-size: 10.5px; }
+/* =================== the plans: one radio group, three cards built alike, one x for dot / name / price / line =================== */
+/* every card holds the same lines (name, price, two lines of what it is, two lines of why), so they share one height and one inner rhythm */
+.prc-list { display: grid; gap: 10px; }
+.prc-card {
+  display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; grid-template-rows: 18px auto auto auto; column-gap: 14px;
+  align-content: start; width: 100%; text-align: left; color: var(--ink); font: inherit;
+  padding: 16px var(--pm-pad) 16px; border-radius: 16px; border: 1px solid var(--hair); background: #0a0a0a;
+  transition: border-color 0.25s var(--ease), background-color 0.25s var(--ease), transform 0.16s var(--ease);
 }
-@media (min-width: 720px) {
-  .pm-cmp tbody th { font-size: 12.5px; }
-}
+.prc-card:hover { border-color: var(--hair-strong); }
+.prc-card:active { transform: scale(0.99); }
+.prc-card.on { border-color: var(--pro, #2f6bff); background-color: rgba(47, 107, 255, 0.08); }
+.prc-dot { grid-column: 1; grid-row: 1; width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--hair-strong); display: grid; place-items: center; transition: border-color 0.2s; }
+.prc-dot::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--pro, #2f6bff); transform: scale(0); transition: transform 0.25s var(--ease); }
+.prc-card.on .prc-dot { border-color: var(--pro, #2f6bff); }
+.prc-card.on .prc-dot::after { transform: scale(1); }
+/* the name: display capitals, its cap height centred on the dot's row */
+.prc-name { grid-column: 2; grid-row: 1; align-self: center; font: 500 12.5px/18px var(--display); letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transform: translateY(-0.13em); }
+/* doubled with .prc-card: wins over styles.css's .v3-tag, which loads after this file */
+.prc-card .prc-tag { grid-column: 3; grid-row: 1; align-self: center; height: 18px; padding: 0 6px; margin-left: 10px; border-radius: 4px; font-size: 9px; font-weight: 600; letter-spacing: 0.06em; white-space: nowrap; }
+/* the price: figure and period on one baseline */
+.prc-amount { grid-column: 2 / 4; grid-row: 2; display: flex; align-items: baseline; gap: 7px; margin-top: 14px; min-width: 0; }
+.prc-price { font: 500 26px/1 var(--display); letter-spacing: 0; color: var(--ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.prc-period { font-size: 12.5px; line-height: 1; color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prc-line { grid-column: 2 / 4; grid-row: 3; margin-top: 10px; min-height: calc(2 * 1.45em); font-size: 13px; line-height: 1.45; color: var(--soft); text-wrap: pretty; }
+.prc-value { grid-column: 2 / 4; grid-row: 4; margin-top: 4px; min-height: calc(2 * 1.45em); font-size: 13px; line-height: 1.45; color: var(--mute); transition: color 0.25s var(--ease); text-wrap: pretty; }
+.prc-card.on .prc-value { color: var(--pro-ink, #8fb0ff); }
 
-/* ---- prices: the figure in the display capitals, its period quiet in body type ---- */
-.prc-amount { display: inline-flex; align-items: baseline; gap: 5px; flex: none; white-space: nowrap; }
-.prc-period { font: 400 12px/1 var(--font); color: var(--mute); }
-
-/* ---- the plans' column, the honest line, the docked action, the access code ---- */
-.pm-main > .pm-cmp-wrap:first-child { margin-top: 28px; }
-.pm-honest { margin-top: 18px; padding: 0 2px; }
+/* =================== the honest line, the docked action =================== */
+.pm-honest { margin-top: 16px; }
 .pm-honest .v3-msg { margin: 0; font-size: 13px; line-height: 1.5; color: var(--mute); }
 .pm-honest .prc-ok { display: flex; gap: 10px; align-items: flex-start; color: var(--soft); }
+.prc-ok b { color: var(--ok); }
+.prc-ok-ic { flex: none; width: 16px; height: 16px; margin-top: 2px; color: var(--ok); stroke-width: 2; }
 .pm-dock {
-  position: sticky; bottom: 0; z-index: 3; margin: 6px -20px 0; padding: 22px 20px calc(var(--safe-b, 0px) + 14px);
-  background: linear-gradient(180deg, rgba(3, 3, 3, 0) 0, rgba(3, 3, 3, 0.9) 20px, #030303 34px);
+  position: sticky; bottom: 0; z-index: 3; margin: 4px -20px 0; padding: 20px 20px calc(var(--safe-b, 0px) + 14px);
+  background: linear-gradient(180deg, rgba(3, 3, 3, 0) 0, rgba(3, 3, 3, 0.92) 18px, #030303 32px);
 }
-.pm-cta { justify-content: space-between; padding: 0 20px; box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.9); }
+/* the primary Pro button: solid blue, white text, darker when pressed */
+.pm .pm-cta {
+  justify-content: space-between; padding: 0 var(--pm-pad) 0 20px; color: #fff; background: var(--pm-btn); border-color: var(--pm-btn);
+  box-shadow: 0 18px 40px -20px rgba(0, 0, 0, 0.9);
+}
+.pm .pm-cta:hover { background: var(--pm-btn); }
+.pm .pm-cta:active { background: var(--pm-btn-down); border-color: var(--pm-btn-down); }
+.pm .pm-cta:disabled:hover { background: var(--pm-btn); }
+.pm .pm-cta:focus-visible { outline: 2px solid var(--pro-ink, #8fb0ff); outline-offset: 3px; }
 .pm-cta-l { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pm-cta-p { flex: none; display: inline-flex; align-items: baseline; gap: 5px; font: 500 15px/1 var(--display); letter-spacing: 0.01em; font-variant-numeric: tabular-nums; color: rgba(10, 10, 10, 0.62); animation: pm-swap 0.4s var(--ease) both; }
-.pm-cta-per { font: 400 12.5px/1 var(--font); letter-spacing: 0; color: rgba(10, 10, 10, 0.5); }
+.pm-cta-p { flex: none; display: inline-flex; align-items: baseline; gap: 5px; padding-left: 14px; margin-left: 12px; border-left: 1px solid rgba(255, 255, 255, 0.3); line-height: 22px;
+  font: 500 15px/22px var(--display); letter-spacing: 0.01em; font-variant-numeric: tabular-nums; color: #fff; animation: pm-swap 0.35s var(--ease) both; }
+.pm-cta-per { font: 400 12.5px/1 var(--font); letter-spacing: 0; color: rgba(255, 255, 255, 0.82); }
 .pm-dock-done {
   display: flex; align-items: center; justify-content: center; gap: 10px; height: 54px; margin: 0; border-radius: 16px;
   border: 1px solid rgba(127, 209, 185, 0.32); background: rgba(127, 209, 185, 0.06); color: var(--ink); font-size: 14.5px; font-weight: 500;
-  animation: pm-swap 0.45s var(--ease) both;
+  animation: pm-swap 0.4s var(--ease) both;
 }
 .pm-dock-done .prc-ok-ic { margin-top: 0; }
-.pm-codebox { margin-top: 2px; }
 .pm-dock-err { margin: 0 2px 10px; font-size: 13px; line-height: 1.4; }
 
-/* ---- desktop: the card and the reason hold still on the left, the plans scroll on the right ---- */
-@media (min-width: 960px) {
-  .v3-pro.pm.prc .v3-col { max-width: 1080px; padding-left: 48px; padding-right: 48px; }
-  .pm-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr); gap: 72px; align-items: start; }
-  .pm-hero { position: sticky; top: 28px; padding-bottom: 24px; }
-  .pm-hero .v3-h1 { font-size: 52px; margin-top: 34px; }
-  .pm-hero .v3-lead { max-width: 30em; }
-  .pm-main > .pm-cmp-wrap:first-child { margin-top: 14px; }
-  .pm-dock { margin: 6px 0 0; padding: 22px 0 18px; }
+/* =================== the comparison: fixed columns, labels on the grid's x, checks centred, a clean sticky head =================== */
+.pm-cmp-wrap { border: 1px solid var(--hair); border-radius: 16px; background: #080808; }
+.pm-cmp { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
+.pm-c0 { width: 42%; }
+.pm-cmp th, .pm-cmp td { padding: 0; font-weight: 400; text-align: center; vertical-align: middle; }
+.pm-cmp thead th, .pm-cmp thead td { position: sticky; top: var(--safe-t, 0px); z-index: 1; background: #080808; border-bottom: 1px solid var(--hair); }
+.pm-cmp thead .pm-corner { border-top-left-radius: 15px; }
+.pm-cmp thead th:last-child { border-top-right-radius: 15px; }
+.pm-colhead { display: flex; align-items: center; justify-content: center; width: 100%; height: 48px; padding: 0 2px; }
+/* a plan's column head is a button: it selects that plan, like its card */
+.pm-colbtn { font: inherit; color: inherit; background: none; border: 0; border-radius: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.pm-colbtn:focus-visible { outline: 2px solid var(--pro, #2f6bff); outline-offset: -2px; }
+/* the column heads speak like the plan names: display capitals, tracked (the trailing tracking taken back, the capitals lifted onto the centre) */
+.pm-cn { display: block; font: 500 10.5px/1 var(--display); letter-spacing: 0.14em; margin-right: -0.14em; text-transform: uppercase; color: var(--soft); white-space: nowrap; transform: translateY(-0.13em); transition: color 0.25s var(--ease); }
+.pm-colbtn:hover .pm-cn { color: var(--ink); }
+/* wide: one row per fact, its label on the grid's x, on one line */
+.pm-cmp tbody th { text-align: left; padding: 0 8px 0 var(--pm-pad); font-size: 12.5px; line-height: 1.35; color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pm-cmp tbody td { height: 48px; padding: 0 2px; }
+.pm-cmp .pm-lrow { display: none; }
+.pm-cmp .pm-crow:not(.first) > * { border-top: 1px solid rgba(246, 242, 234, 0.07); }
+/* the selected plan's column: a blue field, a 2 px blue line on its head, its name in blue */
+.pm-cmp thead th.on { background: linear-gradient(rgba(47, 107, 255, 0.1), rgba(47, 107, 255, 0.1)), #080808; box-shadow: inset 0 2px 0 var(--pro, #2f6bff); }
+.pm-cmp tbody td.on { background: rgba(47, 107, 255, 0.1); }
+.pm-cmp thead th.on .pm-cn { color: var(--pro-ink, #8fb0ff); }
+.pm-cmp tbody tr:last-child td.on:last-child { border-bottom-right-radius: 15px; }
+.pm-cmp td, .pm-cmp thead th { transition: background-color 0.25s var(--ease), box-shadow 0.25s var(--ease); }
+.pm-yes { width: 16px; height: 16px; color: var(--pro-ink, #8fb0ff); stroke-width: 2; vertical-align: middle; }
+.pm-cmp td.free .pm-yes { color: var(--soft); }
+.pm-no { display: inline-block; width: 10px; height: 1.5px; border-radius: 1px; background: rgba(246, 242, 234, 0.2); vertical-align: middle; }
+.pm-qty { display: inline-block; font-size: 11.5px; line-height: 1.25; color: var(--ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pm-cmp td.free .pm-qty { color: var(--soft); }
+
+.pm-free { margin: 14px 0 0; padding: 0 var(--pm-pad); font-size: 12.5px; line-height: 1.5; color: var(--mute); }
+.pm-free b { font-weight: 600; color: var(--soft); }
+.pm-free .v3-tag { margin-right: 8px; vertical-align: 1px; height: 19px; font-size: 9.5px; }
+
+/* =================== the access code =================== */
+.pm-codebox { margin-top: 26px; }
+.prc-code { border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair); }
+.prc-code summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px; min-height: 52px; padding: 0 2px; font-size: 13.5px; color: var(--soft); }
+.prc-code summary::-webkit-details-marker { display: none; }
+.prc-code summary::after { content: ""; margin-left: auto; width: 7px; height: 7px; border-right: 1.5px solid var(--mute); border-bottom: 1.5px solid var(--mute); transform: translateY(-2px) rotate(45deg); transition: transform 0.2s var(--ease); }
+.prc-code[open] summary::after { transform: translateY(2px) rotate(-135deg); }
+.prc-code form { display: flex; flex-direction: column; gap: 10px; padding: 2px 0 16px; }
+.prc-code .v3-field:focus-within { border-color: var(--pro, #2f6bff); }
+.prc-code .v3-btn { height: 48px; font-size: 14.5px; }
+
+/* =================== the member state =================== */
+.pm-member .pm-card .pm-card-name { color: var(--ink); }
+.pm-unlocked { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--hair); }
+.pm-unlocked li { display: grid; grid-template-columns: 18px minmax(0, 1fr); column-gap: 14px; align-items: start; padding: 14px 0; border-bottom: 1px solid rgba(246, 242, 234, 0.08); font-size: 14px; line-height: 1.45; color: var(--ink); }
+.pm-unlocked .pm-yes { width: 18px; height: 18px; margin-top: 1px; color: var(--pro, #2f6bff); }
+.pm-continue { margin-top: 24px; }
+.pm .pm-cta.pm-continue { justify-content: center; padding: 0 20px; }
+
+/* =================== up to a wide desktop: each fact's label on its own full-width line, its four cells under it on one 44 px row
+   (the inline label column only where the table is wide enough for every label on one line) =================== */
+@media (max-width: 1079px) {
+  .pm-c0 { width: 0; }
+  .pm-cmp .pm-corner { padding: 0; }
+  .pm-cmp .pm-lrow { display: table-row; }
+  .pm-cmp .pm-lrow td {
+    height: auto; padding: 14px var(--pm-pad) 0; text-align: left; font-size: 12.5px; line-height: 1.35; color: var(--soft);
+    /* the selected plan's blue column runs on through the label line (four equal columns: --on is its index) */
+    background: linear-gradient(90deg, transparent calc(var(--on, 2) * 25%), rgba(47, 107, 255, 0.1) calc(var(--on, 2) * 25%), rgba(47, 107, 255, 0.1) calc((var(--on, 2) + 1) * 25%), transparent calc((var(--on, 2) + 1) * 25%));
+  }
+  .pm-cmp .pm-lrow:not(.first) td { border-top: 1px solid rgba(246, 242, 234, 0.07); }
+  .pm-cmp .pm-crow:not(.first) > * { border-top: 0; }
+  .pm-cmp tbody .pm-rl { padding: 0; overflow: hidden; }
+  .pm-rl-t { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .pm-cmp tbody td { height: 44px; }
 }
+
+/* =================== narrow phones (344 px) =================== */
 @media (max-width: 360px) {
-  .pm-cta { padding: 0 16px; font-size: 14.5px; }
-  .pm-cta-p { font-size: 14px; }
+  .pm { --pm-pad: 14px; }
+  .pm-card { padding-top: 15px; padding-bottom: 14px; border-radius: 16px; }
+  .pm-card-brand { font-size: 9px; letter-spacing: 0.24em; margin-right: -0.24em; }
+  .pm-card-foot { margin-top: 10px; padding-top: 10px; }
+  .pm-v { font-size: 12.5px; }
+  .prc-card { column-gap: 12px; }
+  .prc-name { letter-spacing: 0.12em; }
+  .prc-card .prc-tag { font-size: 8.5px; letter-spacing: 0.03em; padding: 0 5px; margin-left: 8px; }
+  .prc-price { font-size: 24px; }
+  .pm-cn { letter-spacing: 0.1em; margin-right: -0.1em; font-size: 10px; }
+  .pm-qty { font-size: 11px; }
+  .pm .pm-cta { padding: 0 var(--pm-pad); font-size: 14.5px; }
+  .pm-cta-p { font-size: 14px; padding-left: 12px; margin-left: 10px; }
 }
+
+/* =================== desktop: the card and the reason hold still on the left, the plans scroll on the right =================== */
+@media (min-width: 960px) {
+  .v3-pro.pm .v3-col { max-width: 1080px; padding-left: 48px; padding-right: 48px; }
+  .pm-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr); column-gap: 80px; align-items: start; }
+  .pm-hero { position: sticky; top: 28px; padding-bottom: 24px; }
+  .pm .pm-hero .v3-h1 { font-size: 52px; }
+  .pm-hero .pm-lead { max-width: 30em; }
+  .pm-hero .pm-card { margin-top: 36px; }
+  .pm-main > .pm-sec:first-child { margin-top: 18px; }
+  .pm-dock { margin: 4px 0 0; padding: 20px 0 16px; }
+}
+@media (min-width: 1080px) {
+  .pm-c0 { width: 44%; }
+  .pm-cn { letter-spacing: 0.1em; margin-right: -0.1em; }
+  /* the plans' column is fixed here (the page's 1080 px): every line and every "why" holds on one line, in both languages */
+  .prc-line, .prc-value { min-height: 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .pm-rise, .pm-card, .pm-v, .pm-cta-p, .pm-dock-done { animation: none; }
-  .pm-card::after { display: none; }
-  .pm-cmp .on, .pm-cmp td, .pm-cmp th, .pm-cn, .pm-card .pm-card-name { transition: none; }
+  .pm-rise, .pm-v, .pm-cta-p, .pm-dock-done { animation: none; }
+  .prc-card, .prc-dot, .prc-dot::after, .prc-value, .pm-cmp td, .pm-cmp th, .pm-cn, .pm-card .pm-card-name, .prc-code summary::after { transition: none; }
 }
+
+/* capitals set in a line box of 1 sit 0.13 em low in this face: lifted wherever they share a centre line with the mark or a cell */
+.pm-card-brand { transform: translateY(-0.13em); }

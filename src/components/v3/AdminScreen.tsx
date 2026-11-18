@@ -273,7 +273,7 @@ function Accounts() {
               <small>{t("Inscrit {date}", { date: day(a.created_at) })} · {t("actif {date}", { date: day(a.last_active ?? a.last_seen) })} · {a.trips > 1 ? t("{n} voyages", { n: a.trips }) : t("{n} voyage", { n: a.trips })} · {t("{n} IA/30 j", { n: a.ai30 })}{a.steps30 != null ? ` · ${t("{n} actions/30 j", { n: a.steps30 })}` : ""}{a.waitlisted ? ` · ${t("en attente")}` : ""}</small>
             </button>
             <div className="adm-side">
-              {a.pro ? <span className="v3-tag gold">{a.granted ? (a.until ? `Pro → ${day(a.until)}` : t("Pro à vie")) : t("Pro inclus")}</span> : <span className="v3-tag dim">{t("Gratuit")}</span>}
+              {a.pro ? <span className="v3-tag pro">{a.granted ? (a.until ? `Pro → ${day(a.until)}` : t("Pro à vie")) : t("Pro inclus")}</span> : <span className="v3-tag dim">{t("Gratuit")}</span>}
               <select
                 aria-label={t("Pro pour {email}", { email: a.email })}
                 disabled={busy === a.user_id}
