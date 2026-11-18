@@ -77,7 +77,7 @@ export default function Trips({ onOpen, onClose }: { onOpen: (id: string) => voi
         {/* no illustration: one confident line in the display face, what it takes, and the way in */}
         <div className="hx-empty">
           <p className="v3-lbl">{greeting()}{name ? ` ${name}` : ""}</p>
-          <h1 className="v3-d hx-empty-h">{t("Votre premier voyage commence ici.")}</h1>
+          <h1 className="v3-d hx-empty-h">{t("Votre premier voyage commence\u00a0ici.")}</h1>
           <p className="v3-lead">{t("Une destination et des dates suffisent. Le reste se construit avec vous.")}</p>
           <button className="v3-btn" onClick={() => setCreating(true)}>{t("＋ Créer un voyage")}</button>
         </div>

@@ -4,7 +4,7 @@ import type { Trip } from "../data/types";
 import { expensesOf, toEur } from "./business";
 import { countable } from "./plan";
 import { getState } from "./store";
-import { homeZone, tripEndMs } from "./time";
+import { tripEndMs } from "./time";
 import { dateLabel } from "./newTrip";
 import { locale, t } from "./i18n";
 
@@ -33,34 +33,30 @@ const iata = (s?: string | null) => {
   return /^[A-Z]{3}$/.test(v) ? v : "";
 };
 
-/** Home as a city name: the traveller's own answer in the onboarding ("Paris", "CDG"), else this phone's timezone
- *  (on site, the last one seen before the phone switched to the trip's time); "" when none is known */
-export function homeCityOf(trip: Trip): string {
-  const own = String((getState().profile as { home?: unknown }).home || "").trim();
-  if (own) return own;
-  const here = homeZone();
-  let zone = here.zone !== trip.timezone ? here.zone : "";
-  if (!zone) {
-    try {
-      const saved = localStorage.getItem("orbes.homeZone");
-      if (saved && saved !== trip.timezone) zone = saved;
-    } catch {
-      /* ignore */
-    }
-  }
-  return zone ? (zone.split("/").pop() || zone).replace(/_/g, " ") : "";
+/** The traveller's own answer for home in the onboarding ("Lyon", "CDG"); "" when none was given */
+export function homeAnswerOf(): string {
+  return String((getState().profile as { home?: unknown }).home || "").trim();
 }
 
-/** The trip's route: the outbound flight's airports when there is one (else the way back's, reversed), else home
- *  to the destination by name. The origin is null when nothing tells where the traveller comes from. */
-export function routeOf(trip: Trip, home = homeCityOf(trip)): Route {
+/** The trip's route: the outbound flight's airports when there is one (else the way back's, reversed), else the
+ *  traveller's home answer to the destination by name. A flight's origin is never paired with the home answer, and
+ *  the origin is null when nothing tells where the traveller comes from. */
+export function routeOf(trip: Trip, home = homeAnswerOf()): Route {
   const arr = trip.flights?.find((f) => f.kind === "arrival");
   const dep = trip.flights?.find((f) => f.kind === "departure");
-  const homeCode = iata(home);
-  const fromCode = iata(arr?.from) || iata(dep?.to) || homeCode;
-  const fromCity = (arr ? arr.fromCity : dep?.toCity) || (homeCode ? "" : home) || "";
-  const to: RouteEnd = { code: iata(arr?.to) || iata(dep?.from), city: trip.title };
-  return { from: fromCode || fromCity ? { code: fromCode, city: fromCity } : null, to };
+  // the origin: where the flight out leaves from (or where the way back lands)
+  const rawFrom = ((arr ? arr.from : dep?.to) || "").trim();
+  const fromCode = iata(arr?.from) || iata(dep?.to);
+  const flightCity = ((arr ? arr.fromCity : dep?.toCity) || "").trim();
+  let from: RouteEnd | null = null;
+  if (fromCode || flightCity || rawFrom) from = { code: fromCode, city: flightCity || (fromCode ? "" : rawFrom) };
+  else if (home) from = iata(home) ? { code: iata(home), city: "" } : { code: "", city: home };
+  // the destination: the airport's own city under its code, else the trip's name
+  const toArr = iata(arr?.to);
+  const toCode = toArr || iata(dep?.from);
+  const toCity = (toArr ? arr?.toCity : toCode ? dep?.fromCity : "") || "";
+  const to: RouteEnd = { code: toCode, city: toCity.trim() || trip.title };
+  return { from, to };
 }
 
 /** "43,77° N · 11,26° E" (two decimals, the reader's own decimal mark); "" for a point that is not one */
@@ -224,29 +220,45 @@ function drawRoute(c: CanvasRenderingContext2D, route: Route, L: number, inner: 
   const gap = 40;
   const minLine = 180;
   let size = coded ? 128 : 92;
-  const widths = () => {
+  const room = inner - minLine - gap * 2;
+  const half = room / 2;
+  const fits = (ls: string[], w: number) => ls.every((l) => c.measureText(l).width <= w + 0.5) && !ls.some((l) => l.endsWith("…"));
+  /** the ends at the current size: one line each when they fit, else (names only) up to two lines each, the shorter
+   *  end keeping its own width and the other taking the rest; null when they do not fit whole */
+  const lay = (): [string[], string[]] | null => {
     c.font = `500 ${size}px ${DISPLAY}`;
     spacing(c, Math.round(size * 0.04));
-    return [a ? c.measureText(a).width : 0, c.measureText(b).width];
+    const na = a ? c.measureText(a).width : 0;
+    const nb = c.measureText(b).width;
+    if (na + nb <= room) return [a ? [a] : [], [b]];
+    if (coded) return null;
+    const wA = a ? (na <= half ? na : nb <= half ? room - nb : half) : 0;
+    const la = a ? wrap(c, a, wA, 2) : [];
+    const used = Math.max(0, ...la.map((l) => c.measureText(l).width));
+    const lb = wrap(c, b, room - used, 2);
+    return fits(la, wA) && fits(lb, room - used) ? [la, lb] : null;
   };
-  let [wa, wb] = widths();
-  while (size > 44 && wa + wb + minLine + gap * 2 > inner) {
+  let ends = lay();
+  while (!ends && size > 40) {
     size -= 4;
-    [wa, wb] = widths();
+    ends = lay();
   }
-  // still too long (two long names): each keeps half the room
-  const half = (inner - minLine - gap * 2) / 2;
-  const over = wa + wb + minLine + gap * 2 > inner;
-  const ta = a && over && wa > half ? fit(c, a, half) : a;
-  const tb = over && wb > half ? fit(c, b, half) : b;
-  [wa, wb] = [ta ? c.measureText(ta).width : 0, c.measureText(tb).width];
+  // still too long at the smallest size: each end keeps half the room, cut with "…"
+  const [la, lb] = ends || [a ? [fit(c, a, half)] : [], coded ? [fit(c, b, half)] : wrap(c, b, half, 2).map((l) => fit(c, l, half))];
+  const widest = (ls: string[]) => Math.max(0, ...ls.map((l) => c.measureText(l).width));
+  const [wa, wb] = [widest(la), widest(lb)];
+  const lh = size * 1.12;
   c.fillStyle = INK;
-  c.textAlign = "left";
-  if (ta) c.fillText(ta, L, base);
-  c.textAlign = "right";
-  c.fillText(tb, L + inner, base);
+  // each end's lines stand centred on the route's line
+  const drawEnd = (ls: string[], x: number, align: CanvasTextAlign) => {
+    c.textAlign = align;
+    ls.forEach((l, i) => c.fillText(l, x, base + (i - (ls.length - 1) / 2) * lh));
+  };
+  drawEnd(la, L, "left");
+  drawEnd(lb, L + inner, "right");
   spacing(c, 0);
   c.textAlign = "left";
+  const ta = la.length > 0;
   // the line, at the middle of the capitals
   const ly = base - size * 0.36;
   const x1 = ta ? L + wa + gap : L + 8;
@@ -336,7 +348,11 @@ export async function recapImage(r: Recap, _from?: [number, number] | null): Pro
     lines = wrap(c, title, inner, 2);
     if (lines.every((l) => c.measureText(l).width <= inner) && !lines[lines.length - 1].endsWith("…")) break;
   }
-  if (size < 84) size = 84;
+  if (size < 84) {
+    size = 84;
+    c.font = `500 ${size}px ${DISPLAY}`;
+    lines = wrap(c, title, inner, 2);
+  }
   // a word longer than the width (a long name without spaces): smaller, then cut by letters with "…"
   while (size > 56 && lines.some((l) => c.measureText(l).width > inner)) {
     size -= 4;

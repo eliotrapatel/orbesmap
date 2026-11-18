@@ -6,7 +6,6 @@
 
 /* the still copy of what just closed (see ghostOut in components/ui.tsx): it only plays its exit */
 .fl-ghost, .fl-ghost * { animation: none !important; transition: none !important; pointer-events: none !important; }
-.fl-ghost .v3-hero-arc { stroke-dashoffset: 0; }
 .fl-ghost.v3 { z-index: 95; }
 /* the start-up copy, once its name and line were fully drawn, keeps them as they were */
 .fl-ghost.fl-splash-drawn .fl-splash-rule { transform: none; }

@@ -1006,7 +1006,7 @@ button.pl-day:hover { border-color: var(--hair-strong); background: rgba(246, 24
   transition: transform 0.3s var(--ease), border-color 0.25s; }
 .v3-hero:hover { border-color: rgba(246, 242, 234, 0.22); }
 .v3-hero:active { transform: scale(0.99); }
-.v3-hero:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+.v3-hero:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
 /* top: the state on the left, the clocks (home, destination) on the right, on one cap line */
 .v3-hero-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; min-width: 0; }
 .v3-hero-top .v3-tags { flex: none; }
@@ -1044,9 +1044,8 @@ button.pl-day:hover { border-color: var(--hair-strong); background: rgba(246, 24
 .v3-hero.static .v3-hero-go:hover span { transform: translateX(3px); }
 .v3-hero.static .v3-hero-go:active, .v3-hero-alt:active { transform: scale(0.98); }
 .v3-hero.static .v3-hero-go:disabled { opacity: 0.65; cursor: progress; }
-.v3-hero-go:focus-visible, .v3-hero-alt:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
-.v3-hero-body.today { margin-top: 6px; }
-.v3-hero-body.today > .v3-today-k { margin-top: 22px; }
+.v3-hero-go:focus-visible, .v3-hero-alt:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.v3-hero-body.today > .v3-today-k { margin-top: 14px; }
 .v3-today-k { color: var(--ok); }
 .v3-today { display: flex; flex-direction: column; margin-top: 16px; padding: 16px 0 0; border-top: 1px solid var(--hair); }
 .v3-today-name { margin-top: 8px; font-size: clamp(24px, 7.4vw, 31px); overflow-wrap: anywhere; }

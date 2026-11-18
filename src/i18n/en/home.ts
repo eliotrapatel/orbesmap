@@ -9,15 +9,16 @@ export default {
   "en retard de {d}": "{d} late",
   "{d} j {h} h": "{d}d {h}h",
   "{h} h {m} min": "{h}h {m} min",
-  "Encore {n} arrêts aujourd'hui": "{n} stops left today",
+  "Encore {n} arrêts aujourd’hui": "{n} stops left today",
   "Dernier arrêt de la journée": "Last stop of the day",
-  "Plus rien de prévu aujourd'hui.": "Nothing else planned today.",
-  "Rien de prévu aujourd'hui.": "Nothing planned today.",
+  "Plus rien de prévu aujourd’hui.": "Nothing else planned today.",
+  "Rien de prévu aujourd’hui.": "Nothing planned today.",
   "Demain": "Tomorrow",
   "Ouvrir la journée": "Open today",
   "Voir demain": "See tomorrow",
   "Voir ce jour": "See that day",
   "Retour dans {t}": "Return in {t}",
+  "Aujourd’hui": "Today",
   // after: the recap
   "Récapitulatif": "Recap",
   "Lieux visités": "Places visited",
@@ -26,6 +27,7 @@ export default {
   "Image du récapitulatif enregistrée": "Recap image saved",
   "L'image n'a pas pu être préparée. Réessayez.": "The image could not be prepared. Please try again.",
   // between trips
+  "Votre premier voyage commence\u00a0ici.": "Your first trip starts\u00a0here.",
   "Prochain voyage": "Next trip",
   "Où allez-vous ensuite ?": "Where to next?",
   "Voyages passés": "Past trips",
@@ -36,4 +38,8 @@ export default {
   "{v}° E": "{v}° E",
   "{v}° O": "{v}° W",
   "{n} nuit": "{n} night",
+  // the destination's clock on the card (its name is set large just below)
+  "Heure locale": "Local time",
+  "avant l’arrivée": "until arrival",
+  "Compte à rebours avant l’arrivée": "Countdown to arrival",
 } satisfies Record<string, string>;

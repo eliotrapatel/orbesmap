@@ -33,23 +33,22 @@ export const CcClip = mk(<path d="M9 4.5h6M9 4.5a1.5 1.5 0 0 0 0 3h6a1.5 1.5 0 0
 
 // The orbit mark as in the mockup's sprite: #orbit (line 28) for the small avatar, #orbit-lg (line 18) for the large one
 const O = "M511.8 740.1C646.7 740.1 747.5 638.8 747.5 512C747.5 384.8 646.7 283.9 511.8 283.9C377.3 283.9 276.5 384.8 276.5 512C276.5 638.8 377.3 740.1 511.8 740.1ZM511.6 676.3C417.1 676.3 344 605.3 344 512.1C344 418.4 417.1 347.4 511.6 347.4C606.6 347.4 679.6 418.4 679.6 512.1C679.6 605.3 606.6 676.3 511.6 676.3Z";
-/** The large avatar's mark (the concierge's launch screen): no orbit drawn as an illustration, a compass needle
- *  standing on a horizon line, in hairlines, on a 40 × 24 grid (the slot of the large orbit it replaces) */
-function ConciergeCompass({ w, h }: { w: number; h: number }) {
+/** The large avatar's mark (the concierge's launch screen): no orbit drawn as an illustration, a horizon: one
+ *  hairline across the slot, a point set on it at the centre (the route's point, as on the trip card), on the
+ *  40 × 24 grid of the large orbit it replaces (no fill of its own: it sits on any ground) */
+function ConciergeHorizon({ w, h }: { w: number; h: number }) {
   return (
-    <svg className="cc-orbit cc-compass" viewBox="0 0 40 24" width={w} height={h} fill="none" aria-hidden="true" focusable="false">
-      <path d="M1.5 12h14.6M23.9 12h14.6" stroke="currentColor" strokeWidth="1" strokeLinecap="round" opacity="0.55" />
-      <path d="M20 1.2 22.6 12h-5.2z" fill="currentColor" />
-      <path d="M17.4 12 20 22.8 22.6 12" stroke="currentColor" strokeWidth="1" strokeLinejoin="round" />
-      <circle cx="20" cy="12" r="1" fill="#121110" />
+    <svg className="cc-orbit cc-horizon" viewBox="0 0 40 24" width={w} height={h} fill="none" aria-hidden="true" focusable="false">
+      <path d="M2 12h36" stroke="currentColor" strokeWidth="1" strokeLinecap="round" opacity="0.6" />
+      <circle cx="20" cy="12" r="2.2" fill="currentColor" />
     </svg>
   );
 }
 
-/** width x height in px; `thin` is the large avatar (the compass mark), else the small orbit mark of the avatars */
+/** width x height in px; `thin` is the large avatar (the horizon mark), else the small orbit mark of the avatars */
 export function ConciergeOrbit({ thin, w, h }: { thin?: boolean; w: number; h: number }) {
   const id = useId().replace(/:/g, "");
-  if (thin) return <ConciergeCompass w={w} h={h} />;
+  if (thin) return <ConciergeHorizon w={w} h={h} />;
   const line = 28;
   return (
     <svg className="cc-orbit" viewBox="116 279 792 466" width={w} height={h} fill="none" aria-hidden="true" focusable="false">

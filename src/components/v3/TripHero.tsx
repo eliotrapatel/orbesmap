@@ -8,7 +8,7 @@ import { getState, toast, useStore } from "../../lib/store";
 import { clock, countdownParts, dayOfTrip, fmtDay, fmtMin, homeZone, localDate, phase, sameHour, tripEndMs, tripStartMs } from "../../lib/time";
 import { t } from "../../lib/i18n";
 import { dateLabel } from "../../lib/newTrip";
-import { coordText, homeCityOf, PLANE_PATH, recapDue, recapImage, recapOf, recapStats, routeOf, shareRecapBlob, type Route } from "../../lib/recap";
+import { coordText, PLANE_PATH, recapDue, recapImage, recapOf, recapStats, routeOf, shareRecapBlob, type Route } from "../../lib/recap";
 import { track } from "../../lib/track";
 import { setIntent } from "./nav";
 import "../../styles/home.css";
@@ -162,7 +162,8 @@ function RouteLine({ route, f, flight, timezone }: { route: Route; f: number; fl
   const cb = cell("hx-cb", under(route.to), arr);
   const pos = Math.min(1, Math.max(0, f));
   return (
-    <span className={"hx-route" + (coded ? " coded" : "")} style={{ "--f": pos } as CSSProperties} aria-label={a ? `${a} → ${b}` : b}>
+    <span className={"hx-route" + (coded ? " coded" : "")} style={{ "--f": pos } as CSSProperties}>
+      <span className="hx-sr">{a ? `${a} → ${b}` : b}</span>
       {a ? <b className="hx-a" aria-hidden="true">{a}</b> : <span className="hx-a" aria-hidden="true" />}
       <span className="hx-line" aria-hidden="true">
         <i className="hx-done" />
@@ -223,7 +224,7 @@ export default function TripHero({ trip: base, onOpen }: { trip: Trip; onOpen: (
   const ph = phase(trip, now);
   const cd = countdownParts(ph === "before" ? tripStartMs(trip) : tripEndMs(trip), now);
   const home = useMemo(() => homeFor(trip), [trip.id, trip.timezone]); // eslint-disable-line react-hooks/exhaustive-deps
-  const route = useMemo(() => routeOf(trip, homeCityOf(trip)), [trip, homeAnswer]); // eslint-disable-line react-hooks/exhaustive-deps
+  const route = useMemo(() => routeOf(trip, homeAnswer.trim()), [trip, homeAnswer]);
   const days = trip.days.filter((d) => d.scheduled).reduce((n, d) => n + (d.dates?.length || 0), 0);
   const today = ph === "during" ? dayOfTrip(trip, now) : null;
   // where the plane stands on the route: at home before, along the days during, arrived after
@@ -245,18 +246,20 @@ export default function TripHero({ trip: base, onOpen }: { trip: Trip; onOpen: (
     return () => window.removeEventListener("keydown", k);
   }, [base.id, onOpen]);
 
+  const homeClock = !!home && !sameHour(home.zone, trip.timezone, d);
   const top = (
     <span className="v3-hero-top">
       <span className="v3-tags">
         {preparing ? (
           <span className="v3-tag dim">{draft === "preparing" ? t("En préparation") : t("À valider")}</span>
         ) : (
-          <span className={"v3-tag " + (ph === "during" ? "ok" : ph === "before" ? "gold" : "dim")}>{ph === "during" ? t("En cours") : ph === "before" ? t("À venir") : t("Passé")}</span>
+          <span className={"v3-tag " + (ph === "during" ? "ok" : ph === "before" ? "up" : "dim")}>{ph === "during" ? t("En cours") : ph === "before" ? t("À venir") : t("Passé")}</span>
         )}
       </span>
       <span className="v3-clocks">
-        {home && !sameHour(home.zone, trip.timezone, d) && <span><small>{home.city}</small><b>{clock(home.zone, d)}</b></span>}
-        <span><small>{trip.title}</small><b>{clock(trip.timezone, d)}</b></span>
+        {homeClock && home && <span><small>{home.city}</small><b>{clock(home.zone, d)}</b></span>}
+        {/* the destination's name is set large just below: its clock says where it is read, not the name again */}
+        <span><small>{homeClock ? t("Sur place") : t("Heure locale")}</small><b>{clock(trip.timezone, d)}</b></span>
       </span>
     </span>
   );
@@ -297,22 +300,24 @@ export default function TripHero({ trip: base, onOpen }: { trip: Trip; onOpen: (
         {routeLine}
 
         {ph !== "after" && (
-          <span className="v3-cdn" role="timer" aria-label={ph === "before" ? t("Compte à rebours avant l'arrivée") : t("Temps restant sur place")}>
+          <span className="v3-cdn" role="timer" aria-label={ph === "before" ? t("Compte à rebours avant l’arrivée") : t("Temps restant sur place")}>
             {([["d", "Jours"], ["h", "Heures"], ["m", "Min"], ["s", "Sec"]] as const).map(([k, l]) => (
               <span key={k}>
                 <b>{String(cd[k]).padStart(2, "0")}</b>
                 <small>{t(l)}</small>
               </span>
             ))}
-            <em>{ph === "before" ? t("avant l'arrivée") : t("avant le retour")}</em>
+            <em>{ph === "before" ? t("avant l’arrivée") : t("avant le retour")}</em>
           </span>
         )}
 
-        <span className="v3-facts">
-          <span><b>{total}</b> {total > 1 ? t("lieux") : t("lieu")}</span>
-          {hotel && <span>{/^h[oô]tel\b/i.test(hotel) ? null : <>{t("Hôtel")} </>}<b>{hotel}</b></span>}
-          {flightFact && <span><b>{flight.code}</b> {flight.from} → {flight.to}</span>}
-        </span>
+        {(total > 0 || hotel || flightFact) && (
+          <span className="v3-facts">
+            {total > 0 && <span><b>{total}</b> {total > 1 ? t("lieux") : t("lieu")}</span>}
+            {hotel && <span>{/^h[oô]tel\b/i.test(hotel) ? null : <>{t("Hôtel")} </>}<b>{hotel}</b></span>}
+            {flightFact && <span><b>{flight.code}</b> {flight.from} → {flight.to}</span>}
+          </span>
+        )}
 
         {(ph !== "before" || visited > 0) && total > 0 && (
           <span className="v3-hero-prog">
@@ -335,7 +340,7 @@ const onGround = (open: () => void) => (e: React.MouseEvent) => {
   if (!(e.target as HTMLElement).closest?.("button,a")) open();
 };
 
-/** On site: "Aujourd'hui", day X of N, the next stop and how its time stands, what is left today, and two ways in */
+/** On site: "Aujourd’hui", day X of N, the next stop and how its time stands, what is left today, and two ways in */
 function TodayCard({ trip, now, top, route, onOpen, progress, returnIn, facts }: {
   trip: Trip; now: number; top: ReactNode; route: ReactNode; onOpen: () => void; progress: ReactNode; returnIn: string; facts: ReactNode;
 }) {
@@ -357,9 +362,9 @@ function TodayCard({ trip, now, top, route, onOpen, progress, returnIn, facts }:
     <div className="v3-hero live static" onClick={onGround(onOpen)}>
       {top}
       <span className="v3-hero-body today">
+        <b className="v3-d v3-hero-title">{trip.title}</b>
+        <span className="v3-lbl v3-today-k">{t("Aujourd’hui")} · {t("Jour {i} sur {n}", { i: dt.i, n: dt.n })}{theme ? ` · ${theme}` : ""}</span>
         {route}
-        <span className="v3-lbl v3-today-k">{t("Aujourd'hui")} · {t("Jour {i} sur {n}", { i: dt.i, n: dt.n })}</span>
-        <small className="v3-hero-when">{trip.title}{theme ? ` · ${theme}` : ""}</small>
 
         {td.next ? (
           <span className="v3-today">
@@ -371,12 +376,12 @@ function TodayCard({ trip, now, top, route, onOpen, progress, returnIn, facts }:
               {rel && <em className={rel.late ? "late" : ""}>{rel.text}</em>}
             </span>
             <small className="v3-today-left">
-              {td.left > 1 ? t("Encore {n} arrêts aujourd'hui", { n: td.left }) : t("Dernier arrêt de la journée")}
+              {td.left > 1 ? t("Encore {n} arrêts aujourd’hui", { n: td.left }) : t("Dernier arrêt de la journée")}
             </small>
           </span>
         ) : (
           <span className="v3-today">
-            <span className="v3-today-none">{td.hadStops ? t("Plus rien de prévu aujourd'hui.") : t("Rien de prévu aujourd'hui.")}</span>
+            <span className="v3-today-none">{td.hadStops ? t("Plus rien de prévu aujourd’hui.") : t("Rien de prévu aujourd’hui.")}</span>
             {td.later && (
               <>
                 <small className="v3-lbl" style={{ marginTop: 16 }}>{laterLabel}</small>
