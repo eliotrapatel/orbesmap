@@ -6,6 +6,9 @@
     "api/ai.ts": {
       "maxDuration": 300
     },
+    "api/prepare.ts": {
+      "maxDuration": 300
+    },
     "api/cron.ts": {
       "maxDuration": 60
     },

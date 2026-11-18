@@ -4,17 +4,19 @@ import { currentTrip, getState, pullPlan, requestPro } from "./store";
 import { t as tr } from "./i18n";
 
 /** Who the AI helps and for which trip (profile + current trip), sent with every request */
-function aiContext() {
+export function aiContext() {
   const p = getState().profile;
   const t = currentTrip();
   return { who: { name: p.name, interests: p.interests, travel: p.travel, pace: p.pace, budget: p.budget, lang: p.lang }, trip: { id: t.id, title: t.title, dates: t.dateLabel }, lang: t.lang };
 }
 
-const ENDPOINT = (() => {
+/** The address of one of the orbesmap functions ("ai", "prepare") */
+export const apiUrl = (name: string) => {
   const h = location.hostname;
   // the relay lives on the orbesmap Vercel project; theorbes.com/maps only serves the page
-  return h.endsWith(".vercel.app") ? "/api/ai" : "https://orbesmap.vercel.app/api/ai";
-})();
+  return h.endsWith(".vercel.app") ? `/api/${name}` : `https://orbesmap.vercel.app/api/${name}`;
+};
+const ENDPOINT = apiUrl("ai");
 
 export class AiError extends Error {}
 

@@ -5,6 +5,7 @@
 // - two days after a trip ends (lot retention): one "welcome back" e-mail, with a few figures of the trip and a way to the next one.
 // Needs on Vercel: SUPABASE_SERVICE_ROLE_KEY, VAPID_PRIVATE_KEY, RESEND_API_KEY (MAIL_FROM optional).
 import webpush from "web-push";
+import { kickStale } from "./prepare.js";
 
 type Json = Record<string, unknown>;
 const SUPA_URL = process.env.SUPABASE_URL || "https://ifugaqjneprbtigvegeb.supabase.co";
@@ -138,6 +139,13 @@ async function run(req: Request): Promise<Response> {
 
   // trips happening around now
   const allTrips = (await db("/rest/v1/trips?select=id,data", key)) as { id: string; data: Json }[];
+  // the trip preparations run on the server (api/prepare.ts): one that gave no sign of life for 6 minutes starts again
+  let restarted = 0;
+  try {
+    restarted = await kickStale(allTrips, key);
+  } catch (e) {
+    warnings.push(`prepare: ${String((e as Error)?.message || e).slice(0, 120)}`);
+  }
   const trips = allTrips.filter((t) => {
     const s = String(t.data.start || "");
     const e = String(t.data.end || "");
@@ -239,7 +247,7 @@ ${FOOTER}</div>`;
   } catch (e) {
     warnings.push(`return: ${String((e as Error)?.message || e).slice(0, 120)}`);
   }
-  return json({ ok: true, trips: trips.length, ...sent, ...(warnings.length ? { warnings } : {}), ...(resend ? {} : { warning_mail: "RESEND_API_KEY missing" }) });
+  return json({ ok: true, trips: trips.length, ...sent, ...(restarted ? { restarted } : {}), ...(warnings.length ? { warnings } : {}), ...(resend ? {} : { warning_mail: "RESEND_API_KEY missing" }) });
 }
 
 function addDays(iso: string, n: number) {

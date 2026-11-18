@@ -1,0 +1,152 @@
+/* =================== the preparation of a new trip (Nov 2026) ===================
+   No orbit, no globe: one large figure in the display face, a hairline rule, and the trip set like a timetable
+   (step, days, figures) on one grid of thirds. Everything below the figure is hairlines on black: no card.
+   Motion: the rule moves, the figure cross-fades when it changes; nothing loops. */
+
+.pp-screen { --pp-mk: 20px; --pp-gap: 12px; --pp-pad: 12px; }
+/* the page's ground stays plain black here (no light behind the figure) */
+.v3.pp-screen { background: #050505; }
+.pp-screen .v3-bg { display: none; }
+.pp-grid, .pp-aside-l, .pp-main { display: flex; flex-direction: column; min-width: 0; }
+
+/* ---------- status, place and dates ---------- */
+.pp-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; min-height: 18px; }
+.pp-state { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; line-height: 1; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink); white-space: nowrap; flex: none; }
+.pp-state i { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); flex: none; }
+.pp-state.pause { color: var(--soft); }
+.pp-state.pause i { background: transparent; box-shadow: inset 0 0 0 1px var(--soft); }
+.pp-state.stop { color: var(--warn); }
+.pp-state.stop i { background: var(--warn); }
+.pp-state.away { color: var(--soft); }
+.pp-state.away i { background: var(--soft); }
+.pp-where { min-width: 0; font-size: 11px; line-height: 1; letter-spacing: 0.14em; text-transform: uppercase; color: var(--soft); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- the figure ---------- */
+.pp-pct { margin: 22px 0 0; display: flex; align-items: flex-start; font-family: var(--display); font-weight: 500; line-height: 0.8; color: var(--ink); font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+.pp-num { font-size: clamp(104px, 36vw, 156px); letter-spacing: -0.02em; animation: ppSwap 0.28s var(--ease) both; }
+.pp-sign { font-size: clamp(30px, 10vw, 44px); line-height: 1; margin: 0.12em 0 0 0.12em; color: var(--soft); }
+@keyframes ppSwap { from { opacity: 0; } to { opacity: 1; } }
+
+.pp-step { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: baseline; gap: 14px; margin-top: 22px; }
+.pp-step b { font-weight: 500; font-size: 11.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pp-step span { min-width: 0; font-size: 13.5px; color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; animation: ppSwap 0.35s var(--ease) both; }
+
+/* the hairline rule: a 1 px line, the done part drawn over it in ink */
+.pp-rule { position: relative; height: 1px; margin-top: 14px; background: var(--hair); }
+.pp-rule i { position: absolute; left: 0; right: 0; top: -0.5px; height: 2px; background: var(--ink); transform-origin: 0 50%; transition: transform 0.9s var(--ease), background 0.3s; }
+.pp-rule.off i { background: var(--soft); }
+
+/* ---------- the grid of thirds: phases, figures, and the day rows' theme column ---------- */
+.pp-phases, .pp-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.pp-phases > li + li, .pp-stats > div + div { padding-left: var(--pp-pad); border-left: 1px solid var(--hair); }
+
+.pp-phases { list-style: none; margin: 0; padding: 0; border-bottom: 1px solid var(--hair); }
+.pp-phases li { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "n mk" "l l"; align-items: center; row-gap: 8px; padding-top: 12px; padding-bottom: 13px; padding-right: 10px; color: var(--mute); transition: color 0.3s; }
+.pp-phases .pp-n { grid-area: n; }
+.pp-phases .pp-mk { grid-area: mk; }
+.pp-phases .pp-l { grid-area: l; }
+.pp-n { font-size: 10.5px; letter-spacing: 0.08em; font-variant-numeric: tabular-nums; color: var(--mute); }
+.pp-l { font-size: 11px; line-height: 1.2; letter-spacing: 0.08em; text-transform: uppercase; overflow-wrap: anywhere; }
+.pp-phases li.live { color: var(--ink); }
+.pp-phases li.done { color: var(--soft); }
+
+/* the marks of a phase or a day: a hairline ring; done = a check; live = a filled centre; error = « ! » */
+.pp-mk { width: 14px; height: 14px; border-radius: 50%; display: grid; place-items: center; box-shadow: inset 0 0 0 1px var(--hair-strong); color: var(--ink); font-size: 9px; font-weight: 700; line-height: 1; flex: none; }
+.pp-mk .cc-ic { width: 10px; height: 10px; stroke-width: 2; }
+li.done > .pp-mk { box-shadow: none; color: var(--ok); }
+li.live > .pp-mk { box-shadow: inset 0 0 0 1px var(--ink); }
+li.live > .pp-mk::after { content: ""; width: 4px; height: 4px; border-radius: 50%; background: var(--ink); }
+li.err > .pp-mk { box-shadow: inset 0 0 0 1px var(--warn); color: var(--warn); }
+
+/* the one promise of the screen, as plain text right under the progress */
+.pp-promise { margin: 14px 0 0; font-size: 13px; line-height: 1.45; color: var(--soft); max-width: 40ch; }
+
+.pp-alert { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 14px; margin-top: 16px; }
+.pp-alert p { margin: 0; flex: 1 1 200px; font-size: 13px; line-height: 1.45; color: var(--warn); }
+.pp-alert button { height: 44px; padding: 0 18px; border-radius: 999px; border: 1px solid var(--hair-strong); color: var(--ink); font-size: 13px; transition: background 0.2s, transform 0.16s var(--ease); }
+.pp-alert button:hover { background: rgba(246, 242, 234, 0.06); }
+.pp-alert button:active { transform: scale(0.97); }
+.pp-aside { margin: 14px 0 0; font-size: 13px; color: var(--soft); line-height: 1.45; }
+
+/* ---------- the trip ---------- */
+.pp-title { margin: 34px 0 0; font-size: clamp(26px, 7.6vw, 32px); line-height: 0.98; overflow-wrap: anywhere; }
+.pp-facts { margin: 10px 0 0; color: var(--soft); font-size: 13px; line-height: 1.5; }
+
+/* the figures share their bottom rule with the first day (one line, never two) */
+.pp-stats { margin: 22px 0 0; border-top: 1px solid var(--hair); }
+.pp-stats > div { display: flex; flex-direction: column; padding-top: 14px; padding-bottom: 14px; padding-right: 10px; min-width: 0; }
+.pp-stats dt { font-size: 10.5px; line-height: 1.25; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mute); overflow-wrap: anywhere; }
+.pp-stats dd { margin: auto 0 0; padding-top: 10px; font: 500 30px/0.9 var(--display); color: var(--ink); font-variant-numeric: tabular-nums; }
+
+/* ---------- day by day, like a timetable: the theme starts on the second third ---------- */
+.pp-days { list-style: none; margin: 0; padding: 0; }
+.pp-days li { display: grid; grid-template-columns: var(--pp-mk) calc(33.333% - var(--pp-mk) - 2 * var(--pp-gap) + var(--pp-pad) + 1px) minmax(0, 1fr) 28px; align-items: baseline; column-gap: var(--pp-gap); padding: 13px 0; border-top: 1px solid var(--hair); transition: opacity 0.3s; }
+.pp-days li:last-child { border-bottom: 1px solid var(--hair); }
+.pp-days li > .pp-mk { align-self: start; margin-top: 2px; }
+.pp-days li.wait { opacity: 0.45; }
+.pp-when { font-size: 11.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--soft); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pp-days li.live .pp-when, .pp-days li.done .pp-when { color: var(--ink); }
+.pp-what { min-width: 0; }
+.pp-what b { display: block; font-weight: 500; font-size: 14.5px; line-height: 1.3; overflow-wrap: anywhere; }
+.pp-what small { display: block; margin-top: 3px; font-size: 12px; line-height: 1.35; color: var(--mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; animation: ppSwap 0.4s var(--ease) both; }
+.pp-what small.warn { color: var(--warn); }
+.pp-cnt { text-align: right; font: 500 15px/1 var(--display); color: var(--soft); font-variant-numeric: tabular-nums; }
+
+/* left on the timetable's axis, a full touch target */
+.pp-screen .pp-review { align-self: flex-start; display: block; margin: 8px 0 0; min-height: 44px; padding: 0; text-align: left; }
+.pp-screen .pp-review:disabled { opacity: 0.5; }
+.pp-err { margin: 6px 0 0; font-size: 13px; line-height: 1.45; color: var(--warn); }
+
+/* ---------- meanwhile: rows between hairlines, no card ---------- */
+.pp-screen .dr-meanwhile { margin-top: 40px; }
+.pp-screen .dr-meanwhile > .v3-lbl { margin: 0 0 12px; }
+.pp-screen .dr-meanwhile .v3-glass { background: none; -webkit-backdrop-filter: none; backdrop-filter: none; border: 0; border-radius: 0; box-shadow: none; border-top: 1px solid var(--hair); margin-top: 0; }
+.pp-screen .dr-meanwhile .inv-entry { padding: 16px 0; min-height: 64px; }
+.pp-screen .dr-meanwhile .inv-entry:hover { border-color: var(--hair); }
+.pp-screen .dr-meanwhile .inv-entry:hover .inv-chev { color: var(--ink); }
+.pp-screen .dr-meanwhile .inv-card { padding: 16px 0 6px; }
+.pp-screen .dr-meanwhile > :last-child { border-bottom: 1px solid var(--hair); }
+
+.pp-wish { padding: 16px 0 18px; border-top: 1px solid var(--hair); }
+.pp-wish > b { display: block; font-weight: 600; font-size: 14.5px; }
+.pp-wish > small { display: block; margin-top: 3px; font-size: 12.5px; color: var(--mute); line-height: 1.4; }
+.pp-wish form { display: flex; align-items: flex-end; gap: 16px; margin-top: 8px; }
+.pp-wish-field { flex: 1; min-width: 0; display: block; border-bottom: 1px solid var(--hair-strong); transition: border-color 0.2s; }
+.pp-wish-field:focus-within { border-color: var(--ink); }
+.pp-wish-field input { display: block; width: 100%; min-width: 0; height: 44px; padding: 0; background: none; border: 0; outline: 0; color: var(--ink); font: inherit; font-size: 16px; color-scheme: dark; }
+.pp-wish-field input::placeholder { color: var(--mute); }
+.pp-wish-add { flex: none; height: 44px; padding: 0 2px; font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink); transition: opacity 0.2s; }
+.pp-wish-add:disabled { color: var(--mute); }
+.pp-wish-add:active:not(:disabled) { opacity: 0.6; }
+.pp-wish-added { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.pp-wish-added li { display: flex; align-items: baseline; gap: 8px; font-size: 13px; line-height: 1.4; color: var(--soft); animation: ppSwap 0.3s var(--ease) both; }
+.pp-wish-added .cc-ic { width: 12px; height: 12px; color: var(--ok); flex: none; transform: translateY(1px); }
+
+/* the app's own run (no server): its note, plain */
+.pp-screen .dr-note { margin: 18px 0 0; padding: 0; border: 0; border-radius: 0; background: none; }
+
+@media (max-width: 360px) {
+  .pp-screen { --pp-gap: 10px; --pp-pad: 9px; }
+  .pp-l { letter-spacing: 0.04em; font-size: 10.5px; }
+  .pp-stats dt { letter-spacing: 0.04em; }
+}
+
+/* ---------- a computer: the progress on the left (it stays in view), the trip on the right ---------- */
+@media (min-width: 1024px) {
+  .pp-screen .v3-col { max-width: 1120px; padding-left: 40px; padding-right: 40px; }
+  .pp-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); column-gap: 72px; align-items: start; margin-top: 28px; }
+  .pp-aside-l { position: sticky; top: 32px; }
+  .pp-head { margin-top: 0; }
+  .pp-pct { margin-top: 36px; }
+  .pp-num { font-size: clamp(156px, 15vw, 200px); }
+  .pp-sign { font-size: 52px; }
+  .pp-step { margin-top: 32px; }
+  .pp-main { padding-top: 2px; }
+  .pp-title { margin-top: 0; font-size: 40px; }
+  .pp-stats { margin-top: 28px; }
+  .pp-screen .pp-review:hover:not(:disabled) { color: var(--ink); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pp-num, .pp-step span, .pp-what small, .pp-wish-added li { animation: none; }
+  .pp-rule i, .pp-days li, .pp-phases li { transition: none; }
+}
