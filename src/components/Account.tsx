@@ -2,7 +2,7 @@ import { useState } from "react";
 import { sendLoginEmail, signInWithPassword, useStore, useTrip, verifyLoginCode, type SyncState } from "../lib/store";
 import { ExportPanel, OfflineCard } from "./Tools";
 import { supabaseConfigured } from "../lib/supabase";
-import { AccountSections } from "./v3/AccountScreen";
+import { AccountSections, TripRows } from "./v3/AccountScreen";
 import { t } from "../lib/i18n";
 
 const SYNC_TEXT: Record<SyncState, string> = {
@@ -58,19 +58,9 @@ export default function Account() {
     return (
       <AccountSections
         variant="app"
-        status={
-          <>
-            <SyncBadge />
-            <p className="ac-status-note">{t("Vos voyages sont sauvegardés en ligne et partagés avec les personnes que vous invitez. Ils restent aussi sur cet appareil pour fonctionner sans réseau, jusqu'à la déconnexion.")}</p>
-          </>
-        }
-        trip={
-          <>
-            <OfflineCard trip={trip} />
-            <p className="ac-sub">{t("Exports")}</p>
-            <ExportPanel trip={trip} />
-          </>
-        }
+        status={<SyncBadge />}
+        trip={<TripRows offline={<OfflineCard trip={trip} />} exports={<ExportPanel trip={trip} />} />}
+        tripFoot={t("Vos voyages sont sauvegardés en ligne et partagés avec les personnes que vous invitez. Ils restent aussi sur cet appareil pour fonctionner sans réseau, jusqu'à la déconnexion.")}
       />
     );
   }
@@ -91,7 +81,7 @@ export default function Account() {
                 await signInWithPassword(email.trim(), password);
               } catch (x) {
                 const m = x instanceof Error ? x.message : "";
-                setErr(/invalid login credentials/i.test(m) ? t("E-mail ou mot de passe incorrect.") : /fetch|network/i.test(m) ? t("Pas de connexion au serveur. Vérifiez le réseau (en Chine : eSIM, itinérance ou VPN).") : m || t("La connexion a échoué. Réessayez."));
+                setErr(/invalid login credentials/i.test(m) ? t("E-mail ou mot de passe incorrect.") : /fetch|network/i.test(m) ? t("Pas de connexion au serveur. Vérifiez le réseau (en Chine\u00a0: eSIM, itinérance ou VPN).") : m || t("La connexion a échoué. Réessayez."));
               } finally {
                 setBusy(false);
               }

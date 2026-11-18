@@ -1,33 +1,26 @@
 import "../../styles/account.css";
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { requestPro, signOutChecked, toast, updateProfile, useStore } from "../../lib/store";
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { closePro, getState, requestPro, signOutChecked, toast, updateProfile, useStore } from "../../lib/store";
 import { deleteMyAccount, exportMyData, proDate } from "../../lib/pro";
 import { alertPrefs, disablePush, enablePush, inboundAddress, pushBlocker, pushEnabled, setAlertPrefs } from "../../lib/alerts";
 import { supabase } from "../../lib/supabase";
+import { offlineSupported, useOffline } from "../../lib/offline";
 import { t, setLang, useLang } from "../../lib/i18n";
-import { IBack, IDownload, IExit, IGlobe, ITrash } from "../Icons";
+import { IBack, IDownload, IExit, IGlobe, IOffline, ITrash } from "../Icons";
 import { useEscape } from "../ui";
 import AiCredit from "../AiCredit";
-import { openAdmin } from "./nav";
+import { openAdmin, useAdmin } from "./nav";
 import { legalHref } from "./Legal";
 import { InboundInbox } from "./AlertsAndInbox";
 
 // ---------- the account: one structure for the trip's "Compte" panel and the "Mes voyages" account screen ----------
 
-/** What the account's Pro status reads as, in one line */
-export function useProLine(): string | null {
-  const plan = useStore((s) => s.plan);
-  if (!plan) return null;
-  if (!plan.pro) return plan.prepLeft > 0 ? t("Gratuit · 1 voyage offert ce mois-ci") : t("Gratuit · voyage du mois utilisé");
-  return plan.granted ? (plan.until ? t("Pro jusqu'au {date}", { date: proDate(plan.until) }) : t("Pro à vie")) : t("Pro inclus");
-}
-
 /** Asks twice (typed word) before deleting the account; returns an error message, or nothing */
 export async function confirmAndDelete(): Promise<string | null> {
-  if (!confirm(t("Supprimer votre compte ?\nLes voyages que vous avez créés seront supprimés, y compris pour les personnes invitées. Les voyages partagés avec vous restent à leurs propriétaires.\nVous pouvez d'abord exporter vos données."))) return null;
+  if (!confirm(t("Supprimer votre compte\u00a0?\nLes voyages que vous avez créés seront supprimés, y compris pour les personnes invitées. Les voyages partagés avec vous restent à leurs propriétaires.\nVous pouvez d'abord exporter vos données."))) return null;
   const word = t("SUPPRIMER");
   const typed = prompt(t("Pour confirmer, écrivez {word}", { word }));
-  if ((typed || "").trim().toUpperCase() !== word) return typed == null ? null : t("Suppression annulée : le mot ne correspond pas.");
+  if ((typed || "").trim().toUpperCase() !== word) return typed == null ? null : t("Suppression annulée\u00a0: le mot ne correspond pas.");
   try {
     await deleteMyAccount();
     return null;
@@ -94,7 +87,19 @@ export function Switch({ id, checked, onChange, disabled, label }: { id: string;
 // ---------- the profile header ----------
 function PlanCard() {
   const plan = useStore((s) => s.plan);
-  if (!plan) return null;
+  const signedIn = useStore((s) => !!s.session);
+  // signed in, plan not read yet: the card's shell at its final height, so nothing shifts when it arrives
+  if (!plan)
+    return signedIn ? (
+      <div className="ac-plan is-wait" aria-busy="true">
+        <span className="ac-plan-main">
+          <span className="ac-plan-k">{t("Votre formule")}</span>
+          <span className="ac-plan-bar" aria-hidden="true" />
+          <small className="ac-wait">{t("Chargement…")}</small>
+        </span>
+        <span className="ac-plan-cta is-ghost" aria-hidden="true">{t("Voir les formules")}<IChev /></span>
+      </div>
+    ) : null;
   if (!plan.pro)
     return (
       <button type="button" className="ac-plan" onClick={() => requestPro("info")}>
@@ -179,7 +184,7 @@ function AlertRows() {
         htmlFor={id + "m"}
         icon={<IMail />}
         title={t("E-mail du matin")}
-        sub={t("Chaque jour du voyage vers 7 h 30 : la journée, les horaires, les lieux fermés.")}
+        sub={t("Chaque jour du voyage vers 7\u00a0h\u00a030\u00a0: la journée, les horaires, les lieux fermés.")}
         end={<Switch id={id + "m"} label={t("E-mail du matin")} checked={prefs.email} onChange={(v) => setAlertPrefs({ email: v })} />}
       />
       <Row
@@ -210,10 +215,12 @@ function Forwarding({ home }: { home?: boolean }) {
   const copy = () => {
     if (!addr) return;
     const done = () => toast(t("Adresse copiée"));
-    if (navigator.clipboard) void navigator.clipboard.writeText(addr).then(done, () => toast(t("Copie impossible\u00a0: sélectionnez l'adresse à la main.")));
+    const fail = () => toast(t("Copie impossible\u00a0: sélectionnez l'adresse à la main."));
+    if (navigator.clipboard?.writeText) void navigator.clipboard.writeText(addr).then(done, fail);
+    else fail();
   };
   return (
-    <Group label={t("Transfert des réservations")} foot={t("Envoyez à cette adresse vos confirmations de vol, d'hôtel ou de réservation : elles arrivent dans le voyage, prêtes à être ajoutées.")}>
+    <Group label={t("Transfert des réservations")} foot={t("Envoyez à cette adresse vos confirmations de vol, d'hôtel ou de réservation\u00a0: elles arrivent dans le voyage, prêtes à être ajoutées.")}>
       <div className="ac-row ac-fwd">
         <span className="ac-ico"><IForward /></span>
         <span className="ac-txt">
@@ -261,7 +268,7 @@ const pwError = (m: string) =>
       : /reauth|nonce|recent/i.test(m)
         ? t("Par sécurité, déconnectez-vous puis reconnectez-vous avant de changer le mot de passe.")
         : /fetch|network|failed to/i.test(m)
-          ? t("Pas de connexion au serveur. Vérifiez le réseau (en Chine : eSIM, itinérance ou VPN).")
+          ? t("Pas de connexion au serveur. Vérifiez le réseau (en Chine\u00a0: eSIM, itinérance ou VPN).")
           : t("Le mot de passe n'a pas pu être enregistré. Réessayez.");
 
 function PasswordRow() {
@@ -272,7 +279,6 @@ function PasswordRow() {
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
   const first = useRef<HTMLInputElement>(null);
   const id = useId();
   useEffect(() => {
@@ -288,14 +294,13 @@ function PasswordRow() {
     setErr(null);
     if (pw.length < MIN_PW) return setErr(t("{n} caractères minimum.", { n: MIN_PW }));
     if (pw !== pw2) return setErr(t("Les deux mots de passe ne correspondent pas."));
-    if (!supabase) return setErr(t("Pas de connexion au serveur. Vérifiez le réseau (en Chine : eSIM, itinérance ou VPN)."));
+    if (!supabase) return setErr(t("Pas de connexion au serveur. Vérifiez le réseau (en Chine\u00a0: eSIM, itinérance ou VPN)."));
     setBusy(true);
     try {
       const { error } = await supabase.auth.updateUser({ password: pw });
       if (error) return setErr(pwError(error.message || ""));
       reset();
       setOpen(false);
-      setSaved(true);
       toast(t("Mot de passe enregistré"));
     } catch (e) {
       setErr(pwError((e as Error).message || ""));
@@ -316,7 +321,7 @@ function PasswordRow() {
         className={open ? "is-open" : ""}
         icon={<ILock />}
         title={t("Mot de passe")}
-        sub={saved ? t("Enregistré. Utilisez-le à votre prochaine connexion.") : t("Pour vous connecter avec votre e-mail et un mot de passe. Les comptes créés avec un lien n'en ont pas encore.")}
+        sub={open ? undefined : t("Connectez-vous avec votre e-mail et ce mot de passe. Vous utilisiez un lien\u00a0? Définissez-en un ici.")}
         end={<span className="ac-end-k"><span>{open ? t("Fermer") : t("Définir ou modifier")}</span><IChev /></span>}
       />
       {open && (
@@ -370,8 +375,8 @@ function PrivacyRows({ signedIn }: { signedIn: boolean }) {
         />
       )}
       <Row onClick={() => exportMyData()} icon={<IDownload width={18} height={18} />} title={t("Exporter mes données")} sub={t("Votre profil et vos voyages, dans un fichier JSON.")} end={<IChev />} />
-      <Row href={legalHref("cgu")} icon={<IDoc />} title={t("Conditions")} end={<IChev />} />
-      <Row href={legalHref("confidentialite")} icon={<IShield />} title={t("Confidentialité")} end={<IChev />} />
+      <Row href={legalHref("cgu")} icon={<IDoc />} title={t("Conditions d'utilisation")} end={<IChev />} />
+      <Row href={legalHref("confidentialite")} icon={<IShield />} title={t("Politique de confidentialité")} end={<IChev />} />
       <Row href="mailto:hello@joinentity.com" icon={<IAt />} title={t("Contact")} sub="hello@joinentity.com" end={<IChev />} />
     </Group>
   );
@@ -401,19 +406,57 @@ function DeleteRow() {
   );
 }
 
+// ---------- this trip (the trip's panel): offline mode and exports, each behind its own row ----------
+/** The two tools of the open trip as settings rows that open onto their cards (OfflineCard, ExportPanel, unchanged) */
+export function TripRows({ offline, exports }: { offline: ReactNode; exports: ReactNode }) {
+  const st = useOffline();
+  // a download under way stays in view: its progress is what the person came for
+  const [open, setOpen] = useState<"offline" | "exports" | null>(st.state === "running" ? "offline" : null);
+  const toggle = (k: "offline" | "exports") => setOpen((v) => (v === k ? null : k));
+  const offState = st.state === "running" ? t("Téléchargement…") : st.state === "ready" ? t("Carte téléchargée sur ce téléphone") : t("Désactivé");
+  return (
+    <>
+      {offlineSupported && (
+        <>
+          <Row
+            onClick={() => toggle("offline")}
+            expanded={open === "offline"}
+            className={open === "offline" ? "is-open" : ""}
+            icon={<IOffline width={18} height={18} />}
+            title={t("Mode hors ligne")}
+            sub={offState}
+            end={<IChev />}
+          />
+          {open === "offline" && <div className="ac-trip-body">{offline}</div>}
+        </>
+      )}
+      <Row
+        onClick={() => toggle("exports")}
+        expanded={open === "exports"}
+        className={open === "exports" ? "is-open" : ""}
+        icon={<IDownload width={18} height={18} />}
+        title={t("Exports")}
+        sub={t("PDF, tableur, calendrier")}
+        end={<IChev />}
+      />
+      {open === "exports" && <div className="ac-trip-body">{exports}</div>}
+    </>
+  );
+}
+
 /**
  * The account, in order: who and which plan, this trip (the trip's panel only), alerts, forwarded bookings,
- * language, password, privacy, administration (admins), deletion, then signing out.
+ * language, password, privacy, administration (admins), signing out, then the sensitive zone (last, apart).
  * `variant`: "app" = the trip screen's "Compte" panel, "v3" = the account screen opened from "Mes voyages".
  */
-export function AccountSections({ variant = "v3", status, trip }: { variant?: "v3" | "app"; status?: ReactNode; trip?: ReactNode }) {
+export function AccountSections({ variant = "v3", status, trip, tripFoot }: { variant?: "v3" | "app"; status?: ReactNode; trip?: ReactNode; tripFoot?: ReactNode }) {
   const signedIn = useStore((s) => !!s.session);
   const admin = useStore((s) => !!s.plan?.admin);
   return (
     <div className={"ac is-" + variant}>
       <AccountHeader status={status} />
       {trip && (
-        <Group label={t("Ce voyage")} bare className="ac-trip">
+        <Group label={t("Ce voyage")} className="ac-trip" foot={tripFoot}>
           {trip}
         </Group>
       )}
@@ -424,19 +467,38 @@ export function AccountSections({ variant = "v3", status, trip }: { variant?: "v
       <PrivacyRows signedIn={signedIn} />
       {admin && (
         <Group label={t("Administration")} bare={false}>
-          <Row onClick={() => openAdmin(true)} icon={<IKey />} title={t("Administration")} sub={t("Comptes, codes Pro, coût de l'IA")} end={<IChev />} />
+          <Row onClick={() => openAdmin(true)} icon={<IKey />} title={t("Ouvrir la console")} sub={t("Comptes, codes Pro, coût de l'IA")} end={<IChev />} />
           {variant === "app" && <div className="ac-admin-credit"><AiCredit /></div>}
         </Group>
       )}
-      {signedIn && <DeleteRow />}
       {signedIn && (
         <button type="button" className="ac-signout" onClick={() => void signOutChecked()}>
           <IExit width={18} height={18} />
           {t("Se déconnecter")}
         </button>
       )}
+      {signedIn && <DeleteRow />}
     </div>
   );
+}
+
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([tabindex="-1"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+/** Tab stays inside the screen (aria-modal): from the last control back to the first, and the reverse */
+function loopFocus(e: KeyboardEvent<HTMLDivElement>) {
+  const box = e.currentTarget;
+  // events from a portal (the creation form) bubble here through React: only the screen's own controls loop
+  if (e.key !== "Tab" || !box.contains(e.target as Node)) return;
+  const all = [...box.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => el.getClientRects().length > 0);
+  if (!all.length) return;
+  const first = all[0];
+  const last = all[all.length - 1];
+  if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault();
+    first.focus();
+  }
 }
 
 /** The account as its own full screen over "Mes voyages": slides in, Escape or the phone's back closes it */
@@ -444,7 +506,12 @@ export default function AccountScreen({ onClose, status }: { onClose: () => void
   const [leaving, setLeaving] = useState(false);
   const back = useRef<HTMLButtonElement>(null);
   const timer = useRef(0);
+  const admin = useAdmin();
   const close = () => {
+    // Escape and the phone's back close what is on top first: the plans, the console, a trip being created from a booking
+    if (getState().proAsk) return closePro();
+    if (admin) return openAdmin(false);
+    if (document.querySelector(".rt-wizard")) return;
     if (leaving) return;
     const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     if (still) return onClose();
@@ -459,7 +526,7 @@ export default function AccountScreen({ onClose, status }: { onClose: () => void
     };
   }, []);
   return (
-    <div className={"v3 ac-screen" + (leaving ? " is-leaving" : "")} role="dialog" aria-modal="true" aria-label={t("Mon compte")}>
+    <div className={"v3 ac-screen" + (leaving ? " is-leaving" : "")} role="dialog" aria-modal="true" aria-label={t("Mon compte")} onKeyDown={loopFocus}>
       <div className="v3-bg" aria-hidden="true" />
       <div className="v3-col ac-col">
         <div className="v3-top ac-top">

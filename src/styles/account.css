@@ -18,7 +18,6 @@
 .ac-status .sync { font-size: 12px; }
 .ac-status .sync.idle i { box-shadow: none; }
 .ac-status .sync.syncing i { animation: none; }
-.ac-status-note { margin-top: 8px; font-size: 12.5px; line-height: 1.45; color: var(--mute); max-width: 46ch; }
 
 .ac-plan { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; padding: 16px 16px 16px 18px; border-radius: 18px; border: 1px solid var(--hair); background: rgba(246, 242, 234, 0.03); color: var(--ink);
   transition: border-color 0.25s var(--ease), background 0.25s var(--ease), transform 0.16s var(--ease); }
@@ -35,6 +34,10 @@
 .ac-plan.is-pro { border-color: rgba(216, 196, 126, 0.34); background: linear-gradient(180deg, rgba(216, 196, 126, 0.075), rgba(216, 196, 126, 0.012)); }
 .ac-plan.is-pro:hover { border-color: rgba(216, 196, 126, 0.5); }
 .ac-plan.is-pro .ac-plan-k, .ac-plan.is-pro .ac-plan-cta { color: var(--gold); }
+.ac-plan.is-wait { cursor: default; }
+.ac-plan.is-wait:hover { border-color: var(--hair); background: rgba(246, 242, 234, 0.03); }
+.ac-plan.is-wait:active { transform: none; }
+.ac-plan-bar { display: block; width: 92px; height: 20px; border-radius: 6px; background: rgba(246, 242, 234, 0.06); }
 .ac-promark { display: inline-flex; align-items: center; height: 22px; padding: 0 7px 0 9px; border: 1px solid rgba(216, 196, 126, 0.62); border-radius: 6px; font: 500 11px/1 var(--display); letter-spacing: 0.24em; color: var(--gold); }
 
 /* ---------- groups and rows ---------- */
@@ -78,17 +81,20 @@
 /* language */
 .ac-lang { align-items: center; flex-wrap: wrap; row-gap: 12px; }
 .ac-seg { margin: 0; padding: 3px; flex: none; }
-.ac-seg button { flex: none; height: 32px; padding: 0 13px; font-size: 13px; }
+.ac .ac-seg button { flex: none; height: 40px; padding: 0 13px; font-size: 13px; }
 
 /* forwarded bookings */
 .ac-fwd { align-items: center; }
 .ac-fwd .ac-ico { align-self: flex-start; }
 .ac-addr { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12px !important; color: var(--ink) !important; overflow-wrap: anywhere; user-select: all; -webkit-user-select: all; }
 .ac-wait { color: var(--mute) !important; }
-.ac-copy { flex: none; height: 34px; padding: 0 14px; font-size: 13px; }
+.ac-copy { position: relative; flex: none; height: 40px; padding: 0 16px; font-size: 13px; }
+.ac-copy::after { content: ""; position: absolute; inset: -4px; }
 .ac-empty, .ac-inbox-wait { position: relative; padding: 14px 16px 15px 48px; font-size: 13px; line-height: 1.4; color: var(--mute); }
 .ac-inbox { position: relative; padding: 4px 12px 12px; }
-.ac-empty::before, .ac-inbox-wait::before, .ac-inbox::before, .ac-pw::before, .ac-admin-credit::before { content: ""; position: absolute; top: 0; left: 48px; right: 0; height: 1px; background: rgba(246, 242, 234, 0.08); }
+.ac-empty::before, .ac-inbox-wait::before, .ac-inbox::before, .ac-pw::before, .ac-admin-credit::before, .ac-trip-body::before { content: ""; position: absolute; top: 0; left: 48px; right: 0; height: 1px; background: rgba(246, 242, 234, 0.08); }
+/* blocks that are not rows (a form, cards): the line runs across the block, aligned with what it holds */
+.ac-pw::before, .ac-inbox::before, .ac-admin-credit::before, .ac-trip-body::before { left: 16px; right: 16px; }
 .ac-inbox-h { padding: 12px 4px 2px 36px; font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--mute); }
 .ac-bk { display: flex; flex-direction: column; gap: 3px; margin-top: 10px; padding: 14px; border-radius: 14px; border: 1px solid var(--hair); background: rgba(246, 242, 234, 0.03); }
 .ac-bk.is-next { border-color: rgba(216, 196, 126, 0.34); background: linear-gradient(180deg, rgba(216, 196, 126, 0.06), rgba(216, 196, 126, 0.01)); }
@@ -102,25 +108,27 @@
 .ac-bk-parts svg { width: 16px; height: 16px; flex: none; margin-top: 1px; color: var(--mute); }
 .ac-bk-none { margin-top: 6px; font-size: 12.5px; line-height: 1.4; color: var(--mute); }
 .ac-bk-act { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-.ac-bk-act .v3-chip { height: 36px; padding: 0 14px; font-size: 13px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ac-bk-act .v3-chip { height: 44px; padding: 0 14px; font-size: 13px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* password */
 .ac-pw { position: relative; display: flex; flex-direction: column; gap: 10px; padding: 16px; animation: ac-in 0.34s var(--ease) both; }
 .ac-pw-f { min-height: 58px; }
 .ac-pw-f:has(input[aria-invalid="true"]) { border-color: rgba(238, 143, 143, 0.55); }
-.ac-pw-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; padding: 2px 2px 0; font-size: 12px; color: var(--mute); }
+.ac-pw-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 0 14px; margin: -6px 0; padding: 0 2px; font-size: 12px; color: var(--mute); }
 .ac-pw-rule { display: inline-flex; align-items: center; gap: 7px; transition: color 0.2s; }
 .ac-pw-rule i { width: 7px; height: 7px; border-radius: 50%; border: 1px solid currentColor; transition: background 0.2s; }
-.ac-pw-rule.ok { color: var(--ok); }
+.ac-pw-rule.ok { color: var(--ink); }
 .ac-pw-rule.ok i { background: currentColor; }
-.ac-pw-show { margin-left: auto; padding: 4px 0; font-size: 12.5px; color: var(--soft); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--hair-strong); }
+.ac-pw-show { margin-left: auto; min-height: 44px; display: inline-flex; align-items: center; padding: 0 4px; font-size: 12.5px; color: var(--soft); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--hair-strong); }
 .ac-pw .ac-err { padding: 0 2px; }
 .ac-pw-act { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; margin-top: 4px; }
 .ac-pw-act .v3-btn { height: 48px; font-size: 14.5px; border-radius: 14px; }
 
 /* this trip (the trip's panel): the offline card and the exports keep their own cards */
-.ac-trip .off-card { margin: 0; }
-.ac-sub { margin: 20px 4px 10px; font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--mute); }
+.ac-trip-body { position: relative; padding: 14px 12px 12px; animation: ac-in 0.34s var(--ease) both; }
+.ac-trip .off-card { margin: 0; border-radius: 14px; }
+.ac-trip .cards { gap: 8px; }
+.ac-trip .cards .card { border-radius: 14px; }
 .ac-admin-credit { position: relative; padding: 4px 16px 16px; }
 .ac-admin-credit > * { margin-top: 12px; }
 
@@ -138,7 +146,7 @@
   .ac-fwd .ac-txt { flex-basis: calc(100% - 32px); }
   .ac-fwd .ac-copy { margin-left: 32px; }
   .ac-seg { flex: 1 1 100%; }
-  .ac-seg button { flex: 1; }
+  .ac .ac-seg button { flex: 1; height: 44px; }
   .ac-plan { flex-wrap: wrap; row-gap: 12px; }
   .ac-plan-cta { width: 100%; justify-content: space-between; padding-top: 12px; border-top: 1px solid var(--hair); }
   .ac-plan.is-pro .ac-plan-cta { border-top-color: rgba(216, 196, 126, 0.22); }
@@ -150,9 +158,9 @@
 @keyframes ac-screen-in { 0% { opacity: 0; transform: translateX(28px); } 35% { opacity: 1; } 100% { opacity: 1; transform: none; } }
 @keyframes ac-screen-out { to { opacity: 0; transform: translateX(18px); } }
 .ac-col { padding-bottom: calc(var(--safe-b) + 40px); }
-.ac-top { position: sticky; top: 0; z-index: 3; margin: calc(-1 * (var(--safe-t) + 10px)) -20px 0; padding: calc(var(--safe-t) + 10px) 20px 0;
-  background: rgba(3, 3, 3, 0.86); -webkit-backdrop-filter: blur(18px) saturate(140%); backdrop-filter: blur(18px) saturate(140%);
-  box-shadow: 0 0 0 100vmax rgba(3, 3, 3, 0.86); clip-path: inset(0 -100vmax); }
+/* the bar stays in its column and fades out at its foot: the page slides under a soft edge, never under a band */
+.ac-top { position: sticky; top: 0; z-index: 3; margin: calc(-1 * (var(--safe-t) + 10px)) -20px -12px; padding: calc(var(--safe-t) + 10px) 20px 12px;
+  background: linear-gradient(rgba(3, 3, 3, 0.94) 62%, rgba(3, 3, 3, 0)); -webkit-backdrop-filter: none; backdrop-filter: none; }
 .ac-top-t { text-align: center; }
 
 /* staged entry: the header, then each group */
@@ -172,6 +180,12 @@
 .ac-av.is-pro { color: var(--gold); border-color: rgba(216, 196, 126, 0.6); box-shadow: 0 0 0 2px #030303, 0 0 0 3px rgba(216, 196, 126, 0.24); }
 
 @media (prefers-reduced-motion: reduce) {
-  .ac > *, .ac-pw, .ac-screen, .ac-screen.is-leaving { animation: none; }
+  .ac > *, .ac-pw, .ac-trip-body, .ac-screen, .ac-screen.is-leaving { animation: none; }
   .ac-chev, .ac-switch, .ac-switch::before { transition: none; }
 }
+
+/* the back button keeps the bar's 40 px look with a 44 px touch area */
+.ac-top .v3-tool { position: relative; }
+.ac-top .v3-tool::after { content: ""; position: absolute; inset: -3px; }
+/* the plan card waiting for the plan: the call to action keeps its place, unseen */
+.ac-plan-cta.is-ghost { visibility: hidden; }
