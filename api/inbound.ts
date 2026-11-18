@@ -49,7 +49,7 @@ export async function POST(req: Request): Promise<Response> {
   // the trip it most likely belongs to: the one under way, else the next one
   const today = new Date().toISOString().slice(0, 10);
   const mine = (await db(`/rest/v1/trip_members?user_id=eq.${owner.user_id}&select=trip_id,trips(id,data)`, key)) as { trip_id: string; trips: { id: string; data: Json } | null }[];
-  const trips = mine.map((m) => m.trips).filter((t): t is { id: string; data: Json } => !!t && t.id !== "sha-2026" && t.id !== "gz-2026");
+  const trips = mine.map((m) => m.trips).filter((t): t is { id: string; data: Json } => !!t);
   const during = trips.find((t) => String(t.data.start) <= today && String(t.data.end) >= today);
   const next = trips.filter((t) => String(t.data.start) > today).sort((a, b) => String(a.data.start).localeCompare(String(b.data.start)))[0];
   const trip = during || next || null;

@@ -13,7 +13,6 @@ const tel = (n: string) => `tel:${n.replace(/[^\d+]/g, "")}`;
 /** Emergency sheet: works without network (everything is in the page). */
 export default function Emergency({ trip }: { trip: Trip }) {
   const canEdit = useCanEdit();
-  const member = useStore((s) => s.member);
   const em = trip.emergency;
   const fix = useLoc((s) => s.fix);
   const ins = (useStore((s) => s.data.places["_info:insurance"]) || {}) as Record<string, string>;
@@ -87,7 +86,7 @@ export default function Emergency({ trip }: { trip: Trip }) {
 
       </>)}
       <section className="em-sec">
-        <span className="label">{member === true ? t("Assurance voyage · partagée avec votre père") : t("Assurance voyage")}</span>
+        <span className="label">{t("Assurance voyage")}</span>
         <fieldset className="card em-card" disabled={!canEdit} style={{ margin: 0, minWidth: 0 }}>
           <label className="field"><span>{t("Assureur")}</span><SavedInput value={ins.insurer || ""} placeholder={t("ex. AXA Assistance, carte Visa Premier…")} onSave={setIns("insurer")} /></label>
           <label className="field"><span>{t("N° de contrat")}</span><SavedInput value={ins.policy || ""} onSave={setIns("policy")} /></label>

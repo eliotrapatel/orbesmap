@@ -47,7 +47,7 @@ async function account(token: string): Promise<{ email: string; member: boolean 
 
 /** AI requests per 24 h for a free account, and for a Pro account (the shared space has no cap) */
 const DAILY_CAP = Number(process.env.AI_FREE_DAILY_CAP) || 25;
-const PRO_CAP = Number(process.env.AI_PRO_DAILY_CAP) || 120;
+const PRO_CAP = Number(process.env.AI_PRO_DAILY_CAP) || 400;
 /** Requests per 24 h for the whole service outside the shared space (a ceiling on total spending) */
 const GLOBAL_CAP = Number(process.env.AI_GLOBAL_DAILY_CAP) || 1500;
 type Booking = { id: number } | { refused: "cap" | "pro" | "prep" | "auth" | "error" };
@@ -740,6 +740,10 @@ export async function handle(req: Request, deps: Deps = {}): Promise<Response> {
     ? (await deps.member(token).catch(() => false)) ? { email: "membre", member: true } : false
     : await account(token).catch(() => false as const);
   if (!acc) return json({ error: "auth", message: "Session expirée : reconnectez-vous dans l'onglet Compte." }, 401, origin);
+  // the first shared space is now a normal account: same instructions, same limits, same languages as everyone;
+  // its members only keep the AI balance screen (their spending history)
+  const legacy = acc.member;
+  const member = false;
   const by = acc.email ? acc.email.split("@")[0] : "membre";
   const f = deps.fetch || fetch;
 
@@ -759,8 +763,9 @@ export async function handle(req: Request, deps: Deps = {}): Promise<Response> {
   // accounts outside the first shared space: each request is booked first (daily cap per account and for the
   // whole service; everything is free for now, the AI is not)
   let booked: number | null = null;
-  if (!acc.member) {
-    if (body.task === "balance") return json({ error: "auth", message: "Réservé à l'espace partagé." }, 403, origin);
+  if (body.task === "balance") {
+    if (!legacy) return json({ error: "auth", message: "Réservé à l'administrateur." }, 403, origin);
+  } else {
     if (body.task === "ask" && typeof body.context === "string" && body.context.length > 150_000) return json({ error: "bad", message: "Carnet trop gros pour une question." }, 400, origin);
     const tripId = body.trip && typeof body.trip === "object" && typeof (body.trip as Json).id === "string" ? String((body.trip as Json).id).slice(0, 64) : null;
     const b = await reserve(token, String(body.task || ""), tripId, f);
@@ -815,19 +820,19 @@ export async function handle(req: Request, deps: Deps = {}): Promise<Response> {
   let job: Job;
   if (body.task === "photo") {
     if (!b64ok(body.image)) return json({ error: "bad", message: "Image manquante ou trop lourde." }, 400, origin);
-    job = { task: "photo", system: acc.member ? PHOTO_SYSTEM : photoSystem(personaOf(body)), text: "Traduis et explique cette photo.", image: body.image, schema: PHOTO_SCHEMA, effort: "medium", maxTokens: 8000 };
+    job = { task: "photo", system: member ? PHOTO_SYSTEM : photoSystem(personaOf(body)), text: "Traduis et explique cette photo.", image: body.image, schema: PHOTO_SCHEMA, effort: "medium", maxTokens: 8000 };
   } else if (body.task === "interpret") {
     const text = String(body.text || "").slice(0, 2000).trim();
     const from = body.from === "zh" ? "zh" : "fr";
     if (!text) return json({ error: "bad", message: "Rien à traduire." }, 400, origin);
     const history = Array.isArray(body.history) ? (body.history as { from: string; text: string; translation: string }[]).slice(-6) : [];
     // the members' trips are in China (unchanged); an account's trip speaks its own language
-    const lang = acc.member ? { code: "zh-cn", name: "chinois" } : langOf(body);
+    const lang = member ? { code: "zh-cn", name: "chinois" } : langOf(body);
     const Lang = lang.name.charAt(0).toUpperCase() + lang.name.slice(1);
     const ctx = history.length ? `Échanges précédents (contexte) :\n${history.map((h) => `${h.from === "zh" ? Lang : "Français"} : ${String(h.text).slice(0, 300)} → ${String(h.translation).slice(0, 300)}`).join("\n")}\n\n` : "";
-    const en = !acc.member && englishAccount(body);
+    const en = !member && englishAccount(body);
     // an English-speaking account: the interpreter works between English and the local language
-    const sys = acc.member ? INTERPRET_SYSTEM : interpretSystem(personaOf(body), lang);
+    const sys = member ? INTERPRET_SYSTEM : interpretSystem(personaOf(body), lang);
     const isys = en ? sys.replace(/francophone/g, "anglophone").replace(/[Dd]u français/g, "De l'anglais").replace(/vers le français/g, "vers l'anglais").replace(/français naturel/g, "anglais naturel") : sys;
     job = { task: "interpret", system: isys, text: `${ctx}Traduis ${from === "fr" ? `${en ? "de l'anglais" : "du français"} vers le ${lang.name}` : `du ${lang.name} vers ${en ? "l'anglais" : "le français"}`} :\n${text}`, schema: INTERPRET_SCHEMA, effort: "low", maxTokens: 2000 };
   } else if (body.task === "place") {
@@ -840,8 +845,8 @@ export async function handle(req: Request, deps: Deps = {}): Promise<Response> {
     const known = Array.isArray(body.known) ? (body.known as unknown[]).slice(0, 120).map((x) => String(x).slice(0, 60)).join(", ") : "";
     job = {
       task: "place",
-      system: acc.member ? PLACE_SYSTEM : placeSystem(personaOf(body)),
-      text: `Demande ${acc.member ? "d'Eliot" : `de ${personaOf(body).name}`} :${url ? `\nLien : ${url}` : ""}${text ? `\nTexte : ${text}` : ""}${image ? "\n(Capture d'écran jointe.)" : ""}${nearTxt}${known ? `\nDéjà dans son programme : ${known}` : ""}`,
+      system: member ? PLACE_SYSTEM : placeSystem(personaOf(body)),
+      text: `Demande ${member ? "d'Eliot" : `de ${personaOf(body).name}`} :${url ? `\nLien : ${url}` : ""}${text ? `\nTexte : ${text}` : ""}${image ? "\n(Capture d'écran jointe.)" : ""}${nearTxt}${known ? `\nDéjà dans son programme : ${known}` : ""}`,
       image,
       schema: PLACES_SCHEMA,
       effort: "medium",
@@ -868,9 +873,9 @@ export async function handle(req: Request, deps: Deps = {}): Promise<Response> {
       field("why", 300) && `Pourquoi il l'a ajouté : ${field("why", 300)}`,
       field("hours") && `Horaires notés : ${field("hours")}`,
       field("source", 500) && `Source : ${field("source", 500)}`,
-      field("note", 500) && `Note ${acc.member ? "d'Eliot" : "du voyageur"} : ${field("note", 500)}`,
+      field("note", 500) && `Note ${member ? "d'Eliot" : "du voyageur"} : ${field("note", 500)}`,
     ].filter(Boolean).join("\n");
-    job = { task: "enrich", system: acc.member ? ENRICH_SYSTEM : enrichSystem(personaOf(body)), text: `Lieu à décrire :\n${known}`, schema: ENRICH_SCHEMA, example: ENRICH_EXAMPLE, effort: "medium", research: true, maxTokens: 6000 };
+    job = { task: "enrich", system: member ? ENRICH_SYSTEM : enrichSystem(personaOf(body)), text: `Lieu à décrire :\n${known}`, schema: ENRICH_SCHEMA, example: ENRICH_EXAMPLE, effort: "medium", research: true, maxTokens: 6000 };
   } else if (["extract", "intake", "outline", "day", "adjust", "essentials"].includes(String(body.task))) {
     const p = personaOf(body);
     const head = tripLines(body, p);
@@ -907,11 +912,11 @@ export async function handle(req: Request, deps: Deps = {}): Promise<Response> {
     const history = Array.isArray(body.history) ? (body.history as { q: string; a: string; at?: string }[]).slice(-8) : [];
     const past = history.length ? `Échange précédent :\n${history.map((h) => `Q${h.at ? ` (${String(h.at).slice(0, 40)})` : ""} : ${String(h.q).slice(0, 500)}\nR : ${String(h.a).slice(0, 1500)}`).join("\n")}\n\n` : "";
     // the notebook (stable between questions) goes first so the provider can cache it; the live part goes with the question
-    job = { task: "ask", system: `${acc.member ? ASK_SYSTEM : askSystem(personaOf(body))}\n\nCARNET (JSON) :\n${context}`, text: `MAINTENANT (JSON) : ${live || "{}"}\n\n${past}Question : ${question}`, schema: ASK_SCHEMA, effort: "medium", maxTokens: 3000 };
+    job = { task: "ask", system: `${member ? ASK_SYSTEM : askSystem(personaOf(body))}\n\nCARNET (JSON) :\n${context}`, text: `MAINTENANT (JSON) : ${live || "{}"}\n\n${past}Question : ${question}`, schema: ASK_SCHEMA, effort: "medium", maxTokens: 3000 };
   } else return json({ error: "bad", message: "Tâche inconnue." }, 400, origin);
   // an English-speaking account (profile language "en"): every text written for the traveller comes back in English
   // (the shared space keeps French; the instructions themselves stay in French)
-  if (!acc.member && englishAccount(body) && job.task !== "interpret") job.system += EN_ANSWER;
+  if (!member && englishAccount(body) && job.task !== "interpret") job.system += EN_ANSWER;
 
   try {
     // always answer (with CORS headers) before Vercel cuts the function at 300 s
@@ -930,7 +935,7 @@ export async function handle(req: Request, deps: Deps = {}): Promise<Response> {
           void mine;
         }
       }
-      if (!acc.member || provider !== "deepseek" || usage.hit + usage.miss + usage.out + usage.search + usage.fetch === 0) return;
+      if (!legacy || provider !== "deepseek" || usage.hit + usage.miss + usage.out + usage.search + usage.fetch === 0) return;
       const p = logUsage(token, { at: started, task: job.task, by, model: DS_MODEL, ...usage, usd: Math.round(usage.usd * 1e6) / 1e6, ok, ms: Date.now() - started }, f);
       try {
         if (deps.fetch) void p; // tests

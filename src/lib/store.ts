@@ -1167,7 +1167,7 @@ function migrate(tripId: string, pinsSynced: boolean) {
   });
   // the trips of the code belong to the first shared space: only its members send their records (an account
   // outside it keeps them on this phone; members' records are also sent by the next sync, see pull)
-  if (TRIP_BY_ID[tripId] && state.member !== true) return;
+  if (TRIP_BY_ID[tripId] && state.member !== true && !["owner", "editor"].includes(state.roles[tripId] || "")) return;
   ids.forEach((id) => enqueue({ t: "def", trip: tripId, id }));
 }
 

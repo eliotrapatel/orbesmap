@@ -13,8 +13,7 @@ export default function ShareTrip({ onClose }: { onClose: () => void }) {
   const me = useStore((s) => s.session?.user.id);
   const myName = useStore((s) => (s.profile.name as string) || "");
   const myRole = useStore((s) => s.roles[trip.id]);
-  const legacy = trip.id === "sha-2026" || trip.id === "gz-2026";
-  const canManage = !legacy && myRole === "owner";
+  const canManage = myRole === "owner";
   const [list, setList] = useState<Person[]>([]);
   const [pending, setPending] = useState<Invite[]>([]);
   const [email, setEmail] = useState("");
@@ -104,8 +103,7 @@ export default function ShareTrip({ onClose }: { onClose: () => void }) {
       {canManage && <PublicLink tripId={trip.id} title={trip.title} />}
 
       <p className="v3-lbl" style={{ marginTop: 22 }}>{t("Voyageurs")}</p>
-      {legacy && <p className="v3-note">{t("Ce voyage est partagé entre vous deux depuis le début. Inviter d'autres personnes sera possible plus tard ; vos nouveaux voyages, eux, se partagent dès maintenant.")}</p>}
-      {!legacy && !list.length && !err && <p className="v3-note">{t("Vous seul pour l'instant.")}</p>}
+      {!list.length && !err && <p className="v3-note">{t("Vous seul pour l'instant.")}</p>}
       {list.map((p) => (
         <div key={p.user_id} className="v3-card on" style={{ cursor: "default" }}>
           <span className="v3-grow"><b>{p.name || p.email.split("@")[0]}{p.user_id === me ? t(" (vous)") : ""}</b><small>{p.email}</small></span>

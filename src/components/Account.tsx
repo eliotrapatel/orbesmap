@@ -34,7 +34,7 @@ export function SyncBadge() {
 
 export default function Account() {
   const session = useStore((s) => s.session);
-  const member = useStore((s) => s.member);
+  const admin = useStore((s) => !!s.plan?.admin);
   const pending = useStore((s) => s.pending);
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -60,15 +60,11 @@ export default function Account() {
     return (
       <div>
         <div className="card">
-          <h4>{member === false ? t("Votre compte") : t("Espace partagé")}</h4>
+          <h4>{t("Votre compte")}</h4>
           <p style={{ marginTop: 6 }}>{t("Connecté avec {email}", { email: session.user.email })}</p>
           <div style={{ marginTop: 14 }}><SyncBadge /></div>
-          {member === false ? (
             <p style={{ marginTop: 14 }}>{t("Vos voyages sont sauvegardés en ligne et partagés avec les personnes que vous invitez. Ils restent aussi sur cet appareil pour fonctionner sans réseau.")}</p>
-          ) : (
-            <p style={{ marginTop: 14 }}>{t("Vos données sont sauvegardées en ligne et partagées en direct avec les autres membres. Elles restent aussi sur cet appareil pour fonctionner sans réseau.")}</p>
-          )}
-          {member !== false && <AiCredit />}
+          {admin && <AiCredit />}
           <InboundInbox />
           <AccountActions variant="app" />
           <button

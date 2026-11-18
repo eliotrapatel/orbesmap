@@ -3,7 +3,6 @@
 // - around 7:30 local time on a trip day: the day by e-mail (Resend) and as a notification, with the places closed that day;
 // - 30 minutes before each place at a set time: a notification (Web Push).
 // Needs on Vercel: SUPABASE_SERVICE_ROLE_KEY, VAPID_PRIVATE_KEY, RESEND_API_KEY (MAIL_FROM optional).
-// The two trips of the first shared space are written in the code, not on the server: they get no alerts.
 import webpush from "web-push";
 
 type Json = Record<string, unknown>;
@@ -97,8 +96,8 @@ async function run(req: Request): Promise<Response> {
   const today = now.toISOString().slice(0, 10);
   const sent = { emails: 0, pushes: 0, gone: 0 };
 
-  // trips happening around now (the shared space's two trips are not on the server)
-  const trips = ((await db("/rest/v1/trips?select=id,data&id=not.in.(sha-2026,gz-2026)", key)) as { id: string; data: Json }[]).filter((t) => {
+  // trips happening around now
+  const trips = ((await db("/rest/v1/trips?select=id,data", key)) as { id: string; data: Json }[]).filter((t) => {
     const s = String(t.data.start || "");
     const e = String(t.data.end || "");
     return s && e && s <= addDays(today, 1) && e >= addDays(today, -1);

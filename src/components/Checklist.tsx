@@ -5,13 +5,14 @@ import { toast, updateRecord, useCanEdit, useStore } from "../lib/store";
 import { localDate } from "../lib/time";
 import { ICheck, IPlus, ITrash } from "./Icons";
 import { locale, t } from "../lib/i18n";
+import { travellersOf } from "../lib/business";
 
 type Item = { id: string; text: string; due?: string; group?: string; owner?: string; done?: boolean; deleted?: boolean; custom?: boolean; order?: number };
-const OWNERS = [
-  { key: "eliot", label: "Eliot" },
-  { key: "papa", label: "Papa" },
-  { key: "both", label: "Les deux" },
-];
+/** Who an item is for: each traveller of the trip, or everyone (keys are the names in lower case: "eliot", "papa"…) */
+const ownersOf = (trip: Trip) => {
+  const people = travellersOf(trip);
+  return [...people.map((p) => ({ key: p.toLowerCase(), label: p })), { key: "both", label: people.length > 2 ? "Tous" : "Les deux" }];
+};
 const fmtDue = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString(locale(), { day: "numeric", month: "short" });
 
 /** Shared departure checklist: who does what before when. Synced live between Eliot and his father. */
@@ -31,6 +32,9 @@ export default function Checklist({ trip }: { trip: Trip }) {
   // readers of a shared trip see the list without changing it
   const canEdit = useCanEdit();
   const items = useChecklist(trip);
+  useStore((s) => s.trips[trip.id]);
+  const OWNERS = ownersOf(trip);
+  const people = travellersOf(trip);
   const [text, setText] = useState("");
   const [who, setWho] = useState<string>("all");
   const today = localDate(Intl.DateTimeFormat().resolvedOptions().timeZone);
@@ -54,12 +58,12 @@ export default function Checklist({ trip }: { trip: Trip }) {
       <div className="ck-head">
         <div>
           <b>{left.length ? t("{n} à faire", { n: left.length }) : t("Tout est prêt")}</b>
-          <span>{t("{done} / {total} faites · partagée avec votre père", { done: items.length - left.length, total: items.length })}</span>
+          <span>{people.length > 1 ? t("{done} / {total} faites · partagée avec les voyageurs du voyage", { done: items.length - left.length, total: items.length }) : t("{done} / {total} faites", { done: items.length - left.length, total: items.length })}</span>
         </div>
         <div className="bar"><span style={{ width: `${items.length ? ((items.length - left.length) / items.length) * 100 : 0}%` }} /></div>
       </div>
       <div className="seg" role="group" aria-label={t("Filtrer par personne")} style={{ margin: "14px 0 6px" }}>
-        {[{ key: "all", label: "Tout" }, ...OWNERS.slice(0, 2)].map((o) => (
+        {[{ key: "all", label: "Tout" }, ...OWNERS.slice(0, -1)].map((o) => (
           <button key={o.key} className={who === o.key ? "on" : ""} style={{ ["--c" as string]: "var(--ink)" }} aria-pressed={who === o.key} onClick={() => setWho(o.key)}>{t(o.label)}</button>
         ))}
       </div>

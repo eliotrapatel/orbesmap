@@ -45,7 +45,7 @@ export function enrichPlace(id: string, auto = false): Promise<void> {
   // a validated trip's sheets are part of its programme: Pro (the screen opens when asked by hand)
   if (auto ? programmeLocked() : needPro()) return chain;
   const st = getState();
-  if (auto && (!navigator.onLine || !st.session || !st.member)) return chain;
+  if (auto && (!navigator.onLine || !st.session)) return chain;
   // queued: busy with no start time yet
   set(id, { busy: true, startedAt: 0, err: null });
   chain = chain.then(() => run(id));

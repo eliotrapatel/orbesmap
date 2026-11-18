@@ -85,7 +85,7 @@ function Screen() {
   // a phone that already holds trips opens on them at once (the session is checked in the background)
   if (supabase && !authReady && !hasLocalData && !trips.length) return splash;
   if (supabase && authReady && !session && !hasLocalData) return <Welcome />;
-  if (session && member === false && !profile.onboardedAt) return <Onboarding />;
+  if (session && member !== null && !profile.onboardedAt) return <Onboarding />;
   // "Copier ce voyage" asked before signing in: back to that programme, its copy sheet open
   if (session) {
     const pending = takeRememberedCopy();
