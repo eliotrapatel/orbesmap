@@ -3,6 +3,7 @@
 import { supabase } from "./supabase";
 import { track } from "./track";
 import { t } from "./i18n";
+import { toast } from "./store";
 
 export type Person = { user_id: string; email: string; name: string; role: "owner" | "editor" | "viewer" };
 export type Invite = { email: string; role: "editor" | "viewer"; created_at: string };
@@ -60,3 +61,27 @@ export const inviteMessage = (tripTitle: string, inviter: string) =>
   inviter
     ? t("{inviter} vous invite à rejoindre le voyage « {title} » sur ORBES Trips. Ouvrez https://orbesmap.vercel.app et connectez-vous avec cette adresse e-mail : le voyage apparaîtra dans « Mes voyages ».", { inviter, title: tripTitle })
     : t("Vous êtes invité à rejoindre le voyage « {title} » sur ORBES Trips. Ouvrez https://orbesmap.vercel.app et connectez-vous avec cette adresse e-mail : le voyage apparaîtra dans « Mes voyages ».", { title: tripTitle });
+
+/** Sends the invitation message by the phone's share sheet when there is one, else copies it
+ * (the same way as "Partager" → "Envoyer l'invitation"). `to` names the person in the copy notice. */
+export async function sendInviteMessage(tripTitle: string, inviter: string, to: string) {
+  const msg = inviteMessage(tripTitle, inviter);
+  try {
+    if (navigator.share) {
+      await navigator.share({ title: `ORBES Trips · ${tripTitle}`, text: msg });
+      return;
+    }
+  } catch (e) {
+    // closed by the user: nothing to do; any other failure: the message is copied instead
+    if ((e as Error)?.name === "AbortError") return;
+  }
+  try {
+    await navigator.clipboard.writeText(msg);
+    toast(t("Message copié : envoyez-le à {to}", { to }));
+  } catch {
+    toast(t("Copie impossible : sélectionnez le message à la main"));
+  }
+}
+/** The same invitation message, ready in WhatsApp (the person is chosen there) */
+export const whatsappInviteUrl = (tripTitle: string, inviter: string) =>
+  `https://wa.me/?text=${encodeURIComponent(inviteMessage(tripTitle, inviter))}`;
