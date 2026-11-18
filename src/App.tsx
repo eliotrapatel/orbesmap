@@ -505,7 +505,7 @@ export default function App() {
             <div className="sheet-grip" {...side.handlers} role="button" aria-label="Agrandir ou réduire la liste" />
             <div className="side-head" {...side.handlers}>
               <span className="label">{trip.subtitle}</span>
-              <div style={{ fontSize: 22, fontWeight: 500, letterSpacing: "-0.02em", marginTop: 4 }}>{trip.title}</div>
+              <div className="side-title">{trip.title}</div>
               <div style={{ fontSize: 12.5, color: "var(--soft)" }}>
                 {trip.dateLabel} · {trip.hotel.name}
               </div>

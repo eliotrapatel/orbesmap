@@ -1066,3 +1066,92 @@ button.pl-day:hover { border-color: var(--hair-strong); background: rgba(246, 24
 .v3-x { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; color: var(--mute); flex: none; }
 .v3-x:hover { color: var(--ink); background: rgba(246, 242, 234, 0.06); }
 .v3-msg p { margin: 0; }
+
+/* =================== v3 « Vault » everywhere (lot 5): the map app speaks the same language as the welcome,
+   my trips and the creation screens: Gravesend capitals for titles, deeper glass, larger radii, ivory buttons =================== */
+:root { --r-lg: 22px; --r-md: 16px; --glass: rgba(16, 15, 14, 0.7); --glass-strong: rgba(10, 10, 9, 0.9); }
+body { background: #030303; }
+.glass { background: linear-gradient(180deg, rgba(246, 242, 234, 0.035), transparent 120px), var(--glass); backdrop-filter: blur(26px) saturate(160%); -webkit-backdrop-filter: blur(26px) saturate(160%); }
+/* titles */
+.side-title { font: 500 26px/0.98 var(--display); text-transform: uppercase; letter-spacing: 0.005em; margin-top: 8px; text-wrap: balance; }
+.side-head > div:last-child { margin-top: 6px; font-size: 12.5px; color: var(--soft); }
+.detail h2 { font-family: var(--display); text-transform: uppercase; font-size: clamp(27px, 7.4vw, 34px); line-height: 0.98; letter-spacing: 0.005em; margin-top: 12px; }
+.drawer-head h3 { font: 500 22px/1 var(--display); text-transform: uppercase; letter-spacing: 0.01em; }
+.ag-title h4 { font: 500 16px/1.05 var(--display); text-transform: uppercase; letter-spacing: 0.02em; }
+.ag-date b { font-weight: 200; }
+.next b { font: 500 17px/1.05 var(--display); text-transform: uppercase; letter-spacing: 0.01em; margin-top: 2px; }
+.card h4, .menu-item b { letter-spacing: -0.005em; }
+.label { letter-spacing: 0.24em; }
+/* surfaces */
+.next { border-radius: var(--r-md); background: radial-gradient(120% 140% at 100% 0%, rgba(216, 196, 126, 0.1), transparent 60%), linear-gradient(135deg, rgba(246, 242, 234, 0.07), rgba(246, 242, 234, 0.015)); }
+.card { border-radius: var(--r-md); background: rgba(246, 242, 234, 0.03); }
+.menu { border-radius: 18px; padding: 8px; }
+.menu-item { border-radius: 12px; }
+.topbar { border-radius: 18px; }
+.day { border-radius: 14px; }
+.driver { border-radius: 18px; }
+.action { border-radius: 14px; height: 62px; }
+.detail-hero { padding: 16px 22px 22px; }
+/* buttons: the ivory pill of the welcome screens */
+.btn { height: 50px; border-radius: 15px; font-size: 14.5px; }
+.btn.primary { font-weight: 600; }
+.btn.primary:hover { background: #fffaf2; }
+.btn:active, .btn-sm:active, .fchip:active, .action:active { transform: scale(0.97); }
+.btn-sm { height: 32px; padding: 0 13px; }
+.fchip { height: 32px; padding: 0 13px; font-size: 12.5px; }
+.sheet-grip::before { width: 36px; background: rgba(246, 242, 234, 0.3); }
+
+/* =================== v3 public page (lot 5): the welcome screen, then how it works, an example day, features, price, questions =================== */
+.v3-toplink { font-size: 13px; color: var(--soft); padding: 8px 2px 8px 10px; font-family: var(--font); text-transform: none; letter-spacing: 0; }
+.v3-toplink:hover { color: var(--ink); }
+.v3-public .v3-brand { width: 100%; }
+.pub-hero { display: flex; flex-direction: column; min-height: calc(100svh - 70px - var(--safe-t)); }
+.pub-hero-text { flex: 1; display: flex; flex-direction: column; }
+.pub-hero-text .v3-vp { margin-top: auto; padding-top: 0; }
+.pub-hero-text .v3-lead { margin-bottom: 26px; }
+.pub-hero-card { display: flex; flex-direction: column; }
+.pub-more { margin-top: 14px; text-decoration: none; }
+.pub-sec { padding: 64px 0 0; }
+.pub-h2 { font-size: clamp(28px, 8vw, 40px); margin: 12px 0 0; }
+.pub-sec .v3-lead { margin-top: 14px; }
+.pub-steps { list-style: none; margin: 26px 0 0; padding: 0; display: grid; gap: 10px; }
+.pub-steps li { padding: 18px 18px 18px; border: 1px solid var(--hair); border-radius: 20px; background: rgba(246, 242, 234, 0.025); }
+.pub-steps b { display: block; font: 500 17px/1.05 var(--display); text-transform: uppercase; margin-top: 12px; }
+.pub-steps p { color: var(--soft); font-size: 14px; margin-top: 6px; line-height: 1.45; }
+.pub-n { font: 500 11px/1 var(--display); color: var(--gold); letter-spacing: 0.14em; }
+.pub-day { margin-top: 24px; }
+.pub-day .v3-chip { pointer-events: none; display: inline-flex; align-items: center; }
+.pub-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; margin-top: 24px; border: 1px solid var(--hair); border-radius: 20px; overflow: hidden; background: var(--hair); }
+.pub-feat { padding: 16px; background: #070707; }
+.pub-feat b { display: block; font-weight: 500; font-size: 14.5px; }
+.pub-feat p { color: var(--mute); font-size: 12.5px; margin-top: 4px; line-height: 1.4; }
+.pub-free { text-align: left; }
+.pub-faq { margin-top: 14px; border-top: 1px solid var(--hair); }
+.pub-faq details { border-bottom: 1px solid var(--hair); }
+.pub-faq summary { list-style: none; cursor: pointer; padding: 17px 30px 17px 0; position: relative; font-size: 15px; }
+.pub-faq summary::-webkit-details-marker { display: none; }
+.pub-faq summary::after { content: "+"; position: absolute; right: 4px; top: 14px; font-size: 20px; color: var(--soft); transition: transform 0.25s var(--ease); }
+.pub-faq details[open] summary::after { transform: rotate(45deg); }
+.pub-faq p { color: var(--soft); font-size: 14px; padding: 0 0 18px; line-height: 1.5; max-width: 60ch; }
+.pub-end { padding-bottom: 12px; display: flex; flex-direction: column; gap: 22px; }
+.pub-end .v3-fine { margin-top: 18px; }
+@media (max-width: 359px) { .pub-grid { grid-template-columns: 1fr; } }
+@media (min-width: 900px) {
+  .v3-public .v3-col { max-width: 1120px; padding-left: 40px; padding-right: 40px; }
+  .v3-public .v3-ring { left: 10%; width: 90%; top: 40px; }
+  .pub-hero { display: grid; grid-template-columns: 1.15fr 420px; gap: 72px; align-items: center; min-height: calc(100vh - 90px); }
+  .pub-hero-text .v3-h1 { font-size: 64px; }
+  .pub-hero-text .v3-lead { font-size: 17px; max-width: 40ch; }
+  .pub-hero-text .v3-vp { margin-top: 36px; max-width: 460px; }
+  .pub-sec { padding-top: 120px; }
+  .pub-h2 { font-size: 48px; max-width: 24ch; }
+  .pub-steps { grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .pub-steps li { padding: 24px; }
+  .pub-demo { display: grid; grid-template-columns: 1fr 460px; gap: 72px; align-items: center; }
+  .pub-day { margin-top: 0; }
+  .pub-grid { grid-template-columns: repeat(3, 1fr); }
+  .pub-feat { padding: 22px; }
+  .pub-faq { max-width: 760px; }
+  .pub-end { align-items: center; text-align: center; padding-top: 140px; }
+  .pub-end .v3-btn { max-width: 360px; }
+}
