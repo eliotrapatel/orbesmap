@@ -1,5 +1,13 @@
 // Calls the ORBES AI relay (api/ai.ts on Vercel). Only members of the shared space can use it.
 import { supabase } from "./supabase";
+import { currentTrip, getState } from "./store";
+
+/** Who the AI helps and for which trip (profile + current trip), sent with every request */
+function aiContext() {
+  const p = getState().profile;
+  const t = currentTrip();
+  return { who: { name: p.name, interests: p.interests, travel: p.travel, pace: p.pace, budget: p.budget, lang: p.lang }, trip: { title: t.title, dates: t.dateLabel } };
+}
 
 const ENDPOINT = (() => {
   const h = location.hostname;
@@ -76,7 +84,7 @@ export async function ai<T>(task: "photo" | "interpret" | "place" | "ask" | "enr
     const res = await fetch(ENDPOINT, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-      body: JSON.stringify({ task, ...payload }),
+      body: JSON.stringify({ ...(task === "balance" ? {} : aiContext()), task, ...payload }),
       signal: ctl.signal,
     });
     const body = await res.json().catch(() => ({}));
