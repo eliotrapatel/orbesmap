@@ -10,10 +10,13 @@
 // When everything is ready: a notification to the person who started it (Web Push, else a short e-mail).
 // Needs on Vercel: SUPABASE_SERVICE_ROLE_KEY, DEEPSEEK_API_KEY (or ANTHROPIC_API_KEY); VAPID_PRIVATE_KEY and
 // RESEND_API_KEY for the notice at the end (MAIL_FROM optional). Nothing new: the same keys as api/ai.ts and api/cron.ts.
+// The photo of each place and of the trip is found here too, after the places are placed and when the app asks for a
+// trip that lacks some (runPhotos, api/_photos.ts): it needs nothing new (the service key creates its public bucket).
 import { createCipheriv, createDecipheriv, createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import webpush from "web-push";
 import { waitUntil } from "@vercel/functions";
 import { reserve, runTask, TaskFailure, type TaskRun } from "./ai.js";
+import { Busy, copyToBucket, ensureBucket, lookupCity, lookupPlaces, needsLookup as photoNeeded, type Found, type Io, type PhotoRef, type Target } from "./_photos.js";
 
 type Json = Record<string, unknown>;
 const SUPA_URL = process.env.SUPABASE_URL || "https://ifugaqjneprbtigvegeb.supabase.co";
@@ -36,6 +39,25 @@ const CALL_BUDGET = 255_000;
 const UNIT_TRIES = 3;
 /** Where the scratch of a preparation lives (place_states, trip "_prep", place = the trip's id) */
 const SCRATCH_TRIP = "_prep";
+/** Where the photo pass keeps its lease (place_states, trip "_photos", place = the trip's id) */
+const PHOTO_TRIP = "_photos";
+/** The photo pass: lookups stop after this, no copy starts after PHOTO_COPY_END (a call lives 300 s) */
+const PHOTO_BUDGET = 170_000;
+const PHOTO_COPY_END = 270_000;
+/** the trip's cover is looked up only when the call started less than this ago, and its requests stop at PHOTO_CITY_END */
+const PHOTO_COVER_START = 240_000;
+const PHOTO_CITY_END = 275_000;
+/** a pass asked by the app: not again within this time of the last one that ended (the server's own calls are not held) */
+const PHOTO_COOLDOWN = 10 * 60_000;
+/** found places are written by tens as their copies end (a cut call keeps what it copied) */
+const PHOTO_WRITE_BATCH = 10;
+/** places looked up per call; the rest in the next call (a pass chains PHOTO_HOPS more calls at most) */
+const PHOTO_CAP = 60;
+const PHOTO_HOPS = 5;
+/** the kinds of place whose photo can stand for the trip when its city has none */
+const COVER_TYPES = new Set(["landmark", "musee", "jardin", "galerie"]);
+/** the two trips written in the code (same list as the SQL's legacy_access) */
+const CODE_TRIPS = new Set(["sha-2026", "gz-2026"]);
 
 // the same messages as api/ai.ts (the app translates them)
 const MSG = {
@@ -128,6 +150,11 @@ export type Db = {
   pushSubs(userId: string): Promise<{ endpoint: string; p256dh: string; auth: string }[]>;
   dropPushSub(endpoint: string): Promise<void>;
   email(userId: string): Promise<string | null>;
+  /** the photo pass's lease (place_states row trip "_photos", place = the trip): true when this call got it;
+   *  `cooldown`: also refused while the last pass that ended (its `done`) is more recent than this */
+  claimPhotos?(tripId: string, hold: string, now: number, cooldown?: number): Promise<boolean>;
+  touchPhotos?(tripId: string, hold: string, now: number): Promise<void>;
+  releasePhotos?(tripId: string, hold: string, now: number, note: Json): Promise<void>;
 };
 export type BookResult = { id: number } | { refused: "cap" | "pro" | "prep" | "auth" | "error" };
 export type Deps = {
@@ -151,6 +178,12 @@ export type Deps = {
   now: () => number;
   sleep: (ms: number) => Promise<void>;
   log?: (msg: string) => void;
+  /** the photo pass's services (Wikimedia, Openverse, Storage); absent = no photo pass */
+  photoIo?: Io;
+  /** starts the photo pass in a new call */
+  kickPhotos?: (tripId: string, hop: number) => Promise<boolean>;
+  /** a member of the first shared space (rpc is_member with the user's session): may write the two code trips */
+  isMember?: (token: string) => Promise<boolean>;
 };
 
 // ---------- small helpers ----------
@@ -556,6 +589,8 @@ async function unit(deps: Deps, tripId: string, s: Scratch, c: Claim, t0: number
       if (await save(deps, tripId, s)) await sendReady(deps, tripId, res.data, s.user).catch((e) => deps.log?.(`prepare notify: ${String(e)}`));
     }
     await giveBack(deps, tripId, s);
+    // the photos of the places, in a call of their own: the trip is already ready (never slowed by them)
+    if (res?.changed) await deps.kickPhotos?.(tripId, 0).catch(() => false);
     return "stop";
   }
 
@@ -775,6 +810,174 @@ async function unit(deps: Deps, tripId: string, s: Scratch, c: Claim, t0: number
   return "next";
 }
 
+// ---------- the photos of the places and of the trip ----------
+const isPhotoRef = (v: unknown): v is PhotoRef => !!v && typeof v === "object" && typeof (v as PhotoRef).path === "string" && typeof (v as PhotoRef).thumb === "string";
+const staleNone = (v: unknown, now: number) => !!v && typeof v === "object" && (v as { none?: boolean }).none === true && now - (Number((v as { at?: number }).at) || 0) > 30 * 86_400_000;
+const sameSpot = (row: PlaceRow, t: Target) => String(row.data.name || "").trim() === t.name && Number(row.data.lat) === t.lat && Number(row.data.lng) === t.lng;
+
+/**
+ * One photo pass on a trip: the places without a photo (or renamed, moved, or "none" for 30 days) are looked up,
+ * their files copied into the public bucket and written by tens as the copies end (the open phones pull a few times);
+ * then the trip's cover. Only one pass per trip at a time (a lease in place_states). Never touches the draft.
+ */
+export async function runPhotos(tripId: string, deps: Deps, opts: { hop?: number; asked?: boolean } = {}): Promise<string> {
+  const io = deps.photoIo;
+  const db = deps.db;
+  if (!io || !db.claimPhotos) return "off";
+  const hop = Math.max(0, Math.floor(Number(opts.hop) || 0));
+  const hold = randomUUID();
+  const t0 = deps.now();
+  // asked by the app: never within PHOTO_COOLDOWN of the last pass that ended
+  if (!(await db.claimPhotos(tripId, hold, t0, opts.asked ? PHOTO_COOLDOWN : undefined))) return "busy";
+  const alive = setInterval(() => void db.touchPhotos?.(tripId, hold, deps.now()).catch(() => undefined), 60_000);
+  (alive as { unref?: () => void }).unref?.();
+  const release = (note: Json) => db.releasePhotos?.(tripId, hold, deps.now(), note).catch(() => undefined);
+  try {
+    try {
+      await ensureBucket(io);
+    } catch (e) {
+      deps.log?.(`photos ${tripId}: ${String((e as Error)?.message || e)}`);
+      await release({ error: "bucket" });
+      return "error";
+    }
+    const row = await db.getTrip(tripId);
+    if (!row) {
+      await release({ done: deps.now() });
+      return "done";
+    }
+    const now = deps.now();
+    const order = (r: PlaceRow) => Number(r.data.order) || 0;
+    const live = (await db.listPlaces(tripId)).filter((r) => r.id !== "__meta" && r.data.deleted !== true && r.data.removed !== true && typeof r.data.name === "string" && r.data.name.trim() && typeof r.data.lat === "number" && typeof r.data.lng === "number" && Number.isFinite(r.data.lat) && Number.isFinite(r.data.lng));
+    const todo = live.filter((r) => photoNeeded(r.data.photo, r.data.fieldsAt, now)).sort((a, b) => order(a) - order(b) || a.id.localeCompare(b.id));
+    const targets: Target[] = todo.slice(0, PHOTO_CAP).map((r) => ({ id: r.id, name: String(r.data.name).trim(), nameCn: typeof r.data.nameCn === "string" && r.data.nameCn.trim() ? r.data.nameCn.trim() : undefined, lat: r.data.lat as number, lng: r.data.lng as number, type: String(r.data.type || "") }));
+    const leftOver = todo.length > targets.length;
+    // the trip's city: the preparation's first city, else the trip's own title and centre (never the app's input)
+    const d = draftOf(row.data);
+    const c0 = d ? arr<{ name?: string; lat?: number; lng?: number; country?: string }>(d.cities)[0] : undefined;
+    const center = Array.isArray(row.data.center) ? (row.data.center as number[]) : null;
+    const country = String(c0?.country || row.data.country || (CODE_TRIPS.has(tripId) ? "cn" : "")).toLowerCase();
+    const title = typeof row.data.title === "string" ? row.data.title.trim() : "";
+    const city = c0?.name ? { name: c0.name, country, lat: c0.lat, lng: c0.lng } : title ? { name: title, country, lat: center?.[1], lng: center?.[0] } : null;
+    const lang = (row.data.lang && typeof row.data.lang === "object" ? String((row.data.lang as { code?: unknown }).code || "") : "").slice(0, 2).toLowerCase();
+    const langs = [...new Set(["en", lang, "fr"].filter(Boolean))];
+
+    const results = targets.length ? await lookupPlaces(targets, { city: city?.name || "", country, langs }, io, t0 + PHOTO_BUDGET) : new Map<string, Found | "none" | "retry">();
+    const budgetHit = deps.now() > t0 + PHOTO_BUDGET;
+
+    // the copies (3 at a time, none started late; upload.wikimedia.org busy stops them all), each found place written
+    // by tens as its copy ends, on fresh rows (the open phones pull a few times, and a cut call keeps what it copied)
+    const refs = new Map<string, PhotoRef>();
+    const queue = [...results].filter((x): x is [string, Found] => typeof x[1] === "object");
+    let cut = false;
+    let copyFailed = false;
+    let fresh = await db.listPlaces(tripId);
+    const write = async (id: string, photo: Json): Promise<boolean | "skip"> => {
+      const r = fresh.find((x) => x.id === id);
+      const t = targets.find((x) => x.id === id)!;
+      // deleted, renamed or moved meanwhile: left for the next pass
+      if (!r || r.data.deleted === true || !sameSpot(r, t)) return "skip";
+      const n = deps.now();
+      const fa = { ...((r.data.fieldsAt as Record<string, number>) || {}) };
+      fa.photo = Math.max(n, (Number(fa.photo) || 0) + 1);
+      const data: Json = { ...r.data, photo: { ...photo, at: fa.photo }, fieldsAt: fa, updatedAt: Math.max(Number(r.data.updatedAt) || 0, fa.photo) };
+      return db.patchPlace(tripId, id, data, r.updatedAt);
+    };
+    let written = 0;
+    let writeError: unknown = null;
+    const writeOne = async (id: string) => {
+      const res = results.get(id);
+      const photo: Json | null = res === "none" ? { v: 1, none: true } : res && res !== "retry" && refs.has(id) ? { ...refs.get(id)! } : null;
+      if (!photo) return;
+      let ok = await write(id, photo);
+      if (ok === false) {
+        // changed on a phone meanwhile: read again, once
+        fresh = await db.listPlaces(tripId);
+        ok = await write(id, photo);
+      }
+      if (ok === true) written++;
+    };
+    const ready: string[] = [];
+    let writing: Promise<void> = Promise.resolve();
+    const flush = () => {
+      const ids = ready.splice(0);
+      if (ids.length)
+        writing = writing.then(async () => {
+          if (writeError) return;
+          try {
+            for (const id of ids) await writeOne(id);
+          } catch (e) {
+            writeError = e;
+          }
+        });
+      return writing;
+    };
+    const copier = async () => {
+      for (let item = queue.shift(); item; item = queue.shift()) {
+        if (cut || deps.now() > t0 + PHOTO_COPY_END) {
+          cut = true;
+          continue;
+        }
+        try {
+          refs.set(item[0], await copyToBucket(item[1], io));
+          ready.push(item[0]);
+          if (ready.length >= PHOTO_WRITE_BATCH) void flush();
+        } catch (e) {
+          copyFailed = true;
+          // a 429 from the file host: no more downloads in this call (the next call, or the app's next ask, retries)
+          if (e instanceof Busy) cut = true;
+          else deps.log?.(`photos copy ${tripId}: ${String((e as Error)?.message || e).slice(0, 120)}`);
+        }
+      }
+    };
+    await Promise.all([copier(), copier(), copier()]);
+    // then the places with nothing acceptable, and the rest of the found ones
+    for (const t of targets) if (results.get(t.id) === "none") ready.push(t.id);
+    await flush();
+    if (writeError) throw writeError;
+    // a photo found but not copied (failed, busy, late) counts as still to find
+    const pending = leftOver || cut || copyFailed || [...results.values()].some((x) => x === "retry");
+
+    // the trip's cover: its city's photo, else one of its landmarks' (wide enough for the band), else none
+    const cur = (await db.getTrip(tripId))?.data.cover;
+    if ((!cur || staleNone(cur, deps.now())) && city && deps.now() < t0 + PHOTO_COVER_START) {
+      let cover: Json | null = null;
+      const r = await lookupCity(city, io, t0 + PHOTO_CITY_END);
+      if (typeof r === "object") {
+        try {
+          cover = { ...(await copyToBucket(r, io)), from: "city" };
+        } catch (e) {
+          deps.log?.(`photos cover ${tripId}: ${String((e as Error)?.message || e).slice(0, 120)}`);
+        }
+      } else if (r === "none") {
+        const rows = (await db.listPlaces(tripId)).filter((x) => x.data.deleted !== true && x.data.removed !== true && COVER_TYPES.has(String(x.data.type)) && isPhotoRef(x.data.photo) && /-(960|1280)\.\w+$/.test((x.data.photo as PhotoRef).path)).sort((a, b) => order(a) - order(b) || a.id.localeCompare(b.id));
+        if (rows[0]) cover = { ...(rows[0].data.photo as Json), from: "place", placeId: rows[0].id };
+        // nothing at all, no place still to look up and no photo found left uncopied: said once (tried again in 30 days)
+        else if (!pending) cover = { v: 1, none: true, at: deps.now() };
+      }
+      if (cover) {
+        const c = cover;
+        await commit(deps, tripId, (data) => (data.cover && !staleNone(data.cover, deps.now()) ? null : { cover: c })).catch((e) => deps.log?.(`photos cover ${tripId}: ${String(e)}`));
+      }
+    }
+
+    deps.log?.(`photos ${tripId}: ${targets.length} looked up, ${refs.size} copied, ${written} written`);
+    if ((leftOver || cut || budgetHit) && hop < PHOTO_HOPS && deps.kickPhotos) {
+      await release({ at: deps.now() });
+      clearInterval(alive);
+      const sent = await deps.kickPhotos(tripId, hop + 1).catch(() => false);
+      return sent ? "kicked" : "done";
+    }
+    await release({ done: deps.now() });
+    return "done";
+  } catch (e) {
+    deps.log?.(`photos ${tripId}: ${String((e as Error)?.message || e).slice(0, 200)}`);
+    await release({ error: "failed" });
+    return "error";
+  } finally {
+    clearInterval(alive);
+  }
+}
+
 // ---------- the notice at the end ----------
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 const FOOTER = `<p style="font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#a8a39b;margin:22px 0 0">ORBES Trips</p>`;
@@ -858,7 +1061,8 @@ export async function handle(req: Request, depsIn?: Deps): Promise<Response> {
   const internal = req.headers.get("x-prep-key") || "";
   if (internal) {
     if (!sameSecret(internal, deps.secret)) return reply({ error: "forbidden" }, 403, origin);
-    deps.schedule(runUnit(tripId, deps).catch((e) => deps.log?.(`prepare run: ${String(e)}`)));
+    if (action === "photos-run") deps.schedule(runPhotos(tripId, deps, { hop: Number(body.hop) || 0 }).catch((e) => deps.log?.(`photos run: ${String(e)}`)));
+    else deps.schedule(runUnit(tripId, deps).catch((e) => deps.log?.(`prepare run: ${String(e)}`)));
     return reply({ ok: true }, 202, origin);
   }
 
@@ -868,6 +1072,15 @@ export async function handle(req: Request, depsIn?: Deps): Promise<Response> {
   if (!user) return reply({ error: "auth", message: "Session expirée : reconnectez-vous dans l'onglet Compte." }, 401, origin);
   const role = await deps.db.role(tripId, user).catch(() => null);
   const row = await deps.db.getTrip(tripId);
+  // the photos of a trip's places (asked once by the app when it opens a trip lacking some): any trip, with or
+  // without a draft, by who may write it (owner, editor; the code trips: the first shared space's members)
+  if (action === "photos") {
+    if (!row) return reply({ error: "notready" }, 409, origin);
+    const ok = role === "owner" || role === "editor" || (CODE_TRIPS.has(tripId) && (await (deps.isMember?.(token) ?? Promise.resolve(false)).catch(() => false)));
+    if (!ok) return reply({ error: "forbidden" }, 403, origin);
+    deps.schedule(runPhotos(tripId, deps, { asked: true }).catch((e) => deps.log?.(`photos ${tripId}: ${String(e)}`)));
+    return reply({ ok: true, queued: true }, 202, origin);
+  }
   // a trip just created on the phone may not have reached the server yet: the app asks again
   if (!row || !draftOf(row.data)) return reply({ error: "notready" }, 409, origin);
   if (role !== "owner" && role !== "editor") return reply({ error: "forbidden" }, 403, origin);
@@ -1044,11 +1257,11 @@ export async function kickStale(trips: { id: string; data: Json }[], serviceKey:
   for (const id of staleRuns(trips, now)) if (await kickOnce(id, secret, f)) n++;
   return n;
 }
-async function kickOnce(tripId: string, secret: string, f: typeof fetch): Promise<boolean> {
+async function kickOnce(tripId: string, secret: string, f: typeof fetch, action = "run", extra: Json = {}): Promise<boolean> {
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), 10_000);
   try {
-    const r = await f(PREP_URL, { method: "POST", headers: { "content-type": "application/json", "x-prep-key": secret }, body: JSON.stringify({ action: "run", trip: tripId }), signal: ctl.signal });
+    const r = await f(PREP_URL, { method: "POST", headers: { "content-type": "application/json", "x-prep-key": secret }, body: JSON.stringify({ action, trip: tripId, ...extra }), signal: ctl.signal });
     return r.status === 202;
   } catch {
     return false;
@@ -1162,10 +1375,34 @@ export function restDb(key: string, f: typeof fetch): Db {
       const u = (await call(`/auth/v1/admin/users/${enc(userId)}`)) as { email?: string };
       return u?.email || null;
     },
+    // the photo pass's lease: the row is made once, then taken only when free or stale (one row back = taken).
+    // `at` is always written as a 13-digit ms number (or 0), so comparing it as text is right.
+    // `done` (the end of the last finished pass) is a 13-digit ms number too: the cooldown compares it the same way.
+    async claimPhotos(tripId, hold, now, cooldown) {
+      const iso = new Date().toISOString();
+      await call("/rest/v1/place_states?on_conflict=trip_id,place_id", { method: "POST", headers: { prefer: "resolution=ignore-duplicates,return=minimal" }, body: JSON.stringify({ trip_id: PHOTO_TRIP, place_id: tripId, data: { hold: null, at: 0 }, updated_at: iso }) });
+      const free = `or(data->>hold.is.null,data->>at.lt.${Math.floor(now - LEASE_STALE)})`;
+      const cond = cooldown ? `and=(${free},or(data->>done.is.null,data->>done.lt.${Math.floor(now - cooldown)}))` : `or=(data->>hold.is.null,data->>at.lt.${Math.floor(now - LEASE_STALE)})`;
+      const rows = (await call(`/rest/v1/place_states?trip_id=eq.${PHOTO_TRIP}&place_id=eq.${enc(tripId)}&${cond}&select=place_id`, { method: "PATCH", headers: { prefer: "return=representation" }, body: JSON.stringify({ data: { hold, at: Math.floor(now) }, updated_at: iso }) })) as unknown[];
+      return Array.isArray(rows) && rows.length > 0;
+    },
+    async touchPhotos(tripId, hold, now) {
+      await call(`/rest/v1/place_states?trip_id=eq.${PHOTO_TRIP}&place_id=eq.${enc(tripId)}&data->>hold=eq.${enc(hold)}`, { method: "PATCH", headers: { prefer: "return=minimal" }, body: JSON.stringify({ data: { hold, at: Math.floor(now) }, updated_at: new Date().toISOString() }) });
+    },
+    async releasePhotos(tripId, hold, now, note) {
+      await call(`/rest/v1/place_states?trip_id=eq.${PHOTO_TRIP}&place_id=eq.${enc(tripId)}&data->>hold=eq.${enc(hold)}`, { method: "PATCH", headers: { prefer: "return=minimal" }, body: JSON.stringify({ data: { ...note, hold: null, at: Math.floor(now) }, updated_at: new Date().toISOString() }) });
+    },
   };
 }
 
 let lastGeo = 0;
+/** The same 1.1 s spacing, for the photo pass's OpenStreetMap requests (one counter: never more than 1 per 1.1 s) */
+async function nomGate(): Promise<void> {
+  const slot = Math.max(Date.now(), lastGeo + 1100);
+  lastGeo = slot;
+  const wait = slot - Date.now();
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+}
 /** OpenStreetMap search: a place (never a city or an area), inside the box; one request per 1.1 s */
 async function nominatim(q: string, box: [number, number, number, number], country: string, f: typeof fetch): Promise<[number, number] | null> {
   if (q.trim().length < 2) return null;
@@ -1222,6 +1459,13 @@ function realDeps(): Deps | null {
         }
       : undefined,
     kick: (tripId) => kickOnce(tripId, secret, f),
+    photoIo: { fetch: f, now: () => Date.now(), sleep: (ms) => new Promise((r) => setTimeout(r, ms)), log: (m) => console.warn(m), supaUrl: SUPA_URL, key, nomGate },
+    kickPhotos: (tripId, hop) => kickOnce(tripId, secret, f, "photos-run", { hop }),
+    async isMember(token) {
+      const r = await f(`${SUPA_URL}/rest/v1/rpc/is_member`, { method: "POST", headers: { apikey: SUPA_KEY, authorization: `Bearer ${token}`, "content-type": "application/json" }, body: "{}" });
+      if (!r.ok) return false;
+      return (await r.json().catch(() => null)) === true;
+    },
     schedule: (p) => {
       try {
         waitUntil(p);

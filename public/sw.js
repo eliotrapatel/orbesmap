@@ -8,6 +8,46 @@ self.addEventListener("install", (e) => {
 });
 self.addEventListener("activate", (e) => {
   e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k.startsWith("orbes-shell-") && k !== SHELL).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
+  e.waitUntil(trimPhotos());
+});
+
+// The photos of the places and trips (public Supabase Storage bucket "place-photos"): kept for offline use, the
+// stored copy first (a photo file never changes: its name carries its source and width). The app fills this cache
+// with the open trip's photos (src/lib/placePhotos.ts); every photo viewed is kept too, up to PHOTOS_MAX files (the
+// oldest go first, checked every PHOTOS_TRIM_EVERY files kept: the cache never grows enough for the browser to empty
+// this site's storage, the app shell with it).
+const PHOTOS = "orbes-photos-v1";
+const PHOTOS_MAX = 600;
+const PHOTOS_TRIM_EVERY = 25;
+let photoPuts = 0;
+const PHOTO_URL = /^https:\/\/[a-z0-9-]+\.supabase\.co\/storage\/v1\/object\/public\/place-photos\//;
+async function trimPhotos() {
+  try {
+    const c = await caches.open(PHOTOS);
+    const ks = await c.keys();
+    // the oldest first (keys come back in insertion order)
+    for (const k of ks.slice(0, Math.max(0, ks.length - PHOTOS_MAX))) await c.delete(k);
+  } catch {
+    /* no cache storage */
+  }
+}
+self.addEventListener("fetch", (e) => {
+  const req = e.request;
+  if (req.method !== "GET" || !PHOTO_URL.test(req.url)) return;
+  e.respondWith(
+    (async () => {
+      try {
+        const c = await caches.open(PHOTOS);
+        const hit = await c.match(req.url);
+        if (hit) return hit;
+        const res = await fetch(req.url, { mode: "cors", credentials: "omit" });
+        if (res.ok) e.waitUntil(c.put(req.url, res.clone()).then(() => (++photoPuts % PHOTOS_TRIM_EVERY === 0 ? trimPhotos() : undefined)).catch(() => {}));
+        return res;
+      } catch {
+        return Response.error();
+      }
+    })(),
+  );
 });
 const sig = (r) => r && (r.headers.get("etag") || r.headers.get("last-modified") || r.headers.get("content-length") || "");
 async function refresh(cache, req, old) {

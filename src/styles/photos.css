@@ -1,0 +1,114 @@
+/* The photos of the places and of the trips (lot PHOTOS), treatment A · NUIT: a two-ink night print, ink black to a
+   cold blue grey, very fine grain. Set here at display time over the plain stored file (the licensed file itself is
+   never altered). Without a photo: typographic cards in the boarding-pass language, never an invented image.
+   Every class is prefixed "ph" so nothing else in the app is touched. */
+:root {
+  --ph-s: #07080b;
+  --ph-h: #b9c3cf;
+  --ph-grain-o: 0.13;
+  --ph-scrim: 7, 8, 11;
+  --ph-ov: #f6f2ea;
+  --ph-ov-soft: rgba(246, 242, 234, 0.72);
+  --ph-ov-credit: rgba(246, 242, 234, 0.55);
+  --ph-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+}
+/* light mode (when the app has one): the same print, lifted */
+:root[data-theme="light"] {
+  --ph-s: #1a1c20;
+  --ph-h: #e9ecef;
+  --ph-grain-o: 0.09;
+  --ph-scrim: 10, 10, 10;
+}
+
+/* ---------- the frame ---------- */
+.ph { position: relative; display: block; overflow: hidden; isolation: isolate; aspect-ratio: var(--ar, 16/10); width: 100%; background: var(--ph-s); border-radius: inherit; }
+.ph img { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; object-fit: cover; object-position: var(--focus, 50% 50%); filter: grayscale(1) contrast(1.8) brightness(0.9); opacity: 0; transition: opacity 0.24s var(--ease); }
+.ph.in img { opacity: 1; }
+.ph::before, .ph::after { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+/* highlight cap, then ink floor: whites become the cold grey, blacks the ink */
+.ph::before { background: var(--ph-h); mix-blend-mode: multiply; }
+.ph::after { background: var(--ph-s); mix-blend-mode: lighten; }
+.ph-grain { position: absolute; inset: 0; z-index: 2; background: var(--ph-grain); background-size: 180px 180px; mix-blend-mode: overlay; opacity: var(--ph-grain-o); pointer-events: none; }
+.ph.flat { --ph-grain-o: 0.08; }
+.ph-scrim { position: absolute; left: 0; right: 0; bottom: 0; height: 62%; z-index: 3; pointer-events: none; background: linear-gradient(180deg, rgba(var(--ph-scrim), 0) 0%, rgba(var(--ph-scrim), 0.55) 45%, rgba(var(--ph-scrim), 0.88) 100%); }
+.ph.flat .ph-scrim { display: none; }
+.ph-over { position: absolute; inset: 0; z-index: 4; color: var(--ph-ov); }
+@media (prefers-reduced-motion: reduce) { .ph img { transition: none; } }
+
+/* ---------- Mes voyages: the band at the top of the trip's card (to come, under way, recap) ---------- */
+.ph-band { position: relative; display: block; }
+.ph-band .ph { border-radius: 0; }
+.ph-band-top { position: absolute; left: 0; right: 0; top: 0; height: 46%; z-index: 3; background: linear-gradient(180deg, rgba(var(--ph-scrim), 0.62), rgba(var(--ph-scrim), 0)); pointer-events: none; }
+.ph-band-fade { position: absolute; left: 0; right: 0; bottom: 0; height: 55%; z-index: 3; background: linear-gradient(180deg, transparent 0%, #0f0f10 100%); pointer-events: none; }
+.v3-hero > .ph-band { margin: -18px -20px 0; }
+.ph-band .v3-hero-top { position: absolute; inset: 0 0 auto; padding: 18px 20px 0; z-index: 4; color: var(--ph-ov); --ink: var(--ph-ov); --soft: var(--ph-ov-soft); --mute: var(--ph-ov-soft); }
+.v3-hero:has(> .ph-band) .v3-hero-body { margin-top: 2px; }
+@media (max-width: 360px) {
+  .v3-hero > .ph-band { margin: -16px -16px 0; }
+  .ph-band .v3-hero-top { padding: 16px 16px 0; }
+}
+
+/* ---------- Mes voyages: the other trips' cards ---------- */
+.v3-trip-art.has-ph { background: var(--ph-s); }
+.v3-trip-art .ph { position: absolute; inset: 0; height: 100%; aspect-ratio: auto; }
+.v3-trip.has-ph .v3-trip-over { background: linear-gradient(180deg, rgba(0, 0, 0, 0.22), transparent 36%); }
+.v3-trip.has-ph .v3-trip-name small { color: var(--ph-ov-soft); }
+/* the state tag stays legible on a bright sky: the dark glass of the sheet's buttons on a photo */
+.v3-trip.has-ph .v3-tag { background: rgba(10, 10, 10, 0.46); }
+.v3-trip.has-ph .v3-tag.dim { color: var(--ph-ov-soft); }
+/* no photo: the boarding pass (code, coordinates, a hairline), on the plain dark plate */
+.v3-trip.ph-none-trip .v3-trip-art, .v3-grid .v3-trip.ph-none-trip:nth-child(n) .v3-trip-art { background: linear-gradient(180deg, #0f0f10, #0a0a0b); }
+.ph-nt-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; min-width: 0; }
+.ph-nt-head > .v3-tags { flex: none; }
+.ph-nt-code { display: flex; flex-direction: column; align-items: flex-end; min-width: 0; }
+.ph-nt-code b { font-size: 30px; line-height: 0.94; letter-spacing: 0.04em; color: var(--mute); }
+.ph-coord { display: block; margin-top: 7px; font-size: 10px; line-height: 1.2; letter-spacing: 0.16em; text-transform: uppercase; color: var(--mute); font-variant-numeric: tabular-nums; }
+.ph-nt-code .ph-coord { text-align: right; }
+.ph-nt-line { display: block; height: 1px; margin: 12px 0 0; background: var(--hair); }
+
+/* ---------- lists: the place list, the next stop, the agenda ---------- */
+.ph-thumb { position: relative; display: block; flex: none; width: 48px; height: 48px; overflow: hidden; border-radius: var(--r-sm); border: 1px solid var(--hair); }
+.ph-thumb .ph { height: 100%; aspect-ratio: auto; border-radius: 0; }
+.ph-none { display: grid; place-items: center; background: var(--plate-2); font: 500 15px/1 var(--display); color: var(--soft); font-variant-numeric: tabular-nums; }
+.next.has-ph { display: grid; grid-template-columns: minmax(0, 1fr) 52px; gap: 12px; align-items: center; }
+.next-txt { display: block; min-width: 0; }
+.ag-body.has-th { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 12px; align-items: start; }
+.ag-txt { display: block; min-width: 0; }
+
+/* ---------- the place's sheet: the large photo and its credit line ---------- */
+.detail-hero.has-ph, .detail-hero.has-none { padding-top: 0; }
+.ph-sheet { display: block; margin: 0 -22px 14px; }
+.ph-sheet .ph { border-radius: 0; max-height: 30vh; }
+.ph-sh-top { position: absolute; left: 0; right: 0; top: 0; height: 30%; z-index: 3; background: linear-gradient(180deg, rgba(var(--ph-scrim), 0.4), rgba(var(--ph-scrim), 0)); pointer-events: none; }
+.ph-sh-over { display: flex; align-items: flex-end; padding: 0 16px 14px; }
+.ph-credit { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 9px; line-height: 1.2; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ph-ov-credit); }
+.detail-hero.has-ph .detail-actions, .detail-hero.has-none .detail-actions { position: absolute; top: 12px; left: 12px; right: 12px; z-index: 5; margin: 0; }
+.detail-hero.has-ph .detail-actions .icon-btn { background: rgba(10, 10, 10, 0.46); border: 1px solid rgba(246, 242, 234, 0.16); }
+.detail-hero.has-ph .detail-actions .icon-btn:not(.fav-on) { color: #f6f2ea; }
+.detail-hero.has-ph .detail-actions .icon-btn:hover { background: rgba(10, 10, 10, 0.62); }
+/* nothing found: the same box, set like a boarding pass (type, coordinates, a line to the point) */
+.ph-none-sheet { position: relative; display: flex; flex-direction: column; justify-content: flex-end; aspect-ratio: 16/10; max-height: 30vh; padding: 16px 22px; background: var(--plate); border-bottom: 1px solid var(--hair); }
+.ph-none-sheet .label { color: var(--soft); }
+.ph-ns-line { position: relative; display: block; height: 1px; margin-top: 14px; background: var(--hair-strong); }
+.ph-ns-line::after { content: ""; position: absolute; right: 0; top: -2px; width: 5px; height: 5px; border-radius: 50%; background: var(--ink); }
+@media (min-width: 900px) {
+  .ph-sheet .ph, .ph-none-sheet { max-height: 38vh; }
+}
+
+/* ---------- the trip's photo credits (Aperçu) ---------- */
+.ph-credits > summary.label { margin-bottom: 0; cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ph-credits summary::-webkit-details-marker { display: none; }
+.ph-credits summary::after { content: "+"; font: 400 15px/1 var(--font); color: var(--mute); }
+.ph-credits[open] summary::after { content: "–"; }
+.ph-credits p { margin-top: 10px; font-size: 12px; line-height: 1.45; color: var(--mute); }
+.ph-credits ul { list-style: none; margin-top: 8px; padding: 0; font-size: 12.5px; }
+.ph-credits li { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto; gap: 4px 12px; padding: 9px 0; border-bottom: 1px solid var(--hair); }
+.ph-credits li > span { min-width: 0; overflow-wrap: anywhere; }
+.ph-credits li > span:nth-child(2) { color: var(--soft); }
+.ph-credits a { color: var(--soft); text-decoration: underline; text-decoration-color: var(--hair-strong); text-underline-offset: 2px; }
+.ph-credits a:hover { color: var(--ink); }
+@media (max-width: 520px) {
+  .ph-credits li { grid-template-columns: 1fr auto; }
+  .ph-credits li > span:nth-child(2) { grid-column: 1; grid-row: 2; }
+  .ph-credits li > a { grid-row: 1 / span 2; align-self: center; }
+}

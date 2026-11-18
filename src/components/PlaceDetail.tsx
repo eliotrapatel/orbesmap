@@ -21,6 +21,10 @@ import { money, useBusiness, useExpenses } from "../lib/business";
 import { exportReport } from "../lib/export";
 import { vote, votesOf } from "../lib/social";
 import { track } from "../lib/track";
+import { isNone, isRef } from "../lib/photoData";
+import { creditLine } from "../lib/placePhotos";
+import { coordText } from "../lib/recap";
+import { Ph } from "./PlacePhoto";
 
 export default function PlaceDetail({ trip, place, onBack, onGo, sheetH, onMovePoint }: { trip: Trip; place: Place; onBack: () => void; onGo: (m: Mode) => void; sheetH?: string; onMovePoint?: () => void }) {
   const state = useStore((s) => s.data.places[place.id]) || {};
@@ -31,6 +35,10 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH, onMoveP
   useStore((s) => s.photoUrls);
   const contacts = allContacts.filter((c) => c.placeId === place.id);
   const photos = allPhotos.filter((p) => p.placeId === place.id);
+  // the place's own photo (found by the server), not the travellers' photos above; nothing while it is looked up
+  const [photoFailed, setPhotoFailed] = useState<unknown>(null);
+  const placePhoto = isRef(place.photo) && photoFailed !== place.photo ? place.photo : null;
+  const noPhoto = isNone(place.photo);
   const day = trip.days.find((d) => d.key === place.day);
   const color = day?.color || "#f6f2ea";
   const [show, setShow] = useState(false);
@@ -81,7 +89,25 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH, onMoveP
     <section ref={sheet.ref} className="detail glass" style={{ ["--c" as string]: color, ...(sheetH ? { ["--sheet-h" as string]: sheetH } : {}) }} aria-label={place.name}>
       <div className="sheet-grip" data-grip {...sheet.handlers} role="button" aria-label={t("Glisser vers le bas pour fermer, vers le haut pour agrandir")} />
       <div className="detail-scroll scroll" style={{ flex: 1, minHeight: 0, paddingBottom: 28 }}>
-        <header className="detail-hero">
+        <header className={"detail-hero" + (placePhoto ? " has-ph" : noPhoto ? " has-none" : "")}>
+          {placePhoto && (
+            <span className="ph-sheet">
+              <Ph photo={placePhoto} size="l" ar="16/10" onFail={() => setPhotoFailed(place.photo)}>
+                <i className="ph-sh-top" />
+                <i className="ph-scrim" />
+                <span className="ph-over ph-sh-over">
+                  <span className="ph-credit">{creditLine(placePhoto)}</span>
+                </span>
+              </Ph>
+            </span>
+          )}
+          {noPhoto && (
+            <span className="ph-sheet ph-none-sheet">
+              <span className="label">{t(TYPE_LABEL[place.type] || place.type)}</span>
+              <span className="ph-coord">{coordText([place.lng, place.lat])}</span>
+              <span className="ph-ns-line" />
+            </span>
+          )}
           <div className="detail-actions">
             <button className="icon-btn" onClick={onBack} aria-label={t("Fermer la fiche")}>
               <IBack />

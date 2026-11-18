@@ -11,6 +11,7 @@ import { dateLabel } from "../../lib/newTrip";
 import { coordText, PLANE_PATH, recapDue, recapImage, recapOf, recapStats, routeOf, shareRecapBlob, type Route } from "../../lib/recap";
 import { track } from "../../lib/track";
 import { setIntent } from "./nav";
+import { Band, hasBand } from "../PlacePhoto";
 import "../../styles/home.css";
 
 /** The trip with the places added / moved in the app (the open one from the store, the others from this phone) */
@@ -290,8 +291,8 @@ export default function TripHero({ trip: base, onOpen }: { trip: Trip; onOpen: (
     return <RecapCard trip={trip} top={top} route={routeLine} onOpen={() => onOpen(base.id)} />;
 
   return (
-    <button className={"v3-hero" + (ph === "during" ? " live" : "")} onClick={() => onOpen(base.id)}>
-      {top}
+    <button className={"v3-hero" + (ph === "during" ? " live" : "") + (hasBand(trip.cover) ? " has-band" : "")} onClick={() => onOpen(base.id)}>
+      <Band cover={trip.cover} top={top} />
 
       <span className="v3-hero-body">
         <b className="v3-d v3-hero-title">{trip.title}</b>
@@ -359,8 +360,8 @@ function TodayCard({ trip, now, top, route, onOpen, progress, returnIn, facts }:
   const laterLabel = td.later ? (td.later.tomorrow ? t("Demain") : fmtDay(td.later.date, trip.timezone, { weekday: "long", day: "numeric", month: "long" })) : "";
 
   return (
-    <div className="v3-hero live static" onClick={onGround(onOpen)}>
-      {top}
+    <div className={"v3-hero live static" + (hasBand(trip.cover) ? " has-band" : "")} onClick={onGround(onOpen)}>
+      <Band cover={trip.cover} top={top} />
       <span className="v3-hero-body today">
         <b className="v3-d v3-hero-title">{trip.title}</b>
         <span className="v3-lbl v3-today-k">{t("Aujourd’hui")} · {t("Jour {i} sur {n}", { i: dt.i, n: dt.n })}{theme ? ` · ${theme}` : ""}</span>
@@ -469,8 +470,8 @@ function RecapCard({ trip, top, route, onOpen }: {
   const showCities = r.cities.length > 1 || r.cities[0] !== r.title;
 
   return (
-    <div className="v3-hero static recap" onClick={onGround(onOpen)}>
-      {top}
+    <div className={"v3-hero static recap" + (hasBand(trip.cover) ? " has-band" : "")} onClick={onGround(onOpen)}>
+      <Band cover={trip.cover} top={top} />
       <span className="v3-hero-body">
         <span className="v3-lbl hx-kicker">{t("Récapitulatif")}</span>
         <b className="v3-d v3-hero-title">{trip.title}</b>

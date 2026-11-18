@@ -14,6 +14,7 @@ import { t } from "../lib/i18n";
 import { useState } from "react";
 import { addComment, deleteComment, useComments } from "../lib/social";
 import { ago } from "../lib/notes";
+import { PhThumb } from "./PlacePhoto";
 
 export default function Agenda({ trip, states, pins = [], onOpen, onOpenPin, onShowDay, onOptimize }: { trip: Trip; states: Record<string, PlaceState>; pins?: Pin[]; onOpen: (p: Place) => void; onOpenPin?: (p: Pin) => void; onShowDay: (d: string) => void; onOptimize: (d: string) => void }) {
   const canEdit = useCanEdit();
@@ -101,17 +102,20 @@ export default function Agenda({ trip, states, pins = [], onOpen, onOpenPin, onS
                     <span className="ag-rail">
                       <span className={"ag-node" + (s.visited ? " done" : "")} />
                     </span>
-                    <span className="ag-body">
-                      <b>{p.name}</b>
-                      <small>{s.appt ? t("RDV {appt}", { appt: s.appt }) : p.time}</small>
-                      <span className="ag-leg">
-                        {i === 0 ? t("Depuis l'hôtel : ~{time}", { time: formatMinutes(legs[i]) }) : t("Trajet : ~{time}", { time: formatMinutes(legs[i]) })}
+                    <span className="ag-body has-th">
+                      <PhThumb photo={p.photo} label={String(i + 1)} />
+                      <span className="ag-txt">
+                        <b>{p.name}</b>
+                        <small>{s.appt ? t("RDV {appt}", { appt: s.appt }) : p.time}</small>
+                        <span className="ag-leg">
+                          {i === 0 ? t("Depuis l'hôtel : ~{time}", { time: formatMinutes(legs[i]) }) : t("Trajet : ~{time}", { time: formatMinutes(legs[i]) })}
+                        </span>
+                        {issues.map((x, k) => {
+                          // reservation details are long: short label here, full text in the place sheet
+                          const short = x.tone === "info" && x.text.length > 70 ? x.text.slice(0, 66).replace(/\s+\S*$/, "") + "…" : x.text;
+                          return <span key={k} className={"ag-issue " + x.tone} title={x.text}>{x.tone === "bad" ? "⚠ " : x.tone === "warn" ? "! " : ""}{short}</span>;
+                        })}
                       </span>
-                      {issues.map((x, k) => {
-                        // reservation details are long: short label here, full text in the place sheet
-                        const short = x.tone === "info" && x.text.length > 70 ? x.text.slice(0, 66).replace(/\s+\S*$/, "") + "…" : x.text;
-                        return <span key={k} className={"ag-issue " + x.tone} title={x.text}>{x.tone === "bad" ? "⚠ " : x.tone === "warn" ? "! " : ""}{short}</span>;
-                      })}
                     </span>
                   </button>
                   {canEdit && (

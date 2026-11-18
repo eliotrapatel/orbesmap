@@ -43,7 +43,7 @@ function world(opts = {}) {
   const usage = new Map();
   const members = new Map();
   const subs = new Map();
-  const calls = { ai: [], geocode: 0, push: [], mail: [], kicks: [], reserve: [], inserts: 0 };
+  const calls = { ai: [], geocode: 0, push: [], mail: [], kicks: [], photoKicks: [], reserve: [], inserts: 0 };
   let usageId = 100;
   const db = {
     async getTrip(id) {
@@ -187,6 +187,11 @@ function world(opts = {}) {
       calls.kicks.push(tripId);
       return true;
     },
+    // the photo pass (api/_photos.ts, checked in scripts/photos-sim.mjs): only its start is recorded here
+    async kickPhotos(tripId, hop) {
+      calls.photoKicks.push({ tripId, hop, status: trips.get(tripId)?.data.draft?.status, lease: !!trips.get(tripId)?.data.draft?.lease });
+      return true;
+    },
     pending: [],
     schedule(p) {
       deps.pending.push(p);
@@ -277,6 +282,7 @@ console.log("1. Full run: outline, essentials, three days, review, notice");
   // a late duplicate call after the end changes nothing and never notifies twice
   const again = await P.runUnit("trip-1", w.deps);
   check(again === "no-scratch" && w.calls.push.length === 1, `a late call does nothing (${again})`);
+  check(w.calls.photoKicks.length === 1 && w.calls.photoKicks[0].tripId === "trip-1" && w.calls.photoKicks[0].hop === 0 && w.calls.photoKicks[0].status === "review" && !w.calls.photoKicks[0].lease, `the photo pass is started once, at the end, once the trip is ready (review, no lease) (${w.calls.photoKicks.length})`);
 
   // ---------- 5. regenerate one day ----------
   console.log("5. Regenerate one day from the review");
@@ -293,6 +299,7 @@ console.log("1. Full run: outline, essentials, three days, review, notice");
   check(now2.length === 3, `3 new places for that day (${now2.length})`);
   check(livePlaces(w).filter(([, p]) => p.data.fromDraft === dates[0]).length === 3, "the other days keep their places");
   check(w.calls.push.length === 1, "no notification for one day prepared again");
+  check(w.calls.photoKicks.length === 2, `the day prepared again starts the photo pass for its new places (${w.calls.photoKicks.length})`);
   check([...w.usage.values()].length === 6, "one more booking, settled");
 }
 

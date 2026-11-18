@@ -3,7 +3,10 @@ import type { Trip } from "../../data/types";
 import { createTrip, getState, requestPro, switchTrip, useStore, useTrips } from "../../lib/store";
 import { dateLabel, dayCount, newTripRecord, searchCities, type Destination } from "../../lib/newTrip";
 import { daysLeft, phase } from "../../lib/time";
-import { recapDue } from "../../lib/recap";
+import { coordText, recapDue } from "../../lib/recap";
+import { isRef } from "../../lib/photoData";
+import { askPhotos, canAskPhotos } from "../../lib/placePhotos";
+import { Ph } from "../PlacePhoto";
 import TripHero from "./TripHero";
 import OrbitMark from "../OrbitMark";
 import Shell, { Steps } from "./Shell";
@@ -47,6 +50,17 @@ export default function Trips({ onOpen, onClose }: { onOpen: (id: string) => voi
   const between = !!hero && phase(hero) === "after";
   const showHero = !!hero && (!between || recapDue(hero));
   const others = between && !showHero ? sorted : rest;
+  // up to 3 listed trips without a photo that this account may ask for: asked once from the server (askPhotos
+  // throttles each trip)
+  const roles = useStore((s) => s.roles);
+  const member = useStore((s) => s.member);
+  const coverless = useMemo(() => trips.filter((x) => !x.cover && canAskPhotos(x)).slice(0, 3), [trips, roles, member]); // eslint-disable-line react-hooks/exhaustive-deps
+  const coverlessKey = coverless.map((x) => x.id).join(",");
+  useEffect(() => {
+    if (!coverlessKey) return;
+    const tm = window.setTimeout(() => coverless.forEach((x) => void askPhotos(x, true)), 4000);
+    return () => window.clearTimeout(tm);
+  }, [coverlessKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (creating === "choose") return <CreateChooser onCancel={() => setCreating(false)} onPick={(k) => { track("tool_opened", `create_${k}`); setCreatingRaw(k); }} />;
   if (creating === "concierge") return <Concierge onCancel={() => setCreating(false)} onForm={() => setCreatingRaw("form")} onCreated={(id) => { setCreating(false); onOpen(id); }} />;
@@ -117,17 +131,42 @@ function TripCard({ t: trip, onOpen }: { t: Trip; onOpen: (id: string) => void }
   const d = daysLeft(trip);
   const n = trip.days.filter((x) => x.scheduled).reduce((k, x) => k + (x.dates?.length || 0), 0);
   const draft = (useStore((s) => s.trips[trip.id])?.draft as { status?: string } | undefined)?.status;
+  // the trip's photo (NUIT); without one, or if it fails to load, the boarding pass (code, coordinates, a hairline)
+  const [failed, setFailed] = useState(false);
+  const cover = isRef(trip.cover) && !failed ? trip.cover : null;
+  const tags = (
+    <span className="v3-tags">
+      {draft && draft !== "done" ? (
+        <span className="v3-tag dim">{draft === "preparing" ? t("En préparation") : t("À valider")}</span>
+      ) : (
+        <span className={"v3-tag " + (ph === "during" ? "ok" : ph === "before" ? "gold" : "dim")}>{ph === "during" ? t("En cours") : ph === "before" ? (d > 0 ? t("J–{d}", { d }) : t("Moins de 24 h")) : t("Passé")}</span>
+      )}
+    </span>
+  );
   return (
-    <button className="v3-trip" onClick={() => onOpen(trip.id)}>
-      <span className="v3-trip-art" aria-hidden="true" />
-      <span className="v3-trip-over">
-        <span className="v3-tags">
-          {draft && draft !== "done" ? (
-            <span className="v3-tag dim">{draft === "preparing" ? t("En préparation") : t("À valider")}</span>
-          ) : (
-            <span className={"v3-tag " + (ph === "during" ? "ok" : ph === "before" ? "gold" : "dim")}>{ph === "during" ? t("En cours") : ph === "before" ? (d > 0 ? t("J–{d}", { d }) : t("Moins de 24 h")) : t("Passé")}</span>
-          )}
+    <button className={"v3-trip" + (cover ? " has-ph" : " ph-none-trip")} onClick={() => onOpen(trip.id)}>
+      {cover ? (
+        <span className="v3-trip-art has-ph" aria-hidden="true">
+          <Ph photo={cover} size="l" onFail={() => setFailed(true)}><i className="ph-scrim" /></Ph>
         </span>
+      ) : (
+        <span className="v3-trip-art" aria-hidden="true" />
+      )}
+      <span className="v3-trip-over">
+        {cover ? (
+          tags
+        ) : (
+          <>
+            <span className="ph-nt-head">
+              {tags}
+              <span className="ph-nt-code">
+                <b className="v3-d">{trip.code.split(" ")[0]}</b>
+                <span className="ph-coord">{coordText(trip.center)}</span>
+              </span>
+            </span>
+            <span className="ph-nt-line" />
+          </>
+        )}
         <span className="v3-grow" />
         <span className="v3-trip-name">
           <span>
