@@ -45,23 +45,38 @@ async function account(token: string): Promise<{ email: string; member: boolean 
   return { email, member };
 }
 
-/** AI requests an account (outside the shared space) may make per 24 h, everything being free for now */
-const DAILY_CAP = 40;
+/** AI requests per 24 h for a free account, and for a Pro account (the shared space has no cap) */
+const DAILY_CAP = Number(process.env.AI_FREE_DAILY_CAP) || 25;
+const PRO_CAP = Number(process.env.AI_PRO_DAILY_CAP) || 120;
 /** Requests per 24 h for the whole service outside the shared space (a ceiling on total spending) */
 const GLOBAL_CAP = Number(process.env.AI_GLOBAL_DAILY_CAP) || 1500;
-/** Books one request for the account before the AI is called (server function, atomic); null = refused or unknown */
-async function reserve(token: string, task: string, f: typeof fetch): Promise<number | null> {
-  try {
-    const r = await f(`${SUPA_URL}/rest/v1/rpc/reserve_ai_call`, {
+type Booking = { id: number } | { refused: "cap" | "pro" | "prep" | "auth" | "error" };
+/** Books one request for the account before the AI is called (server function, atomic, with the plan's rules:
+ * daily cap, the free trip of the month, a validated trip's programme reserved to Pro). Falls back to the lot 2
+ * function while supabase/saas-4.sql has not run. */
+async function reserve(token: string, task: string, trip: string | null, f: typeof fetch): Promise<Booking> {
+  const call = (fn: string, args: Json) =>
+    f(`${SUPA_URL}/rest/v1/rpc/${fn}`, {
       method: "POST",
       headers: { apikey: SUPA_KEY, authorization: `Bearer ${token}`, "content-type": "application/json" },
-      body: JSON.stringify({ p_task: task, p_cap: DAILY_CAP, p_global_cap: GLOBAL_CAP }),
+      body: JSON.stringify(args),
     });
-    if (!r.ok) return null;
-    const id = await r.json();
-    return typeof id === "number" ? id : null;
+  try {
+    const r = await call("reserve_ai", { p_task: task, p_trip: trip, p_cap: DAILY_CAP, p_pro_cap: PRO_CAP, p_global_cap: GLOBAL_CAP });
+    if (r.ok) {
+      const b = (await r.json()) as Json;
+      if (typeof b?.id === "number") return { id: b.id };
+      const why = String(b?.refused || "error");
+      return { refused: (["cap", "pro", "prep", "auth"].includes(why) ? why : "error") as "cap" };
+    }
+    if (r.status !== 404) return { refused: "error" };
+    // before saas-4.sql: the lot 2 cap of 40 per account, as before
+    const old = await call("reserve_ai_call", { p_task: task, p_cap: 40, p_global_cap: GLOBAL_CAP });
+    if (!old.ok) return { refused: "error" };
+    const id = await old.json();
+    return typeof id === "number" ? { id } : { refused: "cap" };
   } catch {
-    return null;
+    return { refused: "error" };
   }
 }
 /** After the answer: its cost and whether it worked (best effort) */
@@ -737,8 +752,15 @@ export async function handle(req: Request, deps: Deps = {}): Promise<Response> {
   if (!acc.member) {
     if (body.task === "balance") return json({ error: "auth", message: "Réservé à l'espace partagé." }, 403, origin);
     if (body.task === "ask" && typeof body.context === "string" && body.context.length > 150_000) return json({ error: "bad", message: "Carnet trop gros pour une question." }, 400, origin);
-    booked = await reserve(token, String(body.task || ""), f);
-    if (booked == null) return json({ error: "busy", message: `Limite du jour atteinte (${DAILY_CAP} demandes à l'IA). Elle repart dans les 24 heures.` }, 429, origin);
+    const tripId = body.trip && typeof body.trip === "object" && typeof (body.trip as Json).id === "string" ? String((body.trip as Json).id).slice(0, 64) : null;
+    const b = await reserve(token, String(body.task || ""), tripId, f);
+    if ("refused" in b) {
+      if (b.refused === "pro") return json({ error: "pro", message: "Ce voyage est validé : modifier son programme est réservé à ORBES Trips Pro." }, 403, origin);
+      if (b.refused === "prep") return json({ error: "pro", message: "Votre voyage offert de ce mois a déjà été préparé. Passez à Pro pour en préparer d'autres." }, 403, origin);
+      if (b.refused === "cap") return json({ error: "busy", message: "Limite du jour atteinte pour les demandes à l'IA. Elle repart dans les 24 heures." }, 429, origin);
+      return json({ error: "unavailable", message: "Le service ne répond pas, réessayez dans un instant." }, 503, origin);
+    }
+    booked = b.id;
   }
 
   // DeepSeek balance (official API) + our own spending log (DeepSeek has no history API)

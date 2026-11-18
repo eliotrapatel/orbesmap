@@ -6,8 +6,10 @@ import Onboarding from "./Onboarding";
 import Trips from "./Trips";
 import Welcome from "./Welcome";
 import DraftScreen from "./DraftScreen";
-import { openHome, openShare, useHome, useShare } from "./nav";
+import { openAdmin, openHome, openShare, useAdmin, useHome, useShare } from "./nav";
 import ShareTrip from "./ShareTrip";
+import ProScreen from "./ProScreen";
+import AdminScreen from "./AdminScreen";
 
 
 /**
@@ -16,6 +18,19 @@ import ShareTrip from "./ShareTrip";
  * The two people of the first shared space go straight to their trips, as before.
  */
 export default function Root() {
+  const proAsk = useStore((s) => s.proAsk);
+  const admin = useAdmin();
+  const screen = <Screen />;
+  return (
+    <>
+      {screen}
+      {admin && <AdminScreen onClose={() => openAdmin(false)} />}
+      {proAsk && <ProScreen />}
+    </>
+  );
+}
+
+function Screen() {
   const authReady = useStore((s) => s.authReady);
   const session = useStore((s) => s.session);
   const member = useStore((s) => s.member);

@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Trip } from "../../data/types";
-import { createTrip, switchTrip, useStore, useTrips } from "../../lib/store";
+import { createTrip, getState, requestPro, signOut, switchTrip, useStore, useTrips } from "../../lib/store";
 import { dayCount, newTripRecord, searchCities, type Destination } from "../../lib/newTrip";
 import { phase } from "../../lib/time";
 import OrbitMark from "../OrbitMark";
 import Shell, { Steps } from "./Shell";
 import CreateWizard from "./CreateWizard";
+import AccountActions from "./AccountActions";
 
 const greeting = () => {
   const h = new Date().getHours();
@@ -18,7 +19,14 @@ export default function Trips({ onOpen, onClose }: { onOpen: (id: string) => voi
   const trips = useTrips();
   const profile = useStore((s) => s.profile);
   const email = useStore((s) => s.session?.user.email) || "";
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreatingRaw] = useState(false);
+  const [menu, setMenu] = useState(false);
+  // a free account prepares one trip per month with the AI: the next one asks for Pro
+  const setCreating = (v: boolean) => {
+    const p = getState().plan;
+    if (v && p && !p.pro && p.prepLeft <= 0) return requestPro("prep");
+    setCreatingRaw(v);
+  };
   const name = (profile.name as string) || "";
   const initial = (name || email || "·").slice(0, 1).toUpperCase();
   const sorted = useMemo(() => {
@@ -34,7 +42,17 @@ export default function Trips({ onOpen, onClose }: { onOpen: (id: string) => voi
       <OrbitMark size={20} title="ORBES Trips" />
       <span className="v3-grow" />
       {onClose && <button className="v3-tool" onClick={onClose} aria-label="Revenir à la carte">✕</button>}
-      <span className="v3-av" aria-hidden="true">{initial}</span>
+      <button type="button" className="v3-av" aria-label="Mon compte" aria-expanded={menu} onClick={() => setMenu((v) => !v)}>{initial}</button>
+      {menu && (
+        <div className="v3-acct-wrap" onClick={() => setMenu(false)}>
+          <div className="v3-glass v3-acct" role="dialog" aria-label="Mon compte" onClick={(e) => e.stopPropagation()}>
+            <b>{name || email.split("@")[0]}</b>
+            <small>{email}</small>
+            <AccountActions />
+            <button type="button" className="v3-link" onClick={() => { setMenu(false); void signOut(); }}>Se déconnecter</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 

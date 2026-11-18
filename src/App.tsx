@@ -23,7 +23,7 @@ import { Drawer, EscGuard, Toaster } from "./components/ui";
 import type { Place } from "./data/types";
 import { km, optimizeOrder } from "./lib/geo";
 import { dayStops } from "./lib/plan";
-import { createPlace, currentAuthor, switchTrip, toast, updateDef, updatePlace, useCanEdit, useStore, useTrip } from "./lib/store";
+import { createPlace, currentAuthor, switchTrip, toast, updateDef, updatePlace, useCanEdit, useStore, useTrip, needPro } from "./lib/store";
 import { noteKey } from "./lib/notes";
 import { pinPlaceId } from "./lib/live";
 import { enrichPlace } from "./lib/enrich";
@@ -321,6 +321,7 @@ export default function App() {
         name: f.name || f.nameCn || "Lieu", lng: ll[0], lat: ll[1], nameCn: f.nameCn, address: f.address, addressCn: f.addressCn, desc: f.desc,
         why: f.why, hoursText: f.hours, price: f.price, source: f.source, day: f.day, slot: "", type: f.type,
       });
+      if (!id) return null;
       const pin = { id, lng: ll[0], lat: ll[1] };
       // the full sheet (highlights, tip, metro, hours…) is written right away in the background
       void enrichPlace(id, true);
@@ -356,7 +357,7 @@ export default function App() {
         saveFound(ok[0], ok[0].ll!);
         return;
       }
-      const pins = ok.map((f) => saveFound(f, f.ll!, true));
+      const pins = ok.map((f) => saveFound(f, f.ll!, true)).filter((x): x is NonNullable<typeof x> => !!x);
       if (pins.length) {
         toast(`${pins.length} lieu${pins.length > 1 ? "x" : ""} ajouté${pins.length > 1 ? "s" : ""} sur la carte${manual.length ? ` · ${manual.length} à placer à la main` : ""}`);
         if (!manual.length) {
@@ -573,6 +574,7 @@ export default function App() {
                   onOpenPlace={openPlace}
                   onOpenPin={openPin}
                   onAddPlace={(q) => {
+                    if (needPro()) return;
                     setTool(null);
                     setAddInitial(q);
                     setAddLink(true);
@@ -610,10 +612,10 @@ export default function App() {
               </button>
               {canEdit && (
                 <>
-                  <button className={"ctl" + (pinMode ? " on" : "")} onClick={() => { setPlaceQueue([]); setPinMode((v) => !v); }} aria-pressed={pinMode} aria-label="Ajouter un lieu sur la carte" title="Ajouter un lieu">
+                  <button className={"ctl" + (pinMode ? " on" : "")} onClick={() => { if (!pinMode && needPro()) return; setPlaceQueue([]); setPinMode((v) => !v); }} aria-pressed={pinMode} aria-label="Ajouter un lieu sur la carte" title="Ajouter un lieu">
                     <IPinPlus />
                   </button>
-                  <button className="ctl" onClick={() => setAddLink(true)} aria-label="Ajouter un lieu : lien, nom ou description" title="Ajouter un lieu (lien, nom ou description)">
+                  <button className="ctl" onClick={() => !needPro() && setAddLink(true)} aria-label="Ajouter un lieu : lien, nom ou description" title="Ajouter un lieu (lien, nom ou description)">
                     <ILink />
                   </button>
                 </>
@@ -676,8 +678,8 @@ export default function App() {
           onZone={(center, zoom) => fly({ center, zoom })}
           onToggle3D={() => setThreeD((v) => !v)}
           onLocate={toggleLocate}
-          onAddPin={() => setPinMode(true)}
-          onAddLink={() => setAddLink(true)}
+          onAddPin={() => !needPro() && setPinMode(true)}
+          onAddLink={() => !needPro() && setAddLink(true)}
         />
       )}
 
@@ -696,8 +698,7 @@ export default function App() {
             else {
               // a place removed from the programme: put back, then opened
               const r = trip.removed?.find((x) => x.id === id);
-              if (r && canEdit) {
-                updateDef(r.id, { removed: false });
+              if (r && canEdit && updateDef(r.id, { removed: false })) {
                 toast(`« ${r.name} » remis au programme`);
                 openPlace(r);
               }
@@ -710,6 +711,7 @@ export default function App() {
           onClose={() => setPendingPin(null)}
           onSave={(name, note) => {
             const id = createPlace({ name, lng: pendingPin[0], lat: pendingPin[1], slot: "" });
+            if (!id) return setPendingPin(null);
             // the note goes into my own note (signed in) or the shared one (signed out)
             if (note) updatePlace(id, { [noteKey(currentAuthor()) || "note"]: note });
             setPendingPin(null);

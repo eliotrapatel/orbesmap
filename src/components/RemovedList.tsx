@@ -1,17 +1,17 @@
 import type { Place, Trip } from "../data/types";
-import { toast, updateDef, useCanEdit } from "../lib/store";
+import { toast, updateDef, useCanEdit, needPro } from "../lib/store";
 
 /** Removes a place from the programme: hidden everywhere (both phones), listed in "Lieux retirés" to be put back */
 export function removeFromProgramme(place: Place): boolean {
+  if (needPro()) return false;
   if (!confirm(`Retirer « ${place.name} » du programme ?\nIl disparaît de la carte, de la liste et de l'agenda. Vous pourrez le remettre depuis « Lieux retirés », en bas de la liste.`)) return false;
-  updateDef(place.id, { removed: true });
+  if (!updateDef(place.id, { removed: true })) return false;
   toast(`« ${place.name} » retiré du programme`);
   return true;
 }
 
 export function restoreToProgramme(place: Place) {
-  updateDef(place.id, { removed: false });
-  toast(`« ${place.name} » remis au programme`);
+  if (updateDef(place.id, { removed: false })) toast(`« ${place.name} » remis au programme`);
 }
 
 /** Places removed from the programme, with a button to put each one back (in its day and slot) */

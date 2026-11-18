@@ -35,3 +35,21 @@ export const useShare = () =>
     },
     () => shareOpen,
   );
+
+// the admin's screen (accounts, Pro codes, AI cost), opened from the account
+let adminOpen = false;
+const adminSubs = new Set<() => void>();
+export function openAdmin(open = true) {
+  adminOpen = open;
+  adminSubs.forEach((f) => f());
+}
+export const useAdmin = () =>
+  useSyncExternalStore(
+    (f) => {
+      adminSubs.add(f);
+      return () => {
+        adminSubs.delete(f);
+      };
+    },
+    () => adminOpen,
+  );

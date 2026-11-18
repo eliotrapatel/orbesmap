@@ -4,7 +4,7 @@ import type { Place, Trip } from "../data/types";
 import { amapDirections, formatMinutes, googleDirections, travelMinutes } from "../lib/geo";
 import { isHotel, stopTime } from "../lib/plan";
 import { checkVisit, hoursLine, liveStatus } from "../lib/hours";
-import { addContact, addPhoto, currentAuthor, deleteContact, deletePhoto, deletePin, photoSrc, toast, updateDef, updatePin, updatePlace, updateRecord, useCanEdit, useStore } from "../lib/store";
+import { addContact, addPhoto, currentAuthor, deleteContact, deletePhoto, deletePin, photoSrc, toast, updateDef, updatePin, updatePlace, updateRecord, useCanEdit, useStore, needPro, requestPro, useProgrammeLocked } from "../lib/store";
 import { enrichPlace, restorePrevSheet, useEnrich } from "../lib/enrich";
 import EditSheet from "./EditSheet";
 import { fitAll, slotText } from "../lib/slots";
@@ -46,6 +46,7 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH, onMoveP
   const [planning, setPlanning] = useState(false);
   // a reader of a shared trip sees the sheet without anything to change
   const canEdit = useCanEdit();
+  const locked = useProgrammeLocked();
   const [editing, setEditing] = useState(false);
   const [secs, setSecs] = useState(0);
   useEffect(() => {
@@ -91,7 +92,7 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH, onMoveP
               <IStar />
             </button>}
             {canEdit && (
-              <button className="icon-btn" aria-label="Modifier la fiche" onClick={() => setEditing(true)}>
+              <button className="icon-btn" aria-label="Modifier la fiche" onClick={() => !needPro() && setEditing(true)}>
                 <IEdit />
               </button>
             )}
@@ -100,6 +101,7 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH, onMoveP
                 className="icon-btn"
                 aria-label="Supprimer ce lieu"
                 onClick={() => {
+                  if (needPro()) return;
                   const extra = [photos.length ? `${photos.length} photo${photos.length > 1 ? "s" : ""}` : "", contacts.length ? `${contacts.length} contact${contacts.length > 1 ? "s" : ""}` : ""].filter(Boolean).join(" et ");
                   if (!confirm(`Supprimer définitivement « ${place.name} »${extra ? ` avec ${extra}` : ""} ?\nPour le sortir du programme en pouvant le remettre plus tard, utilisez plutôt « Retirer du programme ».`)) return;
                   photos.forEach((p) => deletePhoto(p.id));
@@ -169,7 +171,7 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH, onMoveP
                 <b>{day?.dates?.[0] ? day.short : day?.title}</b>
                 <span>{place.time ? place.time : scheduledDay ? "sans heure" : day?.theme}</span>
               </span>
-              <button className="btn-sm" onClick={() => setPlanning(true)}>{timed ? "Déplacer" : "Placer"}</button>
+              <button className="btn-sm" onClick={() => !needPro() && setPlanning(true)}>{timed ? "Déplacer" : "Placer"}</button>
             </div>
             {suggestion?.ok && !suggestion.tight && (
               <button className="plan-best" style={{ ["--c" as string]: suggestion.day.color }} onClick={() => placeAt(place, suggestion.day.key, slotText(suggestion.start, suggestion.end), trip)}>
@@ -183,6 +185,7 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH, onMoveP
               <p className="em-small">Programme d'origine : {trip.days.find((d) => d.key === place.orig!.day)?.short}{place.orig.time ? `, ${place.orig.time}` : ""}</p>
             )}
             <button className="link-btn plan-remove" onClick={() => removeFromProgramme(place) && onBack()}>Retirer du programme</button>
+            {locked && <button className="pro-note" onClick={() => requestPro("edit")}><span className="pro-tag">PRO</span> Voyage validé : modifier le programme est réservé à Pro.</button>}
           </div>
         )}
 

@@ -8,7 +8,7 @@ import { fmtDay, fmtMin, localDate } from "../lib/time";
 import { checkVisit } from "../lib/hours";
 import { ICalPlus, IClose, IMap, IRoute } from "./Icons";
 import RemovedList, { removeFromProgramme } from "./RemovedList";
-import { useCanEdit } from "../lib/store";
+import { useCanEdit, hasPro, requestPro } from "../lib/store";
 
 export default function Agenda({ trip, states, pins = [], onOpen, onOpenPin, onShowDay, onOptimize }: { trip: Trip; states: Record<string, PlaceState>; pins?: Pin[]; onOpen: (p: Place) => void; onOpenPin?: (p: Pin) => void; onShowDay: (d: string) => void; onOptimize: (d: string) => void }) {
   const canEdit = useCanEdit();
@@ -34,7 +34,7 @@ export default function Agenda({ trip, states, pins = [], onOpen, onOpenPin, onS
         </div>
       )}
       <div style={{ display: "flex", gap: 8, marginBottom: 22, flexWrap: "wrap" }}>
-        <button className="btn-sm" onClick={() => exportIcs(trip, states)}>
+        <button className="btn-sm" onClick={() => (hasPro() ? exportIcs(trip, states) : requestPro("export"))}>
           <ICalPlus /> Ajouter à mon calendrier (.ics)
         </button>
       </div>

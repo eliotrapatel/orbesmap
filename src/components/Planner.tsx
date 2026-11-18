@@ -18,8 +18,8 @@ export function placeAt(place: Place, day: string, slot: string, trip: Trip) {
   const o = place.orig ? rangeOf(place.orig.time) : null;
   const n = rangeOf(slot);
   const same = !!place.orig && place.orig.day === day && (place.orig.time === slot || (!!o && !!n && o.start === n.start && o.end === n.end));
-  if (same && place.orig) updateDef(place.id, { day: place.orig.day, slot: place.orig.time });
-  else updateDef(place.id, { day, slot });
+  const ok = same && place.orig ? updateDef(place.id, { day: place.orig.day, slot: place.orig.time }) : updateDef(place.id, { day, slot });
+  if (!ok) return;
   const d = trip.days.find((x) => x.key === day);
   toast(`« ${place.name} » : ${d?.dates?.[0] ? d.short : d?.title || ""}${slot ? `, ${slot}` : ", sans heure"}`);
 }

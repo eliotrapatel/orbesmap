@@ -1,12 +1,12 @@
 // Calls the ORBES AI relay (api/ai.ts on Vercel). Only members of the shared space can use it.
 import { supabase } from "./supabase";
-import { currentTrip, getState } from "./store";
+import { currentTrip, getState, pullPlan, requestPro } from "./store";
 
 /** Who the AI helps and for which trip (profile + current trip), sent with every request */
 function aiContext() {
   const p = getState().profile;
   const t = currentTrip();
-  return { who: { name: p.name, interests: p.interests, travel: p.travel, pace: p.pace, budget: p.budget, lang: p.lang }, trip: { title: t.title, dates: t.dateLabel }, lang: t.lang };
+  return { who: { name: p.name, interests: p.interests, travel: p.travel, pace: p.pace, budget: p.budget, lang: p.lang }, trip: { id: t.id, title: t.title, dates: t.dateLabel }, lang: t.lang };
 }
 
 const ENDPOINT = (() => {
@@ -115,7 +115,13 @@ export async function ai<T>(task: AiTask, payload: Record<string, unknown>, time
       signal: ctl.signal,
     });
     const body = await res.json().catch(() => ({}));
-    if (!res.ok) throw new AiError(body.message || "Le service ne répond pas, réessayez.");
+    if (!res.ok) {
+      // a validated trip's programme, or the free trip of the month already used: the Pro screen opens
+      if (body.error === "pro") requestPro(task === "outline" ? "prep" : "edit");
+      throw new AiError(body.message || "Le service ne répond pas, réessayez.");
+    }
+    // the free trip of the month is now used: the account's plan says so
+    if (task === "outline") void pullPlan();
     return body as T;
   } catch (e) {
     if (e instanceof AiError) throw e;

@@ -30,6 +30,8 @@ export type Draft = {
   error?: string;
   /** which phone is preparing, and when it last showed signs of life (only one at a time) */
   lease?: { by: string; at: number };
+  /** when the trip was validated (ms): later changes to its programme need Pro on a free account */
+  doneAt?: number;
 };
 
 type Run = { tripId: string; busy: boolean; step: string; found: number; placed: number; err: string | null };
@@ -297,7 +299,8 @@ export async function regenerateDay(tripId: string, date: string) {
 
 /** The trip is confirmed: the preparation screens close, the trip opens */
 export function confirmTrip(tripId: string) {
-  saveDraft(tripId, { status: "done", lease: undefined });
+  // the moment of the validation: after it, a free account's changes to the programme need Pro (saas-4.sql)
+  saveDraft(tripId, { status: "done", doneAt: Date.now(), lease: undefined });
 }
 
 const MAX_ADDS = 3;

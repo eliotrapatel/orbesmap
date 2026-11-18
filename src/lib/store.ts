@@ -61,7 +61,15 @@ interface State {
   authReady: boolean;
   /** last time everything was sent and received (ms) */
   syncedAt: number | null;
+  /** the account's plan (supabase/saas-4.sql); null = not known (signed out, or not on the server yet: nothing locked) */
+  plan: Plan | null;
+  /** the Pro screen is open, and why */
+  proAsk: ProReason | null;
 }
+
+/** Pro = the paid version (opened by codes for now): see supabase/saas-4.sql */
+export type Plan = { uid: string; pro: boolean; until: string | null; granted: boolean; admin: boolean; waitlisted: boolean; prepLeft: number; proTrips: string[] };
+export type ProReason = "edit" | "prep" | "export" | "info";
 
 // ---------- toasts (queued until the UI subscribes) ----------
 type ToastListener = (msg: string) => void;
@@ -191,6 +199,7 @@ let legacyUnsaved: Data | null = null; // kept in memory if storage was too full
   } else legacyUnsaved = merged;
 })();
 
+const PLAN_KEY = "orbes.plan.v1";
 const savedSettings = readJSON<Settings>(SETTINGS_KEY);
 const initialSettings: Settings = { eurRate: savedSettings?.eurRate || legacyRate || 7.7 };
 const startTrip = initialTrip();
@@ -210,6 +219,8 @@ let state: State = {
   pending: 0,
   syncedAt: null,
   authReady: !supabase,
+  plan: readJSON<Plan>(PLAN_KEY),
+  proAsk: null,
 };
 let outbox: Op[] = readJSON<Op[]>(OUTBOX_KEY) || [];
 state.pending = outbox.length;
@@ -896,13 +907,13 @@ function adoptAccount(uid: string) {
   }
   if (!prev || prev === uid) return;
   try {
-    for (const k of Object.keys(localStorage)) if (k.startsWith("orbes.v2.") || k === OUTBOX_KEY || k === TRIPS_KEY || k === PROFILE_KEY || k.startsWith("orbes.ask.") || k.startsWith("orbes.wizard") || k === "orbes.roles.v1") localStorage.removeItem(k);
+    for (const k of Object.keys(localStorage)) if (k.startsWith("orbes.v2.") || k === OUTBOX_KEY || k === TRIPS_KEY || k === PROFILE_KEY || k.startsWith("orbes.ask.") || k.startsWith("orbes.wizard") || k === "orbes.roles.v1" || k === PLAN_KEY) localStorage.removeItem(k);
   } catch {
     /* ignore */
   }
   outbox = [];
   baseCache.clear();
-  set({ trips: {}, profile: {}, roles: {}, data: emptyData(), pending: 0 });
+  set({ trips: {}, profile: {}, roles: {}, data: emptyData(), pending: 0, plan: null });
 }
 
 export async function initAuth() {
@@ -1103,6 +1114,7 @@ function setProfile(p: Profile) {
 async function pullProfile() {
   const uid = state.session?.user.id;
   if (!uid || !supabase) return;
+  void pullPlan();
   if (state.profile.uid && state.profile.uid !== uid) setProfile({ uid });
   const { data, error } = await supabase.from("profiles").select("data,updated_at").eq("id", uid).maybeSingle();
   if (error) return;
@@ -1155,8 +1167,12 @@ function migrate(tripId: string, pinsSynced: boolean) {
 }
 
 /** Changes fields of a place's sheet (day, slot, removed, deleted, texts, hours, position…), shared with the other phone */
-export function updateDef(id: string, patch: Record<string, unknown>) {
+export function updateDef(id: string, patch: Record<string, unknown>): boolean {
   const trip = state.tripId;
+  if (programmeLocked(trip)) {
+    requestPro("edit");
+    return false;
+  }
   const now = Date.now();
   setData((d) => {
     const cur = d.defs[id] || {};
@@ -1165,13 +1181,13 @@ export function updateDef(id: string, patch: Record<string, unknown>) {
     return { ...d, defs: { ...d.defs, [id]: { ...cur, ...patch, fieldsAt, updatedAt: now } } };
   });
   enqueue({ t: "def", trip, id });
+  return true;
 }
 
 /** A new place of the trip (added from a search, a link or on the map); returns its id */
 export function createPlace(fields: Record<string, unknown>): string {
   const id = uid();
-  updateDef(id, { ...fields, origin: "added", order: 1e12 + Date.now() });
-  return id;
+  return updateDef(id, { ...fields, origin: "added", order: 1e12 + Date.now() }) ? id : "";
 }
 
 // ---------- actions ----------
@@ -1263,4 +1279,56 @@ export function setEurRate(eurRate: number) {
 
 export function photoSrc(p: Photo): string | undefined {
   return state.photoUrls[p.id];
+}
+
+// ---------- Pro (supabase/saas-4.sql) ----------
+function setPlan(plan: Plan | null) {
+  if (plan) writeJSON(PLAN_KEY, plan);
+  else
+    try {
+      localStorage.removeItem(PLAN_KEY);
+    } catch {
+      /* ignore */
+    }
+  set({ plan });
+}
+/** The account's plan, read at each sync (missing on the server = nothing locked, as before) */
+export async function pullPlan() {
+  const uid = state.session?.user.id;
+  if (!uid || !supabase) return;
+  const { data, error } = await supabase.rpc("my_plan");
+  if (error) {
+    if (["PGRST202", "42883"].includes(error.code || "")) setPlan(null);
+    return;
+  }
+  const d = (data || {}) as Partial<Plan>;
+  setPlan({ uid, pro: !!d.pro, until: d.until ?? null, granted: !!d.granted, admin: !!d.admin, waitlisted: !!d.waitlisted, prepLeft: Number(d.prepLeft ?? 1), proTrips: Array.isArray(d.proTrips) ? d.proTrips.map(String) : [] });
+}
+/** This account has Pro (its own); unknown = treated as Pro so nothing is blocked by mistake */
+export const hasPro = () => !state.plan || state.plan.pro;
+export const useHasPro = () => useStore((s) => !s.plan || s.plan.pro);
+/** A validated trip's programme can no longer change without Pro (the account's, or the trip owner's) */
+export function programmeLocked(tripId: string = state.tripId): boolean {
+  const p = state.plan;
+  if (!p || p.pro || TRIP_BY_ID[tripId] || p.proTrips.includes(tripId)) return false;
+  return (state.trips[tripId]?.draft as { status?: string } | undefined)?.status === "done";
+}
+export const useProgrammeLocked = () => useStore((s) => programmeLocked(s.tripId));
+/** Opens the Pro screen (why: a locked programme, the free trip of the month used, exports…) */
+export function requestPro(why: ProReason = "info") {
+  set({ proAsk: why });
+}
+export const closePro = () => set({ proAsk: null });
+/** Before an action that changes the programme: true (and the Pro screen opens) when it needs Pro */
+export function needPro(tripId?: string): boolean {
+  if (!programmeLocked(tripId)) return false;
+  requestPro("edit");
+  return true;
+}
+
+/** The account is gone (deleted): its unsent changes are dropped, never sent after it */
+export function discardPending() {
+  outbox = [];
+  persistOutbox();
+  set({ pending: 0 });
 }

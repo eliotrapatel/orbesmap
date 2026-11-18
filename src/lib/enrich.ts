@@ -4,7 +4,7 @@
 // the other phone). The sheet as it was before is kept and can be brought back ("Revenir à la fiche précédente").
 import { useSyncExternalStore } from "react";
 import { ai, AiError, type EnrichResult } from "./ai";
-import { currentTrip, getState, toast, updateDef } from "./store";
+import { currentTrip, getState, toast, updateDef, programmeLocked, needPro } from "./store";
 
 type One = { busy: boolean; startedAt: number; err: string | null };
 const jobs = new Map<string, One>();
@@ -41,6 +41,8 @@ let chain: Promise<void> = Promise.resolve();
  */
 export function enrichPlace(id: string, auto = false): Promise<void> {
   if (jobs.get(id)?.busy) return chain;
+  // a validated trip's sheets are part of its programme: Pro (the screen opens when asked by hand)
+  if (auto ? programmeLocked() : needPro()) return chain;
   const st = getState();
   if (auto && (!navigator.onLine || !st.session || !st.member)) return chain;
   // queued: busy with no start time yet
@@ -66,7 +68,7 @@ async function run(id: string): Promise<void> {
           name: place.name, nameCn: place.nameCn || "", address: place.address, addressCn: place.cn, lat: place.lat, lng: place.lng, type: place.type,
           desc: place.desc, why: place.why || "", hours: place.hoursText || "", source: place.source || place.website || "", note: place.added?.note || "",
         },
-        trip: { title: trip.title, dates: trip.dateLabel },
+        trip: { id: trip.id, title: trip.title, dates: trip.dateLabel },
       },
       290_000,
     );
@@ -106,9 +108,9 @@ async function run(id: string): Promise<void> {
     const prev: Record<string, unknown> = { at: Date.now() };
     for (const k of SHEET) if (k in patch) prev[k] = cur[k] ?? null;
     if (Object.keys(prev).length > 1) patch.prevSheet = prev;
-    updateDef(id, patch);
+    const saved = updateDef(id, patch);
     set(id, IDLE);
-    toast(`Fiche de « ${place.name} » mise à jour`);
+    if (saved) toast(`Fiche de « ${place.name} » mise à jour`);
   } catch (e) {
     const msg = e instanceof AiError ? e.message : "La fiche n'a pas pu être mise à jour. Réessayez.";
     set(id, { busy: false, startedAt: 0, err: msg });
@@ -122,6 +124,5 @@ export function restorePrevSheet(id: string) {
   if (!prev) return;
   const patch: Record<string, unknown> = { prevSheet: null };
   for (const k of SHEET) if (k in prev) patch[k] = prev[k];
-  updateDef(id, patch);
-  toast("Fiche précédente remise");
+  if (updateDef(id, patch)) toast("Fiche précédente remise");
 }

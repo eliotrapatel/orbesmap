@@ -2,6 +2,7 @@ import { useState } from "react";
 import { sendLoginEmail, signInWithPassword, signOut, useStore, verifyLoginCode, type SyncState } from "../lib/store";
 import { supabaseConfigured } from "../lib/supabase";
 import AiCredit from "./AiCredit";
+import AccountActions from "./v3/AccountActions";
 
 const SYNC_TEXT: Record<SyncState, string> = {
   local: "Enregistré sur cet appareil",
@@ -57,15 +58,16 @@ export default function Account() {
     return (
       <div>
         <div className="card">
-          <h4>{member === false ? "Accès non autorisé" : "Espace partagé"}</h4>
+          <h4>{member === false ? "Votre compte" : "Espace partagé"}</h4>
           <p style={{ marginTop: 6 }}>Connecté avec {session.user.email}</p>
           <div style={{ marginTop: 14 }}><SyncBadge /></div>
           {member === false ? (
-            <p style={{ marginTop: 14 }}>Cette adresse ne figure pas dans la liste des membres. Ajoutez-la dans Supabase (table « members »), puis reconnectez-vous.</p>
+            <p style={{ marginTop: 14 }}>Vos voyages sont sauvegardés en ligne et partagés avec les personnes que vous invitez. Ils restent aussi sur cet appareil pour fonctionner sans réseau.</p>
           ) : (
             <p style={{ marginTop: 14 }}>Vos données sont sauvegardées en ligne et partagées en direct avec les autres membres. Elles restent aussi sur cet appareil pour fonctionner sans réseau.</p>
           )}
           {member !== false && <AiCredit />}
+          <AccountActions variant="app" />
           <button
             className="btn danger block"
             style={{ marginTop: 16 }}

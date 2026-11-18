@@ -100,7 +100,7 @@ export default function EditSheet({ trip, place, onClose, onMovePoint }: { trip:
     if (!f.name.trim() || !timesOk) return false;
     const patch = patchOf();
     if (Object.keys(patch).length) {
-      updateDef(place.id, patch);
+      if (!updateDef(place.id, patch)) return false;
       toast("Fiche enregistrée");
     }
     if (close) onClose();
