@@ -3,6 +3,8 @@
 // Without network, a straight-line estimate is shown instead.
 import { km } from "./geo";
 import { getLang } from "./i18n";
+import { markOfflineUse, packRoute } from "./offlinePack";
+import { getState } from "./store";
 
 export type Mode = "walk" | "car";
 export type LL = { lat: number; lng: number };
@@ -67,13 +69,25 @@ function decode(str: string, precision = 6): [number, number][] {
   return out;
 }
 
-/** fresh: skip the cache read (used when recomputing after leaving the route) */
-export async function fetchRoute(from: LL, to: LL, mode: Mode, signal?: AbortSignal, fresh = false): Promise<Route> {
-  const k = keyOf(from, to, mode);
-  const cache = readCache();
-  const hit = fresh ? undefined : cache.find((c) => c.k === k);
-  if (hit && Date.now() - hit.t < 7 * 864e5) return hit.r;
-  if (!navigator.onLine) return estimate(from, to, mode);
+/**
+ * Without network (or when OSRM fails): the route of the offline pack that ends at this place, cut from where the
+ * traveller stands (lib/offlinePack.ts), else the straight-line estimate. Never throws.
+ */
+async function offlineRoute(from: LL, to: LL, mode: Mode): Promise<Route> {
+  try {
+    const r = await packRoute(from, to, mode);
+    if (r) {
+      if (!navigator.onLine) markOfflineUse(getState().tripId, "route");
+      return r;
+    }
+  } catch {
+    /* the estimate below */
+  }
+  return estimate(from, to, mode);
+}
+
+/** One route from the OSRM servers (network only; the offline pack downloads its routes with it too) */
+export async function osrmRoute(from: LL, to: LL, mode: Mode, signal?: AbortSignal): Promise<Route> {
   const url = `${BASE[mode]}${from.lng.toFixed(6)},${from.lat.toFixed(6)};${to.lng.toFixed(6)},${to.lat.toFixed(6)}?overview=full&geometries=polyline6&steps=false&alternatives=false`;
   // hand-made timeout (AbortSignal.timeout / any are missing on older iPhones)
   const ctl = new AbortController();
@@ -92,14 +106,27 @@ export async function fetchRoute(from: LL, to: LL, mode: Mode, signal?: AbortSig
     const coords: [number, number][] = [[from.lng, from.lat], ...decode(r0.geometry), [to.lng, to.lat]];
     const dist = r0.distance + w0 + w1;
     const route: Route = { coords, distance: dist, duration: mode === "car" ? carSeconds(r0.duration, dist) : Math.max(r0.duration, walkSeconds(dist)), estimate: false, raw: r0.duration + (w0 + w1) / 1.3 };
+    return route;
+  } finally {
+    window.clearTimeout(timer);
+    signal?.removeEventListener("abort", onAbort);
+  }
+}
+
+/** fresh: skip the cache read (used when recomputing after leaving the route) */
+export async function fetchRoute(from: LL, to: LL, mode: Mode, signal?: AbortSignal, fresh = false): Promise<Route> {
+  const k = keyOf(from, to, mode);
+  const cache = readCache();
+  const hit = fresh ? undefined : cache.find((c) => c.k === k);
+  if (hit && Date.now() - hit.t < 7 * 864e5) return hit.r;
+  if (!navigator.onLine) return offlineRoute(from, to, mode);
+  try {
+    const route = await osrmRoute(from, to, mode, signal);
     writeCache([...cache.filter((c) => c.k !== k), { k, r: route, t: Date.now() }]);
     return route;
   } catch (e) {
     if (signal?.aborted) throw e;
-    return estimate(from, to, mode);
-  } finally {
-    window.clearTimeout(timer);
-    signal?.removeEventListener("abort", onAbort);
+    return offlineRoute(from, to, mode);
   }
 }
 

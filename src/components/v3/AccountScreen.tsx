@@ -13,6 +13,8 @@ import { openAdmin, useAdmin } from "./nav";
 import { legalHref } from "./Legal";
 import { InboundInbox } from "./AlertsAndInbox";
 import ProChip from "./ProMark";
+import { track } from "../../lib/track";
+import { takeEntry } from "../../lib/entry";
 
 // ---------- the account: one structure for the trip's "Compte" panel and the "Mes voyages" account screen ----------
 
@@ -153,6 +155,33 @@ function AccountHeader({ status }: { status?: ReactNode }) {
 function AlertRows() {
   useStore((s) => s.profile.alerts);
   const prefs = alertPrefs();
+  // the cycle's tips and reminders by e-mail (lot cycle): a profile field of its own, off also when the address used
+  // the unsubscribe link of an e-mail (mail_optout, supabase/saas-14.sql; ignored before it runs)
+  const tipsOn = useStore((s) => s.profile.mailTips !== false);
+  const [optedOut, setOptedOut] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    if (supabase)
+      void supabase
+        .from("mail_optout")
+        .select("email")
+        .limit(1)
+        .then(
+          ({ data, error }) => alive && !error && !!data?.length && setOptedOut(true),
+          () => undefined,
+        );
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const setTips = (v: boolean) => {
+    updateProfile({ mailTips: v });
+    if (v) {
+      setOptedOut(false);
+      void supabase?.rpc("mail_optin").then(() => undefined, () => undefined);
+    }
+    track("alerts_changed", v ? "tips_on" : "tips_off");
+  };
   const [on, setOn] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -187,6 +216,13 @@ function AlertRows() {
         title={t("E-mail du matin")}
         sub={t("Chaque jour du voyage vers 7\u00a0h\u00a030\u00a0: la journée, les horaires, les lieux fermés.")}
         end={<Switch id={id + "m"} label={t("E-mail du matin")} checked={prefs.email} onChange={(v) => setAlertPrefs({ email: v })} />}
+      />
+      <Row
+        htmlFor={id + "t"}
+        icon={<IMail />}
+        title={t("Conseils et rappels par e-mail")}
+        sub={t("Premier voyage, départ, réservation détectée, voyage du mois. Jamais plus d'un tous les 2 jours.")}
+        end={<Switch id={id + "t"} label={t("Conseils et rappels par e-mail")} checked={tipsOn && !optedOut} onChange={setTips} />}
       />
       <Row
         htmlFor={blocker ? undefined : id + "p"}
@@ -412,9 +448,10 @@ function DeleteRow() {
 export function TripRows({ offline, exports }: { offline: ReactNode; exports: ReactNode }) {
   const st = useOffline();
   // a download under way stays in view: its progress is what the person came for
-  const [open, setOpen] = useState<"offline" | "exports" | null>(st.state === "running" ? "offline" : null);
+  // the J-3 reminder (?offline=1) opens it too
+  const [open, setOpen] = useState<"offline" | "exports" | null>(() => (takeEntry("offline") || st.state === "running" || st.phase ? "offline" : null));
   const toggle = (k: "offline" | "exports") => setOpen((v) => (v === k ? null : k));
-  const offState = st.state === "running" ? t("Téléchargement…") : st.state === "ready" ? t("Carte téléchargée sur ce téléphone") : t("Désactivé");
+  const offState = st.state === "running" || st.phase ? t("Téléchargement…") : st.state === "ready" ? t("Carte téléchargée sur ce téléphone") : t("Désactivé");
   return (
     <>
       {offlineSupported && (

@@ -9,6 +9,7 @@ import { track } from "../../lib/track";
 import CreateWizard, { WIZARD_KEY, type Wiz } from "./CreateWizard";
 import CreateOptions, { type Prefill } from "./CreateOptions";
 import { openHome } from "./nav";
+import { useBookingEntry } from "../../lib/entry";
 
 /** "Lisbonne, 12 – 19 mars 2027" */
 const whereWhen = (d: DetectedTrip) => {
@@ -177,6 +178,7 @@ export function InboundInbox({ home, empty }: { home?: boolean; empty?: ReactNod
   }, [tripId]);
   const drop = (id: number) => setItems((xs) => (xs || []).filter((y) => y.id !== id));
   const flow = useTripFromBooking(drop);
+  useBookingEntry(items, flow);
   if (items === null) return <p className="ac-inbox-wait">{t("Recherche des réservations reçues…")}</p>;
   if (!items.length) return <>{empty}{flow.overlay}</>;
   return (

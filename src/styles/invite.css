@@ -19,6 +19,8 @@
 .inv-form .v3-field { min-height: 48px; }
 .inv-form .v3-field input { height: 46px; }
 .inv-form-row { display: flex; justify-content: flex-end; gap: 8px; }
+.inv-check { display: flex; align-items: center; gap: 9px; min-height: 36px; font-size: 13px; color: var(--soft); cursor: pointer; }
+.inv-check input { flex: none; width: 18px; height: 18px; margin: 0; accent-color: var(--ink); }
 .inv-form-row .v3-chip { height: 38px; font-size: 13.5px; }
 
 .inv-tell { margin-top: 8px; padding-left: 46px; }

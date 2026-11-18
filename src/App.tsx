@@ -36,6 +36,7 @@ import { track, trackOnce } from "./lib/track";
 import { t } from "./lib/i18n";
 import { coverMissing, needsLookup } from "./lib/photoData";
 import { askPhotos, keepTripPhotos } from "./lib/placePhotos";
+import { entryHas } from "./lib/entry";
 
 type Sel = { kind: "place" | "pin"; id: string } | null;
 type Snap = "peek" | "half" | "full";
@@ -78,7 +79,8 @@ export default function App() {
   const [day, setDay] = useState("all");
   const [filter, setFilter] = useState<Filter>({ types: new Set(), fav: false, todo: false });
   const [sel, setSel] = useState<Sel>(null);
-  const [tool, setTool] = useState<ToolKey | null>(null);
+  // the J-3 reminder (?offline=1) opens the account panel on the trip's offline card
+  const [tool, setTool] = useState<ToolKey | null>(() => (entryHas("offline") ? "account" : null));
   useEffect(() => {
     if (tool) track("tool_opened", tool);
   }, [tool]);

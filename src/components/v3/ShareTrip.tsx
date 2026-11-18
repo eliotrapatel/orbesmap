@@ -4,6 +4,7 @@ import { pull, toast, useStore, useTrip } from "../../lib/store";
 import Shell from "./Shell";
 import { closeLink, linkOf, linkUrl, openLink, shareUrl } from "../../lib/publicTrip";
 import { t } from "../../lib/i18n";
+import { inviteNote, inviteText, sendInvite, type InviteMailResult } from "../../lib/inviteMail";
 
 const ROLE = { owner: "Propriétaire", editor: "Peut modifier", viewer: "Lecture seule" } as const;
 
@@ -21,6 +22,9 @@ export default function ShareTrip({ onClose }: { onClose: () => void }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [lastInvite, setLastInvite] = useState<string | null>(null);
+  // the invitation e-mail sent by the server (lot cycle), and its answer for the last invitation
+  const [byMail, setByMail] = useState(true);
+  const [mailed, setMailed] = useState<InviteMailResult | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -49,7 +53,7 @@ export default function ShareTrip({ onClose }: { onClose: () => void }) {
       setBusy(false);
     }
   };
-  const msg = inviteMessage(trip.title, myName);
+  const msg = mailed?.link ? inviteText(trip.title, myName, mailed.link) : inviteMessage(trip.title, myName);
   const send = async (to: string) => {
     // the phone's share sheet when there is one, else the message is copied
     try {
@@ -82,7 +86,7 @@ export default function ShareTrip({ onClose }: { onClose: () => void }) {
       <p className="v3-lead" style={{ marginTop: 10 }}>{trip.title} · {trip.dateLabel}</p>
 
       {canManage && (
-        <form className="v3-glass" style={{ padding: 14, marginTop: 18, display: "flex", flexDirection: "column", gap: 10 }} onSubmit={(e) => { e.preventDefault(); const to = email.trim(); void act(async () => { await invite(trip.id, to, role); setLastInvite(to); setEmail(""); }, t("Invitation enregistrée")); }}>
+        <form className="v3-glass" style={{ padding: 14, marginTop: 18, display: "flex", flexDirection: "column", gap: 10 }} onSubmit={(e) => { e.preventDefault(); const to = email.trim(); void act(async () => { await invite(trip.id, to, role); setLastInvite(to); setMailed(null); setEmail(""); const mail = byMail; void sendInvite(trip.id, to, mail).then((r) => setMailed(r)); }, t("Invitation enregistrée")); }}>
           <label className="v3-field">
             <span className="sr">{t("Adresse e-mail")}</span>
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("Adresse e-mail de la personne")} autoComplete="email" />
@@ -90,10 +94,14 @@ export default function ShareTrip({ onClose }: { onClose: () => void }) {
           <div className="v3-seg" role="radiogroup" aria-label={t("Rôle")} style={{ marginTop: 0 }}>
             {(["editor", "viewer"] as const).map((r) => <button type="button" key={r} role="radio" aria-checked={role === r} className={role === r ? "on" : ""} onClick={() => setRoleNew(r)}>{t(ROLE[r])}</button>)}
           </div>
+          <label style={{ display: "flex", alignItems: "center", gap: 9, minHeight: 36, fontSize: 13, color: "var(--soft)", cursor: "pointer" }}>
+            <input type="checkbox" checked={byMail} onChange={(e) => setByMail(e.target.checked)} style={{ flex: "none", width: 18, height: 18, margin: 0, accentColor: "var(--ink)" }} />
+            <span>{t("Envoyer l'invitation par e-mail")}</span>
+          </label>
           <button className="v3-btn" disabled={busy || !/^\S+@\S+\.\S+$/.test(email.trim())}>{t("Inviter")}</button>
           {lastInvite && (
             <div className="v3-msg">
-              <p>{t("Envoyez-lui ce message : dès qu'elle se connecte avec")} <b>{lastInvite}</b>{t(", le voyage apparaît chez elle.")}</p>
+              {inviteNote(mailed || undefined, lastInvite) ? <p role="status">{inviteNote(mailed || undefined, lastInvite)}</p> : <p>{t("Envoyez-lui ce message : dès qu'elle se connecte avec")} <b>{lastInvite}</b>{t(", le voyage apparaît chez elle.")}</p>}
               <button type="button" className="v3-btn ghost" style={{ marginTop: 8 }} onClick={() => void send(lastInvite)}>{t("Envoyer l'invitation")}</button>
             </div>
           )}

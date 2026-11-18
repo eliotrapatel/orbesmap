@@ -19,6 +19,7 @@ import AccountScreen from "./AccountScreen";
 import { SyncBadge } from "../Account";
 import { IClose } from "../Icons";
 import { t } from "../../lib/i18n";
+import { entryHas, takeEntry } from "../../lib/entry";
 
 const greeting = () => {
   const h = new Date().getHours();
@@ -66,6 +67,11 @@ export default function Trips({ onOpen, onClose }: { onOpen: (id: string) => voi
   const roles = useStore((s) => s.roles);
   const member = useStore((s) => s.member);
   const coverless = useMemo(() => trips.filter((x) => coverMissing(x.cover) && canAskPhotos(x)).slice(0, 3), [trips, roles, member]); // eslint-disable-line react-hooks/exhaustive-deps
+  // a link from a cycle e-mail: "?new=1" opens the creation (same rule as the button), "?booking=" the account and its bookings
+  useEffect(() => {
+    if (entryHas("booking")) setMenu(true);
+    else if (takeEntry("new")) setCreating(true);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const coverlessKey = coverless.map((x) => x.id).join(",");
   useEffect(() => {
     if (!coverlessKey) return;
