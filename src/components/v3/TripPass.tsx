@@ -12,6 +12,8 @@ import "../../styles/plans.css";
 export default function TripPassLine({ trip }: { trip: Trip }) {
   const plan = useStore((s) => s.plan);
   const hasDraft = useStore((s) => !!s.trips[trip.id]?.draft);
+  // its creator (or a trip not sent yet, with no role): invited travellers never see "Créé à la main"
+  const owner = useStore((s) => (s.roles[trip.id] ?? "owner") === "owner");
   if (!plan || plan.pro) return null;
   const pass = plan.passes?.[trip.id];
   if (pass?.kind === "pass" && pass.until)
@@ -31,8 +33,8 @@ export default function TripPassLine({ trip }: { trip: Trip }) {
         <p>{pass.by ? t("Pro sur ce voyage, offert par {name}", { name: pass.by }) : t("Pro sur ce voyage")}</p>
       </div>
     );
-  // a trip created by hand (no preparation), the free AI trip of the month used, the trip not Pro
-  if (hasDraft || TRIP_BY_ID[trip.id] || plan.prepLeft > 0 || tripHasPro(trip.id)) return null;
+  // a trip created by hand (no preparation) by this account, the free AI trip of the month used, the trip not Pro
+  if (!owner || hasDraft || TRIP_BY_ID[trip.id] || plan.prepLeft > 0 || tripHasPro(trip.id)) return null;
   return (
     <div className="card tp-line tp-manual">
       <p>{t("Créé à la main")}</p>

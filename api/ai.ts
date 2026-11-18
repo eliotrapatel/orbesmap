@@ -905,10 +905,13 @@ export class TaskFailure extends Error {
   }
 }
 /** Runs "outline", "essentials" or "day" with the same instructions as the relay; the body is the app's request */
-export async function runTask(task: "outline" | "essentials" | "day", body: Json, opts: { env?: Record<string, string | undefined>; fetch?: typeof fetch; client?: Anthropic; deadlineMs?: number } = {}): Promise<TaskRun> {
+export async function runTask(task: "outline" | "essentials" | "day", body: Json, opts: { env?: Record<string, string | undefined>; fetch?: typeof fetch; client?: Anthropic; deadlineMs?: number; cheap?: boolean } = {}): Promise<TaskRun> {
   const env = opts.env || process.env;
   const f = opts.fetch || fetch;
-  const { provider, dsKey, claudeKey } = pickProvider(env, opts.client);
+  const picked = pickProvider(env, opts.client);
+  const { dsKey, claudeKey } = picked;
+  // above the free monthly budget (the booking says `cheap`): the cheaper provider answers, when its key is set
+  const provider = opts.cheap && dsKey ? "deepseek" : picked.provider;
   const usage = newUsage();
   const started = Date.now();
   if (!provider) throw new TaskFailure("config", usage, "", "", 0);

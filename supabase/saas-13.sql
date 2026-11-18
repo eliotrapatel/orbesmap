@@ -155,6 +155,7 @@ revoke all on function public.reserve_ai2(text, text, int, int, int, numeric, in
 grant execute on function public.reserve_ai2(text, text, int, int, int, numeric, int) to authenticated;
 
 -- 5. The caller's trips that are Pro by a Pass or by their owner: who offers it (a first name, never an e-mail) ----
+-- A Pass names its payer only (an admin's Pass has none: the plain "Pass voyage jusqu'au …", no "offert par").
 create or replace function public.my_trip_passes()
 returns jsonb
 language sql
@@ -168,14 +169,14 @@ as $$
            case when g.trip_id is not null then 'pass' else 'owner' end as kind,
            g.until as until,
            nullif(split_part(trim(coalesce(p.data ->> 'name', '')), ' ', 1), '') as giver,
-           coalesce(coalesce(g.payer, o.user_id) = auth.uid(), false) as mine
+           coalesce(case when g.trip_id is not null then g.payer else o.user_id end = auth.uid(), false) as mine
     from public.trip_members m
     left join public.trip_grants g on g.trip_id = m.trip_id and g.until > now()
     left join lateral (
       select w.user_id from public.trip_members w
       where w.trip_id = m.trip_id and w.role = 'owner' and public.is_pro_user(w.user_id) limit 1
     ) o on true
-    left join public.profiles p on p.id = coalesce(g.payer, o.user_id)
+    left join public.profiles p on p.id = case when g.trip_id is not null then g.payer else o.user_id end
     where m.user_id = auth.uid() and m.trip_id not in ('sha-2026', 'gz-2026')
       and (g.trip_id is not null or o.user_id is not null)
   ) x;
@@ -185,7 +186,9 @@ grant execute on function public.my_trip_passes() to authenticated;
 
 -- 6. The admin gives (or removes) a Pass on a trip ---------------------------------------------
 -- p_days: 0 = removed; 1..365 = that many days from now; null = the Pass rule: the trip's end + 30 days, at least
--- 60 days from now, at most 365 days from now (no end date: 60 days). p_payer: null or a traveller of the trip.
+-- 60 days from now, at most 365 days from now (no end date: 60 days). p_payer: null or a traveller of the trip (the
+-- admin's screen sends null: nobody paid, so nobody is shown as the giver). The events go to p_payer, else to the
+-- trip's owner (detail 'admin': the admin chose).
 create or replace function public.admin_grant_trip_pass(p_trip text, p_payer uuid, p_days int)
 returns jsonb
 language plpgsql
@@ -196,6 +199,7 @@ declare
   tr public.trips;
   e date;
   u timestamptz;
+  who uuid;
 begin
   if not public.is_admin() then raise exception 'admin only' using errcode = '42501'; end if;
   select * into tr from public.trips where id = p_trip;
@@ -204,9 +208,10 @@ begin
     return jsonb_build_object('error', 'payer');
   end if;
   if p_days is not null and (p_days < 0 or p_days > 365) then return jsonb_build_object('error', 'days'); end if;
+  who := coalesce(p_payer, (select w.user_id from public.trip_members w where w.trip_id = p_trip and w.role = 'owner' limit 1));
   if p_days = 0 then
     delete from public.trip_grants where trip_id = p_trip;
-    insert into public.events (user_id, name, detail, trip_id) values (p_payer, 'pass_removed', 'admin', p_trip);
+    insert into public.events (user_id, name, detail, trip_id) values (who, 'pass_removed', 'admin', p_trip);
     return jsonb_build_object('until', null);
   end if;
   if p_days is null then
@@ -226,7 +231,7 @@ begin
   values (p_trip, p_payer, u, 'admin', auth.uid(), now())
   on conflict (trip_id) do update set payer = excluded.payer, until = excluded.until, source = excluded.source,
                                      created_by = excluded.created_by, updated_at = now();
-  insert into public.events (user_id, name, detail, trip_id) values (p_payer, 'pass_granted', 'admin', p_trip);
+  insert into public.events (user_id, name, detail, trip_id) values (who, 'pass_granted', 'admin', p_trip);
   return jsonb_build_object('until', u);
 end;
 $$;

@@ -11,8 +11,9 @@ const usd = (n: number) => t("{n} $", { n: (Number(n) || 0) < 0.1 && Number(n) >
 const dayIso = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString(locale(), { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 
 /** In an account's sheet, on one of its trips: "Pass jusqu'au …" or "Offrir un Pass" (a second touch confirms, with
- *  the date it will run to), "Retirer le Pass" (a second touch). `payer`: the account whose sheet is open. */
-export function AdminTripPass({ tripId, payer }: { tripId: string; payer: string }) {
+ *  the date it will run to), "Retirer le Pass" (a second touch). No payer: nobody paid, the admin chose, so the group
+ *  reads "Pass voyage jusqu'au …" without "offert par" (the events go to the trip's owner, see saas-13.sql). */
+export function AdminTripPass({ tripId }: { tripId: string }) {
   const [row, setRow] = useState<TripPassRow | null | undefined>(undefined);
   const [sure, setSure] = useState<"give" | "remove" | null>(null);
   const [busy, setBusy] = useState(false);
@@ -43,7 +44,7 @@ export function AdminTripPass({ tripId, payer }: { tripId: string; payer: string
     setSure(null);
     setBusy(true);
     setErr(null);
-    adminGrantTripPass(tripId, payer, kind === "give" ? null : 0).then(
+    adminGrantTripPass(tripId, null, kind === "give" ? null : 0).then(
       () => {
         setBusy(false);
         setN((x) => x + 1);
@@ -93,11 +94,14 @@ export function AdminAiBudget() {
   if (data === null) return <p className="v3-note">{t("Lancez supabase/saas-13.sql")}</p>;
   const people = (list: AiBudget["over"]) =>
     list.length ? (
-      list.map((r) => (
-        <div key={r.email} className="adm-tr atp-tr">
-          <span className="atp-mail">{r.email}</span><span>{r.requests}</span><span>{usd(r.usd)}</span>
-        </div>
-      ))
+      <>
+        <div className="adm-tr adm-th atp-tr"><span>{t("E-mail")}</span><span>{t("Demandes")}</span><span>{t("Coût")}</span></div>
+        {list.map((r) => (
+          <div key={r.email} className="adm-tr atp-tr">
+            <span className="atp-mail">{r.email}</span><span>{r.requests}</span><span>{usd(r.usd)}</span>
+          </div>
+        ))}
+      </>
     ) : (
       <p className="v3-note">{t("Personne pour l'instant.")}</p>
     );

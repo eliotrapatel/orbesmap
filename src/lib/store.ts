@@ -1396,8 +1396,9 @@ export async function pullPlan() {
   // a free account back from "Créer un compte / Se connecter" on the Pro screen: the offer it had chosen opens again
   if (!plan.pro && pendingOffer()) requestPro("info");
   else if (plan.pro) clearOffer();
-  // who offers Pro on a trip (supabase/saas-13.sql): only read when a trip other than the code trips is Pro
-  if (!plan.proTrips.some((id) => !TRIP_BY_ID[id])) {
+  // who offers Pro on a trip (supabase/saas-13.sql): only read for a free account with a Pro trip other than the code
+  // trips (a Pro account, a member or an admin never shows it)
+  if (plan.pro || !plan.proTrips.some((id) => !TRIP_BY_ID[id])) {
     if (known) setPlan(plan);
     return;
   }

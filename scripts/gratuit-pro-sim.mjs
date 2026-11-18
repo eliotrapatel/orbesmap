@@ -196,6 +196,21 @@ console.log("2. providers and cost");
   check(near(u.usd, 29), "a dated model name: its family's price (claude-opus-4-8: 5 $ / 1M input)");
 }
 
+{
+  // api/prepare.ts hands the booking's `cheap` to runTask (checked in scripts/prepare-sim.mjs, section 15)
+  const w = world();
+  const cl = claude(w.calls, { pause: false });
+  const env = { ...BOTH, AI_PROVIDER: "claude" };
+  const body = { plan: "Florence, 3 jours", country: "it" };
+  const a = await AI.runTask("essentials", body, { env, fetch: w.f, client: cl, cheap: true }).catch((e) => e);
+  check(w.calls.ds >= 1 && w.calls.claude === 0 && a.provider === "deepseek", "server preparation above the free budget: DeepSeek answers even with AI_PROVIDER=claude");
+  const b = await AI.runTask("essentials", body, { env, fetch: w.f, client: cl }).catch((e) => e);
+  check(w.calls.claude === 1 && b.provider === "claude", "…without cheap: AI_PROVIDER=claude answers as today");
+  const w2 = world();
+  const c = await AI.runTask("essentials", body, { env: { ANTHROPIC_API_KEY: "cl", AI_PROVIDER: "claude" }, fetch: w2.f, client: claude(w2.calls, { pause: false }), cheap: true }).catch((e) => e);
+  check(w2.calls.ds === 0 && w2.calls.claude === 1 && c.provider === "claude", "…cheap without a DeepSeek key: Claude still answers (never a stop)");
+}
+
 // ---------- 3. the free plan's rules ----------
 console.log("3. src/lib/planRules.ts");
 {
@@ -253,6 +268,12 @@ console.log("4. supabase/saas-13.sql (static)");
   check(forbidden.every((f) => !new RegExp(`function public\\.${f}\\(`).test(code)), "does not redefine track_event, my_plan, trip_locked, upsert_place, the admin's other functions, is_pro");
   check(!/function public\.reserve_ai\(/.test(code), "does not redefine the 5-argument reserve_ai");
   check(!/drop table|drop function|truncate/i.test(code), "no drop table, drop function or truncate");
+  const mtp = code.slice(code.indexOf("function public.my_trip_passes"), code.indexOf("$$;", code.indexOf("function public.my_trip_passes")));
+  check(/case when g\.trip_id is not null then g\.payer else o\.user_id end = auth\.uid\(\)/.test(mtp) && /p\.id = case when g\.trip_id is not null then g\.payer else o\.user_id end/.test(mtp), "a Pass names its payer only: an admin's Pass (no payer) shows no « offert par » and is nobody's « mine »");
+  const grant = code.slice(code.indexOf("function public.admin_grant_trip_pass"), code.indexOf("$$;", code.indexOf("function public.admin_grant_trip_pass")));
+  check(/who := coalesce\(p_payer, \(select w\.user_id from public\.trip_members w where w\.trip_id = p_trip and w\.role = 'owner'/.test(grant) && /values \(who, 'pass_granted'/.test(grant) && /values \(who, 'pass_removed'/.test(grant), "the admin's Pass events go to the payer, else to the trip's owner");
+  const atp = readFileSync(new URL("../src/components/v3/AdminTripPass.tsx", import.meta.url), "utf8");
+  check(/adminGrantTripPass\(tripId, null,/.test(atp) && !/payer/.test(atp.slice(atp.indexOf("export function AdminTripPass"), atp.indexOf("export function AdminTripPass") + 120)), "the admin's screen gives a Pass with no payer");
   check(/delete from public\.trip_grants where trip_id = p_trip/.test(code) && (code.match(/delete from/g) || []).length === 1, "the only delete: the admin removing a Pass");
 }
 

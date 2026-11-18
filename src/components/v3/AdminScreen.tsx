@@ -396,7 +396,7 @@ function AccountSheet({ row, onClose }: { row: AccountRow; onClose: () => void }
                   <div className="v3-grow adm-main">
                     <b>{tr.title || t("Sans titre")}</b>
                     <small>{tr.dates || ""} · {tr.role === "owner" ? t("créé") : tr.role === "editor" ? t("invité (modifie)") : t("invité (lecture)")} {day(tr.created_at)} · {tr.places > 1 ? t("{n} lieux", { n: tr.places }) : t("{n} lieu", { n: tr.places })} · {tr.status === "done" ? t("validé") : tr.status === "review" ? t("en revue") : tr.status === "preparing" ? t("en préparation") : t("sans préparation")}</small>
-                    <AdminTripPass tripId={tr.id} payer={row.user_id} />
+                    <AdminTripPass tripId={tr.id} />
                   </div>
                 </div>
               ))}
