@@ -6,13 +6,14 @@
 import type { Trip } from "../data/types";
 import type { PlaceDef } from "./model";
 import { t as tr } from "./i18n";
+import { asCover } from "./photoData";
 
 export type TripRec = PlaceDef;
 
 /** The fields of a trip kept in its record (places are records of their own) */
 export const TRIP_FIELDS = [
   "code", "title", "subtitle", "dateLabel", "start", "end", "timezone", "country", "lang", "hotel", "center",
-  "days", "flights", "phrases", "zones", "practical", "emergency", "checklist", "mode", "travellers",
+  "days", "flights", "phrases", "zones", "practical", "emergency", "checklist", "mode", "travellers", "cover",
 ] as const;
 
 const SEED_AT = 1;
@@ -86,5 +87,6 @@ export function tripFromRecord(id: string, rec: TripRec | undefined, code: Trip 
     hours: c?.hours,
     emergency: pick("emergency", undefined),
     checklist: arr(pick("checklist", []), []),
+    cover: asCover(pick<unknown>("cover", undefined)),
   };
 }

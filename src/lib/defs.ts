@@ -15,6 +15,7 @@ import type { Hours } from "./hours";
 import type { Data, PlaceDef } from "./model";
 import { normHours } from "./live";
 import { t } from "./i18n";
+import { asPhoto } from "./photoData";
 
 /** Record saying the trip's places are data (written last by the migration) */
 export const META = "__meta";
@@ -176,6 +177,7 @@ export function tripFromDefs(base: Trip, data: Pick<Data, "places" | "pins" | "d
         hoursText: str(d.hoursText) || undefined,
         enrichedAt: Number(d.enrichedAt) || undefined,
         hasPrev: !!d.prevSheet,
+        photo: asPhoto(d.photo),
         added: d.origin === "added" ? { pinId: pinId || undefined, note: pin?.note || undefined } : undefined,
       },
     });

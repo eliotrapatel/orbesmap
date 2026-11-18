@@ -37,3 +37,7 @@ function make(): SupabaseClient | null {
 export const supabase: SupabaseClient | null = make();
 export const supabaseConfigured = Boolean(supabase);
 export const PHOTO_BUCKET = "photos";
+/** The resolved project origin (public URLs of the place photos) */
+export const SUPABASE_URL = validUrl(RAW_URL) || DEFAULT_URL;
+/** The public bucket of the places' and trips' photos, filled by the server (api/_photos.ts) */
+export const PLACE_PHOTO_BUCKET = "place-photos";

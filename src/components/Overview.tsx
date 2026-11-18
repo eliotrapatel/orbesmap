@@ -6,6 +6,8 @@ import { daysLeft, fmtDay, phase } from "../lib/time";
 import { useWeather, wxKind, WX_LABEL } from "../lib/weather";
 import { WxIcon } from "./WxIcon";
 import { locale, t } from "../lib/i18n";
+import { licenseLabel, tripCredits } from "../lib/placePhotos";
+import "../styles/photos.css";
 
 export default function Overview({ trip, states, onShowDay }: { trip: Trip; states: Record<string, PlaceState>; onShowDay: (key: string) => void }) {
   const all = countable(trip);
@@ -24,6 +26,7 @@ export default function Overview({ trip, states, onShowDay }: { trip: Trip; stat
     }, {}),
   ).sort((a, b) => b[1] - a[1]);
   const maxCat = Math.max(1, ...cats.map((c) => c[1]));
+  const credits = tripCredits(trip);
 
   return (
     <div>
@@ -106,6 +109,25 @@ export default function Overview({ trip, states, onShowDay }: { trip: Trip; stat
           ))}
         </div>
       </div>
+
+      {credits.length > 0 && (
+        <details className="block ph-credits">
+          <summary className="label">{t("Crédits photo ({n})", { n: credits.length })}</summary>
+          <p>{t("Photos des lieux : Wikimedia Commons et Openverse, sous licence libre. Elles sont montrées en noir et blanc teinté ; les fichiers d'origine ne sont pas modifiés.")}</p>
+          <ul>
+            {credits.map(({ name, photo }) => (
+              <li key={photo.key || photo.path}>
+                <span>{name}</span>
+                <span>
+                  {photo.author || t("Auteur inconnu")} ·{" "}
+                  {photo.licenseUrl ? <a href={photo.licenseUrl} target="_blank" rel="noopener noreferrer">{licenseLabel(photo.license)}</a> : licenseLabel(photo.license)}
+                </span>
+                <a href={photo.sourceUrl} target="_blank" rel="noopener noreferrer">{t("Source")}</a>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
     </div>
   );
 }

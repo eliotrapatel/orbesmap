@@ -44,6 +44,8 @@ export interface Place {
   enrichedAt?: number;
   /** the sheet before the last AI update can be brought back */
   hasPrev?: boolean;
+  /** its photo, found and copied by the server (none = nothing acceptable was found) */
+  photo?: PlacePhoto;
 }
 
 /** A place added in the app (not in the first programme) */
@@ -53,6 +55,34 @@ export interface AddedInfo {
   /** the note stored on that pin row before notes per person */
   note?: string;
 }
+
+/** A photo copied into the public "place-photos" bucket (paths are relative to the bucket) */
+export interface PhotoRef {
+  v: 1;
+  /** large: 1280 (else 960, else = thumb), e.g. "c/3f9a…e1-1280.jpg" */
+  path: string;
+  /** small: 500 (Openverse: its thumbnail), e.g. "c/3f9a…e1-500.jpg" */
+  thumb: string;
+  /** of `path` (only the ratio matters) */
+  w: number;
+  h: number;
+  /** plain text, ≤120 chars ("" = unknown) */
+  author: string;
+  /** "CC BY-SA 3.0", "CC0", "Public domain" */
+  license: string;
+  licenseUrl?: string;
+  source: "wikidata" | "wikipedia" | "openverse";
+  /** Commons file page / Openverse landing page */
+  sourceUrl: string;
+  /** "File:Promenade du Bund.jpg" | "openverse:<uuid>" */
+  key: string;
+  qid?: string;
+  /** ms */
+  at: number;
+}
+export interface PhotoNone { v: 1; none: true; at: number }
+export type PlacePhoto = PhotoRef | PhotoNone;
+export type TripCover = (PhotoRef & { from: "city" | "place"; placeId?: string }) | PhotoNone;
 
 export interface Day {
   key: DayKey;
@@ -135,6 +165,8 @@ export interface Trip {
   emergency?: Emergency;
   /** starting items of the shared departure checklist */
   checklist?: { id: string; text: string; due?: string; group?: string }[];
+  /** the trip's photo (the city's, else one of its landmarks), found and copied by the server */
+  cover?: TripCover;
 }
 
 export interface Emergency {

@@ -13,6 +13,7 @@ import { IStar, IStarFill } from "./Icons";
 import RemovedList from "./RemovedList";
 import { t } from "../lib/i18n";
 import { votesOf } from "../lib/social";
+import { PhThumb } from "./PlacePhoto";
 
 export type Filter = { types: Set<PlaceType>; fav: boolean; todo: boolean; near?: boolean; added?: boolean };
 
@@ -68,13 +69,16 @@ export default function PlaceList({ trip, places, states, pins, selectedId, quer
   return (
     <div>
       {nx && (
-        <button className="next" onClick={() => onOpen(nx.place)}>
-          <span className="label">{ph === "during" ? t("Prochain arrêt") : t("Premier arrêt")}</span>
-          <b>{nx.place.name}</b>
-          <small>
-            {nx.day.title}
-            {nx.when != null ? `, ${fmtMin(nx.when)}` : ""} · {t(TYPE_LABEL[nx.place.type] || "")}
-          </small>
+        <button className="next has-ph" onClick={() => onOpen(nx.place)}>
+          <span className="next-txt">
+            <span className="label">{ph === "during" ? t("Prochain arrêt") : t("Premier arrêt")}</span>
+            <b>{nx.place.name}</b>
+            <small>
+              {nx.day.title}
+              {nx.when != null ? `, ${fmtMin(nx.when)}` : ""} · {t(TYPE_LABEL[nx.place.type] || "")}
+            </small>
+          </span>
+          <PhThumb photo={nx.place.photo} label={(nx.place.name[0] || "·").toUpperCase()} size={52} />
         </button>
       )}
       <div className="filters" role="group" aria-label={t("Filtres")}>
@@ -135,6 +139,7 @@ export default function PlaceList({ trip, places, states, pins, selectedId, quer
                 <span className={"mk" + (hotel ? " mk-hotel" : "") + (s?.visited && !hotel ? " is-visited" : "")} style={{ ["--c" as string]: pd.color, width: hotel ? 28 : 24, height: hotel ? 28 : 24 }}>
                   {hotel ? "H" : pd.glyph}
                 </span>
+                <PhThumb photo={p.photo} label={(p.name[0] || "·").toUpperCase()} size={40} />
                 <span className="row-main">
                   <span className="row-name">{p.name}</span>
                   <span className="row-meta">

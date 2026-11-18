@@ -34,6 +34,8 @@ import type { Mode } from "./lib/route";
 import { NavCard, PointCard, useNavigation, type NavState, type NavTarget } from "./components/Nav";
 import { track } from "./lib/track";
 import { t } from "./lib/i18n";
+import { needsLookup } from "./lib/photoData";
+import { askPhotos, keepTripPhotos } from "./lib/placePhotos";
 
 type Sel = { kind: "place" | "pin"; id: string } | null;
 type Snap = "peek" | "half" | "full";
@@ -60,6 +62,18 @@ export default function App() {
   const desktop = useDesktop();
   const trip = useTrip();
   const data = useStore((s) => s.data);
+  // the trip's photos: asked once from the server when some are missing (throttled), then kept for offline use
+  const photoKey = useMemo(() => {
+    const defs = data.defs as Record<string, { fieldsAt?: Record<string, number> } | undefined>;
+    return `${trip.id}:${trip.cover ? 1 : 0}:${trip.places.filter((p) => needsLookup(p.photo, defs[p.id]?.fieldsAt)).length}`;
+  }, [trip, data.defs]);
+  useEffect(() => {
+    const tm = window.setTimeout(() => {
+      void askPhotos(trip);
+      void keepTripPhotos(trip);
+    }, 4000);
+    return () => window.clearTimeout(tm);
+  }, [photoKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const canEdit = useCanEdit();
   const [day, setDay] = useState("all");
   const [filter, setFilter] = useState<Filter>({ types: new Set(), fav: false, todo: false });
