@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Trip } from "../../data/types";
 import { createTrip, getState, requestPro, signOut, switchTrip, useStore, useTrips } from "../../lib/store";
-import { dayCount, newTripRecord, searchCities, type Destination } from "../../lib/newTrip";
-import { phase } from "../../lib/time";
+import { dateLabel, dayCount, newTripRecord, searchCities, type Destination } from "../../lib/newTrip";
+import { daysLeft, phase } from "../../lib/time";
+import TripHero from "./TripHero";
 import OrbitMark from "../OrbitMark";
 import Shell, { Steps } from "./Shell";
 import CreateWizard from "./CreateWizard";
@@ -15,7 +16,6 @@ const greeting = () => {
   const h = new Date().getHours();
   return h < 5 ? t("Bonsoir") : h < 18 ? t("Bonjour") : t("Bonsoir");
 };
-const daysTo = (t: Trip) => Math.ceil((Date.parse(t.start + "T00:00:00") - Date.now()) / 864e5);
 
 /** "Mes voyages": the account's trips, the one to come first; a first-time account sees where to start */
 export default function Trips({ onOpen, onClose }: { onOpen: (id: string) => void; onClose?: () => void }) {
@@ -80,36 +80,40 @@ export default function Trips({ onOpen, onClose }: { onOpen: (id: string) => voi
         <h1 className="v3-d v3-h2" style={{ margin: 0 }}>{t("Mes voyages")}</h1>
         <span>{trips.length}</span>
       </div>
-      <button className="v3-btn" style={{ marginTop: 16 }} onClick={() => setCreating(true)}>{t("＋ Créer un voyage")}</button>
-      {hero && <TripCard t={hero} big onOpen={onOpen} />}
-      {rest.length > 0 && <div className="v3-grid">{rest.map((t) => <TripCard key={t.id} t={t} onOpen={onOpen} />)}</div>}
+      {hero && <TripHero trip={hero} onOpen={onOpen} />}
+      {rest.length > 0 && (
+        <>
+          <p className="v3-lbl" style={{ marginTop: 26 }}>{t("Autres voyages")}</p>
+          <div className={"v3-grid" + (rest.length === 1 ? " one" : "")}>{rest.map((t) => <TripCard key={t.id} t={t} onOpen={onOpen} />)}</div>
+        </>
+      )}
+      <button className="v3-btn ghost" style={{ marginTop: 18 }} onClick={() => setCreating(true)}>{t("＋ Créer un voyage")}</button>
       <div style={{ height: 24 }} />
     </Shell>
   );
 }
 
-function TripCard({ t: trip, big, onOpen }: { t: Trip; big?: boolean; onOpen: (id: string) => void }) {
+function TripCard({ t: trip, onOpen }: { t: Trip; onOpen: (id: string) => void }) {
   const ph = phase(trip);
-  const d = daysTo(trip);
+  const d = daysLeft(trip);
   const n = trip.days.filter((x) => x.scheduled).reduce((k, x) => k + (x.dates?.length || 0), 0);
   const draft = (useStore((s) => s.trips[trip.id])?.draft as { status?: string } | undefined)?.status;
   return (
-    <button className={"v3-trip" + (big ? " big" : "")} onClick={() => onOpen(trip.id)}>
+    <button className="v3-trip" onClick={() => onOpen(trip.id)}>
       <span className="v3-trip-art" aria-hidden="true" />
       <span className="v3-trip-over">
         <span className="v3-tags">
           {draft && draft !== "done" ? (
             <span className="v3-tag dim">{draft === "preparing" ? t("En préparation") : t("À valider")}</span>
           ) : (
-            <span className={"v3-tag " + (ph === "during" ? "ok" : ph === "before" ? "gold" : "dim")}>{ph === "during" ? t("En cours") : ph === "before" ? t("À venir") : t("Passé")}</span>
+            <span className={"v3-tag " + (ph === "during" ? "ok" : ph === "before" ? "gold" : "dim")}>{ph === "during" ? t("En cours") : ph === "before" ? (d > 0 ? t("J–{d}", { d }) : t("Moins de 24 h")) : t("Passé")}</span>
           )}
         </span>
         <span className="v3-grow" />
         <span className="v3-trip-name">
-          {big && ph === "before" && d > 0 && <span className="v3-cd">{t("J–{d}", { d })}</span>}
           <span>
             <b className="v3-d">{trip.title}</b>
-            <small>{trip.dateLabel}{n ? ` · ${n > 1 ? t("{n} jours", { n }) : t("{n} jour", { n })}` : ""}</small>
+            <small>{dateLabel(trip.start, trip.end)}{n ? ` · ${n > 1 ? t("{n} jours", { n }) : t("{n} jour", { n })}` : ""}</small>
           </span>
         </span>
       </span>

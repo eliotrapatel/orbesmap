@@ -528,4 +528,10 @@ export default {
   "pricing": "Pricing",
   "on-site": "On the ground",
   "travel-style": "Travel style",
+  "Autres voyages": "Other trips",
+  "Moins de 24 h": "Under 24 h",
+  "Jour {i} sur {n}": "Day {i} of {n}",
+  "{v}/{n} visités": "{v}/{n} visited",
+  "Voir la préparation": "See the preparation",
+  "Ouvrir le voyage": "Open the trip",
 } satisfies Record<string, string>;

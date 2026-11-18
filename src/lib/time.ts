@@ -43,3 +43,28 @@ export function parseTime(s?: string): number | null {
   return h * 60 + (m[2] ? +m[2] : 0);
 }
 export const fmtMin = (t: number) => `${Math.floor(t / 60)}h${String(t % 60).padStart(2, "0")}`;
+
+/** Whole days left before the arrival: the one "J–" figure, the same as the countdown's days, everywhere */
+export const daysLeft = (t: Trip, now = Date.now()) => countdownParts(tripStartMs(t), now).d;
+
+/** During the trip: today is day `i` of `n` (calendar days in the trip's timezone) */
+export function dayOfTrip(t: Trip, now = Date.now()): { i: number; n: number } {
+  const day = (iso: string) => Date.parse(iso + "T00:00:00Z") / 864e5;
+  const n = Math.max(1, Math.round(day(t.end) - day(t.start)) + 1);
+  const i = Math.round(day(localDate(t.timezone, new Date(now))) - day(t.start)) + 1;
+  return { i: Math.min(Math.max(i, 1), n), n };
+}
+
+/** This device's own timezone and a short city name for it ("Europe/Paris" → "Paris") */
+export function homeZone(): { zone: string; city: string } {
+  let zone = "Europe/Paris";
+  try {
+    zone = Intl.DateTimeFormat().resolvedOptions().timeZone || zone;
+  } catch {
+    /* ignore */
+  }
+  return { zone, city: (zone.split("/").pop() || zone).replace(/_/g, " ") };
+}
+
+/** Are two timezones on the same hour right now? */
+export const sameHour = (a: string, b: string, d = new Date()) => clock(a, d) === clock(b, d);

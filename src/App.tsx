@@ -12,13 +12,13 @@ import Checklist from "./components/Checklist";
 import Emergency from "./components/Emergency";
 import Translate from "./components/Translate";
 import Ask from "./components/Ask";
-import Landing from "./components/Landing";
 import MapView, { type FocusRequest } from "./components/MapView";
 import Overview from "./components/Overview";
 import { PinForm } from "./components/PinDetail";
 import PlaceDetail from "./components/PlaceDetail";
 import PlaceList, { type Filter } from "./components/PlaceList";
 import TopBar, { TOOLS, type ToolKey } from "./components/TopBar";
+import { openHome } from "./components/v3/nav";
 import { Converter, ExportPanel, Flights, Phrases, Practical } from "./components/Tools";
 import { Drawer, EscGuard, Toaster } from "./components/ui";
 import type { Place } from "./data/types";
@@ -61,19 +61,6 @@ export default function App() {
   const trip = useTrip();
   const data = useStore((s) => s.data);
   const canEdit = useCanEdit();
-  // landing shown when the app is opened (not on every reload of the same session)
-  const firstOpen = (() => {
-    try {
-      return !sessionStorage.getItem("orbes.entered");
-    } catch {
-      return true;
-    }
-  })();
-  const [landing, setLanding] = useState(firstOpen);
-  // the landing overlay stays mounted a little longer than the landing map mode, for its fade-out
-  const [landingOverlay, setLandingOverlay] = useState(firstOpen);
-  const [landingKey, setLandingKey] = useState(0);
-  const overlayTimer = useRef<number | undefined>(undefined);
   const [day, setDay] = useState("all");
   const [filter, setFilter] = useState<Filter>({ types: new Set(), fav: false, todo: false });
   const [sel, setSel] = useState<Sel>(null);
@@ -124,12 +111,12 @@ export default function App() {
     const k = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        if (!landing) setCmdk((v) => !v);
+        setCmdk((v) => !v);
       }
     };
     window.addEventListener("keydown", k);
     return () => window.removeEventListener("keydown", k);
-  }, [landing]);
+  }, []);
 
   const tripBounds = useCallback(() => {
     const core = trip.places.filter((p) => Math.abs(p.lat - trip.center[1]) < 0.35 && Math.abs(p.lng - trip.center[0]) < 0.45);
@@ -139,7 +126,7 @@ export default function App() {
   }, [trip]);
 
   useEffect(() => {
-    if (!firstOpen) fly({ bounds: tripBounds(), pitch: 0, duration: 0 });
+    fly({ bounds: tripBounds(), pitch: 0, duration: 0 });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // reset view state when the trip changes
@@ -153,7 +140,7 @@ export default function App() {
     setSel(null);
     setRoute(null);
     setFilter({ types: new Set(), fav: false, todo: false });
-    if (!landing) fly({ bounds: tripBounds(), pitch: 0, duration: 1600 });
+    fly({ bounds: tripBounds(), pitch: 0, duration: 1600 });
   }, [trip.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // a deleted place (e.g. an added place removed on another device) closes its panel
@@ -379,18 +366,6 @@ export default function App() {
     [saveFound, fly, startQueue],
   );
 
-  const enterMap = () => {
-    setLanding(false);
-    try {
-      sessionStorage.setItem("orbes.entered", "1");
-    } catch {
-      /* ignore */
-    }
-    window.clearTimeout(overlayTimer.current);
-    overlayTimer.current = window.setTimeout(() => setLandingOverlay(false), 900);
-    fly({ bounds: tripBounds(), pitch: 0, duration: 2600 });
-  };
-
   const openTool = (k: ToolKey) => {
     setTool((t) => (t === k ? null : k));
     setSel(null);
@@ -428,7 +403,7 @@ export default function App() {
         route={route?.order ?? null}
         routeColor={route ? dayColor(route.day) : "#f6f2ea"}
         focus={focus}
-        padding={landing ? { top: 0, bottom: 0, left: 0, right: 0 } : padding}
+        padding={padding}
         pinMode={pinMode}
         me={me}
         follow={follow}
@@ -437,20 +412,19 @@ export default function App() {
         point={point}
         onUserPan={() => setFollow(false)}
         onLongPress={(ll) => {
-          if (landing || pinMode || nav) return;
+          if (pinMode || nav) return;
           setPoint(ll);
         }}
         threeD={threeD}
-        landing={landing}
+        landing={false}
         dayColor={dayColor}
         dayGlyph={dayGlyph}
         onSelect={(kind, id) => {
-          if (pinMode || landing || moveFor) return;
+          if (pinMode || moveFor) return;
           const p = trip.places.find((x) => x.id === (kind === "pin" ? pinPlaceId(id) : id));
           if (p) openPlace(p);
         }}
         onMapClick={(ll) => {
-          if (landing) return;
           if (moveFor) {
             updateDef(moveFor.id, { lng: ll[0], lat: ll[1] });
             toast(t("Point de « {name} » déplacé", { name: moveFor.name }));
@@ -479,8 +453,7 @@ export default function App() {
         onBasemapError={setBasemapFailed}
       />
 
-      {!landing && (
-        <>
+      <>
           <TopBar
             trip={trip}
             tool={tool}
@@ -491,10 +464,7 @@ export default function App() {
               setSel(null);
               setTool(null);
               setThreeD(false);
-              window.clearTimeout(overlayTimer.current);
-              setLandingKey((k) => k + 1);
-              setLanding(true);
-              setLandingOverlay(true);
+              openHome();
             }}
           />
           {nav ? (
@@ -658,18 +628,6 @@ export default function App() {
             </div>
           )}
         </>
-      )}
-
-      {landingOverlay && (
-        <Landing
-          key={landingKey}
-          trip={trip}
-          onPick={switchTrip}
-          onEnter={enterMap}
-        />
-      )}
-      {/* globe reopened from the logo: "back" returns to the map instead of leaving the app */}
-      {landing && landingKey > 0 && <EscGuard on={enterMap} />}
 
       {cmdk && (
         <CommandPalette

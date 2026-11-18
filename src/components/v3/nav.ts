@@ -1,12 +1,30 @@
 import { useSyncExternalStore } from "react";
 
-// "Mes voyages" opened from inside the app (trip menu)
-let homeOpen = false;
+// "Mes voyages": the home, shown when the app is opened (once per session, not on every reload) and from the logo / trip menu
+const firstOpen = (() => {
+  try {
+    return !sessionStorage.getItem("orbes.entered");
+  } catch {
+    return true;
+  }
+})();
+let homeOpen = firstOpen;
+// opened from inside a trip (logo, menu): "✕" goes back to it
+let homeFromTrip = false;
 const subs = new Set<() => void>();
 export function openHome(open = true) {
   homeOpen = open;
+  homeFromTrip = open;
+  if (!open) {
+    try {
+      sessionStorage.setItem("orbes.entered", "1");
+    } catch {
+      /* ignore */
+    }
+  }
   subs.forEach((f) => f());
 }
+export const homeOpenedFromTrip = () => homeFromTrip;
 export const useHome = () =>
   useSyncExternalStore(
     (f) => {

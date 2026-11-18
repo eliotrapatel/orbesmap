@@ -6,7 +6,7 @@ import Onboarding from "./Onboarding";
 import Trips from "./Trips";
 import Welcome from "./Welcome";
 import DraftScreen from "./DraftScreen";
-import { openAdmin, openHome, openShare, useAdmin, useHome, useShare } from "./nav";
+import { homeOpenedFromTrip, openAdmin, openHome, openShare, useAdmin, useHome, useShare } from "./nav";
 import ShareTrip from "./ShareTrip";
 import ProScreen from "./ProScreen";
 import AdminScreen from "./AdminScreen";
@@ -103,7 +103,7 @@ function Screen() {
           switchTrip(id);
           openHome(false);
         }}
-        onClose={trips.length && current ? () => openHome(false) : undefined}
+        onClose={trips.length && current && home && homeOpenedFromTrip() ? () => openHome(false) : undefined}
       />
     );
   if (share && session) return <ShareTrip onClose={() => openShare(false)} />;

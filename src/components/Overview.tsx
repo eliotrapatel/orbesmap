@@ -2,7 +2,7 @@ import { TYPE_LABEL } from "../data/trip";
 import type { Trip } from "../data/types";
 import type { PlaceState } from "../lib/model";
 import { countable, dayStops } from "../lib/plan";
-import { countdownParts, fmtDay, phase, tripStartMs } from "../lib/time";
+import { daysLeft, fmtDay, phase } from "../lib/time";
 import { useWeather, wxKind, WX_LABEL } from "../lib/weather";
 import { WxIcon } from "./WxIcon";
 import { locale, t } from "../lib/i18n";
@@ -14,7 +14,6 @@ export default function Overview({ trip, states, onShowDay }: { trip: Trip; stat
   const scheduledDays = trip.days.filter((d) => d.scheduled);
   const nights = Math.max(1, scheduledDays.reduce((n, d) => n + (d.dates?.length || 0), 0));
   const ph = phase(trip);
-  const cd = countdownParts(tripStartMs(trip));
   const wx = useWeather(trip.center[1], trip.center[0], trip.timezone);
   const tripDates = new Set(scheduledDays.flatMap((d) => d.dates || []));
 
@@ -31,7 +30,7 @@ export default function Overview({ trip, states, onShowDay }: { trip: Trip; stat
       <div className="stats">
         <div className="stat">
           <span className="label">{ph === "before" ? t("Départ") : ph === "during" ? t("En cours") : t("Terminé")}</span>
-          <b>{ph === "before" ? t("J-{n}", { n: cd.d }) : ph === "during" ? t("Live") : "✓"}</b>
+          <b>{ph === "before" ? t("J-{n}", { n: daysLeft(trip) }) : ph === "during" ? t("Live") : "✓"}</b>
           <small>{trip.dateLabel}</small>
         </div>
         <div className="stat">
