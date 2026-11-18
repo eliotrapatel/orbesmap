@@ -107,4 +107,5 @@ export default {
   "Et sans réseau\u00a0?": "What about offline?",
   "Votre programme et vos fiches restent sur votre téléphone\u00a0: ils se lisent même sans connexion, et se synchronisent au retour du réseau.": "Your itinerary and place details stay on your phone: you can read them offline, and they sync when you're back online.",
   "Qui voit mon voyage\u00a0?": "Who can see my trip?",
+  "Trois étapes pour un voyage entier.": "Three steps to an entire trip.",
 } satisfies Record<string, string>;

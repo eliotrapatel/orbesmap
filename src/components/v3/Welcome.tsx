@@ -118,7 +118,7 @@ export default function Welcome() {
         <section className="lp2-sec lp2-grid" id="comment" aria-labelledby="lp2-how-h">
           <header className="lp2-head rv">
             <p className="v3-lbl">{t("Comment ça marche")}</p>
-            <h2 className="lp2-h2" id="lp2-how-h">{t("Trois minutes pour un voyage entier.")}</h2>
+            <h2 className="lp2-h2" id="lp2-how-h">{t("Trois étapes pour un voyage entier.")}</h2>
           </header>
           <ol className="lp2-chapters">
             {CHAPTERS.map(([title, text, facts], i) => (
