@@ -75,7 +75,14 @@ export async function inboundAddress(): Promise<string | null> {
   if (error || !data) return null;
   return `${data}@${INBOUND_DOMAIN}`;
 }
-export type InboundItem = { id: number; trip_id: string | null; received_at: string; from_addr: string | null; subject: string | null; extracted: Partial<ExtractResult>; status: string };
+/** A booking whose dates fall outside all the account's trips (api/inbound.ts): the trip it announces */
+export type DetectedTrip = { city: string; country: string; start: string; end: string };
+export type InboundItem = { id: number; trip_id: string | null; received_at: string; from_addr: string | null; subject: string | null; extracted: Partial<ExtractResult> & { detected?: DetectedTrip }; status: string };
+/** The new trip a forwarded booking announces (none once it was added to a trip) */
+export const detectedTrip = (it: InboundItem): DetectedTrip | null => {
+  const d = it.extracted?.detected;
+  return !it.trip_id && d && /^\d{4}-\d{2}-\d{2}$/.test(d.start || "") ? d : null;
+};
 export async function inboundItems(): Promise<InboundItem[]> {
   if (!supabase || !getState().session) return [];
   const { data, error } = await supabase.from("inbound_items").select("id,trip_id,received_at,from_addr,subject,extracted,status").eq("status", "new").order("received_at", { ascending: false }).limit(30);
@@ -90,6 +97,38 @@ export async function addInbound(item: InboundItem, trip: Trip): Promise<{ added
   const r = await applyBookings(item.extracted || {}, trip, item.subject || "");
   await supabase?.from("inbound_items").update({ status: "added", trip_id: trip.id }).eq("id", item.id);
   return r;
+}
+
+/**
+ * A booking that announced a new trip, once that trip was created from it (lot retention): its flights, hotel and
+ * bookings went into the trip through the creation form; here its prices become the trip's expenses (only for what
+ * was kept in the form), and the booking leaves the inbox.
+ */
+export async function attachToNewTrip(item: InboundItem, trip: Trip): Promise<void> {
+  const x = item.extracted || {};
+  const draft = (getState().trips[trip.id]?.draft as { flightsText?: string; fixed?: { name?: string }[] } | undefined) || {};
+  const flightsText = draft.flightsText || "";
+  let kept = false;
+  for (const f of x.flights || []) {
+    if (!f.code || !(flightsText.includes(f.code) || trip.flights.some((c) => c.code === f.code))) continue;
+    kept = true;
+    if (f.price && f.price > 0) await spend(trip, f.price, f.currency, `${f.code} ${f.from}→${f.to}`, "flights", (f.departAt || "").slice(0, 10));
+  }
+  const h = x.hotel;
+  if (h?.name && trip.hotel.name.trim() === h.name.trim()) {
+    kept = true;
+    if (h.price && h.price > 0) await spend(trip, h.price, h.currency, h.name, "lodging", h.checkIn);
+  }
+  for (const f of x.fixed || []) {
+    if (!f.name || !(draft.fixed || []).some((k) => k.name === f.name)) continue;
+    kept = true;
+    if (f.price && f.price > 0) await spend(trip, f.price, f.currency, f.name, /restaurant|dîner|déjeuner|dinner|lunch/i.test(`${f.name} ${f.notes}`) ? "food" : "activities", f.date);
+  }
+  if (kept && x.bookingPrice && x.bookingPrice > 0 && !(x.flights || []).some((f) => f.price) && !x.hotel?.price) {
+    await spend(trip, x.bookingPrice, x.bookingCurrency, item.subject || t("Réservation"), (x.flights || []).length ? "flights" : x.hotel?.name ? "lodging" : "activities", "");
+  }
+  // nothing of it kept in the form: it stays in the inbox, to add to the new trip by hand
+  await supabase?.from("inbound_items").update(kept ? { status: "added", trip_id: trip.id } : { trip_id: trip.id }).eq("id", item.id);
 }
 
 /** Adds what a booking holds (read from an e-mail, a pasted text or a screenshot) to a trip: flights, hotel, bookings, prices */
