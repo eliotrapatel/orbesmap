@@ -28,8 +28,11 @@ function corsHeaders(origin: string | null): Record<string, string> {
 const json = (body: unknown, status: number, origin: string | null) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", ...corsHeaders(origin) } });
 
-/** The caller must be signed in to Supabase AND listed in public.members. Returns who it is (e-mail), or false. */
-async function isMember(token: string): Promise<string | false> {
+/**
+ * Who calls: any signed-in account (ORBES Trips accounts). `member` = the first shared space (public.members):
+ * no daily cap and its own spending log. Returns false when the session is not valid.
+ */
+async function account(token: string): Promise<{ email: string; member: boolean } | false> {
   const u = await fetch(`${SUPA_URL}/auth/v1/user`, { headers: { apikey: SUPA_KEY, authorization: `Bearer ${token}` } });
   if (!u.ok) return false;
   const email = String(((await u.json()) as Json)?.email || "");
@@ -37,8 +40,38 @@ async function isMember(token: string): Promise<string | false> {
     method: "POST",
     headers: { apikey: SUPA_KEY, authorization: `Bearer ${token}`, "content-type": "application/json" },
     body: "{}",
-  });
-  return r.ok && (await r.json()) === true ? email || "membre" : false;
+  }).catch(() => null);
+  const member = !!r && r.ok && (await r.json().catch(() => false)) === true;
+  return { email, member };
+}
+
+/** AI requests an account (outside the shared space) may make per 24 h, everything being free for now */
+const DAILY_CAP = 40;
+/** The account's AI requests over the last 24 h (table ai_usage); unknown = the cap (refused, never free spending) */
+async function callsToday(token: string, f: typeof fetch): Promise<number> {
+  try {
+    const since = new Date(Date.now() - 864e5).toISOString();
+    const r = await f(`${SUPA_URL}/rest/v1/ai_usage?select=id&at=gte.${encodeURIComponent(since)}`, {
+      headers: { apikey: SUPA_KEY, authorization: `Bearer ${token}`, Prefer: "count=exact", Range: "0-0" },
+    });
+    if (!r.ok && r.status !== 416) return DAILY_CAP;
+    const n = Number((r.headers.get("content-range") || "").split("/")[1]);
+    return Number.isFinite(n) ? n : DAILY_CAP;
+  } catch {
+    return DAILY_CAP;
+  }
+}
+/** One row per AI request in the account's own usage (best effort, after the answer) */
+async function logAccount(token: string, row: Json, f: typeof fetch): Promise<void> {
+  try {
+    await f(`${SUPA_URL}/rest/v1/ai_usage`, {
+      method: "POST",
+      headers: { apikey: SUPA_KEY, authorization: `Bearer ${token}`, "content-type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify(row),
+    });
+  } catch {
+    /* best effort */
+  }
 }
 
 // ---------- spending log (DeepSeek has a balance API but no usage history API) ----------
@@ -485,9 +518,11 @@ export async function handle(req: Request, deps: Deps = {}): Promise<Response> {
   if (req.method !== "POST") return json({ error: "method" }, 405, origin);
   const token = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
   if (!token) return json({ error: "auth", message: "Connectez-vous dans l'onglet Compte pour utiliser cette fonction." }, 401, origin);
-  const who = await (deps.member || isMember)(token).catch(() => false);
-  if (!who) return json({ error: "auth", message: "Ce compte n'a pas accès à l'espace partagé." }, 403, origin);
-  const by = typeof who === "string" ? who.split("@")[0] : "membre";
+  const acc = deps.member
+    ? (await deps.member(token).catch(() => false)) ? { email: "membre", member: true } : false
+    : await account(token).catch(() => false as const);
+  if (!acc) return json({ error: "auth", message: "Session expirée : reconnectez-vous dans l'onglet Compte." }, 401, origin);
+  const by = acc.email ? acc.email.split("@")[0] : "membre";
   const f = deps.fetch || fetch;
 
   const dsKey = (env.DEEPSEEK_API_KEY || env.DEEPSEEK_KEY || "").trim();
@@ -501,6 +536,12 @@ export async function handle(req: Request, deps: Deps = {}): Promise<Response> {
     body = await req.json();
   } catch {
     return json({ error: "bad", message: "Requête illisible." }, 400, origin);
+  }
+
+  // accounts outside the first shared space: a daily cap (everything is free for now, the AI is not)
+  if (!acc.member) {
+    if (body.task === "balance") return json({ error: "auth", message: "Réservé à l'espace partagé." }, 403, origin);
+    if ((await callsToday(token, f)) >= DAILY_CAP) return json({ error: "busy", message: `Limite du jour atteinte (${DAILY_CAP} demandes à l'IA). Elle repart dans les 24 heures.` }, 429, origin);
   }
 
   // DeepSeek balance (official API) + our own spending log (DeepSeek has no history API)
@@ -614,7 +655,15 @@ export async function handle(req: Request, deps: Deps = {}): Promise<Response> {
     const started = Date.now();
     // the log is written after the answer has left (the function stays alive until it is done)
     const log = (ok: boolean) => {
-      if (provider !== "deepseek" || usage.hit + usage.miss + usage.out + usage.search + usage.fetch === 0) return;
+      // every account's own count (the daily cap), then the shared space's detailed spending log
+      const mine = logAccount(token, { task: job.task, usd: Math.round(usage.usd * 1e6) / 1e6, ok }, f);
+      try {
+        if (deps.fetch) void mine;
+        else waitUntil(mine);
+      } catch {
+        void mine;
+      }
+      if (!acc.member || provider !== "deepseek" || usage.hit + usage.miss + usage.out + usage.search + usage.fetch === 0) return;
       const p = logUsage(token, { at: started, task: job.task, by, model: DS_MODEL, ...usage, usd: Math.round(usage.usd * 1e6) / 1e6, ok, ms: Date.now() - started }, f);
       try {
         if (deps.fetch) void p; // tests

@@ -8,6 +8,7 @@ import { ICal, IChat, IChevron, IDownload, IGrid, IInfo, IPlane, ISearch, IUser,
 import { WxIcon } from "./WxIcon";
 import { useChecklist } from "./Checklist";
 import { useStore, useTrips } from "../lib/store";
+import { openHome } from "./v3/nav";
 import { supabaseConfigured } from "../lib/supabase";
 import { useEscape } from "./ui";
 
@@ -62,6 +63,12 @@ export function TripMenu({ trip, onPick, onClose, anchor }: { trip: Trip; onPick
           </button>
         );
       })}
+      <button role="menuitem" className="menu-item menu-home" onClick={() => { onClose(); openHome(); }}>
+        <span>
+          <span className="label">Mes voyages</span>
+          <small>Tous vos voyages · créer un voyage</small>
+        </span>
+      </button>
     </div>
   );
 }

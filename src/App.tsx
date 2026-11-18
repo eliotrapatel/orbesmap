@@ -126,6 +126,8 @@ export default function App() {
 
   const tripBounds = useCallback(() => {
     const core = trip.places.filter((p) => Math.abs(p.lat - trip.center[1]) < 0.35 && Math.abs(p.lng - trip.center[0]) < 0.45);
+    // a new trip with no place yet: around its city
+    if (!trip.places.length) return boundsOf([{ lng: trip.center[0] - 0.08, lat: trip.center[1] - 0.06 }, { lng: trip.center[0] + 0.08, lat: trip.center[1] + 0.06 }]);
     return boundsOf(core.length ? core : trip.places);
   }, [trip]);
 

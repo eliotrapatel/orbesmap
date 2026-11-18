@@ -21,6 +21,7 @@ const SETTINGS_KEY = "orbes.settings";
 const OUTBOX_KEY = "orbes.outbox.v2";
 const TRIP_KEY = "orbes.trip";
 const TRIPS_KEY = "orbes.trips.v1";
+const PROFILE_KEY = "orbes.profile.v1";
 const PHOTOS_MARKER = LEGACY_MARKER + ".photos";
 
 type Op =
@@ -33,7 +34,8 @@ type Op =
   | { t: "pin-del"; trip: string; id: string }
   | { t: "photo"; trip: string; id: string }
   | { t: "photo-del"; trip: string; id: string; path: string }
-  | { t: "settings" };
+  | { t: "settings" }
+  | { t: "profile" };
 
 export type SyncState = "local" | "idle" | "syncing" | "pending" | "error" | "denied";
 
@@ -41,6 +43,8 @@ interface State {
   tripId: string;
   /** every trip's record (table "trips"), whatever the current trip */
   trips: Record<string, TripRec>;
+  /** the signed-in account's profile (table "profiles"): name, how they travel, tastes, pace, budget, language… */
+  profile: Profile;
   data: Data;
   settings: Settings;
   session: Session | null;
@@ -51,6 +55,8 @@ interface State {
   photoUrls: Record<string, string>;
   /** number of changes waiting to be sent */
   pending: number;
+  /** the saved session has been read (until then the app does not know if someone is signed in) */
+  authReady: boolean;
   /** last time everything was sent and received (ms) */
   syncedAt: number | null;
 }
@@ -191,6 +197,7 @@ let migrateAtStart = true;
 let state: State = {
   tripId: startTrip,
   trips: savedTrips,
+  profile: readJSON<Profile>(PROFILE_KEY) || {},
   data: startTrip === LEGACY_TRIP && legacyUnsaved ? legacyUnsaved : loadTrip(startTrip),
   settings: initialSettings,
   session: null,
@@ -199,6 +206,7 @@ let state: State = {
   photoUrls: {},
   pending: 0,
   syncedAt: null,
+  authReady: !supabase,
 };
 let outbox: Op[] = readJSON<Op[]>(OUTBOX_KEY) || [];
 state.pending = outbox.length;
@@ -240,8 +248,20 @@ export function useStore<T>(sel: (s: State) => T): T {
 }
 export const getState = () => state;
 
-/** The trips written in the code belong to the first shared space: shown signed out (this phone only) or to its members */
-const codeTripsVisible = () => !state.session || state.member !== false;
+/** This phone already holds data of the first version (used without an account): it keeps opening on the map */
+export const hasLocalData = (() => {
+  try {
+    return Object.keys(localStorage).some((k) => k.startsWith("orbes.v2.") || k === "orbes.outbox.v2" || k.startsWith("gz_"));
+  } catch {
+    return false;
+  }
+})();
+
+/**
+ * The trips written in the code belong to the first shared space: shown to its members, and signed out or before
+ * the membership is known only on a phone that already used them (never to a new account, even for a second)
+ */
+const codeTripsVisible = () => state.member === true || ((!state.session || state.member === null) && hasLocalData);
 
 const baseCache = new Map<string, { rec: TripRec | undefined; trip: Trip }>();
 /** A trip without its places (they come from the places table): its record over the trip of the code */
@@ -359,7 +379,7 @@ async function importLegacyPhotos() {
 }
 
 // ---------- outbox ----------
-const sameRow = (a: Op, b: Op) => a.t === b.t && (a.t === "settings" || ("id" in a && "id" in b && a.id === b.id && a.trip === b.trip));
+const sameRow = (a: Op, b: Op) => a.t === b.t && (a.t === "settings" || a.t === "profile" || ("id" in a && "id" in b && a.id === b.id && a.trip === b.trip));
 
 function persistOutbox() {
   writeJSON(OUTBOX_KEY, outbox); // the in-memory outbox stays the source of truth if this fails
@@ -378,7 +398,9 @@ function enqueue(op: Op) {
   scheduleFlush();
 }
 
-const canSync = () => Boolean(supabase && state.session && state.member);
+// every signed-in account syncs (each one only reaches its own trips: see supabase/saas.sql); the shared
+// space's members also share the settings
+const canSync = () => Boolean(supabase && state.session && state.member !== null);
 
 let flushTimer: number | undefined;
 function scheduleFlush(delay = 500) {
@@ -391,7 +413,7 @@ let pulling = false;
 let flushAfterPull = false;
 /** completed op keys during a pull's fetch: the merge must not undo them */
 let doneDuringPull: Set<string> | null = null;
-const opKey = (o: Op) => ("id" in o ? `${o.t.replace("-del", "")}:${o.id}` : "settings");
+const opKey = (o: Op) => ("id" in o ? `${o.t.replace("-del", "")}:${o.id}` : o.t);
 
 function flush(fromPull = false): Promise<void> {
   if (!canSync()) return Promise.resolve();
@@ -416,6 +438,13 @@ function flush(fromPull = false): Promise<void> {
         } catch (e) {
           // the op stays in the outbox; the other changes keep going
           if (e instanceof DefsMissing) continue;
+          // refused for this account (a trip it cannot write): dropped, so it never blocks the other changes
+          if ((e as { code?: string })?.code === "42501") {
+            console.warn("[orbes] change refused for this account, dropped", op, e);
+            outbox = outbox.filter((o) => o !== op);
+            persistOutbox();
+            continue;
+          }
           throw e;
         }
         outbox = outbox.filter((o) => o !== op);
@@ -445,7 +474,16 @@ async function run(op: Op) {
     if (error) throw error;
   };
   if (op.t === "settings") {
+    // the shared exchange rate belongs to the first shared space; other accounts keep theirs on the phone
+    if (!state.member) return;
     check(await sb.from("settings").upsert({ id: 1, eur_rate: state.settings.eurRate }));
+    return;
+  }
+  if (op.t === "profile") {
+    const uid = state.session?.user.id;
+    if (!uid) return;
+    const { error } = await sb.from("profiles").upsert({ id: uid, data: state.profile, updated_at: new Date().toISOString() });
+    if (error && !isMissing(error, "profile")) throw error;
     return;
   }
   if (op.t === "trip") {
@@ -546,7 +584,7 @@ export async function pull() {
       sb.from("contacts").select("*").eq("trip_id", trip),
       sb.from("pins").select("*").eq("trip_id", trip),
       sb.from("photos").select("*").eq("trip_id", trip),
-      sb.from("settings").select("eur_rate").eq("id", 1).maybeSingle(),
+      state.member ? sb.from("settings").select("eur_rate").eq("id", 1).maybeSingle() : Promise.resolve({ data: null, error: null }),
       sb.from("places").select("place_id,data,updated_at").eq("trip_id", trip),
       sb.from("trips").select("id,data,updated_at"),
     ]);
@@ -653,7 +691,8 @@ export async function pull() {
     }
 
     if (st.data && !settingsPending) setSettingsLocal({ eurRate: Number(st.data.eur_rate) || state.settings.eurRate });
-    else if (!st.data && !settingsPending) toPush.push({ t: "settings" });
+    else if (!st.data && !settingsPending && state.member) toPush.push({ t: "settings" });
+    void pullProfile();
 
     // every trip this person can open (records merged field by field); a failed read never stops the sync
     if (tr.error) {
@@ -795,11 +834,10 @@ async function checkMembership() {
     const { data, error } = await supabase.rpc("is_member");
     if (error) throw error;
     memberDelay = 15_000;
-    set({ member: Boolean(data), sync: data ? "idle" : "denied" });
-    if (data) {
-      subscribeRealtime();
-      void pull();
-    }
+    // outside the first shared space = an ORBES Trips account with its own trips
+    set({ member: Boolean(data), sync: "idle" });
+    subscribeRealtime();
+    void pull();
   } catch (e) {
     console.warn("[orbes] membership check failed, will retry", e);
     set({ member: null, sync: navigator.onLine ? "error" : "pending" });
@@ -819,7 +857,7 @@ export async function initAuth() {
   window.addEventListener("storage", onStorage);
   if (!supabase) return;
   const { data } = await supabase.auth.getSession();
-  set({ session: data.session });
+  set({ session: data.session, authReady: true });
   if (data.session) await checkMembership();
   supabase.auth.onAuthStateChange((_event, session) => {
     const before = state.session?.user.id;
@@ -888,6 +926,13 @@ export async function sendLoginEmail(email: string) {
   if (error) throw error;
 }
 
+/** Sign in (or create the account) with Google; comes back to this page signed in */
+export async function signInWithGoogle() {
+  if (!supabase) throw new Error("not configured");
+  const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin + window.location.pathname } });
+  if (error) throw error;
+}
+
 /** Sign in with the e-mail + password created for each member in Supabase (no e-mail is sent). */
 export async function signInWithPassword(email: string, password: string) {
   if (!supabase) throw new Error("not configured");
@@ -916,9 +961,9 @@ class DefsMissing extends Error {}
 /** the table answered at least once (its live channel can be opened) */
 let placesKnown = false;
 /** The table / function of `what` ("place": places + upsert_place, "trip": trips + upsert_trip) is not on the server yet */
-const isMissing = (e: { code?: string; message?: string }, what: "place" | "trip") => {
+const isMissing = (e: { code?: string; message?: string }, what: "place" | "trip" | "profile") => {
   const m = e.message || "";
-  const names = what === "place" ? /\b(public\.)?(places|upsert_place)\b/i : /\b(public\.)?(trips|upsert_trip)\b/i;
+  const names = what === "place" ? /\b(public\.)?(places|upsert_place)\b/i : what === "trip" ? /\b(public\.)?(trips|upsert_trip)\b/i : /\b(public\.)?profiles\b/i;
   return (["PGRST202", "PGRST205", "42P01", "42883"].includes(e.code || "") && (names.test(m) || !m)) || (/could not find|does not exist/i.test(m) && names.test(m));
 };
 /** true while the server has no "trips" table yet (supabase/saas.sql not run) */
@@ -928,6 +973,38 @@ let tripsKnown = false;
 function setTrips(trips: Record<string, TripRec>) {
   writeJSON(TRIPS_KEY, trips);
   set({ trips });
+}
+
+// ---------- profile (table "profiles") ----------
+export type Profile = Record<string, unknown> & { uid?: string; updatedAt?: number };
+
+function setProfile(p: Profile) {
+  writeJSON(PROFILE_KEY, p);
+  set({ profile: p });
+}
+/** The signed-in account's profile; the one saved on this phone belongs to whoever signed in last */
+async function pullProfile() {
+  const uid = state.session?.user.id;
+  if (!uid || !supabase) return;
+  if (state.profile.uid && state.profile.uid !== uid) setProfile({ uid });
+  const { data, error } = await supabase.from("profiles").select("data,updated_at").eq("id", uid).maybeSingle();
+  if (error) return;
+  const local = state.profile;
+  const remote = (data?.data || null) as Profile | null;
+  if (remote && (!local.updatedAt || (Number(remote.updatedAt) || 0) >= local.updatedAt)) setProfile({ ...remote, uid });
+  else if (local.updatedAt && (!remote || (Number(remote.updatedAt) || 0) < local.updatedAt)) enqueue({ t: "profile" });
+}
+/** Changes fields of the profile (onboarding, account) and saves them for every phone of this account */
+export function updateProfile(patch: Record<string, unknown>) {
+  setProfile({ ...state.profile, ...patch, uid: state.session?.user.id || state.profile.uid, updatedAt: Date.now() });
+  enqueue({ t: "profile" });
+}
+
+/** A new trip of this account: a random id (the server refuses any other for a new trip); returns its id */
+export function createTrip(fields: Record<string, unknown>): string {
+  const id = uid();
+  updateTrip(id, fields);
+  return id;
 }
 
 /** Changes fields of a trip's record (title, dates, hotel, days, flights…), shared with its members */
@@ -954,6 +1031,9 @@ function migrate(tripId: string, pinsSynced: boolean) {
     for (const id of ids) defs[id] = mergePlaceState(defs[id] as PlaceState, patches[id] as PlaceState).merged as PlaceDef;
     return { ...d, defs };
   });
+  // the trips of the code belong to the first shared space: only its members send their records (an account
+  // outside it keeps them on this phone; members' records are also sent by the next sync, see pull)
+  if (TRIP_BY_ID[tripId] && state.member !== true) return;
   ids.forEach((id) => enqueue({ t: "def", trip: tripId, id }));
 }
 

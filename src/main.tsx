@@ -1,6 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import App from "./App";
+import Root from "./components/v3/Root";
 import { initAuth, toast } from "./lib/store";
 import "./styles.css";
 
@@ -17,6 +17,6 @@ if ("serviceWorker" in navigator && location.hostname.endsWith(".vercel.app")) {
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    <Root />
   </StrictMode>,
 );

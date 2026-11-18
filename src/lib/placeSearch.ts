@@ -99,6 +99,8 @@ function boxFor(trip: Trip, near?: { lat: number; lng: number }): [number, numbe
   if (near) return [near.lng - 0.05, near.lat - 0.05, near.lng + 0.05, near.lat + 0.05];
   // the programme's places only: a place added far away by mistake must not widen the search area
   const prog = trip.places.filter((p) => !p.added);
+  // a new trip with no place yet: around its city
+  if (!prog.length) return [trip.center[0] - 0.4, trip.center[1] - 0.4, trip.center[0] + 0.4, trip.center[1] + 0.4];
   const lats = prog.map((p) => p.lat);
   const lngs = prog.map((p) => p.lng);
   return [Math.min(...lngs) - 0.3, Math.min(...lats) - 0.3, Math.max(...lngs) + 0.3, Math.max(...lats) + 0.3];
