@@ -23,7 +23,7 @@ import { Drawer, EscGuard, Toaster } from "./components/ui";
 import type { Place } from "./data/types";
 import { km, optimizeOrder } from "./lib/geo";
 import { dayStops } from "./lib/plan";
-import { createPlace, currentAuthor, switchTrip, toast, updateDef, updatePlace, useStore, useTrip } from "./lib/store";
+import { createPlace, currentAuthor, switchTrip, toast, updateDef, updatePlace, useCanEdit, useStore, useTrip } from "./lib/store";
 import { noteKey } from "./lib/notes";
 import { pinPlaceId } from "./lib/live";
 import { enrichPlace } from "./lib/enrich";
@@ -57,6 +57,7 @@ export default function App() {
   const desktop = useDesktop();
   const trip = useTrip();
   const data = useStore((s) => s.data);
+  const canEdit = useCanEdit();
   // landing shown when the app is opened (not on every reload of the same session)
   const firstOpen = (() => {
     try {
@@ -607,12 +608,16 @@ export default function App() {
               >
                 <ILocate />
               </button>
-              <button className={"ctl" + (pinMode ? " on" : "")} onClick={() => { setPlaceQueue([]); setPinMode((v) => !v); }} aria-pressed={pinMode} aria-label="Ajouter un lieu sur la carte" title="Ajouter un lieu">
-                <IPinPlus />
-              </button>
-              <button className="ctl" onClick={() => setAddLink(true)} aria-label="Ajouter un lieu : lien, nom ou description" title="Ajouter un lieu (lien, nom ou description)">
-                <ILink />
-              </button>
+              {canEdit && (
+                <>
+                  <button className={"ctl" + (pinMode ? " on" : "")} onClick={() => { setPlaceQueue([]); setPinMode((v) => !v); }} aria-pressed={pinMode} aria-label="Ajouter un lieu sur la carte" title="Ajouter un lieu">
+                    <IPinPlus />
+                  </button>
+                  <button className="ctl" onClick={() => setAddLink(true)} aria-label="Ajouter un lieu : lien, nom ou description" title="Ajouter un lieu (lien, nom ou description)">
+                    <ILink />
+                  </button>
+                </>
+              )}
               <button className={"ctl" + (threeD ? " on" : "")} onClick={() => setThreeD((v) => !v)} aria-pressed={threeD} aria-label="Bâtiments en 3D" title="Vue 3D">
                 <ICube />
               </button>

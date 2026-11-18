@@ -45,6 +45,8 @@ interface State {
   trips: Record<string, TripRec>;
   /** the signed-in account's profile (table "profiles"): name, how they travel, tastes, pace, budget, language… */
   profile: Profile;
+  /** this account's role in each shared trip (owner / editor / viewer); none = the first shared space's trips */
+  roles: Record<string, string>;
   data: Data;
   settings: Settings;
   session: Session | null;
@@ -198,6 +200,7 @@ let state: State = {
   tripId: startTrip,
   trips: savedTrips,
   profile: readJSON<Profile>(PROFILE_KEY) || {},
+  roles: readJSON<Record<string, string>>("orbes.roles.v1") || {},
   data: startTrip === LEGACY_TRIP && legacyUnsaved ? legacyUnsaved : loadTrip(startTrip),
   settings: initialSettings,
   session: null,
@@ -851,6 +854,7 @@ async function checkMembership() {
     if (!data) await pullProfile().catch(() => undefined);
     // outside the first shared space = an ORBES Trips account with its own trips
     set({ member: Boolean(data), sync: "idle" });
+    void joinInvitations();
     subscribeRealtime();
     void pull();
   } catch (e) {
@@ -883,13 +887,13 @@ function adoptAccount(uid: string) {
   }
   if (!prev || prev === uid) return;
   try {
-    for (const k of Object.keys(localStorage)) if (k.startsWith("orbes.v2.") || k === OUTBOX_KEY || k === TRIPS_KEY || k === PROFILE_KEY || k.startsWith("orbes.ask.") || k.startsWith("orbes.wizard")) localStorage.removeItem(k);
+    for (const k of Object.keys(localStorage)) if (k.startsWith("orbes.v2.") || k === OUTBOX_KEY || k === TRIPS_KEY || k === PROFILE_KEY || k.startsWith("orbes.ask.") || k.startsWith("orbes.wizard") || k === "orbes.roles.v1") localStorage.removeItem(k);
   } catch {
     /* ignore */
   }
   outbox = [];
   baseCache.clear();
-  set({ trips: {}, profile: {}, data: emptyData(), pending: 0 });
+  set({ trips: {}, profile: {}, roles: {}, data: emptyData(), pending: 0 });
 }
 
 export async function initAuth() {
@@ -1042,6 +1046,32 @@ async function pullTripsOnly() {
   void pullProfile();
   scheduleFlush(0);
 }
+
+// ---------- shared trips: invitations and roles (supabase/saas-3.sql) ----------
+/** Invitations sent to this address become trips; the account's roles are read (readers cannot edit) */
+async function joinInvitations() {
+  if (!supabase || !state.session) return;
+  try {
+    const { data: n } = await supabase.rpc("accept_invites");
+    const { data: rows } = await supabase.from("trip_members").select("trip_id,role").eq("user_id", state.session.user.id);
+    if (rows) {
+      const roles = Object.fromEntries((rows as { trip_id: string; role: string }[]).map((r) => [r.trip_id, r.role]));
+      writeJSON("orbes.roles.v1", roles);
+      set({ roles });
+    }
+    if (Number(n) > 0) {
+      toast(Number(n) > 1 ? `${n} voyages partagés avec vous ont été ajoutés` : "Un voyage partagé avec vous a été ajouté");
+      void pullTripsOnly();
+    }
+  } catch {
+    /* sharing not available yet on the server: nothing to do */
+  }
+}
+/** This account can change the trip (readers of a shared trip cannot) */
+export const useCanEdit = (tripId?: string) => {
+  const id = useStore((s) => tripId ?? s.tripId);
+  return useStore((s) => s.roles[id]) !== "viewer";
+};
 
 // ---------- profile (table "profiles") ----------
 export type Profile = Record<string, unknown> & { uid?: string; updatedAt?: number };

@@ -4,7 +4,7 @@ import type { Place, Trip } from "../data/types";
 import { amapDirections, formatMinutes, googleDirections, travelMinutes } from "../lib/geo";
 import { isHotel, stopTime } from "../lib/plan";
 import { checkVisit, hoursLine, liveStatus } from "../lib/hours";
-import { addContact, addPhoto, currentAuthor, deleteContact, deletePhoto, deletePin, photoSrc, toast, updateDef, updatePin, updatePlace, updateRecord, useStore } from "../lib/store";
+import { addContact, addPhoto, currentAuthor, deleteContact, deletePhoto, deletePin, photoSrc, toast, updateDef, updatePin, updatePlace, updateRecord, useCanEdit, useStore } from "../lib/store";
 import { enrichPlace, restorePrevSheet, useEnrich } from "../lib/enrich";
 import EditSheet from "./EditSheet";
 import { fitAll, slotText } from "../lib/slots";
@@ -44,6 +44,8 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH, onMoveP
   const added = place.added;
   const job = useEnrich(hotel ? null : place.id);
   const [planning, setPlanning] = useState(false);
+  // a reader of a shared trip sees the sheet without anything to change
+  const canEdit = useCanEdit();
   const [editing, setEditing] = useState(false);
   const [secs, setSecs] = useState(0);
   useEffect(() => {
@@ -88,10 +90,12 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH, onMoveP
             >
               <IStar />
             </button>
-            <button className="icon-btn" aria-label="Modifier la fiche" onClick={() => setEditing(true)}>
-              <IEdit />
-            </button>
-            {!hotel && (
+            {canEdit && (
+              <button className="icon-btn" aria-label="Modifier la fiche" onClick={() => setEditing(true)}>
+                <IEdit />
+              </button>
+            )}
+            {!hotel && canEdit && (
               <button
                 className="icon-btn"
                 aria-label="Supprimer ce lieu"
@@ -156,7 +160,7 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH, onMoveP
 
         <GoBlock target={place} onGo={onGo} />
 
-        {!hotel && (
+        {!hotel && canEdit && (
           <div className="sec plan-sec">
             <span className="label">Programme</span>
             <div className="plan-now">
@@ -182,7 +186,7 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH, onMoveP
           </div>
         )}
 
-        {!hotel && (
+        {!hotel && canEdit && (
           <div className="sec">
             <span className="label">Suivi</span>
             <div className="seg" role="group" aria-label="Statut">
@@ -249,7 +253,7 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH, onMoveP
           {place.why && <p className="em-small">Pourquoi : {place.why}</p>}
           {place.price && <p className="em-small">Prix : {place.price}</p>}
           {place.source && /^https?:\/\//.test(place.source) && <p className="em-small"><a href={place.source} target="_blank" rel="noopener">Source</a></p>}
-          {!hotel && (
+          {!hotel && canEdit && (
             <div className="enrich">
               {job.busy ? (
                 <span className="tr-loading">
@@ -272,18 +276,20 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH, onMoveP
           )}
         </div>
 
+        {canEdit && (
         <Notes
-          rec={state as Record<string, unknown>}
-          legacyText={added ? added.note : undefined}
-          placeholder={added ? "Stand, contact, prix…" : "Ce que vous avez vu, les prix, les impressions…"}
-          onSave={(key, v) => {
-            // an added place keeps its former shared note on the pin itself (as before)
-            if (added?.pinId && key === "note") {
-              updatePin(added.pinId, { note: v });
-              updateRecord(place.id, { noteBy: currentAuthor() });
-            } else updateRecord(place.id, key === "note" ? { note: v, noteBy: currentAuthor() } : { [key]: v });
-          }}
-        />
+            rec={state as Record<string, unknown>}
+            legacyText={added ? added.note : undefined}
+            placeholder={added ? "Stand, contact, prix…" : "Ce que vous avez vu, les prix, les impressions…"}
+            onSave={(key, v) => {
+              // an added place keeps its former shared note on the pin itself (as before)
+              if (added?.pinId && key === "note") {
+                updatePin(added.pinId, { note: v });
+                updateRecord(place.id, { noteBy: currentAuthor() });
+              } else updateRecord(place.id, key === "note" ? { note: v, noteBy: currentAuthor() } : { [key]: v });
+            }}
+          />
+        )}
 
         <div className="sec">
           <span className="label">Photos</span>
@@ -299,9 +305,9 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH, onMoveP
                 </div>
               );
             })}
-            <button className="photo-add" onClick={() => file.current?.click()}>
+            {canEdit && <button className="photo-add" onClick={() => file.current?.click()}>
               <span><ICamera />Ajouter</span>
-            </button>
+            </button>}
           </div>
           <input ref={file} type="file" accept="image/*" hidden onChange={(e) => { void onFile(e.target.files?.[0]); e.target.value = ""; }} />
         </div>
@@ -322,11 +328,11 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH, onMoveP
               </div>
             );
           })}
-          <button className="link-btn" onClick={() => setAddingContact(true)}><IPlus /> Ajouter un contact</button>
+          {canEdit && <button className="link-btn" onClick={() => setAddingContact(true)}><IPlus /> Ajouter un contact</button>}
         </div>
 
 
-        {!hotel && (
+        {!hotel && canEdit && (
           <button className={"visit-btn" + (state.visited ? " on" : "")} aria-pressed={!!state.visited} onClick={() => updatePlace(place.id, { visited: !state.visited })}>
             <ICheck /> {state.visited ? "Visité" : "Marquer comme visité"}
           </button>

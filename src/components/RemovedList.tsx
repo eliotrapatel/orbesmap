@@ -1,5 +1,5 @@
 import type { Place, Trip } from "../data/types";
-import { toast, updateDef } from "../lib/store";
+import { toast, updateDef, useCanEdit } from "../lib/store";
 
 /** Removes a place from the programme: hidden everywhere (both phones), listed in "Lieux retirés" to be put back */
 export function removeFromProgramme(place: Place): boolean {
@@ -17,6 +17,7 @@ export function restoreToProgramme(place: Place) {
 /** Places removed from the programme, with a button to put each one back (in its day and slot) */
 export default function RemovedList({ trip }: { trip: Trip }) {
   const list = trip.removed || [];
+  const canEdit = useCanEdit(trip.id);
   if (!list.length) return null;
   return (
     <details className="removed">
@@ -32,7 +33,7 @@ export default function RemovedList({ trip }: { trip: Trip }) {
               <b>{p.name}</b>
               <small>{[d?.dates?.[0] ? d.short : d?.title, p.time].filter(Boolean).join(" · ")}</small>
             </span>
-            <button className="btn-sm" onClick={() => restoreToProgramme(p)}>Remettre</button>
+            {canEdit && <button className="btn-sm" onClick={() => restoreToProgramme(p)}>Remettre</button>}
           </div>
         );
       })}

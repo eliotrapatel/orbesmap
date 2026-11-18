@@ -6,7 +6,8 @@ import Onboarding from "./Onboarding";
 import Trips from "./Trips";
 import Welcome from "./Welcome";
 import DraftScreen from "./DraftScreen";
-import { openHome, useHome } from "./nav";
+import { openHome, openShare, useHome, useShare } from "./nav";
+import ShareTrip from "./ShareTrip";
 
 
 /**
@@ -23,6 +24,7 @@ export default function Root() {
   const allTrips = useStore((s) => s.trips);
   const trips = useTrips();
   const home = useHome();
+  const share = useShare();
   const current = trips.some((t) => t.id === tripId);
 
   // the current trip is not one this account can open (another account's, or the shared space's): its first trip
@@ -57,6 +59,7 @@ export default function Root() {
         onClose={trips.length && current ? () => openHome(false) : undefined}
       />
     );
+  if (share && session) return <ShareTrip onClose={() => openShare(false)} />;
   // a new trip being prepared by the AI, or waiting to be confirmed
   const draft = (allTrips[tripId]?.draft as { status?: string } | undefined)?.status;
   if (draft === "preparing" || draft === "review") return <DraftScreen onClose={() => openHome(true)} />;

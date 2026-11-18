@@ -1062,3 +1062,7 @@ button.pl-day:hover { border-color: var(--hair-strong); background: rgba(246, 24
 .v3-slot b { font-weight: 500; font-size: 14px; display: block; }
 .v3-slot small { display: block; color: var(--mute); font-size: 12px; margin-top: 2px; line-height: 1.35; }
 @media (prefers-reduced-motion: reduce) { .v3-spin, .v3-day.live .v3-st { animation: none; } }
+.v3-select { height: 34px; border-radius: 10px; border: 1px solid var(--hair); background: rgba(246, 242, 234, 0.04); color: var(--ink); font-size: 12.5px; padding: 0 8px; color-scheme: dark; max-width: 130px; }
+.v3-x { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; color: var(--mute); flex: none; }
+.v3-x:hover { color: var(--ink); background: rgba(246, 242, 234, 0.06); }
+.v3-msg p { margin: 0; }

@@ -8,8 +8,10 @@ import { fmtDay, fmtMin, localDate } from "../lib/time";
 import { checkVisit } from "../lib/hours";
 import { ICalPlus, IClose, IMap, IRoute } from "./Icons";
 import RemovedList, { removeFromProgramme } from "./RemovedList";
+import { useCanEdit } from "../lib/store";
 
 export default function Agenda({ trip, states, pins = [], onOpen, onOpenPin, onShowDay, onOptimize }: { trip: Trip; states: Record<string, PlaceState>; pins?: Pin[]; onOpen: (p: Place) => void; onOpenPin?: (p: Pin) => void; onShowDay: (d: string) => void; onOptimize: (d: string) => void }) {
+  const canEdit = useCanEdit();
   // places added from a link / on the map, with the day chosen for them
   const pinDay = (p: Pin) => ((states as Record<string, Record<string, unknown>>)[`_pin:${p.id}`]?.day as string | undefined) || "";
   const today = localDate(trip.timezone);
@@ -107,9 +109,11 @@ export default function Agenda({ trip, states, pins = [], onOpen, onOpenPin, onS
                       })}
                     </span>
                   </button>
-                  <button className="ag-x" aria-label={`Retirer ${p.name} du programme`} title="Retirer du programme" onClick={() => removeFromProgramme(p)}>
-                    <IClose />
-                  </button>
+                  {canEdit && (
+                    <button className="ag-x" aria-label={`Retirer ${p.name} du programme`} title="Retirer du programme" onClick={() => removeFromProgramme(p)}>
+                      <IClose />
+                    </button>
+                  )}
                   </div>
                 );
               })}

@@ -8,7 +8,7 @@ import { ICal, IChat, IChevron, IDownload, IGrid, IInfo, IPlane, ISearch, IUser,
 import { WxIcon } from "./WxIcon";
 import { useChecklist } from "./Checklist";
 import { useStore, useTrips } from "../lib/store";
-import { openHome } from "./v3/nav";
+import { openHome, openShare } from "./v3/nav";
 import { supabaseConfigured } from "../lib/supabase";
 import { useEscape } from "./ui";
 
@@ -41,6 +41,7 @@ function useNow(ms = 30_000) {
 export function TripMenu({ trip, onPick, onClose, anchor }: { trip: Trip; onPick: (id: string) => void; onClose: () => void; anchor: DOMRect | null }) {
   const ref = useRef<HTMLDivElement>(null);
   const trips = useTrips();
+  const signedIn = useStore((s) => !!s.session);
   useEscape(onClose);
   useEffect(() => {
     const f = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && onClose();
@@ -63,7 +64,13 @@ export function TripMenu({ trip, onPick, onClose, anchor }: { trip: Trip; onPick
           </button>
         );
       })}
-      <button role="menuitem" className="menu-item menu-home" onClick={() => { onClose(); openHome(); }}>
+      {signedIn && <button role="menuitem" className="menu-item menu-home" onClick={() => { onClose(); openShare(); }}>
+        <span>
+          <span className="label">Partager ce voyage</span>
+          <small>Inviter par e-mail · modifier ou lecture seule</small>
+        </span>
+      </button>}
+      <button role="menuitem" className="menu-item" onClick={() => { onClose(); openHome(); }}>
         <span>
           <span className="label">Mes voyages</span>
           <small>Tous vos voyages · créer un voyage</small>
