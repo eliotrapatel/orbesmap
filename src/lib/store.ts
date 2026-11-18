@@ -1273,9 +1273,10 @@ export function deletePin(id: string) {
   enqueue({ t: "pin-del", trip: state.tripId, id });
 }
 
-export async function addPhoto(placeId: string, blob: Blob): Promise<boolean> {
+/** `detail` tells what the photo is for in usage stats (e.g. "receipt" for an expense's receipt, place id "_exp:<id>") */
+export async function addPhoto(placeId: string, blob: Blob, detail?: string): Promise<boolean> {
   const trip = state.tripId;
-  track("photo_added", null, trip);
+  track("photo_added", detail ?? null, trip);
   const photo: Photo = { id: uid(), placeId, local: true, createdAt: Date.now() };
   try {
     await putPhoto(photo.id, blob);
