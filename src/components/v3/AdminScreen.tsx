@@ -9,6 +9,8 @@ import { overview, partnerCsv, people, personasOf, totalSpend, type Person } fro
 import { EXPENSE_CATEGORIES } from "../../lib/business";
 import { TYPE_LABEL } from "../../data/trip";
 import { locale, t, tk } from "../../lib/i18n";
+import { currencyAffix, lastDays } from "../../lib/peakData";
+import { PeakSlot } from "./ui/PeakCard";
 
 type Tab = "figures" | "profiles" | "accounts" | "codes" | "waitlist";
 const TABS: [Tab, string][] = [["figures", "Chiffres"], ["profiles", "Profils"], ["accounts", "Comptes"], ["codes", "Codes"], ["waitlist", "Attente"]];
@@ -62,9 +64,26 @@ function useLoad<T>(load: () => Promise<T>, deps: unknown[] = []) {
 
 function Figures() {
   const { data: o, err } = useLoad<Overview>(adminOverview);
+  const [span, setSpan] = useState<7 | 30>(30);
   if (err) return <p className="v3-err">{err}</p>;
   if (!o) return <p className="v3-note">{t("Chargement…")}</p>;
-  const max = Math.max(0.0001, ...o.days.map((d) => Number(d.usd) || 0));
+  // the AI cost per UTC day (the only per-day figure the server gives; sign-ups per day do not exist yet)
+  const today = new Date().toISOString().slice(0, 10);
+  const s = lastDays(o.days.map((d) => ({ day: String(d.day), value: Number(d.usd) || 0 })), span, today);
+  const callsBy = new Map(o.days.map((d) => [String(d.day).slice(0, 10), Number(d.calls) || 0]));
+  const calls = s.days.reduce((n, d) => n + (callsBy.get(d) ?? 0), 0);
+  const total = s.values.reduce((a, b) => a + b, 0);
+  const aff = currencyAffix(locale(), "USD");
+  const usdFr = (n: number) => `${aff.prefix}${new Intl.NumberFormat(locale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0)}${aff.suffix}`;
+  const labels = s.days.map((d) => t("{day} · {n} demandes", { day: day(d), n: callsBy.get(d) ?? 0 }));
+  const caption =
+    calls === 0
+      ? span === 7 ? t("Aucune demande à l'IA sur 7 jours.") : t("Aucune demande à l'IA sur 30 jours.")
+      : total > 0
+        ? t("{n} demandes · le jour le plus cher : {day}, {usd}", { n: calls, day: day(s.days[s.peakIndex]), usd: usdFr(s.values[s.peakIndex]) })
+        : t("{n} demandes", { n: calls });
+  const p7 = t("7 jours");
+  const p30 = t("30 jours");
   const stats: [string, string, string?][] = [
     [t("Comptes"), String(o.accounts), t("+{n} en 7 jours", { n: o.accounts7 })],
     [t("Voyages"), String(o.trips), t("+{n} en 7 jours", { n: o.trips7 })],
@@ -84,16 +103,37 @@ function Figures() {
           </div>
         ))}
       </div>
-      <div className="v3-glass adm-card">
-        <div className="adm-head"><span className="v3-lbl">{t("Coût IA, 30 jours")}</span><b>{usd(o.usd30)}</b></div>
-        {o.days.length === 0 && <p className="v3-note">{t("Aucune demande à l'IA sur 30 jours.")}</p>}
-        <div className="adm-bars" role="img" aria-label={t("Coût IA par jour sur 30 jours, total {total}", { total: usd(o.usd30) })}>
-          {o.days.map((d) => (
-            <i key={d.day} style={{ height: `${Math.max(3, ((Number(d.usd) || 0) / max) * 100)}%` }} title={t("{day} : {n} demandes, {usd}", { day: day(d.day), n: d.calls, usd: usd(d.usd) })} />
-          ))}
+      {o.days.length === 0 ? (
+        <div className="v3-glass adm-card">
+          <div className="adm-head"><span className="v3-lbl">{t("Coût IA, 30 jours")}</span><b>{usd(o.usd30)}</b></div>
+          <p className="v3-note">{t("Aucune demande à l'IA sur 30 jours.")}</p>
+          <p className="v3-note">{t("Hors espace partagé, dont les demandes sont suivies à part.")}</p>
         </div>
-        <p className="v3-note">{t("Hors espace partagé, dont les demandes sont suivies à part.")}</p>
-      </div>
+      ) : (
+        <>
+          <figure className="adm-peak" aria-label={t("Coût IA par jour sur {n} jours, total {total}", { n: span, total: usdFr(total) })}>
+            <PeakSlot
+              mode={total > 0 ? "chart" : "number"}
+              data={s.values}
+              labels={labels}
+              value={total}
+              decimals={2}
+              valuePrefix={aff.prefix}
+              valueSuffix={aff.suffix}
+              locale={locale()}
+              trend="none"
+              title={t("Coût IA")}
+              caption={caption}
+              periods={[p7, p30]}
+              period={span === 7 ? p7 : p30}
+              onPeriodChange={(p) => setSpan(p === p7 ? 7 : 30)}
+              periodLabel={t("Période")}
+              formatValue={usdFr}
+            />
+          </figure>
+          <p className="v3-note">{t("Hors espace partagé, dont les demandes sont suivies à part.")}</p>
+        </>
+      )}
       <Path />
       <AiBySteps />
     </>
