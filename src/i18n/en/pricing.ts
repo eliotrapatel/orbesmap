@@ -17,7 +17,7 @@ export default {
   "Choisir Pro annuel": "Choose Pro yearly",
   "{price} / mois": "{price} / month",
   "par personne": "per person",
-  "Pour les voyages professionnels : sourcing, salons, rendez-vous.": "For business trips: sourcing, trade fairs, meetings.",
+  "Pour les voyages professionnels : sourcing, salons, rendez-vous.": "For business trips: sourcing, trade fairs, meetings.",
   "Note de frais avec justificatifs": "Expense report with receipts",
   "Plusieurs voyageurs": "Several travellers",
   "Facture": "Invoice",

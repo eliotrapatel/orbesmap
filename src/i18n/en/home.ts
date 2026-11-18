@@ -29,4 +29,5 @@ export default {
   "Prochain voyage": "Next trip",
   "Où allez-vous ensuite ?": "Where to next?",
   "Voyages passés": "Past trips",
+  "Guidage Google Maps": "Google Maps directions",
 } satisfies Record<string, string>;

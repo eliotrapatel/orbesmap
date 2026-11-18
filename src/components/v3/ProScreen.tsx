@@ -50,7 +50,7 @@ const OFFERS: Offer[] = [
     name: "Business",
     price: () => t("{price} / mois", { price: eur(19) }),
     per: "par personne",
-    line: "Pour les voyages professionnels : sourcing, salons, rendez-vous.",
+    line: "Pour les voyages professionnels : sourcing, salons, rendez-vous.",
     value: "Tout Pro, et en plus : note de frais, plusieurs voyageurs, facture.",
     items: ["Mode affaires : fournisseurs, rendez-vous, comptes-rendus", "Note de frais avec justificatifs", "Plusieurs voyageurs", "Facture"],
     cta: "Choisir Business",

@@ -1,5 +1,5 @@
 import type { Trip } from "../data/types";
-import { locale } from "./i18n";
+import { getLang, locale } from "./i18n";
 
 const tz = (d: Date, timeZone: string, opts: Intl.DateTimeFormatOptions) => d.toLocaleString(locale(), { timeZone, ...opts });
 
@@ -42,7 +42,8 @@ export function parseTime(s?: string): number | null {
   if (h > 23) return null;
   return h * 60 + (m[2] ? +m[2] : 0);
 }
-export const fmtMin = (t: number) => `${Math.floor(t / 60)}h${String(t % 60).padStart(2, "0")}`;
+/** 690 → "11h30" in French, "11:30" in English */
+export const fmtMin = (t: number) => `${Math.floor(t / 60)}${getLang() === "en" ? ":" : "h"}${String(t % 60).padStart(2, "0")}`;
 
 /** Whole days left before the arrival: the one "J–" figure, the same as the countdown's days, everywhere */
 export const daysLeft = (t: Trip, now = Date.now()) => countdownParts(tripStartMs(t), now).d;

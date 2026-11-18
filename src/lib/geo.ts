@@ -44,6 +44,11 @@ export function optimizeOrder(start: LL, places: Place[]): Place[] {
   return out;
 }
 
+/** Amap only helps in mainland China (the first trips, written without a country, are there) */
+export const inChina = (trip: { country?: string }) => !trip.country || trip.country.toLowerCase() === "cn";
+/** Turn-by-turn guidance in the app that works where the trip is: Amap in China, Google Maps elsewhere */
+export const guideDirections = (trip: { country?: string }, p: LL & { name: string }, mode: "car" | "walk" = "car") =>
+  inChina(trip) ? amapDirections(p, mode) : `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}&travelmode=${mode === "walk" ? "walking" : "driving"}`;
 export const googleDirections = (p: LL) => `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}&travelmode=transit`;
 export const amapDirections = (p: LL & { name: string }, mode: "car" | "walk" = "car") =>
   // Amap (Gaode) works in mainland China without VPN. It expects GCJ-02, so convert from WGS-84.

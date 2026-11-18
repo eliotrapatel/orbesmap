@@ -233,7 +233,10 @@ function useNow(ms: number) {
 /** The trip to come (or under way) at the top of "Mes voyages": globe, clocks, countdown, what is ready, and the way in */
 export default function TripHero({ trip: base, onOpen }: { trip: Trip; onOpen: (id: string) => void }) {
   const now = useNow(1000);
-  const trip = useMemo(() => liveOf(base), [base]);
+  // the open trip's places added / moved since: the card follows them without a reload
+  const defs = useStore((st) => (st.tripId === base.id ? st.data.defs : null));
+  const pins = useStore((st) => (st.tripId === base.id ? st.data.pins : null));
+  const trip = useMemo(() => liveOf(base), [base, defs, pins]); // eslint-disable-line react-hooks/exhaustive-deps
   const draft = (useStore((s) => s.trips[base.id])?.draft as { status?: string } | undefined)?.status;
   const preparing = !!draft && draft !== "done";
   const ph = phase(trip, now);
@@ -288,7 +291,7 @@ export default function TripHero({ trip: base, onOpen }: { trip: Trip; onOpen: (
         returnIn={cd.d > 0 ? t("{d} j {h} h", { d: cd.d, h: cd.h }) : t("{h} h {m} min", { h: cd.h, m: String(cd.m).padStart(2, "0") })}
         facts={
           <span className="v3-facts">
-            {hotel && <span>{t("Hôtel")} <b>{hotel}</b></span>}
+            {hotel && <span>{/^h[oô]tel\b/i.test(hotel) ? null : <>{t("Hôtel")} </>}<b>{hotel}</b></span>}
             {flight?.code && <span><b>{flight.code}</b> {flight.from} → {flight.to}</span>}
           </span>
         }
@@ -323,7 +326,7 @@ export default function TripHero({ trip: base, onOpen }: { trip: Trip; onOpen: (
 
         <span className="v3-facts">
           <span><b>{total}</b> {total > 1 ? t("lieux") : t("lieu")}</span>
-          {hotel && <span>{t("Hôtel")} <b>{hotel}</b></span>}
+          {hotel && <span>{/^h[oô]tel\b/i.test(hotel) ? null : <>{t("Hôtel")} </>}<b>{hotel}</b></span>}
           {flight?.code && <span><b>{flight.code}</b> {flight.from} → {flight.to}</span>}
         </span>
 

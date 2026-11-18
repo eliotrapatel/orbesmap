@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { km } from "../lib/geo";
-import { amapDirections } from "../lib/geo";
+import { guideDirections, inChina } from "../lib/geo";
+import { useTrip } from "../lib/store";
 import { DENIED_HELP, ensureCompass, setFollow, startLocate, useLoc } from "../lib/locate";
 import { estimate, fetchRoute, fmtDistance, fmtDuration, progress, secondsLeft, type LL, type Mode, type Route } from "../lib/route";
 import { IClose, ILocate, INav, IPinPlus } from "./Icons";
@@ -115,6 +116,7 @@ export function useNavigation(nav: NavState) {
 }
 
 export function NavCard({ nav, info, onMode, onClose }: { nav: NonNullable<NavState>; info: ReturnType<typeof useNavigation>; onMode: (m: Mode) => void; onClose: () => void }) {
+  const trip = useTrip();
   useEscape(onClose); // "back" stops the route instead of leaving the app
   const status = useLoc((s) => s.status);
   const follow = useLoc((s) => s.follow);
@@ -157,7 +159,7 @@ export function NavCard({ nav, info, onMode, onClose }: { nav: NonNullable<NavSt
           }}>
           <ILocate /> {follow ? t("Je suis suivi") : t("Me suivre")}
         </button>
-        <a className="btn-sm" href={amapDirections(nav.target, nav.mode)} target="_blank" rel="noopener"><INav /> {t("Guidage Amap")}</a>
+        <a className="btn-sm" href={guideDirections(trip, nav.target, nav.mode)} target="_blank" rel="noopener"><INav /> {inChina(trip) ? t("Guidage Amap") : t("Guidage Google Maps")}</a>
       </div>
     </div>
   );
