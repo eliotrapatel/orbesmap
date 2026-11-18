@@ -441,7 +441,7 @@ function RecapCard({ trip, top, route, onOpen }: {
   // the signature card: spending per day, else places visited (stable across the hero's one-second re-renders)
   const peak = useMemo(() => recapPeak(r), [key, lang]); // eslint-disable-line react-hooks/exhaustive-deps
   // the image is drawn ahead, so the share sheet opens right on the touch (phones refuse it after a wait); in idle
-  // time, since its first drawing also paints the card's field
+  // time, since its first drawing paints its own wide field (shared with the card on a computer, not on a phone)
   const [img, setImg] = useState<{ key: string; blob: Blob } | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {

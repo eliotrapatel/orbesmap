@@ -184,7 +184,7 @@ export function recapPeak(r: Recap): PeakSpec | null {
       valuePrefix: aff.prefix,
       valueSuffix: aff.suffix,
       title: t("Dépenses du voyage"),
-      caption: t("Le plus gros jour : {day}, {amount}", { day: shortDay(s.days[s.peakIndex], loc), amount: eurText(s.values[s.peakIndex]) }),
+      caption: t("Le plus gros jour : {day}, {amount}", { day: shortDay(s.allPeak.day, loc), amount: eurText(s.allPeak.value) }),
       updatedText,
     };
   }

@@ -263,8 +263,12 @@ function buildField(px: number, seed: number, G: Geom, tone: Tone) {
       for (const o of rims) {
         // inner shadow of the card pushed up by `off`: a blurred box, with extra light in the round corners
         const vs = v + o.off;
+        // far enough inside the card the rim adds nothing (every phi below is 1 to within 1e-9): skipped, the
+        // pixels are the same and the field paints about a third faster
+        const sd = -sdf(u, vs, G.rn, HNg);
+        if (sd - o.sp > 6 * o.sg) continue;
         const dx = Math.min(u, 1 - u), dy = Math.min(vs, HNg - vs);
-        const ratio = Math.min(1, phi((-sdf(u, vs, G.rn, HNg) - o.sp) / o.sg) / Math.max(1e-9, phi((Math.min(dx, dy) - o.sp) / o.sg)));
+        const ratio = Math.min(1, phi((sd - o.sp) / o.sg) / Math.max(1e-9, phi((Math.min(dx, dy) - o.sp) / o.sg)));
         const k = 1 - phi((dx - o.sp) / o.sg) * phi((dy - o.sp) / o.sg) * ratio;
         const m = o.a * k;
         r += m * (o.rgb[0] - r); g += m * (o.rgb[1] - g); b += m * (o.rgb[2] - b);
@@ -372,6 +376,10 @@ function cached(map: Map<string, HTMLCanvasElement>, key: string, make: () => HT
   while (map.size > CACHE_MAX) map.delete(map.keys().next().value as string);
   return v;
 }
+/** The field is painted at most 560 px wide and drawn larger with smoothing: it is soft light, so the upscale does
+ *  not show. Measured on a Mac in Node (the same loop): portrait 670 px 194 ms, 560 px 96 ms with the rim skip;
+ *  wide 560 px 36 ms. A phone is several times slower, so the cap holds the first paint down. */
+const FIELD_MAX = 560;
 const fieldFor = (px: number, G: Geom, tone: Tone) => {
   const w = Math.round(px);
   return cached(FIELD_CACHE, `${G.kind}|${tone}|${w}`, () => buildField(w, 11, G, tone));
@@ -433,7 +441,18 @@ function curveY(ys: Float32Array, x: number) {
 /** How far right of the peak the dot rests: the original 8 units, less on a dense series (30 days) so the dot
  *  stays on the top of a narrow spike instead of sliding down its side */
 const dotDxOf = (c: Curve, G: Geom) => Math.min(DOT_DX, ((G.x1 - G.x0) / Math.max(1, c.n - 1)) * 0.14);
+/** Where the line is drawn: edge to edge on the portrait card (its plot nearly fills it); only over the plot on the
+ *  wide card, so the line never runs out of it through the figure's block */
+const spanOf = (G: Geom): [number, number] => (G.kind === "wide" ? [G.x0, G.x1] : [0, G.cw]);
 const lineAlpha = (d: number) => Math.exp(-Math.pow(Math.abs(d) / LINE_FALLOFF, LINE_POWER));
+
+/** The day under a pointer at `x` card units: the nearest data point */
+function hoverIndex(x: number, G: Geom, n: number) {
+  const h = (G.x1 - G.x0) / Math.max(1, n - 1);
+  return Math.max(0, Math.min(n - 1, Math.round((x - G.x0) / h)));
+}
+/** How close the eased pointer must be to its target to count as settled (card units) */
+const HOVER_EPS = 0.05;
 
 /* ---------- timeline ---------- */
 
@@ -504,8 +523,9 @@ function paintCard(ctx: CanvasRenderingContext2D, P: Layers, S: Scene): { x: num
   let dot: { x: number; y: number } | null = null;
   if (P.chart) {
     const lineColor = tone === "light" ? "#2f6bff" : LINE_COLOR;
-    const x1 = F.draw * CWg;
-    if (x1 > 0.5) {
+    const [xs, xe] = spanOf(G);
+    const x1 = xs + F.draw * (xe - xs);
+    if (x1 - xs > 0.5) {
       // the line keeps its light around the peak only (no bright head while drawing)
       const g = ctx.createLinearGradient(0, 0, CWg, 0);
       for (let i = 0; i <= 54; i++) {
@@ -517,8 +537,8 @@ function paintCard(ctx: CanvasRenderingContext2D, P: Layers, S: Scene): { x: num
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
       ctx.beginPath();
-      ctx.moveTo(0, curveY(ys, 0));
-      for (let x = 1; x < x1; x++) ctx.lineTo(x, ys[x]);
+      ctx.moveTo(xs, curveY(ys, xs));
+      for (let x = Math.floor(xs) + 1; x < x1; x++) ctx.lineTo(x, ys[x]);
       ctx.lineTo(x1, curveY(ys, x1));
       ctx.stroke();
     }
@@ -527,7 +547,7 @@ function paintCard(ctx: CanvasRenderingContext2D, P: Layers, S: Scene): { x: num
       const restX = S.peakX + S.dotDx;
       const baseX = Math.min(x1, restX);
       const dx = baseX + (S.hoverX - baseX) * S.hoverMix;
-      const dy = curveY(ys, dx) + DOT_DY * (1 - S.hoverMix) * clamp01(baseX / restX);
+      const dy = curveY(ys, dx) + DOT_DY * (1 - S.hoverMix) * clamp01((baseX - xs) / Math.max(1e-6, restX - xs));
       const pk = S.pulseK;
       ctx.save();
       ctx.globalAlpha = F.dotA;
@@ -579,7 +599,7 @@ export function paintPeakStill(o: { width: number; aspect: "portrait" | "wide"; 
   ctx.setTransform(u, 0, 0, u, bleedX, bleedY);
   paintCard(
     ctx,
-    { G, tone: o.tone, field: fieldFor(Math.min(width, Math.max(width, 700)), G, o.tone), grid: chart ? gridFor(width, G, o.tone) : null, halo: dark ? haloFor(width, G) : null, chart },
+    { G, tone: o.tone, field: fieldFor(Math.min(FIELD_MAX, width), G, o.tone), grid: chart ? gridFor(width, G, o.tone) : null, halo: dark ? haloFor(width, G) : null, chart },
     { ys: C.ys, peakX: C.peakX, dotDx: dotDxOf(C, G), F: REST_FRAME(), hoverX: 0, hoverMix: 0, pulseK: -1 },
   );
   return { canvas, bleedX, bleedY };
@@ -768,7 +788,6 @@ export function PeakChart({
       L.from = null;
       L.morph = 1;
     }
-    const CWg = G.cw;
     const reduce = typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (reduce) {
       L.started = true;
@@ -796,7 +815,7 @@ export function PeakChart({
       : "";
     canvas.style.setProperty("mask-image", mask);
     canvas.style.setProperty("-webkit-mask-image", mask);
-    const fieldPx = Math.min(width * dpr, Math.max(width, 700));
+    const fieldPx = Math.min(FIELD_MAX, width * dpr);
     const layers: Layers = {
       G, tone, chart,
       field: fieldFor(fieldPx, G, tone),
@@ -806,6 +825,8 @@ export function PeakChart({
 
     let visible = true;
     let raf = 0;
+    let readW = 0;
+    const [xs, xe] = spanOf(G);
     let last = performance.now();
 
     const draw = (dt: number) => {
@@ -826,17 +847,20 @@ export function PeakChart({
         for (let x = 0; x < ys.length; x++) ys[x] = L.from.ys[x] + (C.ys[x] - L.from.ys[x]) * mk;
       }
       const peakX = morphing && L.from ? L.from.peakX + (C.peakX - L.from.peakX) * mk : C.peakX;
-      const lo = morphing && L.from ? L.from.lo + (C.lo - L.from.lo) * mk : C.lo;
-      const hi = morphing && L.from ? L.from.hi + (C.hi - L.from.hi) * mk : C.hi;
 
       // hover easing
       const dotDx = dotDxOf(C, G);
       const restX = peakX + dotDx;
-      const landT = tLand(restX / CWg);
+      const landT = tLand((restX - xs) / (xe - xs));
       const landed = t >= landT && F.dotA > 0.99;
       const wantHover = hovering && (landed || reduce);
-      if (L.hover !== null) L.hoverX = reduce ? L.hover : L.hoverX + (L.hover - L.hoverX) * (1 - Math.exp(-dt * 14));
-      L.hoverMix = reduce ? (wantHover ? 1 : 0) : L.hoverMix + ((wantHover ? 1 : 0) - L.hoverMix) * (1 - Math.exp(-dt * 10));
+      if (L.hover !== null) {
+        L.hoverX = reduce ? L.hover : L.hoverX + (L.hover - L.hoverX) * (1 - Math.exp(-dt * 14));
+        if (Math.abs(L.hover - L.hoverX) <= HOVER_EPS) L.hoverX = L.hover;
+      }
+      const mixTo = wantHover ? 1 : 0;
+      L.hoverMix = reduce ? mixTo : L.hoverMix + (mixTo - L.hoverMix) * (1 - Math.exp(-dt * 10));
+      if (Math.abs(mixTo - L.hoverMix) <= 0.001) L.hoverMix = mixTo;
 
       // number: counts up, comes out of a blur
       if (L.valueT < 1) L.valueT = reduce ? 1 : Math.min(1, L.valueT + dt / 0.9);
@@ -867,29 +891,43 @@ export function PeakChart({
       const pulseK = sinceLand > 0 && sinceLand < 1.1 && !reduce ? sinceLand / 1.1 : -1;
       const dot = paintCard(ctx, layers, { ys, peakX, dotDx, F, hoverX: L.hoverX, hoverMix: L.hoverMix, pulseK });
 
-      // readout
+      // readout: the day under the pointer (snapped to it) and that day's own value, never a point of the curve
+      // between two days
       const rd = readRef.current;
       if (rd && dot) {
-        rd.style.opacity = L.hoverMix.toFixed(3);
-        rd.style.transform = `translate(${(dot.x * u).toFixed(1)}px, ${((dot.y - 26) * u).toFixed(1)}px) translate(-50%, -100%) scale(${(0.92 + 0.08 * L.hoverMix).toFixed(3)})`;
-        if (L.hoverMix > 0.01) {
-          const v = lo + ((G.bottom - curveY(ys, dot.x)) / (G.bottom - G.top)) * (hi - lo);
+        if (L.hover !== null) {
+          const idx = hoverIndex(L.hover, G, C.n);
+          const raw = L.data.length ? L.data[Math.min(idx, L.data.length - 1)] : 0;
+          const v = Number.isFinite(raw) ? raw : 0;
           const txt = L.fmt ? L.fmt(v) : `${L.prefix}${Math.round(v).toLocaleString(L.locale)}${L.suffix}`;
-          if (readValRef.current && readValRef.current.textContent !== txt) readValRef.current.textContent = txt;
-          const idx = Math.round(((Math.max(G.x0, Math.min(G.x1, dot.x)) - G.x0) / (G.x1 - G.x0)) * (C.n - 1));
           const lab = L.labels?.[idx] ?? "";
-          if (readLabRef.current && readLabRef.current.textContent !== lab) readLabRef.current.textContent = lab;
-          if (readLabRef.current) readLabRef.current.style.display = lab ? "" : "none";
+          let changed = false;
+          if (readValRef.current && readValRef.current.textContent !== txt) { readValRef.current.textContent = txt; changed = true; }
+          if (readLabRef.current && readLabRef.current.textContent !== lab) {
+            readLabRef.current.textContent = lab;
+            readLabRef.current.style.display = lab ? "" : "none";
+            changed = true;
+          }
+          // measured once per text, never per frame
+          if (changed || readW === 0) readW = rd.offsetWidth;
         }
+        // kept inside the card: centred on the dot, pushed in at the first and last days
+        const cardW = G.cw * u;
+        const left = Math.max(4, Math.min(cardW - readW - 4, dot.x * u - readW / 2));
+        rd.style.opacity = L.hoverMix.toFixed(3);
+        rd.style.transform = `translate(${left.toFixed(1)}px, ${((dot.y - 26) * u).toFixed(1)}px) translate(0, -100%) scale(${(0.92 + 0.08 * L.hoverMix).toFixed(3)})`;
       }
     };
 
-    // the loop sleeps once the reveal and any tween have settled: nothing runs at rest
+    // the loop sleeps once the reveal and any tween have settled: nothing runs at rest, a pointer held still on
+    // the card included (the clock holds while hovered at rest; a move wakes the loop again)
     const busy = () => {
       if (!L.started) return false;
-      const hoverMoving = Math.abs(L.hoverMix - (L.hover !== null ? 1 : 0)) > 0.001;
+      const hovering = L.hover !== null;
+      const hoverMoving = Math.abs(L.hoverMix - (hovering ? 1 : 0)) > 0.001 || (hovering && Math.abs(L.hover! - L.hoverX) > HOVER_EPS);
       if (reduce) return L.morph < 1 || hoverMoving;
-      return L.clock < T_REST + 1.3 || L.morph < 1 || L.valueT < 1 || L.hover !== null || hoverMoving;
+      const clockRuns = L.clock < T_REST + 1.3 && !(hovering && L.clock >= T_REST);
+      return clockRuns || L.morph < 1 || L.valueT < 1 || hoverMoving;
     };
     const tick = () => {
       raf = 0;
@@ -957,7 +995,8 @@ export function PeakChart({
     const r = cardRef.current!.getBoundingClientRect();
     const x = ((e.clientX - r.left) / r.width) * G.cw;
     const L = liveRef.current!;
-    const nx = Math.max(G.x0, Math.min(G.x1, x));
+    // snapped to the nearest day, so the dot and the readout stand on a real point
+    const nx = G.x0 + hoverIndex(Math.max(G.x0, Math.min(G.x1, x)), G, L.curve.n) * ((G.x1 - G.x0) / Math.max(1, L.curve.n - 1));
     if (L.hover === null && L.hoverMix < 0.02) L.hoverX = nx;
     L.hover = nx;
     L.kick();

@@ -74,7 +74,13 @@ function Figures() {
   const calls = s.days.reduce((n, d) => n + (callsBy.get(d) ?? 0), 0);
   const total = s.values.reduce((a, b) => a + b, 0);
   const aff = currencyAffix(locale(), "USD");
-  const usdFr = (n: number) => `${aff.prefix}${new Intl.NumberFormat(locale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0)}${aff.suffix}`;
+  // the same precision as usd(): 4 decimals under $0.10, so a week of cheap requests never reads 0,00 $
+  const decOf = (n: number) => (n > 0 && n < 0.1 ? 4 : 2);
+  const usdFr = (n: number) => {
+    const v = Number(n) || 0;
+    const d = decOf(v);
+    return `${aff.prefix}${new Intl.NumberFormat(locale(), { minimumFractionDigits: d, maximumFractionDigits: d }).format(v)}${aff.suffix}`;
+  };
   const labels = s.days.map((d) => t("{day} · {n} demandes", { day: day(d), n: callsBy.get(d) ?? 0 }));
   const caption =
     calls === 0
@@ -117,7 +123,7 @@ function Figures() {
               data={s.values}
               labels={labels}
               value={total}
-              decimals={2}
+              decimals={decOf(total)}
               valuePrefix={aff.prefix}
               valueSuffix={aff.suffix}
               locale={locale()}

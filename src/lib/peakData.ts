@@ -1,7 +1,9 @@
 // The series the signature card draws (lot CARTE SIGNATURE): one value per calendar day. Pure, no imports, so a
 // node script can check it (scripts/peak-check.mjs).
 
-export type Series = { days: string[]; values: number[]; activeDays: number; peakIndex: number };
+/** `allPeak`: the most expensive day of every dated item, drawn or not (a day left out of a long range can be the
+ *  biggest); the drawn peak unless such a day is bigger */
+export type Series = { days: string[]; values: number[]; activeDays: number; peakIndex: number; allPeak: { day: string; value: number } };
 
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 /** Days since 1970 for a yyyy-mm-dd date (UTC), NaN when it is not one */
@@ -23,7 +25,7 @@ function finish(days: string[], values: number[]): Series {
     if (values[i] > 0) activeDays++;
     if (values[i] > values[peakIndex]) peakIndex = i;
   }
-  return { days, values, activeDays, peakIndex };
+  return { days, values, activeDays, peakIndex, allPeak: { day: days[peakIndex] ?? "", value: values[peakIndex] ?? 0 } };
 }
 
 /** One value per calendar day (yyyy-mm-dd) from `start` to `end`. The range widens to cover the items' own dates
@@ -55,7 +57,15 @@ export function seriesByDay(items: { date: string; value: number }[], start: str
   const values = new Array<number>(n).fill(0);
   for (const p of pts) if (p.d >= a && p.d <= b) values[p.d - a] += p.v;
   const days = Array.from({ length: n }, (_, i) => isoOf(a + i));
-  return finish(days, values);
+  const s = finish(days, values);
+  // a day outside the drawn range still counts for the caption's biggest day
+  const out = new Map<number, number>();
+  for (const p of pts) if (p.d < a || p.d > b) out.set(p.d, (out.get(p.d) ?? 0) + p.v);
+  for (const d of [...out.keys()].sort((x, y) => x - y)) {
+    const v = out.get(d)!;
+    if (v > s.allPeak.value) s.allPeak = { day: isoOf(d), value: v };
+  }
+  return s;
 }
 
 /** The last `n` calendar days ending `today` (a yyyy-mm-dd UTC date), zeros where `rows` has no entry */

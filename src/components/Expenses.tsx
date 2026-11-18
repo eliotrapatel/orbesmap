@@ -75,7 +75,7 @@ export default function Expenses({ trip }: { trip: Trip }) {
               title={t("Total du voyage")}
               caption={[
                 local !== "EUR" && `${money(totalLocal, local, loc)}${t(" en {cur}", { cur: local })}`,
-                lineShown(spend) && t("le plus cher : {day}, {amount}", { day: dayName(spend.days[spend.peakIndex]), amount: money(spend.values[spend.peakIndex], "EUR", loc) }),
+                lineShown(spend) && t("le plus cher : {day}, {amount}", { day: dayName(spend.allPeak.day), amount: money(spend.allPeak.value, "EUR", loc) }),
               ].filter(Boolean).join(" · ")}
               updatedText={`${trip.title} · ${dateLabel(trip.start, trip.end)}`}
             />

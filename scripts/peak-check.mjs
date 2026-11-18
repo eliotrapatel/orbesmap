@@ -33,6 +33,15 @@ console.log("seriesByDay");
 {
   const s = seriesByDay([{ date: "2026-01-01", value: 99 }, { date: "2026-09-08", value: 7 }], "2026-09-07", "2026-09-11");
   eq("not widened past 45 days: out-of-range item not drawn", [s.days.length, s.values], [5, [0, 7, 0, 0, 0]]);
+  eq("the biggest day counts the item left out", s.allPeak, { day: "2026-01-01", value: 99 });
+}
+{
+  const s = seriesByDay([{ date: "2026-01-01", value: 3 }, { date: "2026-01-01", value: 2 }, { date: "2026-09-08", value: 7 }], "2026-09-07", "2026-09-11");
+  eq("a smaller day left out keeps the drawn peak", s.allPeak, { day: "2026-09-08", value: 7 });
+}
+{
+  const s = seriesByDay([{ date: "2026-09-08", value: 10 }, { date: "2026-09-10", value: 40 }], "2026-09-07", "2026-09-11");
+  eq("all items drawn: the biggest day is the drawn peak", s.allPeak, { day: s.days[s.peakIndex], value: s.values[s.peakIndex] });
 }
 {
   const s = seriesByDay([{ date: "2026-09-08", value: 20 }, { date: "2026-09-09", value: 20 }, { date: "2026-09-10", value: 5 }], "2026-09-08", "2026-09-10");
