@@ -13,6 +13,33 @@ const statusLabel = (k?: string | null) => {
 const typeLabel = (k: string) => (TYPE_LABEL[k as keyof typeof TYPE_LABEL] ? t(TYPE_LABEL[k as keyof typeof TYPE_LABEL]) : k);
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 
+/** The app's address now (https://theorbes.com/maps, https://orbesmap.vercel.app/…), without the query or the hash */
+export function appHome(): string {
+  return location.origin + location.pathname.replace(/index\.html$/, "");
+}
+/** The same address, short, to read (theorbes.com/maps) */
+export const appHomeLabel = (href = appHome()) => href.replace(/^https?:\/\//, "").replace(/\/$/, "");
+
+/**
+ * "Préparé avec ORBES Trips · theorbes.com/maps" at the foot of a printed document: on every printed page (a fixed
+ * footer, its room kept free on each page by a repeated table footer), once at the end on screen.
+ */
+const COLOPHON_CSS = `
+  .ob-pg{width:100%;table-layout:fixed;border-collapse:collapse;margin:0}.ob-pg>tbody>tr>td,.ob-pg>tfoot>tr>td{padding:0;border:0}
+  .ob-pg>tbody>tr>td{overflow-wrap:anywhere;word-break:break-word}
+  .ob-colo{margin-top:36px;padding-top:10px;border-top:1px solid #e5e2dc;color:#8a8780;font-size:9.5px;letter-spacing:.06em;text-align:center}
+  .ob-colo a{color:inherit;text-decoration:none}
+  .ob-sp{display:none}
+  @media print{
+    .ob-colo{position:fixed;left:0;right:0;bottom:0;margin:0;padding:4px 0 0;border-top:0;background:#fff}
+    .ob-sp{display:block;height:26px}
+  }`;
+const PAGE_OPEN = `<table class="ob-pg"><tbody><tr><td>`;
+const pageClose = () => {
+  const href = appHome();
+  return `</td></tr></tbody><tfoot><tr><td><div class="ob-sp"></div></td></tr></tfoot></table><div class="ob-colo">${esc(t("Préparé avec ORBES Trips"))} · <a href="${esc(href)}">${esc(appHomeLabel(href))}</a></div>`;
+};
+
 export function exportCsv(trip: Trip, d: Data) {
   const head = ["Jour", "Lieu", "Type", "Statut", "Note /5", "MOQ", "Prix", "Délai", "Échantillon", "RDV", "Créneau", "Adresse", "Adresse (chinois)", "Métro", "Site", "Notes", "Contacts", "Visité", "Favori", "Latitude", "Longitude"].map((x) => t(x));
   const rows: (string | number)[][] = [head];
@@ -41,8 +68,8 @@ export function exportPdf(trip: Trip, d: Data): boolean {
   h2{font-size:11px;letter-spacing:.24em;text-transform:uppercase;font-weight:500;border-bottom:1px solid #0a0a0a;padding-bottom:5px;margin:28px 0 8px}
   .p{padding:9px 0;border-bottom:1px solid #e5e2dc;page-break-inside:avoid}
   .n{font-weight:600;font-size:13px}.m{color:#666}.cn{font-family:"PingFang SC","Noto Sans SC",sans-serif}
-  .b{display:inline-block;border:1px solid #0a0a0a;border-radius:3px;padding:0 5px;margin-right:4px;font-size:10.5px}
-  </style></head><body><div class="wm">ORBES</div><h1>${esc(trip.title)}</h1><div class="sub">${esc(trip.subtitle)}, ${esc(trip.dateLabel)}. ${t("Hôtel : {name}.", { name: esc(trip.hotel.name) })}</div>`;
+  .b{display:inline-block;border:1px solid #0a0a0a;border-radius:3px;padding:0 5px;margin-right:4px;font-size:10.5px}${COLOPHON_CSS}
+  </style></head><body>${PAGE_OPEN}<div class="wm">ORBES</div><h1>${esc(trip.title)}</h1><div class="sub">${esc(trip.subtitle)}, ${esc(trip.dateLabel)}. ${t("Hôtel : {name}.", { name: esc(trip.hotel.name) })}</div>`;
   for (const day of trip.days) {
     const items = trip.places.filter((x) => x.day === day.key);
     if (!items.length) continue;
@@ -63,7 +90,7 @@ export function exportPdf(trip: Trip, d: Data): boolean {
       h += `</div>`;
     }
   }
-  h += `</body></html>`;
+  h += `${pageClose()}</body></html>`;
   const w = window.open("", "_blank");
   if (!w) return false;
   w.document.write(h);
@@ -101,8 +128,8 @@ export function exportReport(trip: Trip, d: Data, placeId?: string): boolean {
   .m{color:#666}.cn{font-family:"PingFang SC","Noto Sans SC",sans-serif}
   .b{display:inline-block;border:1px solid #0a0a0a;border-radius:3px;padding:0 5px;margin-right:4px;font-size:10.5px}
   .ph{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.ph img{width:150px;height:150px;object-fit:cover;border-radius:4px}
-  .sec{page-break-inside:avoid}
-  </style></head><body><div class="wm">ORBES</div>`;
+  .sec{page-break-inside:avoid}${COLOPHON_CSS}
+  </style></head><body>${PAGE_OPEN}<div class="wm">ORBES</div>`;
   h += `<h1>${esc(placeId ? list[0]?.name || "" : t("Compte-rendu fournisseurs"))}</h1>`;
   h += `<div class="sub">${esc(trip.title)} · ${esc(trip.dateLabel)} · ${esc(t("édité le {date}", { date: today }))}</div>`;
   if (!placeId && list.length) {
@@ -141,7 +168,7 @@ export function exportReport(trip: Trip, d: Data, placeId?: string): boolean {
   }
   if (!list.length) h += `<p class="m">${esc(t("Aucun fournisseur pour l'instant : un lieu devient fournisseur dès qu'il a un statut, une fiche fournisseur, un contact ou une dépense."))}</p>`;
   if (!placeId && exps.length) h += `<h2>${esc(t("Toutes les dépenses du voyage"))}</h2><div>${esc(sums(exps))}</div>`;
-  h += `</body></html>`;
+  h += `${pageClose()}</body></html>`;
   const w = window.open("", "_blank");
   if (!w) return false;
   w.document.write(h);

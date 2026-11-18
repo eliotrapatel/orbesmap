@@ -1,4 +1,6 @@
+import "../../styles/brand.css";
 import { useEffect, useState } from "react";
+import { appHome } from "../../lib/export";
 import type { Place } from "../../data/types";
 import { TYPE_LABEL } from "../../data/trip";
 import { dayStops } from "../../lib/plan";
@@ -12,6 +14,15 @@ import { t } from "../../lib/i18n";
 
 const leave = (hash = "") => location.assign(location.pathname + hash);
 const today = () => new Date().toISOString().slice(0, 10);
+
+/** "Préparez votre voyage": the click is counted before the page leaves (a plain click waits a moment; a new-tab click goes as is) */
+const openApp = (e: React.MouseEvent<HTMLAnchorElement>) => {
+  track("link_opened", "brand_cta");
+  if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+  e.preventDefault();
+  const href = e.currentTarget.href;
+  setTimeout(() => location.assign(href), 200);
+};
 
 /** A trip's programme opened from its public link: read only, without an account; "Copier ce voyage" */
 export default function PublicTripPage({ slug, copyNow }: { slug: string; copyNow: boolean }) {
@@ -93,6 +104,11 @@ export default function PublicTripPage({ slug, copyNow }: { slug: string; copyNo
           {ideas.map((p) => <Stop key={p.id} p={p} open={open === p.id} onToggle={() => setOpen(open === p.id ? null : p.id)} />)}
         </section>
       )}
+
+      <footer className="br-pub">
+        <p className="br-pub-by"><OrbitMark size={14} /><span>{t("Préparé avec ORBES Trips")}</span></p>
+        <a className="v3-btn ghost br-pub-cta" href={appHome()} onClick={openApp}>{t("Préparez votre voyage")}</a>
+      </footer>
 
       <div className="pt-cta">
         <button className="v3-btn" disabled={!authReady} onClick={copy}>{t("Copier ce voyage")}</button>

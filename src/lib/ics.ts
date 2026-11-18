@@ -4,6 +4,7 @@ import type { Trip } from "../data/types";
 import type { PlaceState } from "./model";
 import { dayStops, stopTime } from "./plan";
 import { t as tr } from "./i18n";
+import { appHome } from "./export";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/[,;]/g, (c) => "\\" + c);
@@ -11,6 +12,9 @@ const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replac
 export function exportIcs(trip: Trip, states: Record<string, PlaceState>) {
   const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//ORBES//Trip//FR", "CALSCALE:GREGORIAN", `X-WR-CALNAME:ORBES — ${trip.title}`, `X-WR-TIMEZONE:${trip.timezone}`];
   const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+/, "");
+  // the last line of every event's description: where it was prepared
+  const brand = `${tr("Préparé avec ORBES Trips")} — ${appHome()}`;
+  const withBrand = (desc: string) => (desc ? `${desc}\n\n${brand}` : brand);
   for (const day of trip.days.filter((d) => d.scheduled)) {
     const date = day.dates?.[0];
     if (!date) continue;
@@ -26,14 +30,14 @@ export function exportIcs(trip: Trip, states: Record<string, PlaceState>) {
       } else {
         lines.push(`DTSTART;VALUE=DATE:${ymd}`);
       }
-      lines.push(`SUMMARY:${esc(p.name)}`, `LOCATION:${esc(p.cn || p.address)}`, `GEO:${p.lat};${p.lng}`, `DESCRIPTION:${esc(desc)}`, "END:VEVENT");
+      lines.push(`SUMMARY:${esc(p.name)}`, `LOCATION:${esc(p.cn || p.address)}`, `GEO:${p.lat};${p.lng}`, `DESCRIPTION:${esc(withBrand(desc))}`, "END:VEVENT");
     }
   }
   for (const f of trip.flights) {
     const dep = f.departAt || f.at;
     const arr = f.arriveAt || f.at;
     const z = (iso: string) => new Date(iso).toISOString().replace(/[-:]/g, "").replace(/\.\d+/, "");
-    lines.push("BEGIN:VEVENT", `UID:${trip.id}-${f.code}@orbes`, `DTSTAMP:${stamp}`, `DTSTART:${z(dep)}`, `DTEND:${z(arr)}`, `SUMMARY:${esc(`${f.code} ${f.from} → ${f.to}`)}`, `LOCATION:${esc(f.terminal ? `${f.from} ${f.terminal}` : f.from)}`, "END:VEVENT");
+    lines.push("BEGIN:VEVENT", `UID:${trip.id}-${f.code}@orbes`, `DTSTAMP:${stamp}`, `DTSTART:${z(dep)}`, `DTEND:${z(arr)}`, `SUMMARY:${esc(`${f.code} ${f.from} → ${f.to}`)}`, `LOCATION:${esc(f.terminal ? `${f.from} ${f.terminal}` : f.from)}`, `DESCRIPTION:${esc(withBrand(""))}`, "END:VEVENT");
   }
   lines.push("END:VCALENDAR");
   const blob = new Blob([lines.join("\r\n")], { type: "text/calendar;charset=utf-8" });
