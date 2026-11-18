@@ -5,7 +5,7 @@ import { getLang, locale, t } from "../../lib/i18n";
 import { getState, requestPro, useStore } from "../../lib/store";
 import { track } from "../../lib/track";
 import Shell from "./Shell";
-import { clearWizardDraft, CONCIERGE_KEY, createTripFromWizard, lastWay, LinkTile, linkCard, rememberWay, URL_RE, useKeyboardFit, useOnline, WIZARD_KEY, wizardDraft, type Wiz } from "./CreateWizard";
+import { clearWizardDraft, CONCIERGE_KEY, createTripFromWizard, lastWay, LinkTile, linkCard, rememberWay, URL_RE, useKeyboardFit, useOnline, WIZARD_KEY, wizardDraft, wizHasContent, type Wiz } from "./CreateWizard";
 import { INTERESTS, PACES, TRAVEL } from "./Onboarding";
 import { CcArrow, CcBed, CcBell, CcCal, CcCheck, CcClip, CcClock, CcClose, CcImg, CcMic, CcPeople, CcPin, CcPlane, CcPlus, CcRefresh, CcSend, CcSpark, ConciergeOrbit } from "./ConciergeIcons";
 import "../../styles/concierge.css";
@@ -36,6 +36,15 @@ export function CreateChooser({ onPick, onCancel }: { onPick: (k: "concierge" | 
     return s && s.msgs.length > 1 ? s : null;
   });
   const [form, setForm] = useState(wizardDraft);
+  // « Effacer… » asks for a second touch (a stray touch never wipes anything)
+  const [forget, setForget] = useState<"chat" | "form" | null>(null);
+  useEffect(() => {
+    if (!forget) return;
+    const tm = window.setTimeout(() => setForget(null), 4000);
+    return () => window.clearTimeout(tm);
+  }, [forget]);
+  // the order is fixed when the screen opens: what is half-way first, else the way chosen last time
+  const [formFirst] = useState(() => (form && !chat ? true : chat && !form ? false : last === "form"));
   const pick = (k: "concierge" | "form") => {
     rememberWay(k);
     onPick(k);
@@ -49,13 +58,26 @@ export function CreateChooser({ onPick, onCancel }: { onPick: (k: "concierge" | 
   const chatWhere = chat?.facts.cities[0]?.name;
   const formWhere = form?.cities.map((c) => c.name).join(" · ");
   const lastTag = <span className="v3-tag dim">{t("Dernier choix")}</span>;
-  return (
-    <Shell ring={false} top={top} className="cc-chooser">
-      <p className="v3-lbl" style={{ marginTop: 18 }}>{t("Créer un voyage")}</p>
-      <h1 className="v3-d v3-h2">{t("Comment préférez-vous ?")}</h1>
-      <p className="ch-lead">{t("Les deux mènent au même voyage préparé. Vous pouvez passer du concierge au formulaire à tout moment, sans rien perdre.")}</p>
-      <div className="ch-grid">
-      <div className="ch-way">
+  // something to resume: the previews are shortened so both ways show on a small phone
+  const resume = !!chat || !!form;
+  const forgetBtn = (k: "chat" | "form") => (
+    <button type="button" className={"ch-forget" + (forget === k ? " sure" : "")}
+      onClick={() => {
+        if (forget !== k) return setForget(k);
+        setForget(null);
+        if (k === "chat") {
+          save(null);
+          setChat(null);
+        } else {
+          clearWizardDraft();
+          setForm(null);
+        }
+      }}>
+      {forget === k ? t("Touchez encore pour effacer") : k === "chat" ? t("Effacer la conversation") : t("Effacer le brouillon")}
+    </button>
+  );
+  const concierge = (
+    <div className="ch-way" key="concierge">
       <button type="button" className={"ch-card" + (last === "concierge" ? " last" : "")} onClick={() => pick("concierge")}>
         <div className="ch-preview ch-chat" aria-hidden="true">
           <span className="ch-mini-top">
@@ -79,9 +101,11 @@ export function CreateChooser({ onPick, onCancel }: { onPick: (k: "concierge" | 
         {chat && <span className="ch-resume"><i className="cr-dot" /><span>{t("Conversation en cours")}{chatWhere ? <> · <b>{chatWhere}</b></> : null}</span></span>}
         <CcArrow className="cc-ic ch-go" />
       </button>
-      {chat && <button type="button" className="ch-forget" onClick={() => { save(null); setChat(null); }}>{t("Effacer la conversation")}</button>}
-      </div>
-      <div className="ch-way">
+      {chat && forgetBtn("chat")}
+    </div>
+  );
+  const formCard = (
+    <div className="ch-way" key="form">
       <button type="button" className={"ch-card" + (last === "form" ? " last" : "")} onClick={() => pick("form")}>
         <div className="ch-preview ch-form" aria-hidden="true">
           <span className="ch-bars"><i className="on" /><i /><i /><i /></span>
@@ -97,8 +121,16 @@ export function CreateChooser({ onPick, onCancel }: { onPick: (k: "concierge" | 
         {form && <span className="ch-resume"><i className="cr-dot" /><span>{t("Brouillon")}{formWhere ? <> · <b>{formWhere}</b></> : null} · {t("étape {n} sur {of}", { n: form.step, of: 4 })}</span></span>}
         <CcArrow className="cc-ic ch-go" />
       </button>
-      {form && <button type="button" className="ch-forget" onClick={() => { clearWizardDraft(); setForm(null); }}>{t("Effacer le brouillon")}</button>}
-      </div>
+      {form && forgetBtn("form")}
+    </div>
+  );
+  return (
+    <Shell ring={false} top={top} className="cc-chooser">
+      <p className="v3-lbl" style={{ marginTop: 18 }}>{t("Créer un voyage")}</p>
+      <h1 className="v3-d v3-h2">{t("Comment préférez-vous ?")}</h1>
+      <p className="ch-lead">{t("Les deux mènent au même voyage préparé. Vous pouvez passer du concierge au formulaire à tout moment, sans rien perdre.")}</p>
+      <div className={"ch-grid" + (resume ? " resume" : "")}>
+        {formFirst ? [formCard, concierge] : [concierge, formCard]}
       </div>
     </Shell>
   );
@@ -402,7 +434,7 @@ function Mine({ m, old, fresh, onRetry, onEdit }: { m: Msg; old: boolean; fresh:
       )}
       {m.failed && (
         <div className="cc-failed" role="alert">
-          <span>{m.failed === "offline" ? t("Pas de connexion : le message n'est pas parti.") : m.err || t("Le message n'est pas parti.")}</span>
+          <span>{m.failed === "offline" ? t("Pas de connexion : le message n'est pas parti.") : (m.err || "").replace(AGAIN, "").trim() || t("Le message n'est pas parti.")}</span>
           <button type="button" className="cc-retry" onClick={onRetry}><CcRefresh className="cc-ic s" />{t("Réessayer")}</button>
           {m.text && <button type="button" className="cc-act" onClick={onEdit}>{t("Modifier")}</button>}
         </div>
@@ -411,6 +443,8 @@ function Mine({ m, old, fresh, onRetry, onEdit }: { m: Msg; old: boolean; fresh:
   );
 }
 
+/** « Réessayez. » at the end of a reason: the button under it already says it */
+const AGAIN = /\s*(Réessayez|Try again)\s*\.?\s*$/i;
 const IDEAS = ["Un long week-end à Rome, en mai", "Tokyo au printemps, 6 jours", "Lisbonne, tranquille, à deux"];
 const STEPS = ["Où", "Quand", "Infos", "Programme"];
 
@@ -461,6 +495,8 @@ export default function Concierge({ onCancel, onCreated, onForm }: { onCancel: (
   const [launching, setLaunching] = useState(false);
   const [listening, setListening] = useState(false);
   const [mate, setMate] = useState("");
+  // the form already holds another trip's draft: asked once before it is replaced
+  const [replace, setReplace] = useState<Wiz | null>(null);
   const online = useOnline();
   const end = useRef<HTMLDivElement>(null);
   const file = useRef<HTMLInputElement>(null);
@@ -648,6 +684,8 @@ export default function Concierge({ onCancel, onCreated, onForm }: { onCancel: (
       const id = await createTripFromWizard(w, w.mode === "business" && (!plan || plan.pro));
       track("trip_created", "concierge", id);
       save(null);
+      // a form draft opened from this conversation is done with too (no second copy of the same trip)
+      if (wizardDraft()?.from === "concierge") clearWizardDraft();
       onCreated(id);
     } catch {
       setErr(t("Le voyage n'a pas pu être créé. Réessayez."));
@@ -655,11 +693,22 @@ export default function Concierge({ onCancel, onCreated, onForm }: { onCancel: (
     }
   };
   // the form opens on everything understood; the conversation stays saved until the trip is created (from either)
-  const toForm = () => {
-    try {
-      localStorage.setItem(WIZARD_KEY, JSON.stringify(toWizard(f)));
-    } catch {
-      /* ignore */
+  // a draft the form holds for another trip is never replaced without asking
+  const toForm = (force?: "replace" | "keep") => {
+    const cur = wizardDraft();
+    const same = (a: { name: string }[], b: { name: string }[]) => a.map((c) => c.name.toLowerCase()).join("|") === b.map((c) => c.name.toLowerCase()).join("|");
+    if (!force && cur && wizHasContent(cur) && (cur.from !== "concierge" || !same(cur.cities, f.cities))) {
+      setRecap(false);
+      setReplace(cur);
+      return;
+    }
+    setReplace(null);
+    if (force !== "keep") {
+      try {
+        localStorage.setItem(WIZARD_KEY, JSON.stringify(toWizard(f)));
+      } catch {
+        /* ignore */
+      }
     }
     rememberWay("form");
     onForm();
@@ -694,7 +743,8 @@ export default function Concierge({ onCancel, onCreated, onForm }: { onCancel: (
   const intro = state.msgs.length === 1 && !busy && !launching;
   // « Préparer mon voyage » as soon as the destination and the dates are known (in ivory once the concierge has all it asked)
   const ctaReady = state.ready && canLaunch;
-  const showCta = canLaunch && !busy && !launching;
+  // it stays in place while the concierge answers (dimmed), so the bottom of the screen never jumps
+  const showCta = canLaunch && !launching;
   const lastText = state.msgs[state.msgs.length - 1]?.text || "";
   const slowLine = (lastText.match(URL_RE) || []).length ? t("Je lis vos liens, cela peut prendre une minute.") : state.msgs[state.msgs.length - 1]?.image ? t("Je lis votre capture…") : t("Encore un instant…");
   const showProg = done[0] && done[1] && (step === 3 || done[2]) && !launching;
@@ -821,7 +871,18 @@ export default function Concierge({ onCancel, onCreated, onForm }: { onCancel: (
           <div className="cc-glass cc-comp quiet"><span className="cc-r"><CcBell /></span><span className="cc-in">{t("La préparation continue dans le voyage")}</span></div>
         ) : (
           <>
-            {showCta && <button type="button" className={"v3-btn cc-cta" + (ctaReady ? "" : " ghost")} onClick={() => setRecap(true)}><CcSpark />{t("Préparer mon voyage")}</button>}
+            {replace && (
+              <div className="cc-glass cc-replace" role="alertdialog" aria-label={t("Remplacer le brouillon du formulaire ?")}>
+                <b>{replace.cities.length ? t("Remplacer le brouillon {where} ?", { where: replace.cities.map((c) => c.name).join(" · ") }) : t("Remplacer le brouillon du formulaire ?")}</b>
+                <small>{t("Le formulaire a déjà un brouillon. Cette conversation peut prendre sa place, ou vous pouvez reprendre ce brouillon.")}</small>
+                <span className="cc-replace-acts">
+                  <button type="button" className="v3-chip on" onClick={() => toForm("replace")}>{t("Remplacer")}</button>
+                  <button type="button" className="v3-chip" onClick={() => toForm("keep")}>{t("Reprendre le brouillon")}</button>
+                  <button type="button" className="cc-act" onClick={() => setReplace(null)}>{t("Annuler")}</button>
+                </span>
+              </div>
+            )}
+            {showCta && <button type="button" className={"v3-btn cc-cta" + (ctaReady ? "" : " ghost") + (busy ? " wait" : "")} disabled={busy} onClick={() => setRecap(true)}><CcSpark />{t("Préparer mon voyage")}</button>}
             {shot && (
               <span className="cc-att"><CcImg className="cc-ic s" /><span className="nm">{shot.name}</span><button type="button" onClick={() => setShot(null)} aria-label={t("Retirer la capture")}><CcClose className="cc-ic s" /></button></span>
             )}
@@ -837,7 +898,7 @@ export default function Concierge({ onCancel, onCreated, onForm }: { onCancel: (
               )}
             </div>
             <input ref={file} type="file" accept="image/*" hidden onChange={(e) => { setShot(e.target.files?.[0] || null); e.target.value = ""; }} />
-            {!ctaReady && <button type="button" className="v3-link cc-switch" onClick={toForm}>{t("Je préfère remplir le formulaire")}</button>}
+            {!showCta && !replace && <button type="button" className="v3-link cc-switch" onClick={() => toForm()}>{t("Je préfère remplir le formulaire")}</button>}
           </>
         )}
       </div>
@@ -885,6 +946,7 @@ export default function Concierge({ onCancel, onCreated, onForm }: { onCancel: (
             {!canLaunch && <p className="v3-note">{t("Il me faut au moins la destination et les dates pour lancer la préparation.")}</p>}
             <button className="v3-btn" style={{ marginTop: 16 }} disabled={!canLaunch || launching} onClick={() => void launch()}><CcSpark />{launching ? t("Création…") : t("Lancer la préparation")}</button>
             <button type="button" className="v3-link" onClick={() => setRecap(false)}>{t("Continuer la conversation")}</button>
+            <button type="button" className="v3-link cc-switch" onClick={() => toForm()}>{t("Je préfère remplir le formulaire")}</button>
           </div>
         </div>
       )}

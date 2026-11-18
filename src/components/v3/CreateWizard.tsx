@@ -33,6 +33,10 @@ export type Wiz = {
   travellers?: string[];
   /** the draft came from the concierge: its conversation is done with once the trip exists */
   from?: "concierge";
+  /** the furthest step reached: every step up to it can be reopened from the step bar */
+  maxStep?: number;
+  /** the text of « Ce que vous savez déjà » as last sorted (never sorted twice) */
+  sortedKnow?: string;
 };
 export const WIZARD_KEY = "orbes.wizard.v1";
 /** The concierge's saved conversation (read here for the choice screen, cleared when its trip is created from the form) */
@@ -55,11 +59,15 @@ const dayList = (start: string, end: string) => {
 
 // ---------- shared with the concierge and the choice screen ----------
 
-/** The form's saved draft, if any */
+/** Something was entered in the form (an untouched form is not a draft) */
+export function wizHasContent(w: Partial<Wiz> | null | undefined): boolean {
+  return !!w && (!!w.cities?.length || !!w.start || !!w.know?.trim() || !!w.places?.length || !!w.fixed?.length || !!w.wishes?.length || !!w.flights?.length || !!w.hotelName?.trim() || !!w.travellers?.length);
+}
+/** The form's saved draft, if anything was entered in it */
 export function wizardDraft(): Wiz | null {
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) || "null");
-    return saved?.step ? (saved as Wiz) : null;
+    return saved?.step && wizHasContent(saved) ? (saved as Wiz) : null;
   } catch {
     return null;
   }
@@ -193,7 +201,136 @@ function ownerFirstName(): string {
 
 // ---------- the form ----------
 
-type StepProps = { w: Wiz; set: (p: Partial<Wiz>) => void; go: (step: number) => void; nextRef: MutableRefObject<() => void> };
+type StepProps = { w: Wiz; set: (p: Partial<Wiz>) => void; go: (step: number) => void; nextRef: MutableRefObject<() => void>; sorter: Sorter };
+
+// ---------- sorting « Ce que vous savez déjà » ----------
+
+type Shot = { id: string; url: string; state: "wait" | "read" | "ok" | "err" };
+type Sorter = {
+  shots: Shot[];
+  busy: boolean;
+  progress: { i: number; of: number } | null;
+  msg: string | null;
+  err: string | null;
+  /** adds captures (read by the sorting going on, or by a new one) */
+  add: (files: File[]) => void;
+  /** sorts the text not sorted yet and the captures not read yet (failed ones are read again) */
+  run: () => Promise<boolean>;
+};
+/** The text written since the last sorting, if any */
+const pendingText = (w: Wiz) => {
+  const k = w.know.trim();
+  return k && k !== (w.sortedKnow || "").trim() ? k : "";
+};
+/** Sorting lives with the form, not with its step: it goes on when the person moves to the next step, and what it
+ *  finds is merged into the draft as it is at that moment (never into an older copy) */
+function useSorter(wRef: MutableRefObject<Wiz>, setW: (f: (x: Wiz) => Wiz) => void): Sorter {
+  const [shots, setShots] = useState<Shot[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<{ i: number; of: number } | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  // the captures not read yet (a failed one stays here, to be read again)
+  const files = useRef(new Map<string, File>());
+  const running = useRef(false);
+  const urls = useRef<string[]>([]);
+  const ctl = useRef<AbortController | null>(null);
+  useEffect(() => () => {
+    ctl.current?.abort();
+    urls.current.forEach((u) => URL.revokeObjectURL(u));
+  }, []);
+  const mark = (ids: string[], state: Shot["state"]) => setShots((s) => s.map((x) => (ids.includes(x.id) ? { ...x, state } : x)));
+  const merge = (r: IntakeResult, extra?: Partial<Wiz>) => setW((x) => {
+    const places = [...x.places];
+    const fixed = [...x.fixed];
+    const wishes = [...x.wishes];
+    const flights = [...x.flights];
+    let hotelName = x.hotelName;
+    let hotelAddress = x.hotelAddress;
+    for (const f of r.flights || []) if (f.code && !flights.some((y) => y.code === f.code && y.departAt === f.departAt)) flights.push(f);
+    if (r.hotel?.name && !hotelName) {
+      hotelName = r.hotel.name;
+      hotelAddress = r.hotel.address || r.hotel.addressCn || "";
+    }
+    for (const p of r.places || []) if (p.name && !places.some((y) => y.name.toLowerCase() === p.name.toLowerCase())) places.push({ ...p, keep: true });
+    for (const f of r.fixed || []) if (f.name && !fixed.some((y) => y.name === f.name && y.date === f.date)) fixed.push({ ...f, keep: true });
+    for (const y of r.wishes || []) if (y && !wishes.some((z) => z.text === y)) wishes.push({ text: y, keep: true });
+    return { ...x, places, fixed, wishes, flights: flights.sort((a, b) => (a.departAt || "").localeCompare(b.departAt || "")), hotelName, hotelAddress, ...extra };
+  });
+  const run = async (): Promise<boolean> => {
+    // a sorting is going on: the new captures are read by it
+    if (running.current) return true;
+    running.current = true;
+    setBusy(true);
+    setErr(null);
+    setMsg(null);
+    ctl.current = new AbortController();
+    const signal = ctl.current.signal;
+    const tried = new Set<string>();
+    let textTried = false;
+    let done = 0;
+    let failure: unknown = null;
+    const notes: string[] = [];
+    const left = () => ({
+      text: textTried ? "" : pendingText(wRef.current),
+      ids: [...files.current.keys()].filter((id) => !tried.has(id)),
+    });
+    try {
+      for (let l = left(); l.text || l.ids.length; l = left()) {
+        setProgress({ i: done + 1, of: done + (l.text ? 1 : 0) + l.ids.length });
+        const id = l.text ? "" : l.ids[0];
+        try {
+          if (l.text) {
+            textTried = true;
+            const r = await ai<IntakeResult>("intake", { text: l.text }, 290_000, signal);
+            merge(r, { sortedKnow: l.text });
+            if (r.summary) notes.push(r.summary);
+          } else {
+            tried.add(id);
+            mark([id], "read");
+            const r = await ai<IntakeResult>("intake", { image: await imageToBase64(files.current.get(id)!, 1600, 0.8) }, 290_000, signal);
+            files.current.delete(id);
+            mark([id], "ok");
+            merge(r);
+            if (r.summary) notes.push(r.summary);
+          }
+          done++;
+        } catch (e) {
+          if (signal.aborted) return false;
+          failure = e;
+          break;
+        }
+      }
+      // what could not be read says so, and « Trier » reads it again
+      if (failure) mark([...files.current.keys()], "err");
+      if (failure && !done) {
+        setErr(failure instanceof AiError ? failure.message : t("Le tri a échoué. Réessayez."));
+        return false;
+      }
+      if (failure) setErr(failure instanceof AiError ? t("{msg} (le reste est gardé)", { msg: failure.message }) : t("Une partie n'a pas pu être triée (le reste est gardé)."));
+      if (done) setMsg(notes.filter(Boolean).join(" · ") || t("C'est noté."));
+      return true;
+    } finally {
+      running.current = false;
+      ctl.current = null;
+      if (!signal.aborted) {
+        setBusy(false);
+        setProgress(null);
+      }
+    }
+  };
+  const add = (list: File[]) => {
+    const fresh = list.map((f) => {
+      const id = Math.random().toString(36).slice(2, 10);
+      const url = URL.createObjectURL(f);
+      urls.current.push(url);
+      files.current.set(id, f);
+      return { id, url, state: "wait" as const };
+    });
+    setShots((s) => [...s, ...fresh]);
+  };
+  return { shots, busy, progress, msg, err, add, run };
+}
 
 /** "Créer un voyage" in 4 steps: where, when (+ bookings read from a confirmation), what you already know, the ideal programme.
  *  Every change is kept on this device as it is made: closing, going back or leaving the app loses nothing. */
@@ -206,10 +343,15 @@ export default function CreateWizard({ onCancel, onCreated }: { onCancel: () => 
   });
   const [dir, setDir] = useState<1 | -1>(1);
   const nextRef = useRef<() => void>(() => undefined);
+  const wRef = useRef(w);
+  wRef.current = w;
+  const sorter = useSorter(wRef, setW);
   useKeyboardFit(".v3.cr-wiz");
+  // kept on this device as soon as something is entered (an untouched form leaves no draft behind)
   useEffect(() => {
     try {
-      localStorage.setItem(KEY, JSON.stringify(w));
+      if (wizHasContent(w)) localStorage.setItem(KEY, JSON.stringify(w));
+      else localStorage.removeItem(KEY);
     } catch {
       /* ignore */
     }
@@ -221,9 +363,12 @@ export default function CreateWizard({ onCancel, onCreated }: { onCancel: () => 
   const set = (p: Partial<Wiz>) => setW((x) => ({ ...x, ...p }));
   const go = (step: number) => {
     setDir(step >= w.step ? 1 : -1);
-    set({ step });
+    setW((x) => ({ ...x, step, maxStep: Math.max(x.maxStep || x.step, step) }));
   };
-  const hasContent = w.cities.length > 0 || !!w.start || !!w.know.trim();
+  const hasContent = wizHasContent(w);
+  const datesOk = !!w.start && !!w.end && w.end >= w.start && dayCount(w.start, w.end) <= MAX_DAYS;
+  // a step can be reopened once reached, as long as the steps before it hold
+  const reachable = (n: number) => n !== w.step && n <= Math.max(w.maxStep || w.step, w.step) && (n <= 1 || w.cities.length > 0) && (n <= 2 || datesOk);
   const title = w.step === 1 || !w.cities.length
     ? t("Nouveau voyage")
     : [w.cities.map((c) => c.name).join(" · "), w.step > 2 ? rangeShort(w.start, w.end) : ""].filter(Boolean).join(" · ");
@@ -244,10 +389,10 @@ export default function CreateWizard({ onCancel, onCreated }: { onCancel: () => 
       <ol className="cr-stepper" aria-label={t("Étape {n} sur {of}", { n: w.step, of: 4 })}>
         {STEP_NAMES.map((s, i) => {
           const n = i + 1;
-          const cls = n === w.step ? "on" : n < w.step ? "done" : "";
+          const cls = n === w.step ? "on" : n < w.step || reachable(n) ? "done" : "";
           return (
             <li key={s} className={cls} aria-current={n === w.step ? "step" : undefined}>
-              {n < w.step ? <button type="button" onClick={() => go(n)}>{t(s)}</button> : <span>{t(s)}</span>}
+              {reachable(n) ? <button type="button" onClick={() => go(n)}>{t(s)}</button> : <span>{t(s)}</span>}
             </li>
           );
         })}
@@ -264,7 +409,7 @@ export default function CreateWizard({ onCancel, onCreated }: { onCancel: () => 
     e.preventDefault();
     nextRef.current();
   };
-  const props = { w, set, go, nextRef };
+  const props = { w, set, go, nextRef, sorter };
   return (
     <Shell ring={false} top={top} className="cr-wiz">
       <div key={w.step} className="cr-step" style={{ "--dx": `${dir * 28}px` } as CSSProperties} onKeyDown={onKey}>
@@ -614,110 +759,30 @@ function When({ w, set, go, nextRef }: StepProps) {
   );
 }
 
-type Shot = { url: string; state: "wait" | "read" | "ok" | "err" };
-
-function Know({ w, set, go, nextRef }: StepProps) {
-  const [shots, setShots] = useState<Shot[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [progress, setProgress] = useState<{ i: number; of: number } | null>(null);
-  const [msg, setMsg] = useState<string | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+function Know({ w, set, go, nextRef, sorter }: StepProps) {
+  const { shots, busy, progress, msg, err } = sorter;
   const file = useRef<HTMLInputElement>(null);
   const area = useRef<HTMLTextAreaElement>(null);
-  const sorted = useRef("");
-  const urls = useRef<string[]>([]);
-  useEffect(() => () => urls.current.forEach((u) => URL.revokeObjectURL(u)), []);
   // the links written or pasted show at once, before anything is sorted
   const links = useMemo(() => [...new Set(w.know.match(URL_RE) || [])].slice(0, 8), [w.know]);
-  const sort = async (picked?: File[]): Promise<boolean> => {
-    const files = picked || [];
-    const text = w.know.trim() && w.know.trim() !== sorted.current ? w.know.trim() : "";
-    if (!text && !files.length) return true;
-    setBusy(true);
-    setErr(null);
-    setMsg(null);
-    const base = shots.length;
-    if (files.length) {
-      const fresh = files.map((f) => {
-        const url = URL.createObjectURL(f);
-        urls.current.push(url);
-        return { url, state: "wait" as const };
-      });
-      setShots((s) => [...s, ...fresh]);
-    }
-    const of = (text ? 1 : 0) + files.length;
-    let i = 0;
-    setProgress({ i: 1, of });
-    const mark = (k: number, state: Shot["state"]) => setShots((s) => s.map((x, j) => (j === base + k ? { ...x, state } : x)));
-    try {
-      const results: IntakeResult[] = [];
-      try {
-        if (text) {
-          results.push(await ai<IntakeResult>("intake", { text }, 290_000));
-          sorted.current = text;
-          i++;
-          setProgress({ i: Math.min(of, i + 1), of });
-        }
-        for (const [k, f] of files.entries()) {
-          mark(k, "read");
-          try {
-            results.push(await ai<IntakeResult>("intake", { image: await imageToBase64(f, 1600, 0.8) }, 290_000));
-            mark(k, "ok");
-          } catch (e) {
-            mark(k, "err");
-            throw e;
-          }
-          i++;
-          setProgress({ i: Math.min(of, i + 1), of });
-        }
-      } catch (e) {
-        // what was already sorted is kept
-        if (!results.length) throw e;
-        setErr(e instanceof AiError ? t("{msg} (le reste est gardé)", { msg: e.message }) : t("Une partie n'a pas pu être triée (le reste est gardé)."));
-      }
-      const places = [...w.places];
-      const fixed = [...w.fixed];
-      const wishes = [...w.wishes];
-      const flights = [...w.flights];
-      let hotelName = w.hotelName;
-      let hotelAddress = w.hotelAddress;
-      for (const r of results) {
-        for (const f of r.flights || []) if (f.code && !flights.some((x) => x.code === f.code && x.departAt === f.departAt)) flights.push(f);
-        if (r.hotel?.name && !hotelName) {
-          hotelName = r.hotel.name;
-          hotelAddress = r.hotel.address || r.hotel.addressCn || "";
-        }
-        for (const p of r.places || []) if (p.name && !places.some((x) => x.name.toLowerCase() === p.name.toLowerCase())) places.push({ ...p, keep: true });
-        for (const f of r.fixed || []) if (f.name && !fixed.some((x) => x.name === f.name && x.date === f.date)) fixed.push({ ...f, keep: true });
-        for (const x of r.wishes || []) if (x && !wishes.some((y) => y.text === x)) wishes.push({ text: x, keep: true });
-      }
-      set({ places, fixed, wishes, flights: flights.sort((a, b) => (a.departAt || "").localeCompare(b.departAt || "")), hotelName, hotelAddress });
-      setMsg(results.map((r) => r.summary).filter(Boolean).join(" · ") || t("C'est noté."));
-      return true;
-    } catch (e) {
-      setErr(e instanceof AiError ? e.message : t("Le tri a échoué. Réessayez."));
-      return false;
-    } finally {
-      setBusy(false);
-      setProgress(null);
-    }
-  };
-  // a sorting that failed never blocks: what was written goes to the preparation as it is
-  const next = async () => {
-    if (busy) return;
-    if (err && w.know.trim()) return go(4);
-    if (await sort()) go(4);
+  const pending = !!pendingText(w);
+  const unread = shots.filter((x) => x.state === "err").length;
+  // sorting never holds the form: Continue moves on at once and the sorting goes on behind (step 4 says so)
+  const next = () => {
+    if (!busy && pending && !err) void sorter.run();
+    go(4);
   };
   useEffect(() => {
-    nextRef.current = () => void next();
+    nextRef.current = next;
   });
   const addFiles = (list: File[]) => {
     const picked = list.filter((f) => f.type.startsWith("image/")).slice(0, 3);
-    if (picked.length) void sort(picked);
+    if (!picked.length) return;
+    sorter.add(picked);
+    void sorter.run();
   };
   const toggle = <K extends "places" | "fixed" | "wishes">(k: K, i: number) => set({ [k]: (w[k] as Card<object>[]).map((x, j) => (j === i ? { ...x, keep: !x.keep } : x)) } as Partial<Wiz>);
   const kept = w.places.filter((p) => p.keep).length + w.fixed.filter((f) => f.keep).length + w.wishes.filter((x) => x.keep).length;
-  const pending = !!w.know.trim() && w.know.trim() !== sorted.current;
   return (
     <>
       <div className="cr-body">
@@ -729,9 +794,9 @@ function Know({ w, set, go, nextRef }: StepProps) {
             placeholder={t("ex. Le Bund de nuit, des xiaolongbao près de Yuyuan. Restaurant réservé mercredi 19 h. https://…")} />
           <div className="cr-drop-bar">
             <button type="button" className="cr-tool" onClick={() => area.current?.focus()}><CcLink className="cc-ic s" />{t("Lien")}</button>
-            <button type="button" className="cr-tool" onClick={() => file.current?.click()} disabled={busy}><CcImg className="cc-ic s" />{t("Captures")}</button>
+            <button type="button" className="cr-tool" onClick={() => file.current?.click()}><CcImg className="cc-ic s" />{t("Captures")}</button>
             <span className="v3-grow" />
-            {(pending || busy) && <button type="button" className="v3-chip on cr-read" disabled={busy} onClick={() => void sort()}>{busy ? t("Tri en cours…") : t("Trier")}</button>}
+            {(pending || busy || unread > 0) && <button type="button" className="v3-chip on cr-read" disabled={busy} onClick={() => void sorter.run()}>{busy ? t("Tri en cours…") : t("Trier")}</button>}
           </div>
           <input ref={file} type="file" accept="image/*" multiple hidden onChange={(e) => { const picked = Array.from(e.target.files || []); e.target.value = ""; addFiles(picked); }} />
         </div>
@@ -747,7 +812,7 @@ function Know({ w, set, go, nextRef }: StepProps) {
               );
             })}
             {shots.map((s, i) => (
-              <span key={s.url} className={"cr-src shot " + s.state}>
+              <span key={s.id} className={"cr-src shot " + s.state}>
                 <img src={s.url} alt="" />
                 <span className="tx"><b>{t("Capture {n}", { n: i + 1 })}</b><small>{s.state === "wait" ? t("En attente") : s.state === "read" ? t("Lecture…") : s.state === "ok" ? t("Lue") : t("Non lue")}</small></span>
               </span>
@@ -756,13 +821,14 @@ function Know({ w, set, go, nextRef }: StepProps) {
         )}
         {busy && progress && (
           <div className="cr-reading busy" role="status">
-            <span>{progress.of > 1 ? t("Lecture {i} sur {of}…", progress) : t("Lecture en cours…")} {t("Cela peut prendre quelques minutes : gardez l'app ouverte.")}</span>
+            <span>{progress.of > 1 ? t("Lecture {i} sur {of}…", progress) : t("Lecture en cours…")} {t("Vous pouvez continuer : le tri se poursuit pendant l'étape suivante.")}</span>
           </div>
         )}
         {w.know.length > 11000 && <p className="v3-note">{t("Texte très long : seuls les 12 000 premiers caractères seront lus.")}</p>}
         {msg && !busy && <div className="cr-reading done" role="status"><span>{msg}</span><CcCheck className="cc-ic s" /></div>}
         {err && <p className="v3-err">{err}</p>}
         {err && w.know.trim() && <p className="v3-note">{t("Vous pouvez continuer sans trier : votre texte sera transmis tel quel à la préparation.")}</p>}
+        {unread > 0 && !busy && <p className="v3-note">{t("Les captures non lues ne sont pas transmises. Touchez « Trier » pour les relire.")}</p>}
 
         {w.places.length > 0 && <p className="v3-lbl cr-sec">{t("Lieux")} <span className="cr-opt">{(() => { const n = w.places.filter((p) => p.keep).length; return n > 1 ? t("{n} gardés", { n }) : t("{n} gardé", { n }); })()}</span></p>}
         {w.places.map((p, i) => (
@@ -791,16 +857,17 @@ function Know({ w, set, go, nextRef }: StepProps) {
       </div>
       <div className="v3-spacer" />
       <Foot>
-        <button className={"v3-btn" + (kept || w.know.trim() || shots.length ? "" : " ghost")} disabled={busy} onClick={() => void next()}>
-          {busy ? t("Tri en cours…") : <>{err && w.know.trim() ? t("Continuer sans trier") : kept || w.know.trim() || shots.length ? t("Continuer") : t("Passer cette étape")}<CcArrow /></>}
+        <button className={"v3-btn" + (kept || w.know.trim() || shots.length ? "" : " ghost")} onClick={next}>
+          {busy ? t("Continuer pendant le tri") : err && pending ? t("Continuer sans trier") : kept || w.know.trim() || shots.length ? t("Continuer") : t("Passer cette étape")}<CcArrow />
         </button>
       </Foot>
     </>
   );
 }
 
-function Programme({ w, set, nextRef, onCreated }: StepProps & { onCreated: (id: string) => void }) {
+function Programme({ w, set, nextRef, sorter, onCreated }: StepProps & { onCreated: (id: string) => void }) {
   const [busy, setBusy] = useState(false);
+  const [allInterests, setAllInterests] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [name, setName] = useState("");
   const days = dayList(w.start, w.end);
@@ -811,6 +878,14 @@ function Programme({ w, set, nextRef, onCreated }: StepProps & { onCreated: (id:
   const owner = ownerFirstName();
   const people = w.travellers || [];
   const fromProfile = Array.isArray(profile.interests) && (profile.interests as string[]).length > 0 && [...(profile.interests as string[])].sort().join() === [...w.interests].sort().join();
+  // the interests: those of the profile and those chosen, a few others, the rest one touch away (fixed while the step is open)
+  const [firstInterests] = useState(() => {
+    const mine = new Set([...((Array.isArray(profile.interests) ? profile.interests : []) as string[]), ...w.interests]);
+    const others = INTERESTS.filter((x) => !mine.has(x)).slice(0, Math.max(3, 8 - mine.size));
+    return new Set([...mine, ...others]);
+  });
+  const interests = allInterests ? INTERESTS : INTERESTS.filter((x) => firstInterests.has(x));
+  const moreInterests = INTERESTS.length - interests.length;
   const go = async () => {
     if (busy || !w.cities.length) return;
     setBusy(true);
@@ -873,10 +948,11 @@ function Programme({ w, set, nextRef, onCreated }: StepProps & { onCreated: (id:
 
         <p className="v3-lbl cr-sec">{t("Centres d'intérêt")} {fromProfile ? <span className="v3-tag dim">{t("depuis votre profil")}</span> : null}</p>
         <div className="v3-chips cr-chips">
-          {INTERESTS.map((x) => {
+          {interests.map((x) => {
             const on = w.interests.includes(x);
             return <button key={x} aria-pressed={on} className={"v3-chip" + (on ? " on" : "")} onClick={() => set({ interests: on ? w.interests.filter((i) => i !== x) : [...w.interests, x] })}>{t(x)}</button>;
           })}
+          {moreInterests > 0 && <button type="button" className="v3-chip cr-more" onClick={() => setAllInterests(true)} aria-expanded={false}><CcPlus className="cc-ic s" />{t("{n} de plus", { n: moreInterests })}</button>}
         </div>
 
         <p className="v3-lbl cr-sec">{t("Souhaits par jour")} <span className="cr-opt">{t("facultatif")}</span></p>
@@ -904,7 +980,7 @@ function Programme({ w, set, nextRef, onCreated }: StepProps & { onCreated: (id:
         </ul>
       </div>
       <div className="v3-spacer" />
-      <Foot hint={err} line={line}>
+      <Foot hint={err} line={sorter.busy ? <><i className="cr-dot live" />{t("Tri de vos infos en cours")} · {line}</> : line}>
         <button className="v3-btn" disabled={busy || !days.length} onClick={() => void go()}>{busy ? t("Création…") : <><CcSpark />{t("Préparer mon voyage")}</>}</button>
       </Foot>
     </>

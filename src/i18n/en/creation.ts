@@ -7,6 +7,7 @@ export default {
   "Idéal si vous connaissez déjà vos villes et vos dates.": "Best if you already know your cities and dates.",
   "Conversation en cours": "Conversation in progress", "Effacer la conversation": "Clear the conversation",
   "Brouillon": "Draft", "étape {n} sur {of}": "step {n} of {of}", "Effacer le brouillon": "Clear the draft",
+  "Touchez encore pour effacer": "Tap again to clear",
 
   // the guided form
   "Fermer (le brouillon est gardé)": "Close (the draft is kept)",
@@ -33,6 +34,9 @@ export default {
   "{n} voyageurs": "{n} travelers", "Tout est prérempli. Changez seulement ce qui ne vous ressemble pas.": "Everything is prefilled. Change only what doesn't sound like you.",
   "Vous": "You", "Leurs prénoms suffisent. Vous pourrez les inviter pendant la préparation.": "First names are enough. You can invite them while the trip is being prepared.",
   "Souhaits par jour": "Wishes per day",
+  "Vous pouvez continuer : le tri se poursuit pendant l'étape suivante.": "You can continue: sorting carries on during the next step.",
+  "Les captures non lues ne sont pas transmises. Touchez « Trier » pour les relire.": "Unread screenshots aren't passed on. Tap “Sort” to read them again.",
+  "Continuer pendant le tri": "Continue while sorting", "{n} de plus": "{n} more", "Tri de vos infos en cours": "Sorting your info",
 
   // the concierge
   "Avec {names}": "With {names}",
@@ -40,6 +44,9 @@ export default {
   "Ajoutez la capture à nouveau.": "Add the screenshot again.",
   "Je lis vos liens, cela peut prendre une minute.": "I'm reading your links, this can take a minute.", "Je lis votre capture…": "I'm reading your screenshot…",
   "Encore un instant…": "Just a moment…",
+  "Remplacer le brouillon du formulaire ?": "Replace the form's draft?", "Remplacer le brouillon {where} ?": "Replace the {where} draft?",
+  "Le formulaire a déjà un brouillon. Cette conversation peut prendre sa place, ou vous pouvez reprendre ce brouillon.": "The form already has a draft. This conversation can take its place, or you can resume that draft.",
+  "Remplacer": "Replace", "Reprendre le brouillon": "Resume the draft",
 
   // the preparation
   "{n} lieux de votre liste": "{n} places from your list", "1 lieu de votre liste": "1 place from your list",
@@ -47,11 +54,18 @@ export default {
   "Jour {n} sur {of}": "Day {n} of {of}", "La trame": "The outline", "L'essentiel": "The essentials", "Les jours · {n}/{of}": "Days · {n}/{of}",
   "À reprendre": "To retry", "Pendant ce temps": "Meanwhile",
   "La préparation avance tant que cet écran reste ouvert. Si vous le quittez, elle reprendra là où elle s'est arrêtée à votre retour sur ce voyage.": "Preparation moves forward while this screen stays open. If you leave it, it will pick up where it stopped when you come back to this trip.",
-  "Une envie à ajouter ?": "Something to add?", "Elle sera prise en compte pour les jours qui ne sont pas encore prêts.": "It will be taken into account for the days that aren't ready yet.",
+  "Une envie à ajouter ?": "Something to add?", "Elle sera prise en compte pour les jours suivants.": "It will be taken into account for the following days.",
   "ex. un rooftop un soir": "e.g. a rooftop one evening",
+  "Arrêtée": "Stopped", "La préparation s'est arrêtée.": "Preparation stopped.", "Reprendre": "Resume",
+  "Arrêter et voir les {n} jours prêts": "Stop and see the {n} ready days", "Arrêter et voir le jour prêt": "Stop and see the ready day",
+  "L'écran reste allumé pendant la préparation.": "The screen stays on during preparation.",
 
   // the review
-  "Votre voyage est prêt.": "Your trip is ready.",
+  "Votre voyage est prêt.": "Your trip is ready.", "Votre voyage est ouvert.": "Your trip is open.",
+  "{n} jours restent libres.": "{n} days are still free.", "1 jour reste libre.": "1 day is still free.",
+  "Ce jour n'a pas pu être préparé. Ses lieux sont gardés.": "This day couldn't be prepared. Its places are kept.",
+  "{day} est en préparation.": "{day} is being prepared.",
+  "Ce jour a été interrompu avant la fin. Préparez-le à nouveau ci-dessous.": "This day was interrupted before the end. Prepare it again below.",
   "Parcourez chaque jour. Régénérez-en un ou ajustez en une phrase, puis validez.": "Go through each day. Regenerate one or adjust in a sentence, then confirm.",
   "Jours du voyage": "Days of the trip", "pas encore prêt": "not ready yet",
   "Remplacer les lieux de ce jour ?": "Replace this day's places?", "Régénérer le jour": "Regenerate the day",
