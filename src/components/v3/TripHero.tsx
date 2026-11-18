@@ -8,7 +8,7 @@ import { getState, toast, useStore } from "../../lib/store";
 import { clock, countdownParts, dayOfTrip, fmtDay, fmtMin, homeZone, localDate, phase, sameHour, tripEndMs, tripStartMs } from "../../lib/time";
 import { t } from "../../lib/i18n";
 import { dateLabel } from "../../lib/newTrip";
-import { eurText, recapDue, recapImage, recapOf, shareRecapBlob } from "../../lib/recap";
+import { recapDue, recapImage, recapOf, recapStats, shareRecapBlob } from "../../lib/recap";
 import { track } from "../../lib/track";
 import { setIntent } from "./nav";
 
@@ -473,12 +473,7 @@ function RecapCard({ trip, from, top, globe, onOpen }: {
     }
   };
 
-  const stats: [string, string][] = [
-    [String(r.days), r.days > 1 ? t("Jours") : t("Jour")],
-    [r.planned ? `${r.visited}/${r.planned}` : String(r.visited), t("Lieux visités")],
-  ];
-  if (r.photos > 0) stats.push([String(r.photos), r.photos > 1 ? t("Photos") : t("Photo")]);
-  if (r.eur != null && r.eur > 0) stats.push([eurText(r.eur), t("Dépenses")]);
+  const stats = recapStats(r);
   const showCities = r.cities.length > 1 || r.cities[0] !== r.title;
 
   return (

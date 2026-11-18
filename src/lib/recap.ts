@@ -1,7 +1,7 @@
 // After a trip: what it was, in figures (days, places visited, photos, money spent, cities), and the same as a
 // story image (1080 × 1920) to share or save. Everything is read from this phone's copy of the trip.
 import type { Trip } from "../data/types";
-import { expensesOf } from "./business";
+import { expensesOf, toEur } from "./business";
 import { countable } from "./plan";
 import { getState } from "./store";
 import { tripEndMs } from "./time";
@@ -16,7 +16,7 @@ export type Recap = {
   visited: number;
   planned: number;
   photos: number;
-  /** total spent in euros, null when nothing was entered (or no rate was known) */
+  /** total spent in euros, null when nothing was entered, or when one expense has no known rate (a partial total is never shown) */
   eur: number | null;
   cities: string[];
   center: [number, number];
@@ -36,18 +36,37 @@ function rawOf(trip: Trip): Raw {
   }
 }
 
+/** Units of `code` for 1 euro as last known on this phone (the expenses screen's cache), null when never known */
+function rateOf(code: string): number | null {
+  try {
+    const r = Number(JSON.parse(localStorage.getItem("orbes.rate." + code) || "null")?.rate);
+    if (r > 0) return r;
+  } catch {
+    /* ignore */
+  }
+  const fallback = code === "CNY" ? Number(getState().settings.eurRate) : 0;
+  return fallback > 0 ? fallback : null;
+}
+
 export function recapOf(trip: Trip): Recap {
   const raw = rawOf(trip);
   const states = raw?.places || {};
   const list = countable(trip);
   let eur = 0;
   let known = false;
+  let missing = false;
+  const rates: Record<string, number | null> = { EUR: 1 };
   for (const e of expensesOf(states)) {
-    const v = e.currency === "EUR" ? e.amount : e.eur;
+    // the value in euros saved with the expense, else today's rate known on this phone (as the expenses screen does)
+    let v: number | null = e.currency === "EUR" ? e.amount : e.eur ?? null;
+    if (v == null) {
+      if (!(e.currency in rates)) rates[e.currency] = rateOf(e.currency);
+      v = toEur(e, rates);
+    }
     if (typeof v === "number" && Number.isFinite(v)) {
       eur += v;
       known = true;
-    }
+    } else missing = true;
   }
   const day = (iso: string) => Date.parse(iso + "T00:00:00Z") / 864e5;
   const draft = getState().trips[trip.id]?.draft as { cities?: { name?: string }[] } | undefined;
@@ -60,10 +79,21 @@ export function recapOf(trip: Trip): Recap {
     visited: list.filter((p) => (states[p.id] as { visited?: boolean } | undefined)?.visited).length,
     planned: list.length,
     photos: Array.isArray(raw?.photos) ? raw!.photos!.length : 0,
-    eur: known ? Math.round(eur) : null,
+    eur: known && !missing ? Math.round(eur) : null,
     cities: cities.length ? cities : [trip.title],
     center: trip.center,
   };
+}
+
+/** The figures of a recap, two by row on the card and on the image. Places: "visited/planned" once a visit was
+ *  ticked, else only the planned count (most travellers never tick, and "0/14 visited" would be untrue). */
+export function recapStats(r: Recap): [string, string][] {
+  const stats: [string, string][] = [[String(r.days), r.days > 1 ? t("Jours") : t("Jour")]];
+  if (r.visited > 0) stats.push([r.planned ? `${r.visited}/${r.planned}` : String(r.visited), t("Lieux visités")]);
+  else if (r.planned > 0) stats.push([String(r.planned), r.planned > 1 ? t("Lieux") : t("Lieu")]);
+  if (r.photos > 0) stats.push([String(r.photos), r.photos > 1 ? t("Photos") : t("Photo")]);
+  if (r.eur != null && r.eur > 0) stats.push([eurText(r.eur), t("Dépenses")]);
+  return stats;
 }
 
 export const eurText = (n: number) => new Intl.NumberFormat(locale(), { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
@@ -238,21 +268,34 @@ export async function recapImage(r: Recap, from: [number, number] | null): Promi
     lines = wrap(c, title, inner, 2);
     if (lines.every((l) => c.measureText(l).width <= inner) && !lines[lines.length - 1].endsWith("…")) break;
   }
+  if (size < 84) size = 84;
+  // a word longer than the width (a long name without spaces): smaller, then cut by letters with "…"
+  while (size > 56 && lines.some((l) => c.measureText(l).width > inner)) {
+    size -= 4;
+    c.font = `500 ${size}px ${DISPLAY}`;
+    lines = wrap(c, title, inner, 2);
+  }
+  lines = lines.map((l) => {
+    if (c.measureText(l).width <= inner) return l;
+    let cut = l;
+    while (cut.length > 1 && c.measureText(cut + "…").width > inner) cut = cut.slice(0, -1);
+    return cut.trimEnd() + "…";
+  });
   c.fillStyle = INK;
   let y = lines.length > 1 ? 1010 : 1090;
+  c.save();
+  c.beginPath();
+  c.rect(L, 0, inner, H);
+  c.clip();
   lines.forEach((l, i) => c.fillText(l, L, y + i * size * 0.96));
+  c.restore();
   y += (lines.length - 1) * size * 0.96 + 66;
   c.fillStyle = SOFT;
   c.font = `400 40px ${READ}`;
   c.fillText(r.dates, L, y);
 
   // figures, two by row
-  const stats: [string, string][] = [
-    [String(r.days), r.days > 1 ? t("Jours") : t("Jour")],
-    [r.planned ? `${r.visited}/${r.planned}` : String(r.visited), t("Lieux visités")],
-  ];
-  if (r.photos > 0) stats.push([String(r.photos), r.photos > 1 ? t("Photos") : t("Photo")]);
-  if (r.eur != null && r.eur > 0) stats.push([eurText(r.eur), t("Dépenses")]);
+  const stats = recapStats(r);
   const top = y + 90;
   const colW = inner / 2;
   const rowH = 180;
