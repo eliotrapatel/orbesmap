@@ -55,6 +55,10 @@ export function asCover(v: unknown): TripCover | undefined {
 export const isRef = (p: PlacePhoto | TripCover | undefined | null): p is PhotoRef => !!p && !("none" in p);
 export const isNone = (p: PlacePhoto | TripCover | undefined | null): p is PhotoNone => !!p && "none" in p && p.none === true;
 
+/** A trip's cover still to look up: none yet, or a « none » written before the name variants (version 1: the server
+ *  looks it up again; one of version 2 waits its 30 days there) */
+export const coverMissing = (c: TripCover | undefined | null): boolean => !c || (isNone(c) && c.v !== 2);
+
 /**
  * A place still to look up: no photo yet, a "none" older than 30 days (or written before the name variants: version
  * 1), or a name / position changed after the photo was chosen. `fieldsAt` is the place record's (on the phone: getState().data.defs[id]?.fieldsAt).

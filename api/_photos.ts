@@ -131,25 +131,38 @@ const retryAfter = (v: string | null, now: number): number => {
   return Number.isFinite(t) ? Math.max(0, t - now) : 30_000;
 };
 
-/** One gate for Wikimedia: at most 3 requests in flight, at least 250 ms between two starts */
+/** One gate for Wikimedia: at most 3 requests in flight, at least 250 ms between two starts, and none started
+ *  while a Retry-After runs (`pause`: set by the request that got the 429, before its slot is freed, so it holds for
+ *  every request of the pass, not only its own) */
 function makeGate(io: Io, max = 3, gap = 250) {
   let inflight = 0;
   let last = -Infinity;
+  let pauseUntil = -Infinity;
   const waiting: (() => void)[] = [];
-  return async <T>(fn: () => Promise<T>): Promise<T> => {
+  const run = async <T>(fn: () => Promise<T>): Promise<T> => {
     while (inflight >= max) await new Promise<void>((r) => waiting.push(r));
     inflight++;
     try {
-      const slot = Math.max(io.now(), last + gap);
-      last = slot;
-      const wait = slot - io.now();
-      if (wait > 0) await io.sleep(wait);
+      for (;;) {
+        const p = pauseUntil - io.now();
+        if (p > 0) {
+          await io.sleep(p);
+          continue;
+        }
+        const slot = Math.max(io.now(), last + gap);
+        last = slot;
+        const wait = slot - io.now();
+        if (wait > 0) await io.sleep(wait);
+        // a Retry-After set meanwhile is waited too
+        if (pauseUntil <= io.now()) break;
+      }
       return await fn();
     } finally {
       inflight--;
       waiting.shift()?.();
     }
   };
+  return Object.assign(run, { pause: (until: number) => void (pauseUntil = Math.max(pauseUntil, until)) });
 }
 
 async function timed(io: Io, url: string, init: RequestInit, ms: number): Promise<Response> {
@@ -164,15 +177,25 @@ async function timed(io: Io, url: string, init: RequestInit, ms: number): Promis
 
 /** `deadline`: no Wikimedia request starts, and no Retry-After is waited, past it (the call lives 300 s) */
 type Ctx = { io: Io; gate: ReturnType<typeof makeGate>; deadline: number };
-/** A Wikimedia JSON request through the gate; 429: waits Retry-After when it is short (3 times), else Busy */
+/** A Wikimedia JSON request through the gate; 429: waits Retry-After when it is short (3 times), every other request
+ *  of the pass with it (the gate's pause), else Busy */
 async function wm(c: Ctx, url: string, init: RequestInit = {}, notFoundOk = false): Promise<unknown> {
   for (let i = 0; ; i++) {
     if (c.io.now() > c.deadline) throw new Busy();
-    const r = await c.gate(() => timed(c.io, url, { ...init, headers: { "user-agent": UA, "api-user-agent": UA, accept: "application/json", ...((init.headers as Record<string, string>) || {}) } }, 15_000));
+    let busy = false;
+    const r = await c.gate(async () => {
+      const res = await timed(c.io, url, { ...init, headers: { "user-agent": UA, "api-user-agent": UA, accept: "application/json", ...((init.headers as Record<string, string>) || {}) } }, 15_000);
+      if (res.status === 429) {
+        const ms = retryAfter(res.headers.get("retry-after"), c.io.now());
+        busy = ms > 30_000 || i >= 3 || c.io.now() + ms > c.deadline;
+        // waited: no other request starts before it ends (set before the slot is freed)
+        if (!busy) c.gate.pause(c.io.now() + ms);
+      }
+      return res;
+    });
     if (r.status === 429) {
-      const ms = retryAfter(r.headers.get("retry-after"), c.io.now());
-      if (ms > 30_000 || i >= 3 || c.io.now() + ms > c.deadline) throw new Busy();
-      await c.io.sleep(ms);
+      if (busy) throw new Busy();
+      // the gate waits the pause before the next try
       continue;
     }
     if (r.status === 404 && notFoundOk) return null;
@@ -190,7 +213,8 @@ export function okHit(h: NomHit, t: Pick<Target, "type" | "name">, q: string, ci
   const cat = String(h.category || "");
   const typ = String(h.type || "");
   if ((cat === "railway" || cat === "public_transport") && t.type !== "transport") return false;
-  if (cat === "highway" && !(STREETY.test(q) || /[路街]$/.test(q))) return false;
+  // (a street in brackets is where the place stands: « Jia Jia Tang Bao (Huanghe Road) » is no road)
+  if (cat === "highway" && !(STREETY.test(noBrackets(q)) || /[路街]$/.test(q))) return false;
   if (cat === "boundary") return false;
   if (cat === "place" && /^(city|town|village|county|state|province|region|district|borough|municipality|country)$/.test(typ)) return false;
   // a free search also matches addresses (« 张园 » finds a hospital on a street of that name): one of its names must
@@ -380,29 +404,54 @@ export function tokens(name: string, city: string): string[] {
  * two distinctive words are left (« Musée de l'Orangerie » in Paris), each a whole word of the title.
  */
 export function namesPlace(title: string, name: string, city: string, nameCn?: string): boolean {
-  if (nameCn && title.includes(nameCn)) return true;
+  return !!nameMatch(title, name, city, nameCn);
+}
+/** How a title names the place: by its Chinese name, its whole name as a phrase of two words or more, only by its
+ *  words (or a one-word phrase: « Peninsula » for « The Peninsula »), or not at all ("") */
+function nameMatch(title: string, name: string, city: string, nameCn?: string): "cn" | "phrase" | "words" | "" {
+  if (nameCn && title.includes(nameCn)) return "cn";
   const t = ` ${fold(title)} `;
   // the leading article aside (« Le Bund » names « The Bund, Shanghai »)
   const phrase = fold(name).replace(/^(the|le|la|les|l) (?=\S)/, "");
-  if (phrase && t.includes(` ${phrase} `)) return true;
+  if (phrase && t.includes(` ${phrase} `)) return phrase.includes(" ") ? "phrase" : "words";
   const need = tokens(name, city);
-  if (need.length < 2) return false;
+  if (need.length < 2) return "";
   const words = new Set(t.trim().split(" "));
-  return need.every((w) => words.has(w));
+  return need.every((w) => words.has(w)) ? "words" : "";
 }
-type OvHit = { id?: string; title?: string; width?: number; height?: number; thumbnail?: string; license?: string; license_version?: string; license_url?: string; creator?: string; foreign_landing_url?: string };
+/** Does a text name another city than the place's own (« The Peninsula Tokyo », « Lei Garden, Hong Kong »)? A city
+ *  the place's name carries (« Suzhou Museum ») is its own. */
+function otherCity(text: string, name: string, cities: string[]): boolean {
+  const t = ` ${fold(text)} `;
+  const own = ` ${fold(name)} `;
+  const home = new Set(cities.map(fold));
+  return NEAR_CITIES.some((c) => t.includes(` ${c} `) && !own.includes(` ${c} `) && !home.has(c));
+}
+type OvHit = { id?: string; title?: string; width?: number; height?: number; thumbnail?: string; license?: string; license_version?: string; license_url?: string; creator?: string; foreign_landing_url?: string; tags?: { name?: string }[] };
 export function ovLicense(l: string, v: string): string {
   const k = (l || "").toLowerCase();
   if (k === "cc0") return "CC0";
   if (k === "pdm") return "Public domain";
   return `CC ${k.toUpperCase()}${v ? ` ${v}` : ""}`;
 }
-/** `names`: the place's name variants (the title must name the place by one of them, under the same strict rule) */
-function ovPick(hits: OvHit[], t: Target, city: string, names: string[] = [t.name]): Found | null {
+/**
+ * `names`: the place's name variants. The title must name the place by the first one or by its name without brackets
+ * (never a hotel it stands in, a second part or another name), never name another city, and, when it names it only
+ * by words (not its whole name), carry the place's city in its title or its tags. `tripCity`: the trip's own city.
+ */
+function ovPick(hits: OvHit[], t: Target, city: string, names: string[] = [t.name], tripCity = city): Found | null {
   const cn = names.find((v) => CJK.test(v) && !/[a-z]/i.test(v)) || t.nameCn;
-  const latin = names.filter((v) => !CJK.test(v));
+  const own = [...new Set([names.find((v) => !CJK.test(v)) || t.name, noBrackets(t.name)].filter(Boolean))];
+  const fc = fold(city);
   for (const h of hits) {
-    if (!latin.some((v) => namesPlace(String(h.title || ""), v, city, cn)) || PERSON_TITLE.test(String(h.title || "")) || !okTitle(String(h.title || ""))) continue;
+    const title = String(h.title || "");
+    const how = own.map((v) => nameMatch(title, v, city, cn)).find(Boolean) || "";
+    if (!how || PERSON_TITLE.test(title) || !okTitle(title)) continue;
+    if (otherCity(title, t.name, [city, tripCity])) continue;
+    if (how === "words" && fc) {
+      const tags = ` ${fold((Array.isArray(h.tags) ? h.tags : []).map((x) => String(x?.name || "")).join(" "))} `;
+      if (!` ${fold(title)} `.includes(` ${fc} `) && !tags.includes(` ${fc} `)) continue;
+    }
     const w = Number(h.width) || 0;
     const hh = Number(h.height) || 0;
     if (w < 500 || !okRatio(w, hh)) continue;
@@ -452,6 +501,18 @@ const GENERIC = new Set(["boutique", "flagship", "store", "shop", "experience", 
 const DISTRACT = new Set(["station", "metro", "line", "district", "subdistrict", "town", "township", "county", "province", "road", "street", "avenue", "boulevard", "list", "liste", "university", "school", "company", "corporation", "group", "bank", "film", "song", "album", "novel", "band", "dynasty", "war", "incident", "battle", "language", "cuisine", "people"]);
 const ARTICLE = new Set(["the", "le", "la", "les", "l"]);
 const STREETY = /\b(road|rd|street|st|avenue|ave|lane|boulevard|blvd|rue|lu|jie)\b\.?/i;
+const STREET_WORDS = new Set(["road", "rd", "street", "st", "avenue", "ave", "lane", "boulevard", "blvd", "rue", "lu", "jie"]);
+/** kinds of place that may be a street themselves (« Wukang Road & Wukang Mansion »): their street parts are kept */
+const STREET_TYPES = new Set(["landmark", "quartier", "neighbourhood", "district"]);
+/** districts and areas of the cities the trips cover: a name in brackets that is one says where the place stands,
+ *  never another name of it (« Jardin botanique de Shanghai (Xuhui) ») */
+const AREAS = new Set(["huangpu", "xuhui", "changning", "jing an", "jingan", "putuo", "hongkou", "yangpu", "minhang", "baoshan", "jiading", "pudong", "jinshan", "songjiang", "qingpu", "fengxian", "chongming", "lujiazui", "people s square", "west bund", "french concession", "former french concession", "hongqiao", "caohejing", "jiuguang", "gubei", "xintiandi", "chaoyang", "haidian", "dongcheng", "xicheng", "sanlitun", "tianhe", "yuexiu", "haizhu", "liwan", "panyu", "baiyun", "futian", "nanshan", "luohu", "central", "kowloon", "tsim sha tsui", "wan chai", "causeway bay", "mong kok", "admiralty", "shibuya", "shinjuku", "ginza", "marais", "montmartre", "soho"]);
+const isArea = (s: string) => {
+  const f = fold(s);
+  return AREAS.has(f) || /\b(district|qu|new area|subdistrict)$/.test(f);
+};
+/** a name without its brackets */
+const noBrackets = (s: string) => s.replace(/[（(][^（）()]*[）)]/g, " ").replace(/\s+/g, " ").trim();
 /** kinds of place whose name in brackets is another name of the place itself (« Le Bund (Waitan) ») */
 const ALIAS_TYPES = new Set(["landmark", "jardin", "parc", "park", "garden"]);
 /** kinds of place seen over a wide area: a page's position may be farther from the pin */
@@ -474,7 +535,8 @@ const kindsOf = (s: string): Set<string> => {
 const distinct = (s: string, cw: Set<string>) => words(s).filter((w) => w.length >= 2 && !STOP.has(w) && !ARTICLE.has(w) && !cw.has(w) && (!KIND[w] || BRAND.has(w)) && !GENERIC.has(w));
 /** a part of a name that can name a place: a distinctive word, or a kind of place (« Jardin Yu », « Shanghai Tower ») */
 const meaningful = (s: string, cw: Set<string>) => CJK.test(s) || kindsOf(s).size > 0 || distinct(s, cw).some((w) => w.length >= 3);
-export const isWalk = (name: string) => /→/.test(name) || /\b(balade|walk|promenade|itineraire|stroll|circuit)\b/.test(fold(name));
+/** a walk (« Balade … », « … → … ») has no one subject; « Hollywood Walk of Fame », « Promenade des Anglais » are places */
+export const isWalk = (name: string) => /→/.test(name) || /^(balade|walk|stroll|itineraire)\b/.test(fold(name));
 
 /** The Chinese name at the end of a Chinese address (« …人民大道201号 上海博物馆 » → « 上海博物馆 »), or "" */
 export function cnName(addressCn?: string): string {
@@ -491,14 +553,18 @@ export function cnName(addressCn?: string): string {
 function aliasOk(s: string, type: string): boolean {
   if (!s || /\d/.test(s) || STREETY.test(s) || /[A-Z]\.[A-Z]?\./.test(s)) return false;
   if (/^[A-Z0-9][A-Z0-9&.\-]{1,5}$/.test(s) || /^[a-z]{2,5}$/.test(s) || /^(tgv|hsr|metro|mrt|bts)$/i.test(s)) return false;
+  // never a district or a city area, even for a garden or a landmark (« Xuhui »)
+  if (isArea(s)) return false;
   // another name of the place itself, or the hotel / house it stands in (never its square, park, district or mall)
   return ALIAS_TYPES.has(type) || [...kindsOf(s)].some((k) => k === "hotel" || k === "building" || k === "museum" || k === "temple");
 }
 
 /**
  * The names to look a place up by, best first, 4 at most: the meaningful parts of its name (brackets removed, split
- * on « & + – - : → × », the city it starts with dropped), its Chinese name (its own, or the end of its Chinese
- * address), another name in brackets (« Waitan ») or the hotel it stands in (« The Peninsula »), then the whole name.
+ * on « & + – - : → × », the city it starts with dropped, a street part dropped unless the place may be a street
+ * itself), its Chinese name (its own, or the end of its Chinese address), another name in brackets (« Waitan ») or the
+ * hotel it stands in (« The Peninsula »), then the whole name without its brackets (never with them: a street, a park
+ * or a district in brackets is where the place stands, never a name of it).
  */
 export function nameVariants(t: Pick<Target, "name" | "nameCn" | "addressCn" | "type">, city: string): string[] {
   const cw = cityWords(city);
@@ -507,12 +573,12 @@ export function nameVariants(t: Pick<Target, "name" | "nameCn" | "addressCn" | "
   for (const m of raw.matchAll(/\(([^()]*)\)|«\s*([^«»]+?)\s*»/g)) for (const a of (m[1] ?? m[2]).split(/\s*,\s*/)) aliases.push(a.replace(/^\+\s*/, "").trim());
   const base = raw.replace(/\([^()]*\)/g, " ").replace(/[«»“”"]/g, " ").replace(/\s+/g, " ").replace(/\s*[–—:&+→×-]\s*$/, "").trim();
   const segs = base.split(/\s+[&+–—:×-]\s+|\s*→\s*/).map((s) => s.trim()).filter(Boolean);
-  const kept = segs.filter((s) => !isCityName(s, city) && meaningful(s, cw));
+  const kept = segs.filter((s) => !isCityName(s, city) && meaningful(s, cw) && (STREET_TYPES.has(t.type) || !STREETY.test(s)));
   const main = kept.length ? kept : [base];
   const cn = t.nameCn && CJK.test(t.nameCn) ? t.nameCn.trim() : cnName(t.addressCn);
   const out: string[] = [];
   const seen = new Set<string>();
-  for (const v of [...main, cn, ...aliases.filter((a) => aliasOk(a, t.type) && !isCityName(a, city)), segs.length > 1 ? base : "", raw]) {
+  for (const v of [...main, cn, ...aliases.filter((a) => aliasOk(a, t.type) && !isCityName(a, city)), base]) {
     const k = CJK.test(v) && !/[a-z]/i.test(v) ? v : fold(v);
     if (!v || !k || seen.has(k)) continue;
     seen.add(k);
@@ -545,7 +611,9 @@ export function nearEnough(t: Pick<Target, "name" | "type" | "lat" | "lng">, at:
  */
 export function titleNames(title: string, variant: string, t: Pick<Target, "name">, city: string): boolean {
   const base = t.name.replace(/\([^()]*\)/g, " ");
-  const need = kindsOf(variant).size ? kindsOf(variant) : kindsOf(base);
+  // the variant's words without its brackets (« Jia Jia Tang Bao (Huanghe Road) » never names « Huanghe Road »)
+  const vb = variant.replace(/\([^()]*\)/g, " ");
+  const need = kindsOf(vb).size ? kindsOf(vb) : kindsOf(base);
   const clean = title.replace(/\s*[（(][^）)]*[）)]\s*$/, "").trim();
   if (CJK.test(variant) && !/[a-z]/i.test(variant)) {
     if (clean === variant) return true;
@@ -554,19 +622,23 @@ export function titleNames(title: string, variant: string, t: Pick<Target, "name
     return contains && (!need.size || [...kindsOf(clean)].some((k) => need.has(k)));
   }
   const tw = words(clean);
-  const vw = new Set([...words(variant), ...words(base)]);
+  const vw = new Set([...words(vb), ...words(base)]);
   if (tw.some((w) => DISTRACT.has(w) && !vw.has(w))) return false;
   if (need.size && ![...kindsOf(clean)].some((k) => need.has(k))) return false;
-  const cw = cityWords(city);
-  const dv = distinct(variant, cw);
+  // only the place's own city aside (never another one: « Nanjing Road » keeps its « Nanjing »)
+  const cw = new Set([...words(city), ...words(cityOf(t.name, city))]);
+  const dv = distinct(vb, cw);
   const dt = distinct(clean, cw);
   const tset = new Set(tw);
   if (!dv.length) {
     // the same words, its articles and the city aside (« Shanghai Museum », « Suzhou Museum »)
     const strip = (s: string) => words(s).filter((w) => !ARTICLE.has(w) && !cw.has(w)).join(" ");
-    return strip(clean) === strip(variant);
+    return strip(clean) === strip(vb);
   }
-  return dv.every((w) => tset.has(w)) || (dt.length > 0 && dt.every((w) => vw.has(w)));
+  if (dv.every((w) => tset.has(w))) return true;
+  // the other way (« Bund » for « Le Bund »): never a street (it must carry every word of the variant), and one word
+  // at least that is neither a street's nor another thing's
+  return !STREETY.test(clean) && dt.some((w) => !STREET_WORDS.has(w) && !DISTRACT.has(w)) && dt.every((w) => vw.has(w));
 }
 
 // ---------- Wikipedia search ----------
@@ -875,7 +947,7 @@ export async function lookupPlaces(ts: Target[], ctx: { city: string; country: s
       }
       if (!r.ok) throw new Http(r.status);
       const d = (await r.json()) as { results?: OvHit[] };
-      const f = ovPick(Array.isArray(d?.results) ? d.results : [], t, sc, vs);
+      const f = ovPick(Array.isArray(d?.results) ? d.results : [], t, sc, vs, ctx.city);
       if (f) found.set(t.id, { ...f, via: `openverse « ${best} »` });
       settled.add(t.id);
     } catch {

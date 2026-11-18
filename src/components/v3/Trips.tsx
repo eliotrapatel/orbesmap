@@ -4,7 +4,7 @@ import { createTrip, getState, requestPro, switchTrip, useStore, useTrips } from
 import { dateLabel, dayCount, newTripRecord, searchCities, type Destination } from "../../lib/newTrip";
 import { daysLeft, phase } from "../../lib/time";
 import { coordText, recapDue } from "../../lib/recap";
-import { isRef } from "../../lib/photoData";
+import { coverMissing, isRef } from "../../lib/photoData";
 import { askPhotos, canAskPhotos } from "../../lib/placePhotos";
 import { Ph } from "../PlacePhoto";
 import TripHero from "./TripHero";
@@ -54,7 +54,7 @@ export default function Trips({ onOpen, onClose }: { onOpen: (id: string) => voi
   // throttles each trip)
   const roles = useStore((s) => s.roles);
   const member = useStore((s) => s.member);
-  const coverless = useMemo(() => trips.filter((x) => !x.cover && canAskPhotos(x)).slice(0, 3), [trips, roles, member]); // eslint-disable-line react-hooks/exhaustive-deps
+  const coverless = useMemo(() => trips.filter((x) => coverMissing(x.cover) && canAskPhotos(x)).slice(0, 3), [trips, roles, member]); // eslint-disable-line react-hooks/exhaustive-deps
   const coverlessKey = coverless.map((x) => x.id).join(",");
   useEffect(() => {
     if (!coverlessKey) return;

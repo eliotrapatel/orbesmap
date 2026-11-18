@@ -784,15 +784,15 @@ console.log("8. The name variants, the page titles, the positions");
   let v = V("Jardin Yu & temple du Dieu de la ville", { type: "jardin", addressCn: "上海市黄浦区福佑路168号 豫园（城隍庙：方浜中路249号）" });
   check(eq(v, ["Jardin Yu", "temple du Dieu de la ville", "豫园", "Jardin Yu & temple du Dieu de la ville"]), `« & » split, the Chinese name from the address's end (its brackets dropped), the whole name last (${v.join(" | ")})`);
   v = V("Shanghai Museum (People's Square)", { type: "musee", addressCn: "上海市黄浦区人民大道201号 上海博物馆" });
-  check(eq(v, ["Shanghai Museum", "上海博物馆", "Shanghai Museum (People's Square)"]), `brackets removed; « People's Square » (where a museum stands) never alone (${v.join(" | ")})`);
+  check(eq(v, ["Shanghai Museum", "上海博物馆"]), `brackets removed; « People's Square » (where a museum stands) never alone, nor with the name (${v.join(" | ")})`);
   v = V("Le Bund (Waitan)");
-  check(eq(v, ["Le Bund", "Waitan", "Le Bund (Waitan)"]), `a landmark's other name in brackets kept alone (${v.join(" | ")})`);
+  check(eq(v, ["Le Bund", "Waitan"]), `a landmark's other name in brackets kept alone (${v.join(" | ")})`);
   v = V("Suzhou – Jardin de l'Administrateur humble", { type: "jardin", addressCn: "江苏省苏州市姑苏区东北街178号 拙政园" });
   check(eq(v, ["Jardin de l'Administrateur humble", "拙政园", "Suzhou – Jardin de l'Administrateur humble"]), `the nearby city it starts with dropped (${v.join(" | ")})`);
   v = V("Suzhou – Jardin de la Persistance (Liu Yuan)", { type: "jardin", addressCn: "江苏省苏州市姑苏区留园路338号 留园" });
   check(v.length === 4 && eq(v.slice(0, 3), ["Jardin de la Persistance", "留园", "Liu Yuan"]), `4 variants at most (${v.join(" | ")})`);
   v = V("Sir Elly's Terrace (The Peninsula)", { type: "bar", addressCn: "上海市黄浦区中山东一路32号上海半岛酒店13楼" });
-  check(eq(v, ["Sir Elly's Terrace", "The Peninsula", "Sir Elly's Terrace (The Peninsula)"]), `the hotel a bar stands in kept; an address with no space gives no Chinese name (${v.join(" | ")})`);
+  check(eq(v, ["Sir Elly's Terrace", "The Peninsula"]), `the hotel a bar stands in kept; an address with no space gives no Chinese name (${v.join(" | ")})`);
   const noAlias = [["Perrotin Shanghai – Lynn Chadwick (Huqiu Road)", "galerie", "Huqiu Road"], ["Rockbund Art Museum (RAM)", "musee", "RAM"], ["Gare de Shanghai Hongqiao (TGV)", "transport", "TGV"], ["INS Land (Fuxing Park)", "club", "Fuxing Park"], ["Shanghai Museum East (Pudong)", "musee", "Pudong"], ["Suzhou Museum (I.M. Pei)", "musee", "I.M. Pei"], ["Lei Garden (iapm)", "restaurant", "iapm"], ["Flair (Ritz-Carlton Pudong, 58e)", "bar", "58e"]];
   check(noAlias.every(([n, type, a]) => !V(n, { type }).includes(a)), "never alone: a street, an acronym, « TGV », a park for a club, a district, a person, a mall, a floor");
   check(V("Flair (Ritz-Carlton Pudong, 58e)", { type: "bar" }).includes("Ritz-Carlton Pudong"), "a bracket's parts split on commas (« Ritz-Carlton Pudong » kept)");
@@ -814,6 +814,48 @@ console.log("8. The name variants, the page titles, the positions");
   check(!X.okHit(hosp, { name: "Zhangyuan", type: "luxe" }, "张园", "Shanghai") && X.okHit({ ...hosp, category: "tourism", type: "museum", name: "Shanghai Museum", namedetails: { name: "上海博物馆", "name:en": "Shanghai Museum" } }, { name: "Shanghai Museum", type: "musee" }, "上海博物馆", "Shanghai"), "an OpenStreetMap hit must be named as asked (« 张园 » never a hospital on a street of that name)");
   check(!X.okHit({ lat: "0", lon: "0", category: "railway", type: "station", name: "Yuyuan Garden" }, { name: "Yu Garden", type: "jardin" }, "Yu Garden", "Shanghai") && !X.okHit({ lat: "0", lon: "0", category: "highway", type: "bus_stop", name: "上海博物馆" }, { name: "Shanghai Museum", type: "musee" }, "上海博物馆", "Shanghai"), "never its metro station or its bus stop");
   check(X.thumbUrl("https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a1/X.jpg/500px-X.jpg?utm_source=commons.wikimedia.org") === "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a1/X.jpg/500px-X.jpg", "thumb.wikimedia.org thumbnails without their tracking query");
+
+  // the street, park or brand in brackets is where the place stands, never a name of it
+  const bracketed = [["Jia Jia Tang Bao (Huanghe Road)", "restaurant", "Huanghe Road"], ["Old Jesse (Tianping Road)", "restaurant", "Tianping Road"], ["INS Land (Fuxing Park)", "club", "Fuxing Park"], ["HAUS NOWHERE (Gentle Monster)", "design", "Gentle Monster"], ["Unitree – boutique d'expérience (Jiuguang Jing'an)", "tech", "Jing'an Temple"]];
+  check(bracketed.every(([n, type]) => V(n, { type }).every((x) => !/[()]/.test(x))), `no variant keeps its brackets (${V("Jia Jia Tang Bao (Huanghe Road)", { type: "restaurant" }).join(" | ")})`);
+  check(bracketed.every(([n, , title]) => !T(title, n) && !T(title, n.replace(/\s*\(.*\)/, ""), n)), "never « Huanghe Road », « Tianping Road », « Fuxing Park », « Gentle Monster », « Jing'an Temple » for a place standing there, even asked by the bracketed name");
+  check(!X.okHit({ lat: "0", lon: "0", category: "highway", type: "secondary", name: "Jia Jia Tang Bao (Huanghe Road)" }, { name: "Jia Jia Tang Bao (Huanghe Road)", type: "restaurant" }, "Jia Jia Tang Bao (Huanghe Road)", "Shanghai") && X.okHit({ lat: "0", lon: "0", category: "highway", type: "residential", name: "Wukang Road" }, { name: "Wukang Road", type: "landmark" }, "Wukang Road", "Shanghai"), "an OpenStreetMap road only when the name asked is a road itself (not by a street in brackets)");
+  check(!X.okHit({ lat: "0", lon: "0", category: "tourism", type: "attraction", name: "Huanghe Road" }, { name: "Jia Jia Tang Bao (Huanghe Road)", type: "restaurant" }, "Jia Jia Tang Bao", "Shanghai"), "an OpenStreetMap hit named otherwise than asked is refused (not only the hospital)");
+  // « Nanjing Road » (another city's name in it) is no shop on it
+  check(!T("Nanjing Road", "Huawei Flagship Nanjing East Road") && !T("Nanjing Road", "La rue des montres de Nanjing West Road") && !T("Nanjing West Road", "Shanghai Watch – flagship Nanjing West Road", "Shanghai Watch – flagship Nanjing West Road") && !V("Shanghai Watch – flagship Nanjing West Road", { type: "montres" }).includes("flagship Nanjing West Road"), "« Nanjing Road » never for a shop on it; its street part is no variant");
+  check(T("Wukang Road", "Wukang Road") && V("Wukang Road & Wukang Mansion").includes("Wukang Road") && !T("Wukang Road", "Wukang Mansion", "Wukang Road & Wukang Mansion"), "a landmark that is a street keeps it (« Wukang Road »), never for the mansion alone");
+  check(!V("Jardin botanique de Shanghai (Xuhui)", { type: "jardin" }).includes("Xuhui") && !V("Le Bund (Huangpu)").includes("Huangpu") && V("Suzhou – Jardin de la Persistance (Liu Yuan)", { type: "jardin" }).includes("Liu Yuan"), "a district in brackets is no variant, even for a garden or a landmark (« Liu Yuan » still is)");
+  // a walk is told by its start, never by a word inside a place's name
+  check(["Shanghai International Circuit", "Promenade des Anglais", "Hollywood Walk of Fame", "Xuhui Riverside Promenade"].every((n) => !X.isWalk(n)) && X.isWalk("Balade Concession française : Wukang Lu → Anfu Lu → Fuxing Xi Lu") && X.isWalk("Walk around Tianzifang"), "« Circuit », « Promenade des Anglais », « Walk of Fame » are places, not walks");
+}
+{
+  // Openverse: by the first variant or the name without brackets only, never another city, the city when only words match
+  const hit = (id, title, tags) => ({ id: `${id}1111111-2222-3333-4444-555555555555`, title, width: 1024, height: 768, thumbnail: `https://api.openverse.org/v1/images/${id}1111111-2222-3333-4444-555555555555/thumb/`, license: "by", license_version: "2.0", creator: "Ann", foreign_landing_url: `https://www.flickr.com/photos/x/${id}`, ...(tags ? { tags: tags.map((name) => ({ name })) } : {}) });
+  const w = world({
+    ov: {
+      "Sir Elly's Terrace Shanghai": [hit("a", "The Peninsula Tokyo"), hit("b", "Crimean Peninsula coast"), hit("c", "The Peninsula Hong Kong lobby")],
+      "Lei Garden Shanghai": [hit("d", "Lei Garden, Hong Kong"), hit("e", "Lei Garden dim sum")],
+      "West Bund Museum Shanghai": [hit("1", "Centre Pompidou, Paris")],
+      "Jardin botanique de Shanghai Shanghai": [hit("2", "Xuhui riverside")],
+      "Old Jesse Shanghai": [hit("3", "Old Jesse restaurant", ["shanghai"])],
+      "Le Bund Shanghai": [hit("4", "Bund at dusk"), hit("5", "The Bund, Shanghai at night")],
+    },
+  });
+  const ts = [
+    { id: "o1", name: "Sir Elly's Terrace (The Peninsula)", type: "bar", lat: 31.2410, lng: 121.4880 },
+    { id: "o2", name: "Lei Garden (iapm)", type: "restaurant", lat: 31.2150, lng: 121.4560 },
+    { id: "o3", name: "West Bund Museum × Centre Pompidou – « Computer Worlds »", type: "musee", lat: 31.1700, lng: 121.4600 },
+    { id: "o4", name: "Jardin botanique de Shanghai (Xuhui)", type: "jardin", lat: 31.1500, lng: 121.4400 },
+    { id: "o5", name: "Old Jesse (Tianping Road)", type: "restaurant", lat: 31.2050, lng: 121.4370 },
+    { id: "o6", name: "Le Bund (Waitan)", type: "landmark", lat: 31.2400, lng: 121.4900 },
+  ];
+  const res = await X.lookupPlaces(ts, { city: "Shanghai", country: "cn", langs: ["en", "fr"] }, w.io, T0 + 600_000);
+  const r = (id) => res.get(id);
+  check(r("o1") === "none", `« The Peninsula Tokyo », « Crimean Peninsula coast », « …Hong Kong lobby » never for the bar in the Peninsula (${typeof r("o1") === "object" ? r("o1").key : r("o1")})`);
+  check(r("o2")?.key === "openverse:e1111111-2222-3333-4444-555555555555", `« Lei Garden, Hong Kong » refused, « Lei Garden dim sum » (the whole name) kept (${r("o2")?.key || r("o2")})`);
+  check(r("o6")?.key === "openverse:51111111-2222-3333-4444-555555555555", `a one-word match (« Bund ») needs Shanghai in the title or the tags: « Bund at dusk » refused (${r("o6")?.key || r("o6")})`);
+  check(r("o3") === "none" && r("o4") === "none", "never « Centre Pompidou, Paris » (a second part, another city), never the district in brackets");
+  check(r("o5")?.source === "openverse" && r("o6")?.source === "openverse", "« Old Jesse » tagged shanghai and « The Bund, Shanghai » still accepted");
 }
 {
   // a whole pass on human-written names: OpenStreetMap by the Chinese name, then the Wikipedia search
@@ -876,6 +918,36 @@ console.log("8. The name variants, the page titles, the positions");
   check(w.log.wmMax <= 3, `the searches keep ≤3 Wikimedia requests in flight (${w.log.wmMax})`);
 }
 {
+  // a Retry-After holds for every Wikimedia request of the pass, not only the one that got the 429
+  const w = world({ wm429: [2] });
+  w.log.r429 = [];
+  const f0 = w.io.fetch;
+  let first429 = null;
+  w.io.fetch = async (url, init) => {
+    const r = await f0(url, init);
+    if (r.status === 429 && first429 == null) first429 = w.clock.t;
+    return r;
+  };
+  // sleeps end in time order (concurrent waits overlap, as on a real clock; the world's own clock adds them up)
+  const timers = [];
+  w.io.sleep = (ms) => new Promise((r) => timers.push({ at: w.clock.t + ms, r }));
+  const ts = Array.from({ length: 6 }, (_, i) => ({ id: `r${i}`, name: `Calm Corner ${i}`, lat: 31.23 + i * 0.001, lng: 121.47, type: "landmark" }));
+  let done = false;
+  const run = X.lookupPlaces(ts, { city: "Shanghai", country: "cn", langs: ["en", "fr"] }, w.io, T0 + 600_000).then(() => (done = true));
+  while (!done) {
+    for (let i = 0; i < 40 && !done; i++) await tick();
+    if (done || !timers.length) continue;
+    timers.sort((x, y) => x.at - y.at);
+    const next = timers.shift();
+    if (next.at > w.clock.t) w.clock.t = next.at;
+    next.r();
+  }
+  await run;
+  const wmHosts = /(^|\.)(wikipedia|wikidata)\.org$|^commons\.wikimedia\.org$/;
+  const during = w.log.urls.filter((x) => wmHosts.test(x.host) && first429 != null && x.at > first429 && x.at < first429 + 2000);
+  check(first429 != null && during.length === 0 && w.log.searches.length >= ts.length, `a 429 with Retry-After: 2 → no other Wikimedia request starts within its 2 s (${during.length} did, ${w.log.searches.length} searches)`);
+}
+{
   // the time budget runs out during Openverse: the places every source answered are « none », the others retried
   const w = world({ ovCost: 15_000 });
   const ts = Array.from({ length: 6 }, (_, i) => ({ id: `b${i}`, name: `Quiet Spot ${i}`, lat: 31.23 + i * 0.001, lng: 121.47, type: "landmark" }));
@@ -883,6 +955,28 @@ console.log("8. The name variants, the page titles, the positions");
   const got = ts.map((t) => res.get(t.id));
   check(got.slice(0, 3).every((r) => r === "none") && got.slice(3).every((r) => r === "retry"), `cut during Openverse: answered places « none », the rest to retry (${got.join(", ")})`);
   check(w.log.searches.length === ts.length * 2, `the Wikipedia searches ran while OpenStreetMap was asked (${w.log.searches.length} searches)`);
+}
+
+// ---------- 9. the trip's cover « none » ----------
+console.log("9. The cover « none »: version 2, an old one looked up again");
+{
+  const fx = { nom: { Shanghai: [nomHit(31.2304, 121.4737, "Q8686")] }, claims: { Q8686: { P18: "Shanghai skyline.jpg" } }, files: { "File:Shanghai skyline.jpg": { w: 3000, h: 2000, thumbHost: true } } };
+  const w = world(fx);
+  seed(w, "trip-c", [], { cover: { v: 1, none: true, at: T0 - 86_400_000 } });
+  await P.runPhotos("trip-c", w.deps, {});
+  const c = w.trips.get("trip-c").data.cover;
+  check(c?.from === "city" && c.qid === "Q8686" && /-1280\.jpg$/.test(c.path), `a cover « none » of version 1 (a day old) looked up again: the city's photo (${c?.from || JSON.stringify(c)})`);
+  const w2 = world(fx);
+  seed(w2, "trip-c", [], { cover: { v: 2, none: true, at: T0 - 86_400_000 } });
+  await P.runPhotos("trip-c", w2.deps, {});
+  check(w2.trips.get("trip-c").data.cover?.v === 2 && !w2.log.urls.some((x) => x.host === "nominatim.openstreetmap.org"), "a cover « none » of version 2 waits its 30 days");
+  const w3 = world({ nom: { Shanghai: [nomHit(31.2304, 121.4737, "Q1")] } });
+  seed(w3, "trip-c", []);
+  await P.runPhotos("trip-c", w3.deps, {});
+  const c3 = w3.trips.get("trip-c").data.cover;
+  check(c3?.none === true && c3.v === 2 && c3.at > 0, `nothing found → the cover's « none » written as version 2 (${JSON.stringify(c3)})`);
+  const D = await import("../src/lib/photoData.ts");
+  check(D.coverMissing(undefined) && D.coverMissing(D.asCover({ v: 1, none: true, at: T0 })) && D.coverMissing(D.asCover({ none: true, at: T0 })) && !D.coverMissing(D.asCover({ v: 2, none: true, at: T0 })) && !D.coverMissing(D.asCover({ v: 1, path: "c/x-1280.jpg", thumb: "c/x-500.jpg", source: "wikidata", sourceUrl: "https://commons.wikimedia.org/wiki/File:X.jpg", from: "city" })), "on the phone: no cover, or a « none » of version 1, counts as missing (the app asks again); version 2 or a photo does not");
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

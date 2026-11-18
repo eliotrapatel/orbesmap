@@ -814,7 +814,9 @@ async function unit(deps: Deps, tripId: string, s: Scratch, c: Claim, t0: number
 /** a place's Chinese address (« cn » in the code trips, « addressCn » in prepared ones): its end is often its Chinese name */
 const cnText = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 200) : undefined);
 const isPhotoRef = (v: unknown): v is PhotoRef => !!v && typeof v === "object" && typeof (v as PhotoRef).path === "string" && typeof (v as PhotoRef).thumb === "string";
-const staleNone = (v: unknown, now: number) => !!v && typeof v === "object" && (v as { none?: boolean }).none === true && now - (Number((v as { at?: number }).at) || 0) > 30 * 86_400_000;
+/** a cover « none » to look up again: older than 30 days, or written before the name variants (any version but
+ *  PHOTO_NONE_V: the city's own photo was always refused then) */
+const staleNone = (v: unknown, now: number) => !!v && typeof v === "object" && (v as { none?: boolean }).none === true && ((v as { v?: unknown }).v !== PHOTO_NONE_V || now - (Number((v as { at?: number }).at) || 0) > 30 * 86_400_000);
 const sameSpot = (row: PlaceRow, t: Target) => String(row.data.name || "").trim() === t.name && Number(row.data.lat) === t.lat && Number(row.data.lng) === t.lng;
 
 /**
@@ -954,7 +956,7 @@ export async function runPhotos(tripId: string, deps: Deps, opts: { hop?: number
         const rows = (await db.listPlaces(tripId)).filter((x) => x.data.deleted !== true && x.data.removed !== true && COVER_TYPES.has(String(x.data.type)) && isPhotoRef(x.data.photo) && /-(960|1280)\.\w+$/.test((x.data.photo as PhotoRef).path)).sort((a, b) => order(a) - order(b) || a.id.localeCompare(b.id));
         if (rows[0]) cover = { ...(rows[0].data.photo as Json), from: "place", placeId: rows[0].id };
         // nothing at all, no place still to look up and no photo found left uncopied: said once (tried again in 30 days)
-        else if (!pending) cover = { v: 1, none: true, at: deps.now() };
+        else if (!pending) cover = { v: PHOTO_NONE_V, none: true, at: deps.now() };
       }
       if (cover) {
         const c = cover;

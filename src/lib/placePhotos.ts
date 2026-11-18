@@ -7,7 +7,7 @@ import { getState } from "./store";
 import { TRIP_BY_ID } from "../data/trip";
 import { apiUrl } from "./ai";
 import { t } from "./i18n";
-import { isRef, needsLookup } from "./photoData";
+import { coverMissing, isRef, needsLookup } from "./photoData";
 import { phase, tripStartMs } from "./time";
 
 export const PHOTO_CACHE = "orbes-photos-v1";
@@ -40,7 +40,7 @@ export function tripCredits(trip: Trip): { name: string; photo: PhotoRef }[] {
 
 /** The places of the open trip still to look up (the place record's field times come from the trip's data) */
 function missingOf(trip: Trip, coverOnly: boolean): number {
-  const cover = trip.cover ? 0 : 1;
+  const cover = coverMissing(trip.cover) ? 1 : 0;
   if (coverOnly) return cover;
   const st = getState();
   const defs = st.tripId === trip.id ? (st.data.defs as Record<string, { fieldsAt?: Record<string, number> } | undefined>) : {};

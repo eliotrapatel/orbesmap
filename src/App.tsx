@@ -34,7 +34,7 @@ import type { Mode } from "./lib/route";
 import { NavCard, PointCard, useNavigation, type NavState, type NavTarget } from "./components/Nav";
 import { track } from "./lib/track";
 import { t } from "./lib/i18n";
-import { needsLookup } from "./lib/photoData";
+import { coverMissing, needsLookup } from "./lib/photoData";
 import { askPhotos, keepTripPhotos } from "./lib/placePhotos";
 
 type Sel = { kind: "place" | "pin"; id: string } | null;
@@ -65,7 +65,7 @@ export default function App() {
   // the trip's photos: asked once from the server when some are missing (throttled), then kept for offline use
   const photoKey = useMemo(() => {
     const defs = data.defs as Record<string, { fieldsAt?: Record<string, number> } | undefined>;
-    return `${trip.id}:${trip.cover ? 1 : 0}:${trip.places.filter((p) => needsLookup(p.photo, defs[p.id]?.fieldsAt)).length}`;
+    return `${trip.id}:${coverMissing(trip.cover) ? 0 : 1}:${trip.places.filter((p) => needsLookup(p.photo, defs[p.id]?.fieldsAt)).length}`;
   }, [trip, data.defs]);
   useEffect(() => {
     const tm = window.setTimeout(() => {
