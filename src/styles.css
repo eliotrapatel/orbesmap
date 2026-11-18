@@ -1471,6 +1471,8 @@ button.v3-brand { color: var(--ink); background: none; border: 0; padding: 0; cu
 button:disabled { cursor: default; }
 .v3-btn:disabled { opacity: 0.35; }
 .v3-btn:disabled:hover { background: var(--ink); }
+/* the main action waiting (a field to fill first): an outline, not a greyed slab; it fills in once it can be used */
+.v3-btn:not(.ghost):disabled, .v3-btn:not(.ghost):disabled:hover { opacity: 1; background: transparent; border-color: var(--hair-strong); color: var(--mute); }
 .v3-btn.ghost:disabled:hover { background: rgba(246, 242, 234, 0.04); }
 .v3-btn:disabled:active, .btn:disabled:active, .v3-chip:disabled:active, .v3-opt:disabled:active { transform: none; }
 /* hover only where there is a pointer (a tap must not leave a button lit) */
@@ -1499,6 +1501,18 @@ button:disabled { cursor: default; }
   .sync-pill .sp-short { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   .tb-search { width: 40px; height: 40px; border-radius: 12px; }
   .m-tools .tool { height: 36px; border-radius: 10px; }
+  /* a 44 px target for the thumb around each 36 px chip */
+  .m-tools .tool::after { content: ""; position: absolute; inset: -4px 0; }
+}
+/* the search field on a laptop: one short word that always fits; the long hint and the shortcut from 1536 px */
+.tb-search .tb-s-long { display: none; }
+.tb-search .kbd { flex: none; }
+@media (min-width: 900px) and (max-width: 1535px) {
+  .tb-search .kbd { display: none; }
+}
+@media (min-width: 1536px) {
+  .tb-search .tb-s-long { display: block; }
+  .tb-search .tb-s-short { display: none; }
 }
 @media (max-width: 400px) {
   .tb-sep { display: none; }

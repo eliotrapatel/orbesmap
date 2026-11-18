@@ -64,11 +64,19 @@ type Kind = "splash" | "welcome" | "onboarding" | "trips" | "share" | "draft" | 
 const DEPTH: Record<Kind, number> = { splash: 0, welcome: 1, onboarding: 2, trips: 3, draft: 4, app: 4, share: 5, pro: 6, admin: 6 };
 let shown: Kind | null = null;
 
+/** The screen inside a Stage (past the nested frames), looked up when needed: a screen may swap its own root while shown */
+const screenOf = (box: HTMLElement | null) => {
+  let el = box?.firstElementChild as HTMLElement | null;
+  while (el?.classList.contains("fl-stage")) el = el.firstElementChild as HTMLElement | null;
+  return el;
+};
+
 function Stage({ kind, overlay, children }: { kind: Kind; overlay?: boolean; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
-    let el = ref.current?.firstElementChild as HTMLElement | null;
-    while (el?.classList.contains("fl-stage")) el = el.firstElementChild as HTMLElement | null;
+    // the frame itself never changes; the screen inside can (the trip list becomes the concierge, preparing becomes review…)
+    const box = ref.current;
+    const el = screenOf(box);
     const from = overlay ? null : shown;
     if (!overlay) shown = kind;
     const motion = !!el && !reducedMotion() && typeof el.animate === "function";
@@ -78,15 +86,19 @@ function Stage({ kind, overlay, children }: { kind: Kind; overlay?: boolean; chi
     if (motion && el && (overlay || (from && from !== kind))) {
       const back = !overlay && from ? DEPTH[kind] < DEPTH[from] : false;
       const dy = overlay ? 18 : back ? -10 : 14;
-      el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: overlay ? 260 : 300, easing: EASE, fill: "backwards" });
       // the column moves (never the scrolling page itself, so fixed backgrounds stay put)
       const col = el.querySelector<HTMLElement>(":scope > .v3-col");
+      // leaving the map (a live drawing no copy can hold): the black ground is there at once and only the content
+      // settles, a deliberate cut rather than a dip to black
+      const fromMap = from === "app" && !!col;
+      (fromMap ? col : el).animate([{ opacity: 0 }, { opacity: 1 }], { duration: overlay ? 260 : 300, easing: EASE, fill: "backwards" });
       if (col) col.animate([{ transform: `translateY(${dy}px)` }, { transform: "none" }], { duration: overlay ? 380 : 420, easing: EASE, fill: "backwards" });
     }
     return () => {
-      // the map is a live drawing that a copy cannot hold: leaving it is a plain fade-in of the next screen
-      if (!el || el.classList.contains("app")) return;
-      ghostOut(el, (copy) => fadeOut(copy, overlay ? 220 : 240, overlay ? "translateY(12px)" : "none"), { parent: el.ownerDocument.body });
+      // the screen shown now (not the one found on arrival); the map cannot be copied: the next screen covers it
+      const cur = screenOf(box);
+      if (!cur || cur.classList.contains("app")) return;
+      ghostOut(cur, (copy) => fadeOut(copy, overlay ? 220 : 240, overlay ? "translateY(12px)" : "none"), { parent: cur.ownerDocument.body });
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return (
@@ -123,15 +135,21 @@ function HomeScroll({ children }: { children: ReactNode }) {
 function Splash() {
   // a long wait (no network): say so instead of a silent screen
   const [slow, setSlow] = useState(false);
+  // once the orbit and the name are fully drawn, the closing copy keeps them (a copy plays no drawing of its own)
+  const [drawn, setDrawn] = useState(false);
   useEffect(() => {
     const tm = window.setTimeout(() => setSlow(true), 8000);
-    return () => window.clearTimeout(tm);
+    const td = window.setTimeout(() => setDrawn(true), 2900);
+    return () => {
+      window.clearTimeout(tm);
+      window.clearTimeout(td);
+    };
   }, []);
   return (
-    <div className="v3 v3-splash fl-splash" aria-busy="true">
+    <div className={"v3 v3-splash fl-splash" + (drawn ? " fl-splash-drawn" : "")} aria-busy="true">
       <div className="fl-splash-mark">
         <svg className="fl-splash-orbit" viewBox="0 0 200 80" aria-hidden="true">
-          <g transform="rotate(-12 100 40)">
+          <g transform="rotate(-18 100 40)">
             <ellipse className="fl-splash-path" cx="100" cy="40" rx="96" ry="26" pathLength={1} />
             <circle className="fl-splash-sat" r="2">
               <animateMotion begin="1.9s" dur="9s" repeatCount="indefinite" path="M196,40 A96,26 0 1,1 4,40 A96,26 0 1,1 196,40" />
@@ -141,7 +159,7 @@ function Splash() {
         <OrbitMark size={34} title="ORBES Trips" />
         <span className="fl-splash-word" aria-hidden="true">ORBES Trips</span>
       </div>
-      {slow && <p className="v3-note fl-splash-slow" role="status">{t("Connexion en cours… Vérifiez le réseau, l'app s'ouvrira dès qu'elle sera rétablie.")}</p>}
+      {slow && <p className="v3-note fl-splash-slow" role="status">{t("Connexion en cours… Vérifiez votre réseau\u00a0: l'app s'ouvrira dès qu'il sera rétabli.")}</p>}
     </div>
   );
 }

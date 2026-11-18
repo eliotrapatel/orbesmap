@@ -8,6 +8,9 @@
 .fl-ghost, .fl-ghost * { animation: none !important; transition: none !important; pointer-events: none !important; }
 .fl-ghost .v3-hero-arc { stroke-dashoffset: 0; }
 .fl-ghost.v3 { z-index: 95; }
+/* the start-up copy, once its orbit and name were fully drawn, keeps them as they were */
+.fl-ghost.fl-splash-drawn .fl-splash-path { stroke-dashoffset: 0; }
+.fl-ghost.fl-splash-drawn .fl-splash-word, .fl-ghost.fl-splash-drawn .fl-splash-sat { opacity: 1; }
 .fl-ghost.modal-bg { z-index: 81; }
 
 /* ---------- start-up ---------- */
@@ -31,8 +34,11 @@
 /* ---------- onboarding ---------- */
 .fl-onb { overflow-x: hidden; }
 .fl-onb-bar .v3-steps { min-width: 0; }
+.fl-onb-bar .v3-tool { width: 44px; height: 44px; }
 .fl-onb-bar .v3-tool svg { width: 18px; height: 18px; }
-.fl-onb-lang { flex: none; padding: 10px 0 10px 8px; }
+.fl-onb-lang { flex: none; min-height: 44px; display: inline-flex; align-items: center; padding: 0 0 0 10px; }
+/* the question takes focus when a step moves on by itself (for the keyboard and screen readers): no ring on a title */
+.fl-pane h1:focus { outline: none; }
 /* progress: each bar fills from the left */
 .fl-onb .v3-bars i { position: relative; overflow: hidden; }
 .fl-onb .v3-bars i.on { background: var(--hair); }
@@ -46,20 +52,28 @@
 @keyframes fl-pane-fwd { from { opacity: 0; transform: translateX(28px); } }
 @keyframes fl-pane-back { from { opacity: 0; transform: translateX(-28px); } }
 @media (prefers-reduced-motion: reduce) { .fl-pane, .drawer.swap > .drawer-head > div, .drawer.swap > .drawer-body { animation: none; } }
-.fl-foot { display: flex; flex-direction: column; }
+/* the action stays at thumb height on every step, even when a step is taller than the screen (content passes under it) */
+.fl-onb .v3-col { padding-bottom: 0; }
+.fl-foot { position: sticky; bottom: 0; z-index: 2; display: flex; flex-direction: column;
+  margin: 0 calc(-1 * max(20px, env(safe-area-inset-right, 0px))) 0 calc(-1 * max(20px, env(safe-area-inset-left, 0px)));
+  padding: 16px max(20px, env(safe-area-inset-right, 0px)) calc(var(--safe-b) + 24px) max(20px, env(safe-area-inset-left, 0px));
+  background: linear-gradient(to top, #030303 64%, rgba(3, 3, 3, 0)); }
 .fl-foot .v3-btn { transition: transform 0.16s var(--ease), background 0.3s var(--ease), color 0.3s, border-color 0.3s, opacity 0.3s; }
 .fl-onb .v3-ck svg { width: 13px; height: 13px; stroke-width: 2.2; }
 .fl-onb .v3-ck { transition: background 0.22s var(--ease), border-color 0.22s, color 0.2s; }
 .fl-onb .v3-opt.on .v3-ck svg { animation: fl-tick 0.32s var(--ease) both; }
 @keyframes fl-tick { from { transform: scale(0.4); opacity: 0; } }
 .fl-diamond { width: 12px; height: 12px; color: var(--ink); }
-.fl-chip { display: inline-flex; align-items: center; }
-.fl-chip-ck { width: 0; height: 14px; opacity: 0; stroke-width: 2.2; transition: opacity 0.2s; }
-.fl-chip.on .fl-chip-ck { width: 14px; margin-right: 6px; opacity: 1; }
+/* a ticked chip keeps its width: the tick takes room the words give up, nothing after it moves */
+/* (styles.css loads after this file: doubled class so the chip's own padding does not win) */
+.v3-chip.fl-chip { position: relative; display: inline-flex; align-items: center; padding: 0 22px; }
+.fl-chip-ck { position: absolute; left: 14px; top: 50%; width: 12px; height: 12px; margin-top: -6px; opacity: 0; stroke-width: 2.4; transition: opacity 0.2s; }
+.v3-chip.fl-chip.on { padding: 0 14px 0 30px; }
+.fl-chip.on .fl-chip-ck { opacity: 1; }
 .fl-eur { display: flex; width: 54px; flex: none; font: 600 15px/1 var(--font); letter-spacing: 0.02em; }
 .fl-eur i { font-style: normal; color: var(--mute); opacity: 0.5; }
 .fl-eur i.f { color: var(--ink); opacity: 1; }
-.fl-eur + .v3-t small { color: var(--ink); opacity: 0.82; font-size: 13.5px; line-height: 1.35; }
+.fl-eur + .v3-t { font-variant-numeric: tabular-nums; }
 .fl-onb .v3-name { margin-bottom: 14px; caret-color: var(--gold); }
 .fl-onb .v3-name:focus { border-bottom-color: var(--ink); }
 
@@ -73,4 +87,8 @@
 
 /* ---------- toasts ---------- */
 .toast.out { animation: fl-toast-out 0.22s var(--ease) forwards; }
+/* a message replaced by the next one: the pill stays, the words rise again */
+.toast-msg { display: inline-block; animation: fl-toast-msg 0.26s var(--ease) both; }
+@keyframes fl-toast-msg { from { opacity: 0; transform: translateY(4px); } }
+@media (prefers-reduced-motion: reduce) { .toast-msg { animation: none; } }
 @keyframes fl-toast-out { to { opacity: 0; transform: translateY(8px); } }

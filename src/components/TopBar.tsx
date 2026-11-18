@@ -173,7 +173,8 @@ export default function TopBar({ trip, tool, onTool, onSearch, onTrip, onHome }:
         </div>
         <button className="tb-search" onClick={onSearch} aria-label={t("Rechercher")}>
           <ISearch />
-          <span>{t("Rechercher un lieu, une phrase, une action…")}</span>
+          <span className="tb-s-short">{t("Rechercher")}</span>
+          <span className="tb-s-long">{t("Rechercher un lieu, une action…")}</span>
           <span className="kbd">{isMac ? "⌘K" : "Ctrl K"}</span>
         </button>
         <nav className="tb-tools" aria-label={t("Outils")}>{toolsFor(trip).map((tl) => toolBtn(tl))}</nav>

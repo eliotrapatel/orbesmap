@@ -27,7 +27,8 @@ const SCROLLERS = ".scroll, .drawer-body, .detail-scroll, .v3, .modal";
  * left the page too, when `skip()` says so, or when the device asks for reduced motion.
  */
 export function ghostOut(el: HTMLElement | null, play: (copy: HTMLElement) => Animation | undefined, opts: { parent?: Node | null; skip?: () => boolean } = {}) {
-  if (!el || reducedMotion() || typeof el.animate !== "function") return;
+  // an element already out of the page is an old frame of the screen, not what the person sees
+  if (!el || !el.isConnected || reducedMotion() || typeof el.animate !== "function") return;
   const parent = opts.parent ?? el.parentNode;
   if (!parent) return;
   const copy = el.cloneNode(true) as HTMLElement;
@@ -59,6 +60,17 @@ export function ghostOut(el: HTMLElement | null, play: (copy: HTMLElement) => An
       a.oncancel = done;
     }
     window.setTimeout(done, a ? 900 : 0);
+  });
+}
+/**
+ * Focus goes back to what opened an overlay once it closes (only if focus was left on nothing: a click elsewhere keeps
+ * its own focus). `still()` says the close is real, not one overlay swapped for another.
+ */
+function restoreFocus(opener: Element | null, still: () => boolean) {
+  queueMicrotask(() => {
+    const now = document.activeElement;
+    if (!still() || !(opener instanceof HTMLElement) || !opener.isConnected || (now && now !== document.body)) return;
+    opener.focus({ preventScroll: true });
   });
 }
 /** Fade (and slight move) of a whole copy */
@@ -129,9 +141,11 @@ export function Modal({ title, intro, onClose, children, className }: { title: s
   // closing: the dialog settles down while its veil fades (a dialog replaced by another one simply goes)
   useLayoutEffect(() => {
     const el = bg.current;
+    const opener = document.activeElement;
     modalMounts++;
     return () => {
       const n = modalMounts;
+      restoreFocus(opener, () => modalMounts === n);
       ghostOut(
         el,
         (copy) => {
@@ -224,9 +238,12 @@ export function Toaster() {
   useEffect(() => {
     return () => window.clearTimeout(t.current);
   }, []);
+  // one live region while messages follow each other (screen readers announce its new text); only the words rise again
   return msg ? (
     <Portal>
-      <div key={msg.n} className={"toast" + (msg.out ? " out" : "")} role="status">{msg.text}</div>
+      <div className={"toast" + (msg.out ? " out" : "")} role="status">
+        <span key={msg.n} className="toast-msg">{msg.text}</span>
+      </div>
     </Portal>
   ) : null;
 }
@@ -354,6 +371,7 @@ export function useSheetDrag(onClose: () => void, normal?: string) {
 // a tool replaced by another one in the same commit: the new drawer takes the old one's place without sliding in again
 let closingDrawer: HTMLElement | null = null;
 let drawerMounts = 0;
+let drawerOpener: Element | null = null;
 
 /** Glass drawer used by every tool (desktop: right column, mobile: bottom sheet) */
 export function Drawer({ kicker, title, onClose, wide, children, sheetH, actions }: { kicker?: string; title: string; onClose: () => void; wide?: boolean; children: ReactNode; sheetH?: string; actions?: ReactNode }) {
@@ -361,6 +379,10 @@ export function Drawer({ kicker, title, onClose, wide, children, sheetH, actions
   const sheet = useSheetDrag(onClose, sheetH);
   useLayoutEffect(() => {
     const el = sheet.ref.current;
+    // what opened this tool; a tool that replaced another from inside it keeps the first one's opener
+    const active = document.activeElement;
+    const opener = closingDrawer && closingDrawer !== el && (!active || active === document.body) ? drawerOpener : active;
+    drawerOpener = opener;
     drawerMounts++;
     if (el && closingDrawer && closingDrawer !== el) el.classList.add("swap");
     return () => {
@@ -370,6 +392,7 @@ export function Drawer({ kicker, title, onClose, wide, children, sheetH, actions
       queueMicrotask(() => {
         if (closingDrawer === el) closingDrawer = null;
       });
+      restoreFocus(opener, () => drawerMounts === n);
       // closing: the sheet goes down from where it is (desktop: the panel slides back to the right)
       const mobile = isMobileSheet();
       const from = getComputedStyle(el).transform;

@@ -26,6 +26,11 @@ export const BUDGETS = [
   { key: 4, label: "€€€€", note: "Plus de 250 € par jour et par personne, hors hôtel" },
 ] as const;
 
+// the budget rows say their amount only: "per person, excluding hotel" is said once under the title
+const BUDGET_ROWS: Record<number, string> = { 1: "Moins de 60\u00a0€", 2: "60 à 120\u00a0€", 3: "120 à 250\u00a0€", 4: "Plus de 250\u00a0€" };
+/** French typesetting in the big titles: the "?" or ":" never ends up alone on the last line */
+const nb = (s: string) => s.replace(/ ([?!:;»])/g, "\u00a0$1");
+
 const STEPS = 6;
 // a single choice moves on by itself, just after the tick is seen
 const AUTO_NEXT_MS = 340;
@@ -41,6 +46,9 @@ export default function Onboarding() {
   const meta = useStore((s) => s.session?.user.user_metadata) as Record<string, string> | undefined;
   const [step, setStep] = useState(1);
   const [dir, setDir] = useState<"fwd" | "back">("fwd");
+  // read by the step that leaves, at the moment it leaves (the new direction is already set then)
+  const dirRef = useRef(dir);
+  dirRef.current = dir;
   const [name, setName] = useState(() => (profile.name as string) || meta?.given_name || meta?.full_name?.split(" ")[0] || "");
   const [travel, setTravel] = useState<string>(() => (profile.travel as string) || "duo");
   const [interests, setInterests] = useState<string[]>(() => (profile.interests as string[]) || []);
@@ -89,6 +97,8 @@ export default function Onboarding() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Enter" || e.isComposing || e.defaultPrevented || e.shiftKey || e.metaKey || e.ctrlKey || e.altKey) return;
       const el = e.target as HTMLElement | null;
+      // only on this page (a screen opened above it keeps its own Enter)
+      if (el && el !== document.body && !el.closest(".fl-onb")) return;
       if (el && el.closest("button, a, textarea, select, [role=button], [contenteditable=true]")) return;
       e.preventDefault();
       nextRef.current();
@@ -97,7 +107,8 @@ export default function Onboarding() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const otherLang = lang === "fr" ? "en" : "fr";
+  // the language on screen decides what the button offers; what is saved follows the choice
+  const otherLang = getLang() === "fr" ? "en" : "fr";
   const top = (
     <div className="v3-bar fl-onb-bar">
       {back ? (
@@ -112,7 +123,6 @@ export default function Onboarding() {
         type="button"
         className="v3-toplink fl-onb-lang"
         lang={otherLang}
-        aria-label={t("Langue")}
         onClick={() => {
           setLang(otherLang);
           setAppLang(otherLang as Lang);
@@ -128,7 +138,7 @@ export default function Onboarding() {
     body = (
       <>
         <p className="v3-lbl">{t("Faisons connaissance")}</p>
-        <h1 className="v3-d v3-h2">{t("Comment vous appelez-vous ?")}</h1>
+        <h1 className="v3-d v3-h2" tabIndex={-1}>{nb(t("Comment vous appelez-vous ?"))}</h1>
         <input
           className="v3-name"
           value={name}
@@ -147,7 +157,7 @@ export default function Onboarding() {
     body = (
       <>
         <p className="v3-lbl">{t("Enchanté, {first}.", { first })}</p>
-        <h1 className="v3-d v3-h2">{t("Comment voyagez-vous ?")}</h1>
+        <h1 className="v3-d v3-h2" tabIndex={-1}>{nb(t("Comment voyagez-vous ?"))}</h1>
         <div className="v3-opts" role="radiogroup" aria-label={t("Comment voyagez-vous ?")}>
           {TRAVEL.map((o) => (
             <button type="button" key={o.key} role="radio" aria-checked={travel === o.key} className={"v3-opt" + (travel === o.key ? " on" : "")} onClick={() => choose(() => setTravel(o.key))}>
@@ -166,7 +176,7 @@ export default function Onboarding() {
     body = (
       <>
         <p className="v3-lbl">{t("Vos goûts")}</p>
-        <h1 className="v3-d v3-h2">{t("Ce que vous aimez, {first}.", { first })}</h1>
+        <h1 className="v3-d v3-h2" tabIndex={-1}>{nb(t("Ce que vous aimez, {first}.", { first }))}</h1>
         <p className="v3-lead" style={{ marginTop: 12 }}>{t("Choisissez librement. Chaque voyage s'en sert, et vous pourrez tout changer.")}</p>
         <div className="v3-chips" style={{ marginTop: 22 }}>
           {INTERESTS.map((x) => {
@@ -185,7 +195,7 @@ export default function Onboarding() {
     body = (
       <>
         <p className="v3-lbl">{t("Votre façon")}</p>
-        <h1 className="v3-d v3-h2">{t("Quel rythme ?")}</h1>
+        <h1 className="v3-d v3-h2" tabIndex={-1}>{nb(t("Quel rythme ?"))}</h1>
         <div className="v3-opts" role="radiogroup" aria-label={t("Rythme")}>
           {PACES.map((p) => (
             <button type="button" key={p.key} role="radio" aria-checked={pace === p.key} className={"v3-opt tall" + (pace === p.key ? " on" : "")} onClick={() => choose(() => setPace(p.key))}>
@@ -201,12 +211,13 @@ export default function Onboarding() {
     body = (
       <>
         <p className="v3-lbl">{t("Votre façon")}</p>
-        <h1 className="v3-d v3-h2">{t("Quel budget par jour ?")}</h1>
+        <h1 className="v3-d v3-h2" tabIndex={-1}>{nb(t("Quel budget par jour ?"))}</h1>
+        <p className="v3-lead" style={{ marginTop: 12 }}>{t("Par personne, hors hôtel.")}</p>
         <div className="v3-opts" role="radiogroup" aria-label={t("Budget par jour")}>
           {BUDGETS.map((b) => (
             <button type="button" key={b.key} role="radio" aria-checked={budget === b.key} className={"v3-opt tall" + (budget === b.key ? " on" : "")} onClick={() => choose(() => setBudget(b.key))}>
               <span className="fl-eur" aria-hidden="true">{"€€€€".split("").map((c, i) => <i key={i} className={i < b.key ? "f" : ""}>{c}</i>)}</span>
-              <span className="v3-t"><span className="sr">{b.label}</span><small>{t(b.note)}</small></span>
+              <span className="v3-t"><span className="sr">{b.label}</span>{t(BUDGET_ROWS[b.key])}</span>
               <span className="v3-ck"><ICheck /></span>
             </button>
           ))}
@@ -217,11 +228,11 @@ export default function Onboarding() {
     body = (
       <>
         <p className="v3-lbl">{t("Facultatif")}</p>
-        <h1 className="v3-d v3-h2">{t("Un peu plus sur vous.")}</h1>
-        <p className="v3-note">{t("Pour des programmes et des offres qui vous ressemblent.")}</p>
+        <h1 className="v3-d v3-h2" tabIndex={-1}>{nb(t("Un peu plus sur vous."))}</h1>
+        <p className="v3-lead" style={{ marginTop: 12 }}>{t("Pour des programmes et des offres qui vous ressemblent.")}</p>
         <label className="v3-field col" style={{ marginTop: 16 }}>
           <span>{t("Ville ou aéroport de départ")}</span>
-          <input value={home} onChange={(e) => setHome(e.target.value)} placeholder={t("ex. Paris, CDG")} maxLength={60} autoComplete="address-level2" enterKeyHint="done" />
+          <input value={home} onChange={(e) => setHome(e.target.value)} placeholder={t("Par ex. Paris ou CDG")} maxLength={60} autoComplete="address-level2" enterKeyHint="done" />
         </label>
         <p className="v3-lbl" style={{ marginTop: 18 }}>{t("Âge")}</p>
         <div className="v3-chips" style={{ marginTop: 10 }}>
@@ -231,7 +242,7 @@ export default function Onboarding() {
         <div className="v3-chips" style={{ marginTop: 10 }}>
           {FREQS.map((f) => <button key={f.k} type="button" className={"v3-chip" + (freq === f.k ? " on" : "")} aria-pressed={freq === f.k} onClick={() => setFreq(freq === f.k ? "" : f.k)}>{t(f.l)}</button>)}
         </div>
-        <p className="v3-lbl" style={{ marginTop: 18 }}>{t("Comment nous avez-vous connus ?")}</p>
+        <p className="v3-lbl" style={{ marginTop: 18 }}>{nb(t("Comment nous avez-vous connus ?"))}</p>
         <div className="v3-chips" style={{ marginTop: 10 }}>
           {HEARD.map((h) => <button key={h.k} type="button" className={"v3-chip" + (heard === h.k ? " on" : "")} aria-pressed={heard === h.k} onClick={() => setHeard(heard === h.k ? "" : h.k)}>{t(h.l)}</button>)}
         </div>
@@ -241,7 +252,7 @@ export default function Onboarding() {
   return (
     <Shell ring={false} top={top} className="fl-onb">
       {back && <EscGuard on={back} />}
-      <Pane key={step} dir={moved.current ? dir : "still"}>{body}</Pane>
+      <Pane key={step} dir={moved.current ? dir : "still"} getDir={() => dirRef.current}>{body}</Pane>
       <div className="v3-spacer" />
       {/* the action stays in place from one step to the next: only its words change */}
       <div className="fl-foot">
@@ -266,25 +277,31 @@ export default function Onboarding() {
 }
 
 /** One step: it slides in from the side it comes from, the previous one leaves the other way */
-function Pane({ dir, children }: { dir: "fwd" | "back" | "still"; children: ReactNode }) {
+function Pane({ dir, getDir, children }: { dir: "fwd" | "back" | "still"; getDir: () => "fwd" | "back"; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const el = ref.current;
     // each step starts at its top
     const page = el?.closest<HTMLElement>(".v3");
     if (page && page.scrollTop) page.scrollTop = 0;
+    // focus was inside the step that left (a choice that moved on by itself, Enter in the field): it goes to the new
+    // step's question, so a keyboard or a screen reader carries on from here
+    const lost = !document.activeElement || document.activeElement === document.body;
+    if (el && dir !== "still" && lost) el.querySelector<HTMLElement>("h1")?.focus({ preventScroll: true });
     return () => {
       if (!el) return;
       // leaving: held where it was (out of the flow, so the next step takes its place at once)
       const box = { top: el.offsetTop, left: el.offsetLeft, width: el.offsetWidth, height: el.offsetHeight };
+      // the step that replaces this one says which way we went
+      const fwd = getDir() !== "back";
       ghostOut(el, (copy) => {
+        copy.classList.remove("fwd", "back");
+        copy.classList.add("still");
         Object.assign(copy.style, { position: "absolute", top: `${box.top}px`, left: `${box.left}px`, width: `${box.width}px`, height: `${box.height}px`, margin: "0" });
-        // the step that replaces this one says which way we went
-        const fwd = !document.querySelector(".fl-pane.back");
         return copy.animate([{ opacity: 1, transform: "none" }, { opacity: 0, transform: `translateX(${fwd ? -24 : 24}px)` }], { duration: 160, easing: "cubic-bezier(0.4, 0, 1, 1)", fill: "forwards" });
       });
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div ref={ref} className={"fl-pane " + dir}>
       {children}
