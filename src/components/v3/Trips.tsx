@@ -5,7 +5,7 @@ import { dateLabel, dayCount, newTripRecord, searchCities, type Destination } fr
 import { daysLeft, phase } from "../../lib/time";
 import { coordText, recapDue } from "../../lib/recap";
 import { isRef } from "../../lib/photoData";
-import { askPhotos } from "../../lib/placePhotos";
+import { askPhotos, canAskPhotos } from "../../lib/placePhotos";
 import { Ph } from "../PlacePhoto";
 import TripHero from "./TripHero";
 import OrbitMark from "../OrbitMark";
@@ -50,8 +50,11 @@ export default function Trips({ onOpen, onClose }: { onOpen: (id: string) => voi
   const between = !!hero && phase(hero) === "after";
   const showHero = !!hero && (!between || recapDue(hero));
   const others = between && !showHero ? sorted : rest;
-  // up to 3 listed trips without a photo: asked once from the server (askPhotos throttles each trip)
-  const coverless = trips.filter((x) => !x.cover).slice(0, 3);
+  // up to 3 listed trips without a photo that this account may ask for: asked once from the server (askPhotos
+  // throttles each trip)
+  const roles = useStore((s) => s.roles);
+  const member = useStore((s) => s.member);
+  const coverless = useMemo(() => trips.filter((x) => !x.cover && canAskPhotos(x)).slice(0, 3), [trips, roles, member]); // eslint-disable-line react-hooks/exhaustive-deps
   const coverlessKey = coverless.map((x) => x.id).join(",");
   useEffect(() => {
     if (!coverlessKey) return;

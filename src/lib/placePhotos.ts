@@ -21,7 +21,8 @@ export function creditLine(p: PhotoRef): string {
 }
 export const licenseLabel = (l: string) => (/^public domain$/i.test(l) ? t("Domaine public") : l);
 
-/** Every photo shown in a trip, once each: the cover first (named after the trip), then the places in their order */
+/** Every photo shown in a trip, once each: the cover first (named after the trip, or after its place when it is one
+ *  of the places' photos), then the places in their order */
 export function tripCredits(trip: Trip): { name: string; photo: PhotoRef }[] {
   const out: { name: string; photo: PhotoRef }[] = [];
   const seen = new Set<string>();
@@ -30,7 +31,9 @@ export function tripCredits(trip: Trip): { name: string; photo: PhotoRef }[] {
     seen.add(p.key || p.path);
     out.push({ name, photo: p });
   };
-  add(trip.title, trip.cover);
+  const cover = trip.cover;
+  const from = cover && isRef(cover) && cover.from === "place" ? trip.places.find((p) => p.id === cover.placeId) : undefined;
+  add(from ? from.name : trip.title, cover);
   for (const p of trip.places) add(p.name, p.photo);
   return out;
 }
@@ -60,6 +63,13 @@ const write = (k: string, v: unknown) => {
   }
 };
 
+/** May this account ask the server for a trip's photos? Owner, editor; the code trips: a member of the first space */
+export function canAskPhotos(trip: Pick<Trip, "id">): boolean {
+  const st = getState();
+  const role = st.roles[trip.id] || "";
+  return role === "owner" || role === "editor" || (!!TRIP_BY_ID[trip.id] && st.member === true);
+}
+
 const asking = new Set<string>();
 /**
  * Asks the server to find the photos a trip lacks (owner / editor, or a member for the two code trips). Throttled:
@@ -69,8 +79,7 @@ const asking = new Set<string>();
 export async function askPhotos(trip: Trip, coverOnly = false): Promise<void> {
   const st = getState();
   if (!st.session || !supabase || typeof navigator === "undefined" || !navigator.onLine) return;
-  const role = st.roles[trip.id] || "";
-  if (!(role === "owner" || role === "editor" || (TRIP_BY_ID[trip.id] && st.member === true))) return;
+  if (!canAskPhotos(trip)) return;
   const missing = missingOf(trip, coverOnly);
   if (missing === 0 || asking.has(trip.id)) return;
   const key = `orbes.photos.ask.${trip.id}`;

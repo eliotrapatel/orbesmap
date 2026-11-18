@@ -82,6 +82,7 @@ function world(fx = {}) {
     }
     if (u.host === "nominatim.openstreetmap.org") {
       log.nom.push(clock.t);
+      if (fx.nom429) return new Response("", { status: 429 });
       if (fx.nomCost) clock.t += fx.nomCost;
       const q = u.searchParams.get("q");
       const hits = (fx.nom || {})[q] || [];
@@ -119,7 +120,7 @@ function world(fx = {}) {
           imageinfo: [{
             width: f.w, height: f.h, mime: f.mime || "image/jpeg", url: `https://upload.wikimedia.org/wikipedia/commons/a/ab/x`, descriptionurl: `https://commons.wikimedia.org/wiki/${encodeURIComponent(title.replace(/ /g, "_")).replace(/%3A/g, ":")}`,
             ...thumbFor(title, f, step),
-            extmetadata: { LicenseShortName: { value: f.license ?? "CC BY-SA 4.0" }, LicenseUrl: { value: f.licenseUrl ?? "https://creativecommons.org/licenses/by-sa/4.0" }, Artist: { value: f.artist ?? "Someone" } },
+            extmetadata: { LicenseShortName: { value: f.license ?? "CC BY-SA 4.0" }, LicenseUrl: { value: f.licenseUrl ?? "https://creativecommons.org/licenses/by-sa/4.0" }, Artist: { value: f.artist ?? "Someone" }, ...(f.attribution ? { Attribution: { value: f.attribution } } : {}), ...(f.credit ? { Credit: { value: f.credit } } : {}), ...(f.attrRequired ? { AttributionRequired: { value: "true" } } : {}) },
           }],
         };
       });
@@ -137,8 +138,9 @@ function world(fx = {}) {
       return json({ results: (fx.ov || {})[q] || [] });
     }
     if (u.host === "upload.wikimedia.org" || (u.host === "api.openverse.org" && u.pathname.includes("/thumb"))) {
-      log.downloads.push({ url: String(url), at: clock.t });
+      log.downloads.push({ url: String(url), at: clock.t, accept: init.headers?.accept });
       if (fx.dlCost) clock.t += fx.dlCost;
+      if (fx.dl429 && log.downloads.length > fx.dl429) return new Response("", { status: 429, headers: { "retry-after": "60" } });
       const redir = (fx.redirects || {})[String(url)];
       if (redir) return new Response("", { status: 302, headers: { location: redir } });
       return new Response(new Uint8Array(4000), { status: 200, headers: { "content-type": "image/jpeg", "content-length": "4000" } });
@@ -158,6 +160,9 @@ function world(fx = {}) {
         return new Response(null, { status: store.has(m[1]) ? 200 : 400 });
       }
       if (m && method === "POST") {
+        // an upload takes a little while (the database's writes can run meanwhile)
+        await tick();
+        await tick();
         if (log.firstPatchAt != null) log.msgs.push("upload after a place write");
         store.set(m[1], init.headers?.["content-type"]);
         log.uploads.push({ path: m[1], headers: init.headers, at: clock.t });
@@ -223,10 +228,11 @@ function world(fx = {}) {
     async email() {
       return null;
     },
-    async claimPhotos(tripId, hold, now) {
+    async claimPhotos(tripId, hold, now, cooldown) {
       await tick();
       const l = leases.get(tripId);
       if (l && l.hold && now - l.at < 6 * 60_000) return false;
+      if (cooldown && l && l.done && now - l.done < cooldown) return false;
       leases.set(tripId, { hold, at: now });
       return true;
     },
@@ -316,6 +322,9 @@ check(!X.okLicense("GFDL") && !X.okLicense("CC BY-NC 2.0") && !X.okLicense("CC B
 check(!X.okRatio(3300, 1000) && !X.okRatio(2240, 1000) && X.okRatio(2000, 1000) && !X.okRatio(500, 1000), "ratio kept within 0.6–2.2");
 check(X.plain("<a href='x'>John &amp; Doe</a> &#233;&#x00e9;") === "John & Doe éé", "author: HTML stripped, entities decoded");
 check(X.tokens("Yu Garden Shanghai", "Shanghai").join(",") === "garden" && X.tokens("Musée de l'Orangerie", "Paris").join(",") === "musee,orangerie", "Openverse: the place's significant words (city and short words aside)");
+check(X.namesPlace("Shanghai Museum at dusk", "Shanghai Museum", "Shanghai") && !X.namesPlace("Shanghai Natural History Museum", "Shanghai Museum", "Shanghai") && !X.namesPlace("Museum of Contemporary Art Shanghai", "Shanghai Museum", "Shanghai"), "Openverse: the whole name as a phrase (« Shanghai Museum », never another museum of Shanghai)");
+check(X.namesPlace("The Bund, Shanghai", "Bund", "Shanghai") && !X.namesPlace("A bundle of bikes", "Bund", "Shanghai"), "Openverse: whole words only (« Bund », never « bundle »)");
+check(X.namesPlace("Paris - L'Orangerie, musée", "Musée de l'Orangerie", "Paris") && !X.namesPlace("Yu garden style", "Yu Garden Shanghai", "Shanghai") && X.namesPlace("佳家汤包 2019", "Jia Jia Tang Bao", "Shanghai", "佳家汤包"), "Openverse: city words dropped only with 2 distinctive words left; the Chinese name");
 check(X.ovLicense("by-sa", "2.0") === "CC BY-SA 2.0" && X.ovLicense("cc0", "1.0") === "CC0" && X.ovLicense("pdm", "") === "Public domain", "Openverse licence labels");
 const now0 = T0;
 check(X.needsLookup(undefined, {}, now0) && !X.needsLookup({ v: 1, none: true, at: now0 - 86_400_000 }, {}, now0) && X.needsLookup({ v: 1, none: true, at: now0 - 31 * 86_400_000 }, {}, now0), "a « none » is looked up again after 30 days");
@@ -435,11 +444,11 @@ const PLACES = [
   check(w.log.downloads.every((d) => /^https:\/\/(upload\.wikimedia\.org|api\.openverse\.org)\//.test(d.url)) && !w.log.downloads.some((d) => /\/wikipedia\/commons\/a\/ab\/(Peace|Exact|Small)/.test(d.url)), "downloads: allow-listed hosts only, never a throttled original");
   check(w.log.heads.length > 0 && !w.log.urls.some((x) => /\/object\/public\//.test(x.url)), "the existence check uses the service route, never the public URL");
   check(w.log.uploads.every((u) => u.headers["x-upsert"] === "true" && u.headers["cache-control"] === "max-age=31536000" && u.headers.authorization && u.headers.apikey), "uploads: service key, upsert, cached a year");
-  check(!w.log.msgs.includes("upload after a place write"), "every copy happens before the first place write (one write burst)");
+  check(!w.log.msgs.includes("upload after a place write"), "fewer than ten found: every copy happens before the first place write (one write burst)");
   check(w.log.bucket === 1, "the bucket is made (once)");
   const cover = w.trips.get("trip-p").data.cover;
-  check(cover?.from === "place" && cover?.placeId === "p1" && cover.path === p1.path, `montage P18 → P948 banner (7:1) refused → the first landmark's photo (${cover?.from}:${cover?.placeId})`);
-  check(w.log.urls.some((x) => /property=P948/.test(x.url)), "the P948 banner was tried");
+  check(cover?.from === "place" && cover?.placeId === "p1" && cover.path === p1.path, `montage P18 refused → the first landmark's photo (${cover?.from}:${cover?.placeId})`);
+  check(!w.log.urls.some((x) => /property=P948/.test(x.url)), "the P948 banner (7:1, outside the ratio rule) is never asked");
   check(w.trips.get("trip-p").data.fieldsAt.cover > 0, "the cover written with its fieldsAt");
   check(w.leases.get("trip-p")?.hold === null, "the lease is let go");
   check(w.log.kicks.length === 0, "nothing left over: no next call");
@@ -644,6 +653,108 @@ const req = (body, headers = {}) => new Request("https://orbesmap.vercel.app/api
   const [ins, patch] = sent;
   check(got === true && ins.method === "POST" && /resolution=ignore-duplicates/.test(ins.prefer) && ins.body.trip_id === "_photos" && ins.body.place_id === "trip-1", "the lease row is made with « on conflict do nothing » (trip « _photos »)");
   check(patch.method === "PATCH" && /or=\(data->>hold\.is\.null,data->>at\.lt\.1763459640000\)/.test(patch.url) && /return=representation/.test(patch.prefer) && patch.body.data.hold === "h1", "then taken only when free or stale (6 minutes)");
+}
+
+// ---------- 7. review fixes ----------
+console.log("7. Credits, OpenStreetMap refusals, busy downloads, the app's cooldown, trimmed names");
+{
+  const w = world({
+    nom: { "A Tower": [nomHit(31.2300, 121.4700, "Q21")], "B Tower": [nomHit(31.2310, 121.4710, "Q22")], "C Tower": [nomHit(31.2320, 121.4720, "Q23")], "D Tower": [nomHit(31.2330, 121.4730, "Q24")] },
+    ents: { Q21: { p18: "A.jpg" }, Q22: { p18: "B.jpg" }, Q23: { p18: "C.jpg" }, Q24: { p18: "D.jpg" } },
+    files: {
+      "File:A.jpg": { w: 2000, h: 1500, artist: "Ann", attribution: "Photo: Ann Example / Wikimedia Commons" },
+      "File:B.jpg": { w: 2000, h: 1500, artist: "", credit: "Bob Example" },
+      "File:C.jpg": { w: 2000, h: 1500, artist: "", credit: "Own work" },
+      "File:D.jpg": { w: 2000, h: 1500, artist: "", license: "CC0" },
+    },
+  });
+  seed(w, "trip-c", [{ id: "a", name: "A Tower", lat: 31.2301, lng: 121.4701 }, { id: "b", name: "B Tower", lat: 31.2311, lng: 121.4711 }, { id: "c", name: "C Tower", lat: 31.2321, lng: 121.4721 }, { id: "d", name: "D Tower", lat: 31.2331, lng: 121.4731 }]);
+  await P.runPhotos("trip-c", w.deps, {});
+  check(photoOf(w, "trip-c", "a")?.author === "Photo: Ann Example / Wikimedia Commons", "the credit the uploader asked for (Attribution) comes first");
+  check(photoOf(w, "trip-c", "b")?.author === "Bob Example", "no Artist: the Credit line names the author");
+  check(photoOf(w, "trip-c", "c")?.none === true, "CC BY-SA with no author at all (« Own work » alone) → refused");
+  check(photoOf(w, "trip-c", "d")?.path && photoOf(w, "trip-c", "d")?.author === "", "CC0 with no author → accepted");
+  const body = new URLSearchParams(String(w.log.urls.find((x) => x.host === "commons.wikimedia.org").body));
+  check(/Attribution\|Credit/.test(body.get("iiextmetadatafilter")), "Commons asked for Attribution and Credit");
+}
+{
+  const w = world({ ...FX, nom429: true });
+  seed(w, "trip-p", PLACES.slice(0, 5));
+  await P.runPhotos("trip-p", w.deps, {});
+  check(w.log.nom.length === 1, `OpenStreetMap refuses (429): asked nothing more in the pass, the city included (${w.log.nom.length} request)`);
+  check(PLACES.slice(0, 5).every((p) => photoOf(w, "trip-p", p.id)?.none !== true) && photoOf(w, "trip-p", "p1") === undefined && w.trips.get("trip-p").data.cover === undefined, "no place and no cover marked « none » (retried later); Openverse still answers for the others");
+  const n = w.log.nom.length;
+  w.clock.t += 60_000;
+  await P.runPhotos("trip-p", w.deps, {});
+  check(w.log.nom.length === n, "a pass a minute later in the same instance asks OpenStreetMap nothing");
+}
+{
+  const w = world({ ...FX, dl429: 1, claims: {} });
+  seed(w, "trip-p", [PLACES[0], PLACES[4], PLACES[9]]);
+  const r = await P.runPhotos("trip-p", w.deps, {});
+  check(w.log.downloads.length <= 4, `upload.wikimedia.org busy (429): the other copies stop (${w.log.downloads.length} downloads)`);
+  check(r === "kicked", `a found photo not copied: the next call is kicked (${r})`);
+  check(w.trips.get("trip-p").data.cover === undefined || w.trips.get("trip-p").data.cover?.none !== true, "and the trip's cover is not set to « none »");
+}
+{
+  const w = world({ ...FX, ov: { "Yu Garden Shanghai": FX.ov["Yu Garden Shanghai"] } });
+  seed(w, "trip-p", [PLACES[2]]);
+  await P.runPhotos("trip-p", w.deps, {});
+  const dl = w.log.downloads.find((d) => d.url.includes("api.openverse.org"));
+  check(dl?.accept === "image/jpeg", "an Openverse thumbnail is asked as JPEG");
+  w.places.get("trip-p").get("p3").data.photo = undefined;
+  const before = w.log.downloads.length;
+  await P.runPhotos("trip-p", w.deps, {});
+  check(w.log.downloads.length === before && photoOf(w, "trip-p", "p3")?.path === `o/${OV1}-500.jpg`, "already in the bucket: found by its name, not downloaded again");
+}
+{
+  const w = world(FX);
+  seed(w, "trip-p", [{ ...PLACES[0], name: "  Bund " }]);
+  w.members.set("trip-p:user-1", "owner");
+  await P.handle(req({ action: "photos", trip: "trip-p" }, { authorization: "Bearer user-token" }), w.deps);
+  await drain(w);
+  check(!!photoOf(w, "trip-p", "p1")?.path, "a name with spaces around it is written (trimmed on both sides)");
+  w.places.get("trip-p").get("p1").data.photo = undefined;
+  w.clock.t += 5 * 60_000;
+  const runs = w.log.nom.length;
+  const r = await P.handle(req({ action: "photos", trip: "trip-p" }, { authorization: "Bearer user-token" }), w.deps);
+  await drain(w);
+  check(r.status === 202 && w.log.nom.length === runs, "asked again by the app 5 minutes after a finished pass: still 202, nothing runs");
+  check((await P.runPhotos("trip-p", w.deps, { hop: 1 })) === "done" && w.log.nom.length > runs, "the server's own next call is not held by the cooldown");
+  w.places.get("trip-p").get("p1").data.photo = undefined;
+  w.clock.t += 11 * 60_000;
+  const runs2 = w.log.nom.length;
+  await P.handle(req({ action: "photos", trip: "trip-p" }, { authorization: "Bearer user-token" }), w.deps);
+  await drain(w);
+  check(w.log.nom.length > runs2, "asked again 11 minutes later: the pass runs");
+}
+{
+  // 14 places found: written by tens as their copies end (a call cut later keeps them)
+  const nom = {};
+  const ents = {};
+  const files = {};
+  const list = [];
+  for (let i = 0; i < 14; i++) {
+    nom[`Spot ${i}`] = [nomHit(31.2 + i * 0.001, 121.4, `Q${100 + i}`)];
+    ents[`Q${100 + i}`] = { p18: `Spot ${i}.jpg` };
+    files[`File:Spot ${i}.jpg`] = { w: 2000, h: 1500 };
+    list.push({ id: `s${i}`, name: `Spot ${i}`, lat: 31.2 + i * 0.001, lng: 121.4 });
+  }
+  const w = world({ nom, ents, files });
+  seed(w, "trip-s", list);
+  await P.runPhotos("trip-s", w.deps, {});
+  check(list.every((p) => photoOf(w, "trip-s", p.id)?.path) && w.log.msgs.includes("upload after a place write"), "14 found: the first ten written before the last copies, all 14 written");
+}
+{
+  const sent = [];
+  const f = async (url, init = {}) => {
+    sent.push({ url: decodeURIComponent(String(url)), method: init.method || "GET" });
+    if (init.method === "PATCH") return new Response(JSON.stringify([]), { status: 200 });
+    return new Response("", { status: 201 });
+  };
+  const db = P.restDb("test-service-key", f);
+  const got = await db.claimPhotos("trip-1", "h1", 1763460000000, 600_000);
+  check(got === false && /and=\(or\(data->>hold\.is\.null,data->>at\.lt\.1763459640000\),or\(data->>done\.is\.null,data->>done\.lt\.1763459400000\)\)/.test(sent[1].url), "the app's claim also asks the last finished pass to be 10 minutes old");
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

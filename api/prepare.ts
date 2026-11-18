@@ -16,7 +16,7 @@ import { createCipheriv, createDecipheriv, createHmac, randomBytes, randomUUID, 
 import webpush from "web-push";
 import { waitUntil } from "@vercel/functions";
 import { reserve, runTask, TaskFailure, type TaskRun } from "./ai.js";
-import { copyToBucket, ensureBucket, lookupCity, lookupPlaces, needsLookup as photoNeeded, type Found, type Io, type PhotoRef, type Target } from "./_photos.js";
+import { Busy, copyToBucket, ensureBucket, lookupCity, lookupPlaces, needsLookup as photoNeeded, type Found, type Io, type PhotoRef, type Target } from "./_photos.js";
 
 type Json = Record<string, unknown>;
 const SUPA_URL = process.env.SUPABASE_URL || "https://ifugaqjneprbtigvegeb.supabase.co";
@@ -44,6 +44,13 @@ const PHOTO_TRIP = "_photos";
 /** The photo pass: lookups stop after this, no copy starts after PHOTO_COPY_END (a call lives 300 s) */
 const PHOTO_BUDGET = 170_000;
 const PHOTO_COPY_END = 270_000;
+/** the trip's cover is looked up only when the call started less than this ago, and its requests stop at PHOTO_CITY_END */
+const PHOTO_COVER_START = 240_000;
+const PHOTO_CITY_END = 275_000;
+/** a pass asked by the app: not again within this time of the last one that ended (the server's own calls are not held) */
+const PHOTO_COOLDOWN = 10 * 60_000;
+/** found places are written by tens as their copies end (a cut call keeps what it copied) */
+const PHOTO_WRITE_BATCH = 10;
 /** places looked up per call; the rest in the next call (a pass chains PHOTO_HOPS more calls at most) */
 const PHOTO_CAP = 60;
 const PHOTO_HOPS = 5;
@@ -143,8 +150,9 @@ export type Db = {
   pushSubs(userId: string): Promise<{ endpoint: string; p256dh: string; auth: string }[]>;
   dropPushSub(endpoint: string): Promise<void>;
   email(userId: string): Promise<string | null>;
-  /** the photo pass's lease (place_states row trip "_photos", place = the trip): true when this call got it */
-  claimPhotos?(tripId: string, hold: string, now: number): Promise<boolean>;
+  /** the photo pass's lease (place_states row trip "_photos", place = the trip): true when this call got it;
+   *  `cooldown`: also refused while the last pass that ended (its `done`) is more recent than this */
+  claimPhotos?(tripId: string, hold: string, now: number, cooldown?: number): Promise<boolean>;
   touchPhotos?(tripId: string, hold: string, now: number): Promise<void>;
   releasePhotos?(tripId: string, hold: string, now: number, note: Json): Promise<void>;
 };
@@ -805,21 +813,22 @@ async function unit(deps: Deps, tripId: string, s: Scratch, c: Claim, t0: number
 // ---------- the photos of the places and of the trip ----------
 const isPhotoRef = (v: unknown): v is PhotoRef => !!v && typeof v === "object" && typeof (v as PhotoRef).path === "string" && typeof (v as PhotoRef).thumb === "string";
 const staleNone = (v: unknown, now: number) => !!v && typeof v === "object" && (v as { none?: boolean }).none === true && now - (Number((v as { at?: number }).at) || 0) > 30 * 86_400_000;
-const sameSpot = (row: PlaceRow, t: Target) => String(row.data.name || "") === t.name && Number(row.data.lat) === t.lat && Number(row.data.lng) === t.lng;
+const sameSpot = (row: PlaceRow, t: Target) => String(row.data.name || "").trim() === t.name && Number(row.data.lat) === t.lat && Number(row.data.lng) === t.lng;
 
 /**
  * One photo pass on a trip: the places without a photo (or renamed, moved, or "none" for 30 days) are looked up,
- * their files copied into the public bucket, then written in one short burst (the open phones pull once or twice);
+ * their files copied into the public bucket and written by tens as the copies end (the open phones pull a few times);
  * then the trip's cover. Only one pass per trip at a time (a lease in place_states). Never touches the draft.
  */
-export async function runPhotos(tripId: string, deps: Deps, opts: { hop?: number } = {}): Promise<string> {
+export async function runPhotos(tripId: string, deps: Deps, opts: { hop?: number; asked?: boolean } = {}): Promise<string> {
   const io = deps.photoIo;
   const db = deps.db;
   if (!io || !db.claimPhotos) return "off";
   const hop = Math.max(0, Math.floor(Number(opts.hop) || 0));
   const hold = randomUUID();
   const t0 = deps.now();
-  if (!(await db.claimPhotos(tripId, hold, t0))) return "busy";
+  // asked by the app: never within PHOTO_COOLDOWN of the last pass that ended
+  if (!(await db.claimPhotos(tripId, hold, t0, opts.asked ? PHOTO_COOLDOWN : undefined))) return "busy";
   const alive = setInterval(() => void db.touchPhotos?.(tripId, hold, deps.now()).catch(() => undefined), 60_000);
   (alive as { unref?: () => void }).unref?.();
   const release = (note: Json) => db.releasePhotos?.(tripId, hold, deps.now(), note).catch(() => undefined);
@@ -855,26 +864,12 @@ export async function runPhotos(tripId: string, deps: Deps, opts: { hop?: number
     const results = targets.length ? await lookupPlaces(targets, { city: city?.name || "", country, langs }, io, t0 + PHOTO_BUDGET) : new Map<string, Found | "none" | "retry">();
     const budgetHit = deps.now() > t0 + PHOTO_BUDGET;
 
-    // every copy first (3 at a time), none started late
+    // the copies (3 at a time, none started late; upload.wikimedia.org busy stops them all), each found place written
+    // by tens as its copy ends, on fresh rows (the open phones pull a few times, and a cut call keeps what it copied)
     const refs = new Map<string, PhotoRef>();
     const queue = [...results].filter((x): x is [string, Found] => typeof x[1] === "object");
     let cut = false;
-    const copier = async () => {
-      for (let item = queue.shift(); item; item = queue.shift()) {
-        if (deps.now() > t0 + PHOTO_COPY_END) {
-          cut = true;
-          continue;
-        }
-        try {
-          refs.set(item[0], await copyToBucket(item[1], io));
-        } catch (e) {
-          deps.log?.(`photos copy ${tripId}: ${String((e as Error)?.message || e).slice(0, 120)}`);
-        }
-      }
-    };
-    await Promise.all([copier(), copier(), copier()]);
-
-    // then one short burst of writes, on fresh rows
+    let copyFailed = false;
     let fresh = await db.listPlaces(tripId);
     const write = async (id: string, photo: Json): Promise<boolean | "skip"> => {
       const r = fresh.find((x) => x.id === id);
@@ -888,25 +883,65 @@ export async function runPhotos(tripId: string, deps: Deps, opts: { hop?: number
       return db.patchPlace(tripId, id, data, r.updatedAt);
     };
     let written = 0;
-    for (const t of targets) {
-      const res = results.get(t.id);
-      const photo: Json | null = res === "none" ? { v: 1, none: true } : res && res !== "retry" && refs.has(t.id) ? { ...refs.get(t.id)! } : null;
-      if (!photo) continue;
-      let ok = await write(t.id, photo);
+    let writeError: unknown = null;
+    const writeOne = async (id: string) => {
+      const res = results.get(id);
+      const photo: Json | null = res === "none" ? { v: 1, none: true } : res && res !== "retry" && refs.has(id) ? { ...refs.get(id)! } : null;
+      if (!photo) return;
+      let ok = await write(id, photo);
       if (ok === false) {
         // changed on a phone meanwhile: read again, once
         fresh = await db.listPlaces(tripId);
-        ok = await write(t.id, photo);
+        ok = await write(id, photo);
       }
       if (ok === true) written++;
-    }
-    const pending = leftOver || cut || [...results.values()].some((x) => x === "retry");
+    };
+    const ready: string[] = [];
+    let writing: Promise<void> = Promise.resolve();
+    const flush = () => {
+      const ids = ready.splice(0);
+      if (ids.length)
+        writing = writing.then(async () => {
+          if (writeError) return;
+          try {
+            for (const id of ids) await writeOne(id);
+          } catch (e) {
+            writeError = e;
+          }
+        });
+      return writing;
+    };
+    const copier = async () => {
+      for (let item = queue.shift(); item; item = queue.shift()) {
+        if (cut || deps.now() > t0 + PHOTO_COPY_END) {
+          cut = true;
+          continue;
+        }
+        try {
+          refs.set(item[0], await copyToBucket(item[1], io));
+          ready.push(item[0]);
+          if (ready.length >= PHOTO_WRITE_BATCH) void flush();
+        } catch (e) {
+          copyFailed = true;
+          // a 429 from the file host: no more downloads in this call (the next call, or the app's next ask, retries)
+          if (e instanceof Busy) cut = true;
+          else deps.log?.(`photos copy ${tripId}: ${String((e as Error)?.message || e).slice(0, 120)}`);
+        }
+      }
+    };
+    await Promise.all([copier(), copier(), copier()]);
+    // then the places with nothing acceptable, and the rest of the found ones
+    for (const t of targets) if (results.get(t.id) === "none") ready.push(t.id);
+    await flush();
+    if (writeError) throw writeError;
+    // a photo found but not copied (failed, busy, late) counts as still to find
+    const pending = leftOver || cut || copyFailed || [...results.values()].some((x) => x === "retry");
 
     // the trip's cover: its city's photo, else one of its landmarks' (wide enough for the band), else none
     const cur = (await db.getTrip(tripId))?.data.cover;
-    if ((!cur || staleNone(cur, deps.now())) && city && deps.now() < t0 + PHOTO_COPY_END) {
+    if ((!cur || staleNone(cur, deps.now())) && city && deps.now() < t0 + PHOTO_COVER_START) {
       let cover: Json | null = null;
-      const r = await lookupCity(city, io);
+      const r = await lookupCity(city, io, t0 + PHOTO_CITY_END);
       if (typeof r === "object") {
         try {
           cover = { ...(await copyToBucket(r, io)), from: "city" };
@@ -916,7 +951,7 @@ export async function runPhotos(tripId: string, deps: Deps, opts: { hop?: number
       } else if (r === "none") {
         const rows = (await db.listPlaces(tripId)).filter((x) => x.data.deleted !== true && x.data.removed !== true && COVER_TYPES.has(String(x.data.type)) && isPhotoRef(x.data.photo) && /-(960|1280)\.\w+$/.test((x.data.photo as PhotoRef).path)).sort((a, b) => order(a) - order(b) || a.id.localeCompare(b.id));
         if (rows[0]) cover = { ...(rows[0].data.photo as Json), from: "place", placeId: rows[0].id };
-        // nothing at all, and no place still to look up: said once (tried again in 30 days)
+        // nothing at all, no place still to look up and no photo found left uncopied: said once (tried again in 30 days)
         else if (!pending) cover = { v: 1, none: true, at: deps.now() };
       }
       if (cover) {
@@ -1043,7 +1078,7 @@ export async function handle(req: Request, depsIn?: Deps): Promise<Response> {
     if (!row) return reply({ error: "notready" }, 409, origin);
     const ok = role === "owner" || role === "editor" || (CODE_TRIPS.has(tripId) && (await (deps.isMember?.(token) ?? Promise.resolve(false)).catch(() => false)));
     if (!ok) return reply({ error: "forbidden" }, 403, origin);
-    deps.schedule(runPhotos(tripId, deps, {}).catch((e) => deps.log?.(`photos ${tripId}: ${String(e)}`)));
+    deps.schedule(runPhotos(tripId, deps, { asked: true }).catch((e) => deps.log?.(`photos ${tripId}: ${String(e)}`)));
     return reply({ ok: true, queued: true }, 202, origin);
   }
   // a trip just created on the phone may not have reached the server yet: the app asks again
@@ -1342,10 +1377,13 @@ export function restDb(key: string, f: typeof fetch): Db {
     },
     // the photo pass's lease: the row is made once, then taken only when free or stale (one row back = taken).
     // `at` is always written as a 13-digit ms number (or 0), so comparing it as text is right.
-    async claimPhotos(tripId, hold, now) {
+    // `done` (the end of the last finished pass) is a 13-digit ms number too: the cooldown compares it the same way.
+    async claimPhotos(tripId, hold, now, cooldown) {
       const iso = new Date().toISOString();
       await call("/rest/v1/place_states?on_conflict=trip_id,place_id", { method: "POST", headers: { prefer: "resolution=ignore-duplicates,return=minimal" }, body: JSON.stringify({ trip_id: PHOTO_TRIP, place_id: tripId, data: { hold: null, at: 0 }, updated_at: iso }) });
-      const rows = (await call(`/rest/v1/place_states?trip_id=eq.${PHOTO_TRIP}&place_id=eq.${enc(tripId)}&or=(data->>hold.is.null,data->>at.lt.${Math.floor(now - LEASE_STALE)})&select=place_id`, { method: "PATCH", headers: { prefer: "return=representation" }, body: JSON.stringify({ data: { hold, at: Math.floor(now) }, updated_at: iso }) })) as unknown[];
+      const free = `or(data->>hold.is.null,data->>at.lt.${Math.floor(now - LEASE_STALE)})`;
+      const cond = cooldown ? `and=(${free},or(data->>done.is.null,data->>done.lt.${Math.floor(now - cooldown)}))` : `or=(data->>hold.is.null,data->>at.lt.${Math.floor(now - LEASE_STALE)})`;
+      const rows = (await call(`/rest/v1/place_states?trip_id=eq.${PHOTO_TRIP}&place_id=eq.${enc(tripId)}&${cond}&select=place_id`, { method: "PATCH", headers: { prefer: "return=representation" }, body: JSON.stringify({ data: { hold, at: Math.floor(now) }, updated_at: iso }) })) as unknown[];
       return Array.isArray(rows) && rows.length > 0;
     },
     async touchPhotos(tripId, hold, now) {

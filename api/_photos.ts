@@ -1,6 +1,5 @@
 // The photo of each place and of each trip, found and copied by the server (api/prepare.ts runs the pass).
-// Sources, in this order: OpenStreetMap (Nominatim, extratags → the Wikidata id) → Wikidata P18 (P948 banner for the
-// trip's city) → Wikimedia Commons (standard thumbnail widths, licence, author, file page) → the Wikipedia summary's
+// Sources, in this order: OpenStreetMap (Nominatim, extratags → the Wikidata id) → Wikidata P18 → Wikimedia Commons (standard thumbnail widths, licence, author, file page) → the Wikipedia summary's
 // Commons file → Openverse (commercial use + modification allowed, title naming the place). Never: Commons geosearch,
 // Google, Unsplash, AI images. The files are copied, as plain resized thumbnails, into the public Supabase Storage
 // bucket "place-photos", keyed by their source (shared between trips). The underscore keeps Vercel from making this a
@@ -154,14 +153,16 @@ async function timed(io: Io, url: string, init: RequestInit, ms: number): Promis
   }
 }
 
-type Ctx = { io: Io; gate: ReturnType<typeof makeGate> };
+/** `deadline`: no Wikimedia request starts, and no Retry-After is waited, past it (the call lives 300 s) */
+type Ctx = { io: Io; gate: ReturnType<typeof makeGate>; deadline: number };
 /** A Wikimedia JSON request through the gate; 429: waits Retry-After when it is short (3 times), else Busy */
 async function wm(c: Ctx, url: string, init: RequestInit = {}, notFoundOk = false): Promise<unknown> {
   for (let i = 0; ; i++) {
+    if (c.io.now() > c.deadline) throw new Busy();
     const r = await c.gate(() => timed(c.io, url, { ...init, headers: { "user-agent": UA, "api-user-agent": UA, accept: "application/json", ...((init.headers as Record<string, string>) || {}) } }, 15_000));
     if (r.status === 429) {
       const ms = retryAfter(r.headers.get("retry-after"), c.io.now());
-      if (ms > 30_000 || i >= 3) throw new Busy();
+      if (ms > 30_000 || i >= 3 || c.io.now() + ms > c.deadline) throw new Busy();
       await c.io.sleep(ms);
       continue;
     }
@@ -174,16 +175,25 @@ const form = (o: Record<string, string>) => Object.entries(o).map(([k, v]) => `$
 
 // ---------- Nominatim ----------
 type NomHit = { lat: string; lon: string; extratags?: Record<string, string> | null };
+/** OpenStreetMap refused us (429 / 403 / 503): no photo request goes to it from this instance for 10 minutes at least
+ *  (the preparation's own geocoding shares the servers' address, it must never be blocked by the photos). Kept with
+ *  the Nominatim gate the instance shares. */
+const nomBlocked = new WeakMap<object, number>();
 async function nominatim(io: Io, params: Record<string, string>): Promise<NomHit[]> {
+  if (io.now() < (nomBlocked.get(io.nomGate) || 0)) throw new Busy();
   await io.nomGate();
   const r = await timed(io, `https://nominatim.openstreetmap.org/search?${form({ format: "jsonv2", extratags: "1", "accept-language": "en", ...params })}`, { headers: { "user-agent": UA, referer: REFERER } }, 8000);
+  if (r.status === 429 || r.status === 403 || r.status === 503) {
+    nomBlocked.set(io.nomGate, io.now() + Math.max(10 * 60_000, retryAfter(r.headers.get("retry-after"), io.now())));
+    throw new Busy();
+  }
   if (!r.ok) throw new Http(r.status);
   const out = await r.json();
   return Array.isArray(out) ? (out as NomHit[]) : [];
 }
 
 // ---------- Commons ----------
-type Info = { title: string; origW: number; origH: number; mime: string; page: string; license: string; licenseUrl?: string; author: string; thumb?: string; tw?: number; th?: number };
+type Info = { title: string; origW: number; origH: number; mime: string; page: string; license: string; licenseUrl?: string; author: string; attrRequired: boolean; thumb?: string; tw?: number; th?: number };
 const titleOf = (f: string) => (/^File:/i.test(f) ? "File:" + f.slice(5) : "File:" + f).replace(/_/g, " ");
 /** imageinfo for up to 50 files per POST at one standard width; the answer is keyed by the title asked */
 async function commons(c: Ctx, files: string[], width: (typeof STEPS)[number]): Promise<Map<string, Info>> {
@@ -194,7 +204,7 @@ async function commons(c: Ctx, files: string[], width: (typeof STEPS)[number]): 
     const d = (await wm(c, "https://commons.wikimedia.org/w/api.php", {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: form({ action: "query", format: "json", formatversion: "2", titles: chunk.join("|"), prop: "imageinfo", iiprop: "url|size|mime|extmetadata", iiextmetadatafilter: "LicenseShortName|LicenseUrl|Artist|AttributionRequired", iiurlwidth: String(width) }),
+      body: form({ action: "query", format: "json", formatversion: "2", titles: chunk.join("|"), prop: "imageinfo", iiprop: "url|size|mime|extmetadata", iiextmetadatafilter: "LicenseShortName|LicenseUrl|Artist|Attribution|Credit|AttributionRequired", iiurlwidth: String(width) }),
     })) as { query?: { normalized?: { from: string; to: string }[]; pages?: { title: string; imageinfo?: Record<string, unknown>[] }[] } } | null;
     const back = new Map<string, string[]>();
     for (const n of d?.query?.normalized || []) back.set(n.to, [...(back.get(n.to) || []), n.from]);
@@ -210,7 +220,9 @@ async function commons(c: Ctx, files: string[], width: (typeof STEPS)[number]): 
         page: httpsUrl(ii.descriptionurl) || `https://commons.wikimedia.org/wiki/${encodeURIComponent(p.title.replace(/ /g, "_"))}`,
         license: plain(String(md.LicenseShortName?.value || ""), 60),
         licenseUrl: httpsUrl(plain(String(md.LicenseUrl?.value || ""), 300)),
-        author: plain(String(md.Artist?.value || "")),
+        // the credit the uploader asked for, else the author, else the credit line (never « Own work » alone)
+        author: plain(String(md.Attribution?.value || "")) || plain(String(md.Artist?.value || "")) || creditOf(String(md.Credit?.value || "")),
+        attrRequired: /^true$/i.test(plain(String(md.AttributionRequired?.value || ""), 10)),
         thumb: typeof ii.thumburl === "string" ? ii.thumburl : undefined,
         tw: Number(ii.thumbwidth) || undefined,
         th: Number(ii.thumbheight) || undefined,
@@ -221,9 +233,15 @@ async function commons(c: Ctx, files: string[], width: (typeof STEPS)[number]): 
   }
   return out;
 }
+const creditOf = (html: string) => {
+  const v = plain(html);
+  return /^(own work|travail personnel|self-photographed|selbst fotografiert)\.?$/i.test(v) ? "" : v;
+};
+/** CC BY and CC BY-SA ask for the author's name: such a file without one is refused */
+const BY_LICENSE = /^CC BY(-SA)? /;
 /** A thumbnail URL usable as a step: a real thumbnail on upload.wikimedia.org (never the throttled original) */
 const isThumb = (u?: string) => !!u && /^https:\/\/upload\.wikimedia\.org\/.+\/thumb\//.test(u);
-const acceptInfo = (i: Info) => okLicense(i.license) && MIMES.has(i.mime) && okRatio(i.origW, i.origH) && okTitle(i.title);
+const acceptInfo = (i: Info) => okLicense(i.license) && MIMES.has(i.mime) && okRatio(i.origW, i.origH) && okTitle(i.title) && (!!i.author || !(BY_LICENSE.test(i.license.trim()) || i.attrRequired));
 
 /**
  * The files' sizes: large = 1280 when wider than 1280, else 960 when wider than 960, else the small one; small = 500
@@ -287,7 +305,7 @@ async function entities(c: Ctx, qids: string[], langs: string[]): Promise<Map<st
   return out;
 }
 /** One property of one entity (a city weighs megabytes as a whole entity) */
-async function claim(c: Ctx, qid: string, prop: "P18" | "P948"): Promise<string | null> {
+async function claim(c: Ctx, qid: string, prop: "P18"): Promise<string | null> {
   const d = (await wm(c, `https://www.wikidata.org/w/api.php?${form({ action: "wbgetclaims", format: "json", entity: qid, property: prop })}`)) as { claims?: Record<string, Claim[]> } | null;
   return firstValue(d?.claims?.[prop]);
 }
@@ -323,6 +341,21 @@ export function tokens(name: string, city: string): string[] {
   const c = new Set(fold(city).split(" "));
   return fold(name).split(" ").filter((w) => w.length >= 3 && !STOP.has(w) && !c.has(w));
 }
+/**
+ * Does a photo's title name the place? Its whole name as a phrase, on word boundaries (« Shanghai Museum », never
+ * « Shanghai Natural History Museum »; « Bund », never « bundle »); the city's words may be missing only when at least
+ * two distinctive words are left (« Musée de l'Orangerie » in Paris), each a whole word of the title.
+ */
+export function namesPlace(title: string, name: string, city: string, nameCn?: string): boolean {
+  if (nameCn && title.includes(nameCn)) return true;
+  const t = ` ${fold(title)} `;
+  const phrase = fold(name);
+  if (phrase && t.includes(` ${phrase} `)) return true;
+  const need = tokens(name, city);
+  if (need.length < 2) return false;
+  const words = new Set(t.trim().split(" "));
+  return need.every((w) => words.has(w));
+}
 type OvHit = { id?: string; title?: string; width?: number; height?: number; thumbnail?: string; license?: string; license_version?: string; license_url?: string; creator?: string; foreign_landing_url?: string };
 export function ovLicense(l: string, v: string): string {
   const k = (l || "").toLowerCase();
@@ -331,12 +364,8 @@ export function ovLicense(l: string, v: string): string {
   return `CC ${k.toUpperCase()}${v ? ` ${v}` : ""}`;
 }
 function ovPick(hits: OvHit[], t: Target, city: string): Found | null {
-  const need = tokens(t.name, city);
   for (const h of hits) {
-    const title = fold(String(h.title || ""));
-    const byName = need.length > 0 && need.every((w) => title.includes(w));
-    const byCn = !!t.nameCn && String(h.title || "").includes(t.nameCn);
-    if (!byName && !byCn) continue;
+    if (!namesPlace(String(h.title || ""), t.name, city, t.nameCn)) continue;
     const w = Number(h.width) || 0;
     const hh = Number(h.height) || 0;
     if (w < 500 || !okRatio(w, hh)) continue;
@@ -347,6 +376,8 @@ function ovPick(hits: OvHit[], t: Target, city: string): Found | null {
     const lic = String(h.license || "").toLowerCase();
     // commercial use and modification allowed (the search asked for it; checked again here)
     if (!["cc0", "pdm", "by", "by-sa"].includes(lic)) continue;
+    // CC BY / BY-SA ask for the author's name
+    if ((lic === "by" || lic === "by-sa") && !plain(String(h.creator || ""))) continue;
     return {
       large: thumb, small: thumb, largeW: 500, smallW: 500, w, h: hh,
       author: plain(String(h.creator || "")), license: ovLicense(lic, String(h.license_version || "")), licenseUrl: httpsUrl(h.license_url),
@@ -362,7 +393,8 @@ function ovPick(hits: OvHit[], t: Target, city: string): Found | null {
  * budget: nothing is written, the next pass tries again). Lookups stop at `budgetEnd`.
  */
 export async function lookupPlaces(ts: Target[], ctx: { city: string; country: string; langs: string[] }, io: Io, budgetEnd: number): Promise<Map<string, Result>> {
-  const c: Ctx = { io, gate: makeGate(io) };
+  // a step started before the budget may finish within 30 s after it
+  const c: Ctx = { io, gate: makeGate(io), deadline: budgetEnd + 30_000 };
   const found = new Map<string, Found>();
   const failed = new Set<string>();
   const langs = [...new Set(ctx.langs.filter((l) => LANG.test(l)))];
@@ -380,24 +412,29 @@ export async function lookupPlaces(ts: Target[], ctx: { city: string; country: s
     for (const id of ids) failed.add(id);
   };
 
-  // 1. OpenStreetMap: the Wikidata id (and the Wikipedia article) of each place, within 2 km of it
+  // 1. OpenStreetMap: the Wikidata id (and the Wikipedia article) of each place, within 2 km of it; refused once
+  // (429 / 403 / 503), it is asked nothing more: the places left stay to retry
+  let nomOff = false;
   for (const t of ts) {
-    if (stopped || over(40_000)) {
+    if (stopped || nomOff || over(40_000)) {
       failed.add(t.id);
       continue;
     }
     const box = [t.lng - 0.03, t.lat + 0.03, t.lng + 0.03, t.lat - 0.03].map((x) => x.toFixed(5)).join(",");
     try {
       const near = (hits: NomHit[]) => hits.filter((h) => km(t, { lat: Number(h.lat), lng: Number(h.lon) }) <= 2);
-      let hits = near(await nominatim(io, { limit: "3", viewbox: box, bounded: "1", q: t.name }));
-      if (!hits.length && t.nameCn && t.nameCn !== t.name) hits = near(await nominatim(io, { limit: "3", viewbox: box, bounded: "1", q: t.nameCn }));
+      // one request per place; the Chinese name only when the name finds nothing at all
+      const raw = await nominatim(io, { limit: "3", viewbox: box, bounded: "1", q: t.name });
+      let hits = near(raw);
+      if (!raw.length && t.nameCn && t.nameCn !== t.name) hits = near(await nominatim(io, { limit: "3", viewbox: box, bounded: "1", q: t.nameCn }));
       const withQ = hits.find((h) => /^Q\d+$/.test(String(h.extratags?.wikidata || "")));
       const wpHit = withQ || hits.find((h) => h.extratags?.wikipedia);
       st.set(t.id, { qid: withQ?.extratags?.wikidata, wp: wpHit?.extratags?.wikipedia });
     } catch (e) {
       st.set(t.id, {});
       failed.add(t.id);
-      if (!(e instanceof Http)) io.log?.(`photos nominatim: ${String((e as Error)?.message || e).slice(0, 80)}`);
+      if (e instanceof Busy) nomOff = true;
+      else if (!(e instanceof Http)) io.log?.(`photos nominatim: ${String((e as Error)?.message || e).slice(0, 80)}`);
     }
   }
 
@@ -515,9 +552,12 @@ export async function lookupPlaces(ts: Target[], ctx: { city: string; country: s
   return out;
 }
 
-/** The trip's city: its Wikidata P18, else its P948 banner, under the same rules, and wide enough for the band */
-export async function lookupCity(city: { name: string; country: string; lat?: number; lng?: number }, io: Io): Promise<Result> {
-  const c: Ctx = { io, gate: makeGate(io) };
+/**
+ * The trip's city: its Wikidata P18, under the same rules, and wide enough for the band. (Its P948 Wikivoyage banner
+ * is not asked: about 7:1, always outside the 0.6–2.2 ratio rule.)
+ */
+export async function lookupCity(city: { name: string; country: string; lat?: number; lng?: number }, io: Io, deadline = io.now() + 60_000): Promise<Result> {
+  const c: Ctx = { io, gate: makeGate(io), deadline };
   try {
     const cc = /^[a-z]{2}$/.test(city.country) ? city.country : "";
     const hits = await nominatim(io, { q: city.name, limit: "3", featureType: "settlement", ...(cc ? { countrycodes: cc } : {}) });
@@ -525,14 +565,11 @@ export async function lookupCity(city: { name: string; country: string; lat?: nu
     const hit = hits.find((h) => /^Q\d+$/.test(String(h.extratags?.wikidata || "")) && (!known || km({ lat: city.lat!, lng: city.lng! }, { lat: Number(h.lat), lng: Number(h.lon) }) <= 80));
     if (!hit) return "none";
     const qid = hit.extratags!.wikidata!;
-    for (const prop of ["P18", "P948"] as const) {
-      const file = await claim(c, qid, prop);
-      if (!file) continue;
-      const got = await commonsFound(c, [file], "wikidata", 960);
-      const f = got.get(titleOf(file));
-      if (f) return { ...f, qid };
-    }
-    return "none";
+    const file = await claim(c, qid, "P18");
+    if (!file) return "none";
+    const got = await commonsFound(c, [file], "wikidata", 960);
+    const f = got.get(titleOf(file));
+    return f ? { ...f, qid } : "none";
   } catch (e) {
     if (!(e instanceof Busy) && !(e instanceof Http)) io.log?.(`photos city: ${String((e as Error)?.message || e).slice(0, 80)}`);
     return "retry";
@@ -547,11 +584,11 @@ const bucketDone = new Set<string>();
 export async function ensureBucket(io: Io): Promise<void> {
   const memo = `${io.supaUrl}|${createHash("sha1").update(io.key).digest("hex")}`;
   if (bucketDone.has(memo)) return;
-  const r = await io.fetch(storage(io, "bucket"), {
+  const r = await timed(io, storage(io, "bucket"), {
     method: "POST",
     headers: { ...auth(io), "content-type": "application/json" },
     body: JSON.stringify({ id: BUCKET, name: BUCKET, public: true, file_size_limit: MAX_BYTES, allowed_mime_types: Object.keys(MIME_EXT) }),
-  });
+  }, 10_000);
   if (!r.ok) {
     const text = await r.text().catch(() => "");
     if (!((r.status === 400 || r.status === 409) && /already exists|duplicate/i.test(text))) throw new Error(`bucket ${r.status}`);
@@ -560,7 +597,7 @@ export async function ensureBucket(io: Io): Promise<void> {
 }
 
 /** A file from an allow-listed host only, following at most 2 redirects that stay on the list */
-async function download(io: Io, url: string): Promise<{ bytes: ArrayBuffer; type: string }> {
+async function download(io: Io, url: string, accept = "image/jpeg,image/png,image/webp"): Promise<{ bytes: ArrayBuffer; type: string }> {
   let u = url;
   for (let hop = 0; hop <= 2; hop++) {
     let host = "";
@@ -571,7 +608,7 @@ async function download(io: Io, url: string): Promise<{ bytes: ArrayBuffer; type
       host = "";
     }
     if (!DOWNLOAD_HOSTS.has(host)) throw new Error("host");
-    const r = await timed(io, u, { redirect: "manual", headers: { "user-agent": UA, accept: "image/jpeg,image/png,image/webp" } }, 20_000);
+    const r = await timed(io, u, { redirect: "manual", headers: { "user-agent": UA, accept } }, 20_000);
     if (r.status >= 300 && r.status < 400) {
       const loc = r.headers.get("location");
       if (!loc) throw new Error("redirect");
@@ -599,26 +636,32 @@ export function baseOf(f: Pick<Found, "key">): string {
   if (f.key.startsWith("openverse:")) return `o/${f.key.slice(10)}`;
   return `c/${createHash("sha1").update(f.key).digest("hex").slice(0, 20)}`;
 }
-async function copyOne(io: Io, url: string, base: string, w: number): Promise<string> {
-  const guess = `${base}-${w}.${guessExt(url)}`;
-  // already copied (another trip, an earlier pass): checked with the service key, never on the public URL
-  const head = await io.fetch(storage(io, `object/${BUCKET}/${guess}`), { method: "HEAD", headers: auth(io) });
-  if (head.status === 200) return guess;
-  const { bytes, type } = await download(io, url);
+async function copyOne(io: Io, url: string, base: string, w: number, openverse: boolean): Promise<string> {
+  // already copied (another trip, an earlier pass): checked with the service key, never on the public URL. An
+  // Openverse thumbnail's URL carries no extension (asked as JPEG, but its type decides the name): each is tried
+  const first = openverse ? "jpg" : guessExt(url);
+  const exts = openverse ? [first, ...Object.values(MIME_EXT).filter((x) => x !== first)] : [first];
+  for (const ext of exts) {
+    const guess = `${base}-${w}.${ext}`;
+    const head = await timed(io, storage(io, `object/${BUCKET}/${guess}`), { method: "HEAD", headers: auth(io) }, 10_000);
+    if (head.status === 200) return guess;
+  }
+  const { bytes, type } = await download(io, url, openverse ? "image/jpeg" : undefined);
   const path = `${base}-${w}.${MIME_EXT[type]}`;
-  const up = await io.fetch(storage(io, `object/${BUCKET}/${path}`), {
+  const up = await timed(io, storage(io, `object/${BUCKET}/${path}`), {
     method: "POST",
     headers: { ...auth(io), "content-type": type, "cache-control": "max-age=31536000", "x-upsert": "true" },
     body: bytes,
-  });
+  }, 10_000);
   if (!up.ok) throw new Error(`upload ${up.status}`);
   return path;
 }
 /** Copies a found photo (large and small) into the bucket; returns what the records keep */
 export async function copyToBucket(f: Found, io: Io): Promise<PhotoRef> {
   const base = baseOf(f);
-  const thumb = await copyOne(io, f.small, base, f.smallW);
-  const path = f.large === f.small ? thumb : await copyOne(io, f.large, base, f.largeW);
+  const ov = f.source === "openverse";
+  const thumb = await copyOne(io, f.small, base, f.smallW, ov);
+  const path = f.large === f.small ? thumb : await copyOne(io, f.large, base, f.largeW, ov);
   const ref: PhotoRef = {
     v: 1, path, thumb, w: f.w, h: f.h, author: f.author, license: f.license, source: f.source, sourceUrl: f.sourceUrl, key: f.key, at: io.now(),
   };
