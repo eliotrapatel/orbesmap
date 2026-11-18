@@ -41,3 +41,30 @@ self.addEventListener("fetch", (e) => {
     })(),
   );
 });
+
+// Alerts (lot 6g): the morning summary and the reminder before each place, sent by api/cron
+self.addEventListener("push", (e) => {
+  let d = {};
+  try {
+    d = e.data ? e.data.json() : {};
+  } catch {
+    d = { title: "ORBES Trips", body: e.data ? e.data.text() : "" };
+  }
+  e.waitUntil(self.registration.showNotification(d.title || "ORBES Trips", { body: d.body || "", tag: d.tag, data: { url: d.url || "/" }, icon: "/icons/icon-192.png", badge: "/icons/icon-192.png" }));
+});
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  const url = (e.notification.data && e.notification.data.url) || "/";
+  e.waitUntil(
+    (async () => {
+      for (const c of await self.clients.matchAll({ type: "window", includeUncontrolled: true })) {
+        if (new URL(c.url).origin === self.location.origin) {
+          await c.focus();
+          c.navigate(url).catch(() => {});
+          return;
+        }
+      }
+      await self.clients.openWindow(url);
+    })(),
+  );
+});

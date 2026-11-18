@@ -1305,3 +1305,19 @@ button.v3-brand { color: var(--ink); background: none; border: 0; padding: 0; cu
 .ag-cmt-form .input { flex: 1; min-width: 0; height: 36px; font-size: 13.5px; }
 .ag-cmt-open { justify-self: start; font-size: 12.5px; }
 @media (max-width: 899px) { .ag-cmts { margin-left: 0; } .ag-cmt-form .input { font-size: 16px; } }
+
+/* =================== alerts, forwarded bookings (lot 6g) =================== */
+.alerts-block { display: flex; flex-direction: column; gap: 6px; margin: 6px 0 4px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--hair); }
+.alerts-row { display: flex; align-items: center; gap: 12px; padding: 6px 0; cursor: pointer; }
+.alerts-row b { display: block; font-weight: 500; font-size: 14px; }
+.alerts-row small { display: block; color: var(--soft); font-size: 12px; line-height: 1.35; }
+.alerts-row input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--ink); flex: none; }
+.alerts-row .v3-chip { height: 34px; font-size: 13px; padding: 0 12px; flex: none; }
+.alerts-inbound { margin-top: 6px; padding-top: 10px; border-top: 1px solid var(--hair); }
+.alerts-inbound b { display: block; font-weight: 500; font-size: 14px; }
+.alerts-inbound small { display: block; color: var(--soft); font-size: 12px; line-height: 1.35; margin-top: 2px; }
+.inbox { margin-top: 14px; }
+.inbox-item { padding: 10px 0; border-top: 1px solid var(--hair); }
+.inbox-item b { display: block; font-weight: 500; }
+.inbox-item small { color: var(--mute); font-size: 12px; }
+.inbox-item p { color: var(--soft); font-size: 13px; margin-top: 4px; }

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { requestPro, useStore } from "../../lib/store";
 import { deleteMyAccount, exportMyData, proDate } from "../../lib/pro";
 import { openAdmin } from "./nav";
+import { AlertsBlock } from "./AlertsAndInbox";
 import { legalHref } from "./Legal";
 import { t, setLang, useLang } from "../../lib/i18n";
 
@@ -32,6 +33,7 @@ export default function AccountActions({ variant = "v3" }: { variant?: "v3" | "a
   const plan = useStore((s) => s.plan);
   const line = useProLine();
   const lang = useLang();
+  const signedIn = useStore((st) => !!st.session);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const btn = variant === "app" ? "btn block" : "v3-btn ghost";
@@ -47,6 +49,7 @@ export default function AccountActions({ variant = "v3" }: { variant?: "v3" | "a
           <span aria-hidden="true">›</span>
         </button>
       )}
+      {signedIn && <AlertsBlock />}
       {plan?.admin && <button type="button" className={btn} onClick={() => openAdmin(true)}>{t("Administration")}</button>}
       <button type="button" className={btn} onClick={() => exportMyData()}>{t("Exporter mes données")}</button>
       <button

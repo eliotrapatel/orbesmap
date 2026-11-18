@@ -3,6 +3,7 @@ import { sendLoginEmail, signInWithPassword, signOut, useStore, verifyLoginCode,
 import { supabaseConfigured } from "../lib/supabase";
 import AiCredit from "./AiCredit";
 import AccountActions from "./v3/AccountActions";
+import { InboundInbox } from "./v3/AlertsAndInbox";
 import { t } from "../lib/i18n";
 
 const SYNC_TEXT: Record<SyncState, string> = {
@@ -68,6 +69,7 @@ export default function Account() {
             <p style={{ marginTop: 14 }}>{t("Vos données sont sauvegardées en ligne et partagées en direct avec les autres membres. Elles restent aussi sur cet appareil pour fonctionner sans réseau.")}</p>
           )}
           {member !== false && <AiCredit />}
+          <InboundInbox />
           <AccountActions variant="app" />
           <button
             className="btn danger block"

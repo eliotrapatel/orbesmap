@@ -9,8 +9,8 @@ import { waitUntil } from "@vercel/functions";
 const SUPA_URL = process.env.SUPABASE_URL || "https://ifugaqjneprbtigvegeb.supabase.co";
 const SUPA_KEY = process.env.SUPABASE_ANON_KEY || "sb_publishable_0qPu_8XZTLk-l68k2kPUvQ_7UXk-fCu";
 const MODEL = "claude-opus-5-5";
-const DS_URL = "https://api.deepseek.com";
-const DS_MODEL = "deepseek-flash"; // DeepSeek V4.1 Flash: text + images, JSON output, tool calls
+export const DS_URL = "https://api.deepseek.com";
+export const DS_MODEL = "deepseek-flash"; // DeepSeek V4.1 Flash: text + images, JSON output, tool calls
 const ORIGINS = [/^https:\/\/(www\.)?theorbes\.com$/, /^https:\/\/orbesmap(-[a-z0-9-]+)?\.vercel\.app$/, /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/];
 
 type Json = Record<string, unknown>;
@@ -330,13 +330,13 @@ function enrichSystem(p: Persona): string {
 
 // ---------- trip creation (lot 3): extract, intake, outline, day, adjust, essentials ----------
 const fixedItem = obj({ kind: { type: "string", enum: ["reservation", "rendez-vous", "billet", "autre"] }, name: str, date: str, time: str, endTime: str, address: str, notes: str });
-const EXTRACT_SCHEMA = obj({
+export const EXTRACT_SCHEMA = obj({
   flights: arr(obj({ code: str, airline: str, from: str, to: str, fromCity: str, toCity: str, departAt: str, arriveAt: str, terminal: str })),
   hotel: obj({ name: str, address: str, addressCn: str, checkIn: str, checkOut: str }),
   fixed: arr(fixedItem),
   notes: str,
 });
-const EXTRACT_SYSTEM = `Tu lis une confirmation de voyage (texte collé ou capture d'écran) : billet d'avion, réservation d'hôtel, réservation de restaurant, billet de musée…
+export const EXTRACT_SYSTEM = `Tu lis une confirmation de voyage (texte collé ou capture d'écran) : billet d'avion, réservation d'hôtel, réservation de restaurant, billet de musée…
 Extrais seulement ce qui est écrit, sans rien inventer.
 - flights : chaque vol. code = numéro de vol (ex. AF116). from / to = codes aéroport IATA ; fromCity / toCity = villes. departAt / arriveAt = date et heure LOCALES au format ISO avec le décalage horaire du lieu (ex. 2026-11-23T23:20:00+01:00, 2026-11-24T19:00:00+08:00) ; "" si inconnu. terminal si indiqué.
 - hotel : nom, adresse (latine), adresse dans l'écriture locale si elle figure, checkIn / checkOut au format AAAA-MM-JJ ; tout à "" s'il n'y a pas d'hôtel.
@@ -531,7 +531,7 @@ async function dsPost(path: string, body: unknown, key: string, f: typeof fetch,
 }
 
 /** Example JSON built from the schema, shown to the model (DeepSeek JSON mode wants a format example). */
-function skeleton(s: Json): unknown {
+export function skeleton(s: Json): unknown {
   if (s.enum) return (s.enum as unknown[])[0];
   if (s.type === "object") return Object.fromEntries(Object.entries(s.properties as Record<string, Json>).map(([k, v]) => [k, skeleton(v)]));
   if (s.type === "array") return [skeleton(s.items as Json)];
@@ -540,7 +540,7 @@ function skeleton(s: Json): unknown {
   return "";
 }
 /** Force the model's JSON into the exact shape the app expects (missing fields → empty values). */
-function coerce(s: Json, v: unknown): unknown {
+export function coerce(s: Json, v: unknown): unknown {
   if (s.enum) return (s.enum as unknown[]).includes(v) ? v : (s.enum as unknown[])[(s.enum as unknown[]).length - 1];
   if (s.type === "object") {
     const o = v && typeof v === "object" && !Array.isArray(v) ? (v as Json) : {};
