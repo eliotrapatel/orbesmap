@@ -3,7 +3,7 @@
 // from Resend with our key (so a forged call cannot inject anything), the AI extracts flights, hotel and bookings,
 // and the result waits in the app ("Réservations reçues") until the person adds it to the trip.
 // Needs on Vercel: SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY, DEEPSEEK_API_KEY.
-import { coerce, DS_MODEL, DS_URL, EXTRACT_SCHEMA, EXTRACT_SYSTEM, skeleton } from "./ai";
+import { coerce, DS_MODEL, DS_URL, EXTRACT_SCHEMA, EXTRACT_SYSTEM, skeleton } from "./ai.js";
 
 type Json = Record<string, unknown>;
 const SUPA_URL = process.env.SUPABASE_URL || "https://ifugaqjneprbtigvegeb.supabase.co";
