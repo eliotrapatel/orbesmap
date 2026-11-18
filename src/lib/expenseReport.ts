@@ -16,6 +16,8 @@ export type ReportLine = {
   rate: number | null;
   /** where the rate comes from: the day the expense was entered, today's rate, or none (amount not counted in euros) */
   rateFrom: "eur" | "entry" | "today" | "none";
+  /** decimals the rate is printed with: 4 when it is the rate itself, 2 when it is worked back from a rounded euro value */
+  rateDigits: number;
   supplier: string;
   receipts: Photo[];
   /** receipt reference printed in the table and under the image (J1, J2…) */
@@ -29,7 +31,7 @@ export function payersOf(d: Data): string[] {
 
 /**
  * The report's lines, oldest first. `person`: only what this traveller paid (else everyone's).
- * Euros: the value saved when the expense was entered (rate of that day), else today's rate from `rates`.
+ * Euros: the value saved with the expense (with the rate recorded then), else today's rate from `rates`.
  */
 export function reportLines(trip: Trip, d: Data, rates: Record<string, number | null>, person?: string): ReportLine[] {
   const list = expensesOf(d.places as Record<string, Record<string, unknown>>)
@@ -40,14 +42,20 @@ export function reportLines(trip: Trip, d: Data, rates: Record<string, number | 
     let eur: number | null = null;
     let rate: number | null = null;
     let rateFrom: ReportLine["rateFrom"] = "none";
+    let rateDigits = 4;
     if (e.currency === "EUR") {
       eur = e.amount;
       rate = 1;
       rateFrom = "eur";
     } else if (e.eur != null && e.eur > 0) {
       eur = e.eur;
-      rate = e.amount / e.eur;
       rateFrom = "entry";
+      if (e.rate) rate = e.rate;
+      else {
+        // older expense: no rate saved, worked back from the euro value rounded to the cent
+        rate = e.amount / e.eur;
+        rateDigits = 2;
+      }
     } else if (rates[e.currency]) {
       rate = rates[e.currency]!;
       eur = e.amount / rate;
@@ -56,7 +64,7 @@ export function reportLines(trip: Trip, d: Data, rates: Record<string, number | 
     const receipts = receiptsOf(d.photos || [], e.id);
     const refs = receipts.map(() => `J${++n}`);
     const supplier = e.placeId ? trip.places.find((p) => p.id === e.placeId)?.name || "" : "";
-    return { e, eur, rate, rateFrom, supplier, receipts, refs };
+    return { e, eur, rate, rateFrom, rateDigits, supplier, receipts, refs };
   });
 }
 
@@ -68,7 +76,7 @@ const dayShort = (iso: string, loc: string) => {
   const d = new Date(`${iso}T12:00:00Z`);
   return !iso || Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString(loc, { day: "2-digit", month: "2-digit", timeZone: "UTC" });
 };
-const rateText = (r: number | null, loc: string) => (r == null ? "" : r.toLocaleString(loc, { maximumFractionDigits: 4 }));
+const rateText = (r: number | null, loc: string, digits = 4) => (r == null ? "" : r.toLocaleString(loc, { maximumFractionDigits: digits }));
 const description = (l: ReportLine) => l.e.label || t(categoryOf(l.e.category).label);
 
 /** Opens the printable expense report; false when the browser blocked the new window */
@@ -132,7 +140,7 @@ export function exportExpenseReport(trip: Trip, d: Data, rates: Record<string, n
     for (const l of ls) {
       const c = categoryOf(l.e.category);
       h += `<tr><td class="m">${esc(dayShort(day, loc))}</td><td>${esc(t(c.label))}</td><td>${esc(description(l))}${l.supplier ? `<div class="s">${esc(l.supplier)}</div>` : ""}</td>`;
-      h += `<td class="r">${esc(money(l.e.amount, l.e.currency, loc))}</td><td class="r m">${l.e.currency === "EUR" ? "" : esc(rateText(l.rate, loc))}${l.rateFrom === "today" ? "*" : ""}</td>`;
+      h += `<td class="r">${esc(money(l.e.amount, l.e.currency, loc))}</td><td class="r m">${l.e.currency === "EUR" ? "" : esc(rateText(l.rate, loc, l.rateDigits))}${l.rateFrom === "today" ? "*" : ""}</td>`;
       h += `<td class="r">${l.eur == null ? "—" : esc(money(l.eur, "EUR", loc))}</td><td>${esc(l.e.paidBy || "")}</td><td class="m">${esc(l.refs.join(", ") || "—")}</td></tr>`;
     }
     if (ls.length > 1) h += `<tr class="sum"><td></td><td colspan="4">${esc(t("Total du jour"))}</td><td class="r">${esc(money(eurOf(ls), "EUR", loc))}</td><td colspan="2"></td></tr>`;
@@ -150,7 +158,7 @@ export function exportExpenseReport(trip: Trip, d: Data, rates: Record<string, n
 
     // the rates used
     const notes: string[] = [];
-    if (lines.some((l) => l.rateFrom === "entry")) notes.push(t("Montants en euros au taux de change du jour où chaque dépense a été saisie (Banque centrale européenne), indiqué sur chaque ligne."));
+    if (lines.some((l) => l.rateFrom === "entry")) notes.push(t("Montants en euros au taux enregistré avec chaque dépense, indiqué sur chaque ligne."));
     const todayCur = [...new Set(lines.filter((l) => l.rateFrom === "today").map((l) => l.e.currency))];
     if (todayCur.length) notes.push(t("* Taux du jour de l'édition : {list}.", { list: todayCur.map((c) => `1 € = ${rateText(rates[c] ?? null, loc)} ${symbolOf(c)}`).join(", ") }));
     const missing = lines.filter((l) => l.eur == null);
@@ -204,14 +212,16 @@ export function exportExpenseCsv(trip: Trip, d: Data, rates: Record<string, numb
   const fr = getLang() === "fr";
   const sep = fr ? ";" : ",";
   const num = (n: number | null, digits = 2) => (n == null ? "" : (Math.round(n * 10 ** digits) / 10 ** digits).toFixed(digits).replace(".", fr ? "," : "."));
+  // text typed by the trip's editors: a cell starting with = + - @ would run as a formula in a spreadsheet
+  const cell = (c: string) => (/^[=+\-@\t\r]/.test(c) ? "'" + c : c);
   const lines = reportLines(trip, d, rates, person);
   const rows: string[][] = [
     ["Date", "Catégorie", "Description", "Fournisseur", "Montant", "Devise", "Taux (1 € =)", "Montant en euros", "Payé par", "Pour qui", "Justificatifs"].map((x) => t(x)),
   ];
   for (const l of lines) {
     rows.push([
-      l.e.date, t(categoryOf(l.e.category).label), description(l), l.supplier, num(l.e.amount), l.e.currency,
-      l.e.currency === "EUR" ? num(1, 0) : num(l.rate, 4), num(l.eur), l.e.paidBy, l.e.split.length ? l.e.split.join(", ") : t("Tout le monde"), l.refs.join(" "),
+      l.e.date, t(categoryOf(l.e.category).label), cell(description(l)), cell(l.supplier), num(l.e.amount), l.e.currency,
+      l.e.currency === "EUR" ? num(1, 0) : num(l.rate, l.rateDigits), num(l.eur), cell(l.e.paidBy), l.e.split.length ? cell(l.e.split.join(", ")) : t("Tout le monde"), l.refs.join(" "),
     ]);
   }
   const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(sep)).join("\r\n");

@@ -98,6 +98,8 @@ export type Expense = {
   category: string;
   /** its value in euros when it was entered (null: the rate was unknown) */
   eur?: number | null;
+  /** the rate used for `eur` (units of `currency` for 1 €), kept as is; absent on older expenses */
+  rate?: number | null;
   createdBy?: string;
 };
 
@@ -127,6 +129,7 @@ export function expensesOf(records: Record<string, Record<string, unknown>>): Ex
       paidBy: String(r.paidBy || ""), split: Array.isArray(r.split) ? (r.split as unknown[]).map(String) : [],
       placeId: typeof r.placeId === "string" && r.placeId ? r.placeId : undefined, createdBy: typeof r.createdBy === "string" ? r.createdBy : undefined,
       category: typeof r.category === "string" && r.category ? r.category : "other", eur: typeof r.eur === "number" ? r.eur : null,
+      ...(typeof r.rate === "number" && r.rate > 0 ? { rate: r.rate } : {}),
     });
   }
   return out.sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));

@@ -153,7 +153,7 @@ function People({ trip, people, canEdit }: { trip: Trip; people: string[]; canEd
   );
 }
 
-/** A receipt waiting to be saved with a new expense */
+/** A receipt waiting to be saved with the expense (added or changed) */
 type Pending = { blob: Blob; url: string };
 
 /** Adds an expense, or changes one (`edit`); a receipt can be photographed or picked in both cases */
@@ -169,6 +169,8 @@ function AddForm({ trip, people, local, business, suppliers, edit, onClose }: { 
   const [date, setDate] = useState(edit?.date || today);
   const [category, setCategory] = useState(edit?.category || "food");
   const [pending, setPending] = useState<Pending[]>([]);
+  /** edit: saved receipts to remove when the change is saved */
+  const [removed, setRemoved] = useState<string[]>([]);
   const [view, setView] = useState<string | null>(null);
   const saved = useReceipts(edit?.id || "");
   useStore((s) => s.photoUrls);
@@ -187,6 +189,7 @@ function AddForm({ trip, people, local, business, suppliers, edit, onClose }: { 
   const close = () => {
     pending.forEach((p) => URL.revokeObjectURL(p.url));
     setPending([]);
+    setRemoved([]);
     if (edit) onClose?.();
     else setOpen(false);
   };
@@ -194,16 +197,14 @@ function AddForm({ trip, people, local, business, suppliers, edit, onClose }: { 
     if (!f) return;
     try {
       const blob = await compressImage(f);
-      if (edit) {
-        if (await addPhoto(expenseKey(edit.id), blob, "receipt")) toast(t("Justificatif ajouté"));
-      } else setPending((cur) => [...cur, { blob, url: URL.createObjectURL(blob) }]);
+      setPending((cur) => [...cur, { blob, url: URL.createObjectURL(blob) }]);
     } catch {
       toast(t("Cette image ne peut pas être lue"));
     }
   };
   if (!edit && !open) return <button className="btn primary block" style={{ marginTop: 14 }} onClick={() => { setPaidBy(people[0] || ""); setOpen(true); }}>{t("+ Ajouter une dépense")}</button>;
   const thumbs: { key: string; src?: string; remove: () => void }[] = [
-    ...saved.map((p) => ({ key: p.id, src: photoSrc(p), remove: () => { if (confirm(t("Retirer ce justificatif ?"))) deletePhoto(p.id); } })),
+    ...saved.filter((p) => !removed.includes(p.id)).map((p) => ({ key: p.id, src: photoSrc(p), remove: () => setRemoved((cur) => [...cur, p.id]) })),
     ...pending.map((p) => ({ key: p.url, src: p.url, remove: () => { URL.revokeObjectURL(p.url); setPending((cur) => cur.filter((x) => x.url !== p.url)); } })),
   ];
   return (
@@ -213,16 +214,24 @@ function AddForm({ trip, people, local, business, suppliers, edit, onClose }: { 
         e.preventDefault();
         if (!ok) return;
         const amt = Math.round(n * 100) / 100;
+        // units of the currency for 1 €, kept with the expense so the report prints it exactly
+        const r = currency === "EUR" ? 1 : currency === local ? rate : null;
         const fields = { amount: amt, currency, label: label.trim(), date: date || today, paidBy: paidBy || people[0] || "", split: split.length === people.length ? [] : split, placeId: placeId || undefined, category };
         if (edit) {
           // the euro value keeps the rate of the day it was entered, unless the amount or the currency changed
           const same = amt === edit.amount && currency === edit.currency;
-          updateExpense(edit.id, { ...fields, eur: same && edit.eur != null ? edit.eur : currency === "EUR" ? amt : rate ? amt / rate : null });
+          const keep = same && edit.eur != null;
+          const rateField = keep ? (edit.rate ? { rate: edit.rate } : {}) : { rate: r || null };
+          updateExpense(edit.id, { ...fields, ...rateField, eur: keep ? edit.eur : r ? amt / r : null });
+          for (const id of removed) deletePhoto(id);
+          for (const p of pending) void addPhoto(expenseKey(edit.id), p.blob, "receipt").finally(() => URL.revokeObjectURL(p.url));
+          setPending([]);
+          setRemoved([]);
           toast(t("Dépense modifiée"));
           onClose?.();
           return;
         }
-        const id = addExpense({ ...fields, eur: currency === "EUR" ? amt : rate ? amt / rate : null }, trip.id);
+        const id = addExpense({ ...fields, rate: r || null, eur: r ? amt / r : null }, trip.id);
         for (const p of pending) void addPhoto(expenseKey(id), p.blob, "receipt").finally(() => URL.revokeObjectURL(p.url));
         toast(t("Dépense ajoutée"));
         setAmount("");
@@ -348,6 +357,8 @@ export function ExpenseReportSheet({ trip, onClose }: { trip: Trip; onClose: () 
   const lines = useMemo(() => reportLines(trip, data, rates, who), [trip, data, rates, who]);
   const loc = locale();
   const total = lines.reduce((s, l) => s + (l.eur ?? 0), 0);
+  // the Expenses screen counts at today's rate; the report keeps the rate recorded with each expense
+  const recorded = lines.some((l) => l.rateFrom === "entry");
   const receipts = lines.reduce((s, l) => s + l.receipts.length, 0);
   return (
     <Modal title={t("Note de frais")} intro={t("Les dépenses jour par jour, en euros, avec les justificatifs. À imprimer ou enregistrer en PDF, et en tableur pour la comptabilité.")} onClose={onClose} className="exp-sheet">
@@ -364,6 +375,7 @@ export function ExpenseReportSheet({ trip, onClose }: { trip: Trip; onClose: () 
       <p className="exp-sheet-sum">
         {lines.length ? t("{n} dépense(s) · {r} justificatif(s) · {total}", { n: lines.length, r: receipts, total: money(total, "EUR", loc) }) : t("Aucune dépense pour ce choix.")}
       </p>
+      {recorded && <p className="exp-sheet-hint">{t("Montants en euros au taux enregistré avec chaque dépense, et non au taux du jour.")}</p>}
       <div className="btn-row">
         <button type="button" className="btn primary" disabled={!lines.length} onClick={() => { track("export", "expense_report", trip.id); if (!exportExpenseReport(trip, getState().data, rates, who)) toast(t("Autorisez les fenêtres pop-up pour imprimer le PDF")); }}>
           <IDownload /> {t("Imprimer ou PDF")}
