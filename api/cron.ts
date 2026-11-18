@@ -183,6 +183,8 @@ async function run(req: Request): Promise<Response> {
       const phones = (await db(`/rest/v1/push_subscriptions?user_id=eq.${user_id}&select=endpoint,p256dh,auth`, key)) as { endpoint: string; p256dh: string; auth: string }[];
       const title = String(d.title || "ORBES Trips");
       const url = `${APP_URL}/#${trip.id}`;
+      // the day's e-mail says where its link comes from (the notifications keep the plain link: no reload of an open app)
+      const mailUrl = `${APP_URL}/?src=email_day#${trip.id}`;
       const closedNames = places.filter((p) => p.closed).map((p) => p.name);
 
       const push = async (payload: Json) => {
@@ -222,13 +224,13 @@ async function run(req: Request): Promise<Response> {
 <p style="color:#6f6b65;margin:0 0 14px">${esc(title)} · ${esc(day.short || ln.date)}</p>
 ${closedNames.length ? `<p style="background:#fbf3e4;border-radius:10px;padding:10px 12px;color:#7a5410">${esc(T.closed(closedNames.join(", ")))}</p>` : ""}
 ${list}
-<p style="margin:24px 0"><a href="${url}" style="display:inline-block;background:#0a0a0a;color:#f6f2ea;text-decoration:none;padding:12px 20px;border-radius:12px">${esc(T.open)}</a></p>
+<p style="margin:24px 0"><a href="${mailUrl}" style="display:inline-block;background:#0a0a0a;color:#f6f2ea;text-decoration:none;padding:12px 20px;border-radius:12px">${esc(T.open)}</a></p>
 <p style="font-size:12px;color:#6f6b65">${esc(T.stop)}</p>
 ${FOOTER}</div>`;
           const r = await fetch("https://api.resend.com/emails", {
             method: "POST",
             headers: { authorization: `Bearer ${resend}`, "content-type": "application/json" },
-            body: JSON.stringify({ from, to: [to], subject: T.subject(title, String(day.short || ln.date)), html, text: [T.intro, ...lines, closedNames.length ? T.closed(closedNames.join(", ")) : "", url].filter(Boolean).join("\n") }),
+            body: JSON.stringify({ from, to: [to], subject: T.subject(title, String(day.short || ln.date)), html, text: [T.intro, ...lines, closedNames.length ? T.closed(closedNames.join(", ")) : "", mailUrl].filter(Boolean).join("\n") }),
           }).catch(() => null);
           if (r?.ok) sent.emails++;
         }
@@ -381,7 +383,8 @@ async function welcomeBack(all: { id: string; data: Json }[], key: string, resen
       const name = String(prof.name || "");
       const figures = [T.days(days), ...(visited > 0 ? [T.visited(visited)] : []), ...(photos > 0 ? [T.photos(photos)] : [])];
       const intro = figures.length > 1 ? T.backIntro(city) : T.backIntroShort(city);
-      const tripUrl = `${APP_URL}/#${trip.id}`;
+      const tripUrl = `${APP_URL}/?src=email_back#${trip.id}`;
+      const nextUrl = `${APP_URL}/?src=email_back`;
       const html = `<div style="font-family:Helvetica,Arial,sans-serif;max-width:520px;margin:0 auto;padding:28px 22px;color:#0a0a0a">
 <p style="font-size:13px;letter-spacing:.2em;text-transform:uppercase;margin:0 0 22px">ORBES Trips</p>
 <p style="font-size:16px;margin:0 0 6px">${esc(T.backHello(name))}</p>
@@ -390,10 +393,10 @@ ${figures.length > 1 ? `<p style="font-size:20px;font-weight:600;margin:10px 0 1
 <p style="font-size:15px;margin:10px 0 0">${esc(T.recap)}</p>
 <p style="margin:22px 0"><a href="${tripUrl}" style="display:inline-block;background:#0a0a0a;color:#f6f2ea;text-decoration:none;padding:12px 20px;border-radius:12px">${esc(T.openRecap)}</a></p>
 <p style="font-size:15px;margin:26px 0 4px">${esc(T.nextQ)}</p>
-<p style="margin:0 0 24px"><a href="${APP_URL}/" style="color:#0a0a0a">${esc(T.nextLink)}</a></p>
+<p style="margin:0 0 24px"><a href="${nextUrl}" style="color:#0a0a0a">${esc(T.nextLink)}</a></p>
 <p style="font-size:12px;color:#6f6b65">${esc(T.stop)}</p>
 ${FOOTER}</div>`;
-      const text = [T.backHello(name), intro, figures.length > 1 ? figures.join(" · ") : "", T.recap, tripUrl, "", T.nextQ, T.nextLink, `${APP_URL}/`, "", T.stop, "ORBES Trips"].join("\n");
+      const text = [T.backHello(name), intro, figures.length > 1 ? figures.join(" · ") : "", T.recap, tripUrl, "", T.nextQ, T.nextLink, nextUrl, "", T.stop, "ORBES Trips"].join("\n");
       const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { authorization: `Bearer ${resend}`, "content-type": "application/json" },

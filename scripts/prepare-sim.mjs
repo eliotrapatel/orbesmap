@@ -578,5 +578,113 @@ console.log("14. The database adapter: sealed scratch, conditional writes, idemp
   check(!!ins && ins.url.includes("on_conflict=trip_id,place_id") && /resolution=ignore-duplicates/.test(ins.prefer), "a place is added with « on conflict do nothing »");
 }
 
+// ---------- 15. the account's path: preparation started, ready, failed (supabase/saas-5.sql events) ----------
+console.log("15. The account's path: prep_started, prep_ready, prep_failed");
+{
+  const withEvents = (w) => {
+    const events = [];
+    w.db.event = async (userId, name, detail, tripId) => {
+      await tick();
+      events.push({ userId, name, detail, tripId });
+    };
+    return events;
+  };
+  {
+    const w = world();
+    const ev = withEvents(w);
+    seedTrip(w);
+    await P.handle(user({ action: "start", trip: "trip-1", ctx }), w.deps);
+    await drain(w);
+    const started = ev.filter((e) => e.name === "prep_started");
+    const ready = ev.filter((e) => e.name === "prep_ready");
+    check(started.length === 1 && started[0].detail === "new" && started[0].userId === "user-1" && started[0].tripId === "trip-1", "prep_started once at the start (new), for who started it");
+    check(ready.length === 1 && /^\d+$/.test(ready[0].detail || "") && Number(ready[0].detail) > 0, `prep_ready once, with the seconds since the start (${ready[0]?.detail})`);
+    check(!ev.some((e) => e.name === "prep_failed"), "no prep_failed on a run that went well");
+    await P.runUnit("trip-1", w.deps);
+    check(ev.filter((e) => e.name === "prep_ready").length === 1, "a late call never sends prep_ready again");
+    // one day prepared again: day_redone (the app's), not a preparation of its own
+    const dates = Object.keys(draft(w).days);
+    await P.handle(user({ action: "day", trip: "trip-1", date: dates[1], ctx }), w.deps);
+    await drain(w);
+    check(ev.filter((e) => e.name === "prep_started").length === 1 && ev.filter((e) => e.name === "prep_ready").length === 1 && !ev.some((e) => e.name === "prep_failed"), "a day prepared again sends none of them");
+  }
+  {
+    // the daily cap reached after three bookings: the run stops → prep_failed « cap »
+    const w = world({ capAfter: 3 });
+    const ev = withEvents(w);
+    seedTrip(w);
+    await P.handle(user({ action: "start", trip: "trip-1", ctx }), w.deps);
+    await drain(w);
+    const f = ev.filter((e) => e.name === "prep_failed");
+    check(f.length === 1 && f[0].detail === "cap" && !ev.some((e) => e.name === "prep_ready"), `cap reached: prep_failed « cap » once (${f.map((x) => x.detail).join(",")})`);
+  }
+  {
+    // the outline refused by the AI: the run stops → prep_failed « ai »
+    const w = world({ fail: { outline: { kind: "refusal", times: 1 } } });
+    const ev = withEvents(w);
+    seedTrip(w);
+    await P.handle(user({ action: "start", trip: "trip-1", ctx }), w.deps);
+    await drain(w);
+    const f = ev.filter((e) => e.name === "prep_failed");
+    check(f.length === 1 && f[0].detail === "ai", `the outline failed: prep_failed « ai » (${f.map((x) => x.detail).join(",")})`);
+  }
+  {
+    // one day could not be prepared: the run ends with days missing → prep_failed « days »
+    const w = world({ fail: { day: { kind: "refusal", times: 1 } } });
+    const ev = withEvents(w);
+    seedTrip(w);
+    await P.handle(user({ action: "start", trip: "trip-1", ctx }), w.deps);
+    await drain(w);
+    const f = ev.filter((e) => e.name === "prep_failed");
+    check(f.length === 1 && f[0].detail === "days" && !ev.some((e) => e.name === "prep_ready"), `days missing at the end: prep_failed « days » (${f.map((x) => x.detail).join(",")})`);
+    // started again by the same person: « resume »
+    await P.handle(user({ action: "start", trip: "trip-1", ctx }), w.deps);
+    await drain(w);
+    // (the first run ended: the start makes a new one)
+    check(ev.filter((e) => e.name === "prep_started").map((e) => e.detail).join(",") === "new,new", `started again: a second prep_started (${ev.filter((e) => e.name === "prep_started").map((e) => e.detail).join(",")})`);
+    check(draft(w).status === "review" && ev.filter((e) => e.name === "prep_ready").length === 1, "then ready: prep_ready once");
+  }
+  {
+    // the steps table failing: the preparation goes on exactly as before
+    const w = world();
+    w.db.event = async () => {
+      throw new Error("db 500 /rest/v1/events");
+    };
+    seedTrip(w);
+    const r = await P.handle(user({ action: "start", trip: "trip-1", ctx }), w.deps);
+    await drain(w);
+    check(r.status === 200 && draft(w).status === "review" && w.calls.push.length + w.calls.mail.length === 1, `steps that cannot be written never stop the preparation (${r.status}, ${draft(w).status}, ${w.calls.push.length + w.calls.mail.length} notice)`);
+  }
+  {
+    // a database without « event » (the tests above, any other Db): to the end as before
+    const w = world();
+    seedTrip(w);
+    await P.handle(user({ action: "start", trip: "trip-1", ctx }), w.deps);
+    await drain(w);
+    check(!("event" in w.db) && draft(w).status === "review", "a database without event goes to the end as before");
+  }
+  {
+    // the real adapter: one POST to /rest/v1/events with the service key, a cleaned detail, never throwing
+    const sent = [];
+    const db = P.restDb("test-service-key", async (url, init = {}) => {
+      sent.push({ url: String(url), init });
+      return new Response("", { status: 201 });
+    });
+    await db.event("user-1", "prep_ready", "42", "trip-1");
+    const x = sent[0];
+    const b = x ? JSON.parse(x.init.body) : {};
+    check(!!x && x.url.endsWith("/rest/v1/events") && x.init.method === "POST" && x.init.headers.prefer === "return=minimal" && x.init.headers.authorization === "Bearer test-service-key" && !!x.init.signal, "adapter: POST /rest/v1/events, service key, 3 s limit");
+    check(b.user_id === "user-1" && b.name === "prep_ready" && b.detail === "42" && b.trip_id === "trip-1" && Object.keys(b).length === 4, "adapter: only the account, the name, the detail and the trip");
+    await db.event("user-1", "prep_failed", "a b<c>!", "trip-1");
+    check(JSON.parse(sent[1].init.body).detail === "abc", "adapter: the detail is cleaned like track_event");
+    const bad = P.restDb("k", async () => {
+      throw new Error("network");
+    });
+    let threw = false;
+    await bad.event("user-1", "prep_started", "new", "trip-1").catch(() => (threw = true));
+    check(!threw, "adapter: a network error never throws");
+  }
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

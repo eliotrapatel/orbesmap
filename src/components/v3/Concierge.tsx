@@ -3,7 +3,6 @@ import { ai, AiError, imageToBase64, type ConciergeResult, type ExtractResult } 
 import { dateLabel, dayCount, searchCities, type Destination } from "../../lib/newTrip";
 import { getLang, locale, t } from "../../lib/i18n";
 import { getState, requestPro, useStore } from "../../lib/store";
-import { track } from "../../lib/track";
 import Shell from "./Shell";
 import { clearWizardDraft, CONCIERGE_KEY, createTripFromWizard, lastWay, LinkTile, linkCard, rememberWay, URL_RE, useKeyboardFit, useOnline, WIZARD_KEY, wizardDraft, wizHasContent, type Wiz } from "./CreateWizard";
 import { INTERESTS, PACES, TRAVEL } from "./Onboarding";
@@ -682,7 +681,6 @@ export default function Concierge({ onCancel, onCreated, onForm }: { onCancel: (
     try {
       const w = toWizard(f);
       const id = await createTripFromWizard(w, w.mode === "business" && (!plan || plan.pro));
-      track("trip_created", "concierge", id);
       save(null);
       // a form draft opened from this conversation is done with too (no second copy of the same trip)
       if (wizardDraft()?.from === "concierge") clearWizardDraft();

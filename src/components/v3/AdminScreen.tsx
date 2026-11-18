@@ -11,6 +11,9 @@ import { TYPE_LABEL } from "../../data/trip";
 import { locale, t, tk } from "../../lib/i18n";
 import { currencyAffix, lastDays } from "../../lib/peakData";
 import { PeakSlot } from "./ui/PeakCard";
+import { adminChannels, adminCohorts, adminUserSources, pct, span, type CohortPeriod, type Cohorts, type Channels, type UserSources } from "../../lib/measure";
+import { CHANNELS } from "../../lib/source";
+import "../../styles/measure.css";
 
 type Tab = "figures" | "profiles" | "accounts" | "codes" | "waitlist";
 const TABS: [Tab, string][] = [["figures", "Chiffres"], ["profiles", "Profils"], ["accounts", "Comptes"], ["codes", "Codes"], ["waitlist", "Attente"]];
@@ -141,6 +144,8 @@ function Figures() {
         </>
       )}
       <Path />
+      <CohortView />
+      <SourcesView />
       <AiBySteps />
     </>
   );
@@ -217,12 +222,17 @@ function AiDetail({ userId }: { userId: string }) {
 const STEPS: [string, string][] = [
   ["visit", "Visites de la page publique"],
   ["signup_email", "E-mails de connexion envoyés"],
-  ["signup_done", "Inscriptions terminées"],
+  ["signup_submitted", "Inscriptions envoyées"],
+  ["signup_done", "Inscriptions terminées (ancien nom)"],
+  ["onboarding_done", "Accueils terminés"],
   ["app_open", "Ouvertures de l'app (connecté)"],
   ["trip_created", "Voyages créés"],
+  ["prep_started", "Préparations lancées"],
+  ["prep_ready", "Préparations prêtes"],
   ["trip_validated", "Voyages validés"],
   ["place_added", "Lieux ajoutés à la main"],
   ["invite_sent", "Invitations envoyées"],
+  ["invite_accepted", "Invitations acceptées"],
   ["export", "Exports"],
   ["pro_screen", "Écran Pro vu"],
   ["waitlist_join", "Liste d'attente rejointe"],
@@ -238,18 +248,37 @@ const STEP_LABEL: Record<string, string> = {
   place_opened: "Lieu ouvert", tool_opened: "Outil ouvert", status_set: "Statut changé", note_written: "Note écrite", photo_added: "Photo ajoutée",
   vote: "Vote", comment_added: "Commentaire", checklist_done: "Check-list cochée", language_changed: "Langue changée", alerts_changed: "Alertes changées",
   search: "Recherche", adjust_asked: "Ajustement demandé", day_redone: "Jour régénéré",
+  // the measured path (supabase/saas-12.sql) and the steps of the other lots
+  signup_submitted: "Inscription envoyée", onboarding_done: "Accueil terminé", email_confirmed: "E-mail confirmé",
+  create_started: "Création commencée", first_day_opened: "Premier jour ouvert", paywall_closed: "Écran Pro fermé",
+  landing_cta: "Bouton de la page d'accueil", public_link_created: "Lien public créé", public_cta_clicked: "Bouton du programme partagé",
+  trip_shared_whatsapp: "Partagé par WhatsApp", prep_started: "Préparation lancée", prep_ready: "Préparation prête", prep_failed: "Préparation échouée",
+  invite_accepted: "Invitation acceptée", check_email_shown: "Écran « vérifiez vos e-mails »", confirm_resent: "E-mail de confirmation renvoyé",
+  quota_seen: "Limite vue", manual_trip_created: "Voyage créé à la main", validate_explained: "Validation expliquée",
+  trip_pass_granted: "Pass offert", pass_granted: "Pass offert", pass_removed: "Pass retiré", ai_budget_hit: "Limite IA atteinte",
+  landing_destination: "Destination choisie sur l'accueil", invite_email_sent: "E-mail d'invitation envoyé", reminder_sent: "Rappel envoyé",
+  offline_ready: "Hors ligne prêt", offline_reminder_sent: "Rappel hors ligne envoyé", offline_used: "Utilisé hors ligne",
+  confirm_screen: "Écran de confirmation", landing_intent: "Intention sur l'accueil", intent_applied: "Intention reprise",
+  public_copy_click: "Copie du programme partagé", app_redirect: "Redirection vers l'app", confirm_reminder: "Rappel de confirmation",
+  mail_sent: "E-mail envoyé", push_sent: "Notification envoyée", invite_opened: "Invitation ouverte",
+  mail_unsubscribed: "Désabonnement des e-mails", link_preview: "Aperçu du lien",
 };
+/** The names used before 18 Nov 2026, still readable */
+const OLD_NAME = new Set(["signup_done", "link_opened"]);
 /** Details of a step and AI uses, in words */
 const DETAIL: Record<string, string> = {
   link: "par lien ou nom", map: "sur la carte", pdf: "PDF", csv: "tableur", ics: "calendrier", offline: "carte hors ligne", data: "ses données",
   editor: "peut modifier", viewer: "lecture seule",
+  new: "nouvelle", resume: "reprise", cap: "limite du jour", stopped: "arrêtée", ai: "erreur de l'IA", days: "jours manquants",
+  quota: "limite atteinte", signin: "connexion", signup: "création de compte", brand_cta: "« Préparez votre voyage »", concierge: "concierge",
+  invite: "invitation",
 };
 const AI_TASK: Record<string, string> = {
   outline: "trames", day: "jours préparés", essentials: "essentiels", enrich: "fiches", adjust: "ajustements", intake: "collages",
   extract: "réservations lues", place: "lieux cherchés", ask: "questions", photo: "photos", interpret: "interprète",
 };
 const when = (iso: string) => new Date(iso).toLocaleString(locale(), { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" });
-const PRO_WHY: Record<string, string> = { edit: "modifier un voyage validé", prep: "voyage du mois utilisé", export: "exports et hors ligne", business: "mode affaires", info: "depuis le compte" };
+const PRO_WHY: Record<string, string> = { edit: "modifier un voyage validé", prep: "voyage du mois utilisé", export: "exports et hors ligne", business: "mode affaires", info: "depuis le compte", cap: "limite IA du jour" };
 
 /** The visitor's path over 30 days (anonymous steps, supabase/saas-5.sql) */
 function Path() {
@@ -348,6 +377,8 @@ function Accounts() {
 /** One person, in full: profile, plan, trips, AI use, where they came from, every step */
 function AccountSheet({ row, onClose }: { row: AccountRow; onClose: () => void }) {
   const { data: u, err } = useLoad<UserSheet>(() => adminUser(row.user_id), [row.user_id]);
+  // where the account came from (supabase/saas-12.sql; hidden before it runs)
+  const { data: src } = useLoad<UserSources | null>(() => adminUserSources(row.user_id).catch(() => null), [row.user_id]);
   const p = (u?.profile || {}) as Record<string, unknown>;
   const list = (v: unknown) => (Array.isArray(v) ? v.join(", ") : typeof v === "string" ? v : "");
   const titleOf = (id: string | null) => (id ? u?.trips.find((t) => t.id === id)?.title || "" : "");
@@ -363,6 +394,12 @@ function AccountSheet({ row, onClose }: { row: AccountRow; onClose: () => void }
         [t("Dernière connexion"), u.last_seen ? when(u.last_seen) : "—"],
         [t("Première visite"), u.firstSeen ? when(u.firstSeen) : "—"],
         [t("Venu de"), u.firstRef || t("accès direct ou inconnu")],
+        ...(src
+          ? ([
+              [t("Première source"), src.firstSrc ? `${t(CHANNELS[src.firstSrc] || src.firstSrc)}${src.firstSrcAt ? ` · ${when(src.firstSrcAt)}` : ""}` : "—"],
+              [t("Recommandé par"), src.referredBy ? (src.referredBy.name ? `${src.referredBy.name} (${src.referredBy.email})` : src.referredBy.email) : "—"],
+            ] as [string, string][])
+          : []),
         [t("Visites avant inscription"), String(u.visitsBefore)],
         ["Pro", u.pro ? (u.grant ? (u.grant.until ? t("jusqu'au {date} ({source})", { date: day(u.grant.until), source: u.grant.source || "" }) : t("à vie ({source})", { source: u.grant.source || "" })) : t("inclus")) : t("non")],
         [t("IA"), t("{calls30} demandes · {usd30} sur 30 j — {calls} · {usd} au total", { calls30: u.ai.calls30, usd30: usd(u.ai.usd30), calls: u.ai.calls, usd: usd(u.ai.usd) })],
@@ -419,8 +456,8 @@ function AccountSheet({ row, onClose }: { row: AccountRow; onClose: () => void }
                 <div key={i} className="adm-ev">
                   <span className="adm-ev-at">{when(e.at)}</span>
                   <span className="v3-grow">
-                    {t(STEP_LABEL[e.name] || e.name)}
-                    {e.detail ? ` · ${t((e.name === "pro_screen" ? PRO_WHY[e.detail] : DETAIL[e.detail]) || e.detail)}` : ""}
+                    {t(STEP_LABEL[e.name] || e.name)}{OLD_NAME.has(e.name) ? ` ${t("(ancien nom)")}` : ""}
+                    {e.detail ? ` · ${e.name === "prep_ready" && /^\d+$/.test(e.detail) ? span(Number(e.detail)) : t((e.name === "pro_screen" || e.name === "paywall_closed" ? PRO_WHY[e.detail] : DETAIL[e.detail]) || e.detail)}` : ""}
                     {e.trip && titleOf(e.trip) ? ` · ${titleOf(e.trip)}` : ""}
                     {e.ref ? ` · ${t("depuis {ref}", { ref: e.ref })}` : ""}
                   </span>
@@ -621,5 +658,150 @@ function Traveller({ userId }: { userId: string }) {
       {p.hotels.some((h) => h.name && !/à préciser|to be confirmed/i.test(h.name)) && <p className="v3-note">{t("Hôtels : {list}", { list: p.hotels.filter((h) => h.name && !/à préciser|to be confirmed/i.test(h.name)).map((h) => [h.name, h.nights ? t("{n} nuits", { n: h.nights }) : "", h.price ? `${h.price} ${h.currency || ""}` : ""].filter(Boolean).join(" ")).join(" · ") })}</p>}
       {Object.keys(p.places || {}).length > 0 && <p className="v3-note">{t("Lieux : {list}", { list: Object.entries(p.places).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, v]) => `${t(TYPE_LABEL[k as keyof typeof TYPE_LABEL] || k)} ${v}`).join(", ") })}</p>}
     </>
+  );
+}
+
+// ---------- the measure of the path (R03, R11; supabase/saas-12.sql) ----------
+const COHORT_STEPS: [keyof CohortPeriod, string][] = [
+  ["visits", "Visites"], ["signups", "Inscriptions"], ["confirmed", "E-mail confirmé"], ["onboarded", "Accueil terminé"],
+  ["started", "Préparation lancée"], ["ready", "Préparation prête"], ["validated", "Voyage validé"], ["second", "Second voyage"],
+];
+const num = (n: number) => new Intl.NumberFormat(locale()).format(Number(n) || 0);
+const pctText = (n: number, of: number) => {
+  const p = pct(n, of);
+  return p == null ? "—" : t("{p} %", { p });
+};
+/** A period's name: the month, or the week by its Monday (Paris time) */
+const periodName = (start: string, unit: "month" | "week") => {
+  const d = new Date(`${start}T12:00:00Z`);
+  return unit === "month"
+    ? d.toLocaleDateString(locale(), { month: "long", year: "numeric", timeZone: "UTC" })
+    : t("Semaine du {date}", { date: d.toLocaleDateString(locale(), { day: "numeric", month: "short", year: "2-digit", timeZone: "UTC" }) });
+};
+const NOT_YET = "Lancez supabase/saas-12.sql pour voir ces chiffres.";
+
+/** The path by sign-up month (or week): each step in numbers and in % of the step before, activation, time, returns */
+function CohortView() {
+  const [unit, setUnit] = useState<"month" | "week" | null>(null);
+  const [pick, setPick] = useState(0);
+  const { data, err } = useLoad<Cohorts | null>(() => adminCohorts(unit || "month", 12), [unit]);
+  // the default unit is the one the server suggests (week once sign-ups pass ~50 a week)
+  useEffect(() => {
+    if (unit === null && data?.suggest === "week") setUnit("week");
+  }, [unit, data]);
+  const head = (u: "month" | "week") => (
+    <div className="adm-head msr-head">
+      <span className="v3-lbl">{t("Parcours par inscription")}</span>
+      <div className="msr-unit" role="group" aria-label={t("Période")}>
+        {(["month", "week"] as const).map((k) => (
+          <button key={k} type="button" className={u === k ? "on" : ""} aria-pressed={u === k} onClick={() => { setUnit(k); setPick(0); }}>{k === "month" ? t("Mois") : t("Semaine")}</button>
+        ))}
+      </div>
+    </div>
+  );
+  if (err) return <div className="v3-glass adm-card">{head(unit || "month")}<p className="v3-note">{err}</p></div>;
+  if (data === null) return <div className="v3-glass adm-card">{head(unit || "month")}<p className="v3-note">{t(NOT_YET)}</p></div>;
+  if (!data) return <div className="v3-glass adm-card">{head(unit || "month")}<p className="v3-note">{t("Chargement…")}</p></div>;
+  const u = data.unit;
+  const periods = data.periods || [];
+  const p = periods[Math.min(pick, periods.length - 1)];
+  const since = Object.values(data.since || {}).sort()[0];
+  if (!p) return <div className="v3-glass adm-card">{head(u)}<p className="v3-note">{t("Aucune inscription pour l'instant.")}</p></div>;
+  const top = Math.max(1, ...COHORT_STEPS.map(([k]) => Number(p[k]) || 0));
+  return (
+    <div className="v3-glass adm-card">
+      {head(u)}
+      <label className="sr" htmlFor="msr-period">{t("Période")}</label>
+      <select id="msr-period" className="adm-select" value={pick} onChange={(e) => setPick(Number(e.target.value))}>
+        {periods.map((x, i) => (
+          <option key={x.start} value={i}>{periodName(x.start, u)} · {t("{n} inscriptions", { n: x.signups })}</option>
+        ))}
+      </select>
+      <div className="adm-path">
+        {COHORT_STEPS.map(([k, label], i) => {
+          const v = Number(p[k]) || 0;
+          const before = i > 0 ? Number(p[COHORT_STEPS[i - 1][0]]) || 0 : null;
+          return (
+            <div key={k} className="adm-step">
+              <span className="adm-step-bar" style={{ width: `${Math.max(2, (v / top) * 100)}%` }} />
+              <span className="v3-grow">{t(label)}</span>
+              <b>{num(v)}</b>
+              <small className="msr-pct" title={before == null ? undefined : t("{p} % de l'étape d'avant", { p: pct(v, before) ?? "—" })}>{before == null ? "" : pctText(v, before)}</small>
+            </div>
+          );
+        })}
+      </div>
+      <p className="v3-note">{t("Activation (voyage validé en 7 jours) : {n} sur {of} · {p} %", { n: num(p.activated), of: num(p.signups), p: pct(p.activated, p.signups) ?? "—" })}</p>
+      <p className="v3-note">{t("Temps médian jusqu'au premier programme : {d}", { d: span(p.medianS) })} <span className="msr-quiet">{t("Préparations faites par le serveur seulement.")}</span></p>
+      <p className="v3-note">{t("Retour à J7 : {n} sur {of} · à J30 : {m} sur {of2}", { n: num(p.back7), of: num(p.back7Of), m: num(p.back30), of2: num(p.back30Of) })}</p>
+      <p className="v3-note msr-quiet">{t("Visites : personnes vues pour la première fois sur la période.")}</p>
+      {since && <p className="v3-note msr-quiet">{t("Noms d'étapes changés le {date} ; les anciens restent lisibles.", { date: day(since) })}</p>}
+      {periods.length > 1 && (
+        <div className="msr-scroll" role="region" aria-label={t("Toutes les périodes")} tabIndex={0}>
+          <div className="msr-tr msr-th">
+            <span>{t("Période")}</span>
+            {COHORT_STEPS.map(([k, label]) => <span key={k}>{t(label)}</span>)}
+            <span>{t("Activation")}</span>
+          </div>
+          {periods.map((x) => (
+            <div key={x.start} className="msr-tr">
+              <span>{periodName(x.start, u)}</span>
+              {COHORT_STEPS.map(([k]) => <span key={k}>{num(Number(x[k]) || 0)}</span>)}
+              <span>{pctText(x.activated, x.signups)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Where people come from: per channel of the links (visits, sign-ups, activations, returns), and who brings them */
+function SourcesView() {
+  const [days, setDays] = useState<30 | 90>(30);
+  const { data, err } = useLoad<Channels | null>(() => adminChannels(days), [days]);
+  const head = (
+    <div className="adm-head msr-head">
+      <span className="v3-lbl">{t("Sources, {n} jours", { n: days })}</span>
+      <div className="msr-unit" role="group" aria-label={t("Période")}>
+        {([30, 90] as const).map((k) => (
+          <button key={k} type="button" className={days === k ? "on" : ""} aria-pressed={days === k} onClick={() => setDays(k)}>{t("{n} j", { n: k })}</button>
+        ))}
+      </div>
+    </div>
+  );
+  if (err) return <div className="v3-glass adm-card">{head}<p className="v3-note">{err}</p></div>;
+  if (data === null) return <div className="v3-glass adm-card">{head}<p className="v3-note">{t(NOT_YET)}</p></div>;
+  if (!data) return <div className="v3-glass adm-card">{head}<p className="v3-note">{t("Chargement…")}</p></div>;
+  const rows = data.channels || [];
+  const sharers = data.sharers || [];
+  return (
+    <div className="v3-glass adm-card">
+      {head}
+      {rows.length === 0 ? (
+        <p className="v3-note">{t("Aucune source pour l'instant.")}</p>
+      ) : (
+        <div className="msr-scroll" role="region" aria-label={t("Sources, {n} jours", { n: days })} tabIndex={0}>
+          <div className="msr-tr msr-src msr-th">
+            <span>{t("Source")}</span><span>{t("Visites")}</span><span>{t("Inscriptions")}</span><span>{t("Activations")}</span><span>{t("Retours")}</span>
+          </div>
+          {rows.map((r) => (
+            <div key={r.src} className="msr-tr msr-src">
+              <span>{t(CHANNELS[r.src] || r.src)}</span><span>{num(r.visits)}</span><span>{num(r.signups)}</span><span>{num(r.activations)}</span><span>{num(r.returns)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {sharers.length > 0 && (
+        <>
+          <span className="v3-lbl adm-sub">{t("Recommandé par")}</span>
+          <div className="adm-list">
+            {sharers.map((x) => (
+              <p key={x.email} className="v3-note msr-sharer" title={x.email}>{t("{name} : {v} visites, {s} inscriptions", { name: x.name || x.email, v: num(x.visits), s: num(x.signups) })}</p>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
   );
 }

@@ -6,7 +6,8 @@ import { addDays, dateLabel, newTripRecord } from "./newTrip";
 import { createPlace, createTrip, switchTrip, updateTrip } from "./store";
 import { supabase } from "./supabase";
 import { tripFromRecord, type TripRec } from "./trips";
-import { track } from "./track";
+import { refCode, track } from "./track";
+import { tagUrl } from "./source";
 import { t } from "./i18n";
 
 const sb = () => {
@@ -17,6 +18,8 @@ const missing = (e: { code?: string } | null) => !!e && ["PGRST202", "PGRST205",
 
 /** The address to give: always the main site's */
 export const linkUrl = (slug: string) => `https://theorbes.com/maps?t=${slug}`;
+/** The same address as shared or copied: it says its channel and who shares it (?src=public&by=<opaque code>) */
+export const shareUrl = (slug: string) => tagUrl(linkUrl(slug), "public", refCode());
 
 /** The trip's public link: its slug and whether it is open; null = never opened (or not available yet) */
 export async function linkOf(tripId: string): Promise<{ slug: string; active: boolean } | null> {
@@ -30,7 +33,7 @@ export async function linkOf(tripId: string): Promise<{ slug: string; active: bo
 export async function openLink(tripId: string): Promise<string> {
   const { data, error } = await sb().rpc("open_trip_link", { p_trip: tripId });
   if (error) throw new Error(missing(error) ? t("Le lien public n'est pas encore activé sur le serveur.") : error.code === "42501" ? t("Seul le propriétaire du voyage peut créer son lien.") : t("Le lien n'a pas pu être créé. Réessayez."));
-  track("link_opened", null, tripId);
+  track("public_link_created", null, tripId);
   return String(data);
 }
 export async function closeLink(tripId: string) {

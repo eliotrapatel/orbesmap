@@ -1,7 +1,8 @@
 // Sharing a trip: its travellers (owner, editors, readers) and the invitations by e-mail waiting for someone
 // to sign in with that address (supabase/saas-3.sql). Online only: these lists are read from the server.
 import { supabase } from "./supabase";
-import { track } from "./track";
+import { refCode, track } from "./track";
+import { tagAppLinks } from "./source";
 import { t } from "./i18n";
 import { toast } from "./store";
 
@@ -56,11 +57,12 @@ export async function acceptInvites(): Promise<number> {
   if (error) return 0;
   return Number(data) || 0;
 }
-/** The message to send to someone invited (by any messaging app) */
-export const inviteMessage = (tripTitle: string, inviter: string) =>
-  inviter
+/** The message to send to someone invited (by any messaging app); its link says the channel and who invites
+ *  (?src=invite&by=<opaque code>, supabase/saas-12.sql), the words are unchanged */
+export const inviteMessage = (tripTitle: string, inviter: string, src = "invite") =>
+  tagAppLinks(inviter
     ? t("{inviter} vous invite à rejoindre le voyage « {title} » sur ORBES Trips. Ouvrez https://orbesmap.vercel.app et connectez-vous avec cette adresse e-mail : le voyage apparaîtra dans « Mes voyages ».", { inviter, title: tripTitle })
-    : t("Vous êtes invité à rejoindre le voyage « {title} » sur ORBES Trips. Ouvrez https://orbesmap.vercel.app et connectez-vous avec cette adresse e-mail : le voyage apparaîtra dans « Mes voyages ».", { title: tripTitle });
+    : t("Vous êtes invité à rejoindre le voyage « {title} » sur ORBES Trips. Ouvrez https://orbesmap.vercel.app et connectez-vous avec cette adresse e-mail : le voyage apparaîtra dans « Mes voyages ».", { title: tripTitle }), src, refCode());
 
 /** Sends the invitation message by the phone's share sheet when there is one, else copies it
  * (the same way as "Partager" → "Envoyer l'invitation"). `to` names the person in the copy notice. */
@@ -84,4 +86,4 @@ export async function sendInviteMessage(tripTitle: string, inviter: string, to: 
 }
 /** The same invitation message, ready in WhatsApp (the person is chosen there) */
 export const whatsappInviteUrl = (tripTitle: string, inviter: string) =>
-  `https://wa.me/?text=${encodeURIComponent(inviteMessage(tripTitle, inviter))}`;
+  `https://wa.me/?text=${encodeURIComponent(inviteMessage(tripTitle, inviter, "whatsapp"))}`;

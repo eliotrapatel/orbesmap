@@ -49,6 +49,7 @@ export default function Welcome() {
   /** "Se connecter" / "Créer un compte": to the account form, in that mode, the e-mail field ready. On a computer the
    *  form is centred beside its title; on a phone the title comes first, just under the header. */
   const goTo = (m: AuthMode) => {
+    track("landing_cta", m);
     setMode(m);
     setFocusKey((k) => k + 1);
     let wide = false;

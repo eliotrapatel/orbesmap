@@ -180,7 +180,7 @@ export default function AuthBox({ mode, onMode, focusKey }: { mode: AuthMode; on
         setErr(t("Un compte existe déjà avec cette adresse : connectez-vous."));
         return;
       }
-      track("signup_done");
+      track("signup_submitted");
       if (r === "confirm") {
         onMode("signin");
         setNote(

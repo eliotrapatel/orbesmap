@@ -17,7 +17,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 /** "Préparez votre voyage": the click is counted before the page leaves (a plain click waits a moment; a new-tab click goes as is) */
 const openApp = (e: React.MouseEvent<HTMLAnchorElement>) => {
-  track("link_opened", "brand_cta");
+  track("public_cta_clicked", "brand_cta");
   if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
   e.preventDefault();
   const href = e.currentTarget.href;
