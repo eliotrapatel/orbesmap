@@ -333,6 +333,108 @@ const I = await import("../src/lib/intentData.ts");
   check(/wizardDraft\(\) \|\| \{[\s\S]*?\.\.\.\(initial \|\| \{\}\),\s*\}\);/.test(read("src/components/v3/CreateWizard.tsx")), "a draft already kept wins over the prefill");
 }
 
+// ---------------------------------------------------------------- R10: the public link, a way in
+section("R10 · WhatsApp / iMessage preview (api/preview.ts + vercel.json)");
+const PV = await import("../api/preview.ts");
+{
+  const data = { trip: { title: "Shanghai", lang: "fr", days: [{ scheduled: true, dates: ["2026-11-24"] }, { scheduled: true, dates: ["2026-11-25"] }, { scheduled: true, dates: ["2026-11-26"] }, { scheduled: true, dates: ["2026-11-27"] }, { scheduled: true, dates: ["2026-11-28"] }, { scheduled: false }] }, places: Array.from({ length: 32 }, (_, i) => ({ id: `p${i}` })) };
+  const h = PV.previewHtml("abcdefghijkl", data);
+  const meta = (k) => new RegExp(`<meta (?:property|name)="${k}" content="([^"]*)"`).exec(h)?.[1];
+  check(meta("og:title") === "Shanghai · 5 jours", "title: « Shanghai · 5 jours »");
+  check(meta("og:description") === "32 lieux, jour par jour. Copiez ce programme avec vos dates sur ORBES Trips.", "description: « 32 lieux, jour par jour… »");
+  check(meta("og:image") === "https://orbesmap.vercel.app/og/programme-fr.png" && meta("og:url") === "https://orbesmap.vercel.app/p/abcdefghijkl" && meta("twitter:card") === "summary_large_image", "image, address and large card");
+  check(/url=\/\?t=abcdefghijkl/.test(h), "a person who lands here goes on to the programme");
+  const en = PV.previewHtml("abcdefghijkl", { ...data, trip: { ...data.trip, lang: "en" } });
+  check(/og:title" content="Shanghai · 5 days"/.test(en) && /32 places, day by day/.test(en) && /programme-en\.png/.test(en), "in the trip's language (English)");
+  const evil = PV.previewHtml("abcdefghijkl", { ...data, trip: { ...data.trip, title: '"><script>alert(1)</script>' } });
+  check(!/<script>alert/.test(evil) && /&quot;&gt;&lt;script&gt;/.test(evil), "the trip's title is escaped");
+  const generic = PV.previewHtml(null, null);
+  check(/og:title" content="ORBES Trips — Carnet de voyage"/.test(generic) && /home-fr\.png/.test(generic) && !/abcdefghijkl/.test(generic), "closed or unknown link: the generic card, nothing about the trip");
+  check(!/places|hotel|note|flight/i.test(h.replace(/32 lieux/, "")), "nothing private in the page (only title, days and count)");
+}
+{
+  // the function itself, with Supabase replaced: closed link, missing function, tracking parameters ignored
+  const realFetch = globalThis.fetch;
+  const calls = [];
+  const answer = { status: 200, body: { trip: { title: "Kyoto", lang: "fr", days: [{ scheduled: true, dates: ["2027-04-01"] }] }, places: [{ id: "a" }] } };
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url: String(url), body: init?.body ? JSON.parse(init.body) : null });
+    if (String(url).includes("/rpc/track_step")) return new Response(null, { status: 404 });
+    return new Response(JSON.stringify(answer.body), { status: answer.status, headers: { "content-type": "application/json" } });
+  };
+  try {
+    const get = (q, ua = "WhatsApp/2.24") => PV.GET(new Request(`https://orbesmap.vercel.app/api/preview${q}`, { headers: { "user-agent": ua } }));
+    const r1 = await get("?t=abcdefghijkl&src=wa&by=x1");
+    const b1 = await r1.text();
+    check(r1.status === 200 && /Kyoto · 1 jour/.test(b1) && calls[0].body.p_slug === "abcdefghijkl", "?src= and ?by= are ignored: the slug alone is read");
+    check(/s-maxage=600/.test(r1.headers.get("cache-control")) && /stale-while-revalidate=86400/.test(r1.headers.get("cache-control")), "kept 10 minutes by the CDN, per link");
+    await new Promise((r) => setTimeout(r, 10));
+    const tr = calls.find((c) => c.url.includes("track_step"));
+    check(tr?.body.p_name === "link_preview" && tr.body.p_detail === "abcdefghijkl" && tr.body.p_ref === "whatsapp", "counted as link_preview (whatsapp); before saas-15.sql the 404 is ignored");
+    answer.body = null;
+    const r2 = await get("?t=abcdefghijkl");
+    check(r2.status === 200 && /Carnet de voyage/.test(await r2.text()), "closed link: generic card, status 200");
+    answer.status = 404;
+    answer.body = { code: "PGRST202" };
+    const r3 = await get("?t=abcdefghijkl");
+    check(r3.status === 200 && /Carnet de voyage/.test(await r3.text()), "public_trip missing: generic card, never an error");
+    calls.length = 0;
+    const r4 = await get("?t=../../etc");
+    check(r4.status === 200 && calls.length === 0, "an invalid slug is never sent to the database");
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+}
+{
+  const vj = JSON.parse(read("vercel.json"));
+  const red = vj.redirects?.[0];
+  const rw1 = vj.rewrites?.[0];
+  const rw2 = vj.rewrites?.[1];
+  const bots = [red?.missing?.[0]?.value, rw1?.has?.[0]?.value, rw2?.has?.find((x) => x.type === "header")?.value];
+  check(bots.every((b) => b && b === bots[0]), "one robot list for the redirect and both rewrites");
+  check(red?.source === rw1?.source && red?.source === "/p/:slug([a-z0-9]{10,24})" && red?.destination === "/?t=:slug" && red?.permanent === false, "/p/<slug>: a person is sent to /?t=<slug> (307), a robot to the preview");
+  check(rw1?.destination === "/api/preview?t=:slug" && rw2?.source === "/" && rw2?.destination === "/api/preview?t=:t" && rw2?.has?.some((x) => x.type === "query" && x.key === "t"), "/?t=<slug> for a robot: the preview too; a person on / is never concerned");
+  // Vercel compares the value with the whole header: the same anchored test here
+  const re = new RegExp(`^${bots[0]}$`);
+  const robots = {
+    WhatsApp: "WhatsApp/2.23.20.0 A",
+    iMessage: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_1) AppleWebKit/601.2.4 (KHTML, like Gecko) Version/9.0.1 Safari/601.2.4 facebookexternalhit/1.1 Facebot Twitterbot/1.0",
+    Telegram: "TelegramBot (like TwitterBot)",
+    Slack: "Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)",
+    Discord: "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)",
+    X: "Twitterbot/1.0",
+    LinkedIn: "LinkedInBot/1.0 (compatible; Mozilla/5.0; Apache-HttpClient +http://www.linkedin.com)",
+    Facebook: "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
+  };
+  for (const [n, ua] of Object.entries(robots)) check(re.test(ua), `robot recognised: ${n}`);
+  const people = {
+    "Safari iPhone": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1",
+    "Chrome Android": "Mozilla/5.0 (Linux; Android 14; SM-F946B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36",
+    "Samsung Internet": "Mozilla/5.0 (Linux; Android 14; SAMSUNG SM-F946B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/26.0 Chrome/122.0.0.0 Mobile Safari/537.36",
+    "Instagram in-app": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 357.0.0.0 (iPhone15,2; iOS 18_1; fr_FR)",
+    "Facebook in-app": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [FBAN/FBIOS;FBAV/490.0.0;FBBV/1;FBDV/iPhone15,2;FBMD/iPhone;FBSN/iOS;FBSV/18.1;FBSS/3;FBLC/fr_FR]",
+    "WhatsApp in-app (opened link)": "Mozilla/5.0 (Linux; Android 14; SM-F946B; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/131.0.0.0 Mobile Safari/537.36",
+  };
+  for (const [n, ua] of Object.entries(people)) check(!re.test(ua), `a person, never sent to the preview: ${n}`);
+  check(PV.botFamily(robots.iMessage) === "imessage" && PV.botFamily(robots.WhatsApp) === "whatsapp" && PV.botFamily(people["Safari iPhone"]) === "", "the robot's family for the count");
+}
+{
+  const pt = read("src/lib/publicTrip.ts");
+  check(/linkUrl = \(slug: string\) => `https:\/\/orbesmap\.vercel\.app\/p\/\$\{slug\}`/.test(pt), "the link given is https://orbesmap.vercel.app/p/<slug>");
+  const main = read("src/main.tsx");
+  const m = /\/\^\\\/p\\\/\(\[a-z0-9\]\{10,24\}\)\\\/\?\$\//.test(main);
+  check(m && main.indexOf("/p/") < main.indexOf("createRoot("), "the installed app turns /p/<slug> into /?t=<slug> before drawing");
+  const page = read("src/components/v3/PublicTripPage.tsx");
+  check(!/google\.com\/maps/.test(page) && /maps\.apple\.com/.test(page) && /geo:\$\{p\.lat\}/.test(page) && /openstreetmap\.org/.test(page), "« Voir sur la carte »: Plans, geo: or OpenStreetMap, never Google Maps");
+  check(/redirectQuery=\{`\?copyof=\$\{slug\}`\}/.test(page) && /kind: "copy"/.test(page) && /track\("public_copy_click", slug\)/.test(page), "not signed in: the sign-up opens on the page, the trip in the account and in the confirmation link");
+  check(/if \(alreadyCopied\(slug\)\) return null;/.test(pt) && /copyFromLink\(\)/.test(pt) && /takeIntent\(session, "copy"\)/.test(pt), "the copy comes back from the device, the link or the account, never twice");
+  const sql = SQL15;
+  check(/create or replace function public\.admin_link_funnel/.test(sql) && /if not public\.is_admin\(\) then raise exception/.test(sql), "admin_link_funnel: per link, credited to its owner, admin only");
+  check(/grant execute on function public\.unconfirmed_signups\(int, int, int\) to service_role;/.test(sql) && /revoke all on function public\.unconfirmed_signups\(int, int, int\) from public, anon, authenticated;/.test(sql), "unconfirmed_signups: server only");
+  check(/alter table public\.event_names enable row level security;/.test(sql) && !/create or replace function public\.track_event\b/.test(sql), "event_names under RLS; track_event never rewritten by this file");
+  check(!/drop table|delete from public\.(trips|places|trip_members)|alter table public\.(trips|places|profiles)/i.test(sql), "no existing table changed, no data removed");
+}
+
 // ---------------------------------------------------------------- texts: every new French text has its English
 section("Texts · English for every t(\"…\") added by this lot");
 {

@@ -10,6 +10,8 @@ import { useStore } from "../../lib/store";
 import { track } from "../../lib/track";
 import OrbitMark from "../OrbitMark";
 import Shell from "./Shell";
+import AuthBox, { type AuthMode } from "./AuthBox";
+import type { Intent } from "../../lib/intentData";
 import { t } from "../../lib/i18n";
 
 const leave = (hash = "") => location.assign(location.pathname + hash);
@@ -32,6 +34,10 @@ export default function PublicTripPage({ slug, copyNow }: { slug: string; copyNo
   const [err, setErr] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [copying, setCopying] = useState(false);
+  // not signed in: « Copier ce voyage » opens the sign-up right here (lot acquisition, R10)
+  const [joining, setJoining] = useState(false);
+  const [joinMode, setJoinMode] = useState<AuthMode>("signup");
+  const [joinIntent, setJoinIntent] = useState<Intent | null>(null);
   useEffect(() => {
     let live = true;
     fetchPublic(slug).then(
@@ -49,6 +55,10 @@ export default function PublicTripPage({ slug, copyNow }: { slug: string; copyNo
   useEffect(() => {
     if (copyNow && signedIn && pub) setCopying(true);
   }, [copyNow, signedIn, pub]);
+  // signed in from that sheet: the app takes over (its welcome, then this copy, as before)
+  useEffect(() => {
+    if (joining && signedIn) leave();
+  }, [joining, signedIn]);
 
   const top = (
     <div className="v3-bar">
@@ -72,13 +82,17 @@ export default function PublicTripPage({ slug, copyNow }: { slug: string; copyNo
   const ideas = trip.places.filter((p) => !days.some((d) => d.key === p.day));
   const count = trip.places.length;
   const copy = () => {
+    track("public_copy_click", slug);
     if (!signedIn) {
       rememberCopy(slug);
-      leave();
+      setJoinIntent({ v: 1, kind: "copy", at: Date.now(), copy: slug });
+      setJoinMode("signup");
+      setJoining(true);
       return;
     }
     setCopying(true);
   };
+  const tripLine = `${trip.title} · ${days.length > 1 ? t("{n} jours", { n: days.length }) : t("{n} jour", { n: days.length })}`;
   return (
     <Shell ring={false} top={top} className="v3-public-trip">
       <p className="v3-lbl" style={{ marginTop: 18 }}>{t("Programme partagé")}</p>
@@ -115,12 +129,32 @@ export default function PublicTripPage({ slug, copyNow }: { slug: string; copyNo
         <p className="v3-fine">{t("Dans vos voyages, avec vos dates")} · {signedIn ? t("gratuit") : t("un compte gratuit suffit")}</p>
       </div>
       {copying && <CopySheet pub={pub} onClose={() => setCopying(false)} />}
+      {joining && (
+        <div className="v3-acct-wrap pt-sheet-wrap" onClick={() => setJoining(false)}>
+          <div className="v3-glass pt-sheet pt-auth-sheet" role="dialog" aria-label={t("Copier ce voyage")} onClick={(e) => e.stopPropagation()}>
+            <span className="v3-lbl">{t("Copier ce voyage")}</span>
+            <h2 className="v3-d" style={{ fontSize: 26, marginTop: 8 }}>{trip.title}</h2>
+            <AuthBox mode={joinMode} onMode={setJoinMode} intent={joinIntent} context={t("Créez un compte pour copier {trip}", { trip: tripLine })} redirectQuery={`?copyof=${slug}`} />
+            <button type="button" className="v3-link" onClick={() => setJoining(false)}>{t("Annuler")}</button>
+          </div>
+        </div>
+      )}
     </Shell>
   );
 }
 
+/** « Voir sur la carte »: a neutral map (no Google): Apple Plans on an iPhone or iPad, the phone's own map app on Android
+ *  (geo:), OpenStreetMap elsewhere */
+function mapLink(p: Place): string {
+  const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
+  const q = encodeURIComponent(p.name || "");
+  if (/iphone|ipad|ipod/i.test(ua) || (/macintosh/i.test(ua) && typeof navigator !== "undefined" && navigator.maxTouchPoints > 1)) return `https://maps.apple.com/?ll=${p.lat},${p.lng}&q=${q}`;
+  if (/android/i.test(ua)) return `geo:${p.lat},${p.lng}?q=${p.lat},${p.lng}(${q})`;
+  return `https://www.openstreetmap.org/?mlat=${p.lat}&mlon=${p.lng}#map=17/${p.lat}/${p.lng}`;
+}
+
 function Stop({ p, open, onToggle }: { p: Place; open: boolean; onToggle: () => void }) {
-  const maps = `https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}`;
+  const maps = mapLink(p);
   return (
     <div className={"pt-stop" + (open ? " open" : "")}>
       <button type="button" className="pt-stop-head" onClick={onToggle} aria-expanded={open}>

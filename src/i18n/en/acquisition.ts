@@ -22,4 +22,6 @@ export default {
   "Préparer ce voyage": "Plan this trip",
   "Créez votre compte pour préparer {trip}": "Create your account to plan {trip}",
   "La date de départ suit l'arrivée.": "The departure date comes after arrival.",
+  // R10: the sign-up from a shared programme
+  "Créez un compte pour copier {trip}": "Create an account to copy {trip}",
 };
