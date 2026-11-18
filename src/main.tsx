@@ -3,9 +3,20 @@ import { createRoot } from "react-dom/client";
 import Root from "./components/v3/Root";
 import PasswordRecovery from "./components/v3/PasswordRecovery";
 import { initAuth, toast } from "./lib/store";
+import { track } from "./lib/track";
 import "./styles.css";
 
 initAuth();
+
+// sent here from theorbes.com/maps (index.html, lot acquisition R08): counted once
+try {
+  if (sessionStorage.getItem("orbes.from") === "maps") {
+    sessionStorage.removeItem("orbes.from");
+    track("app_redirect", "maps");
+  }
+} catch {
+  /* ignore */
+}
 
 // app shell offline: only where we can serve a service worker (orbesmap.vercel.app)
 if ("serviceWorker" in navigator && location.hostname.endsWith(".vercel.app")) {
