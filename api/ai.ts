@@ -538,7 +538,13 @@ const DS_TOOLS = [
   { type: "function", function: { name: "web_fetch", description: "Lit une page web et renvoie son texte en Markdown.", parameters: { type: "object", properties: { url: { type: "string" } }, required: ["url"] } } },
 ];
 
-async function dsTool(name: string, args: Json, key: string, f: typeof fetch, cap = 20_000, usage?: Usage): Promise<string> {
+/** A page address without its fragment and trailing slash, to compare links */
+const normUrl = (u: string) => u.trim().replace(/#.*$/, "").replace(/\/+$/, "");
+/**
+ * The pages the AI may open: the links in the request and the ones its own searches returned. A page it reads
+ * can never make it open another address (that address could carry the traveller's data elsewhere).
+ */
+async function dsTool(name: string, args: Json, key: string, f: typeof fetch, cap = 20_000, usage?: Usage, allowed?: Set<string>): Promise<string> {
   try {
     if (name === "web_search") {
       const q = String(args.query || "").slice(0, 128).trim();
@@ -550,11 +556,13 @@ async function dsTool(name: string, args: Json, key: string, f: typeof fetch, ca
         usage.usd += 0.00075;
       }
       const list = (r.results as Json[] | undefined) || [];
+      for (const x of list) if (typeof x.url === "string") allowed?.add(normUrl(x.url));
       return JSON.stringify(list.map((x) => ({ title: x.title, url: x.url, summary: String(x.summary || x.snippet || "").slice(0, 700) })));
     }
     if (name === "web_fetch") {
       const url = String(args.url || "");
       if (!/^https?:\/\//.test(url)) return "URL invalide";
+      if (allowed && !allowed.has(normUrl(url))) return "Page non autorisée : seulement les liens fournis par le voyageur ou trouvés par la recherche.";
       const r = await dsPost("/v1/tools/fetch", { url }, key, f, Math.min(20_000, cap));
       if (usage) {
         usage.fetch++;
@@ -600,6 +608,8 @@ async function runDeepSeek(key: string, job: Job, f: typeof fetch, deadline: num
     let thinking = false;
     // keep ~130 s for the last research round + the summary + the JSON answer
     const toolResults: string[] = [];
+    // pages it may open: the links of the request, then those its searches find
+    const allowedUrls = new Set<string>((job.text.match(/https?:\/\/[^\s"'<>)]+/g) || []).map(normUrl));
     for (let round = 0; round < 8 && left() > 155_000; round++) {
       const req = (th: boolean) => dsPost("/chat/completions", { model: DS_MODEL, messages: msgs, tools: DS_TOOLS, max_tokens: 4000, ...(th ? { thinking: { type: "enabled" }, reasoning_effort: "low" } : { thinking: { type: "disabled" } }) }, key, f, ms(50_000));
       let r: Json;
@@ -632,7 +642,7 @@ async function runDeepSeek(key: string, job: Job, f: typeof fetch, deadline: num
           } catch {
             /* bad arguments */
           }
-          const content = await dsTool(c.function.name, args, key, f, Math.max(3_000, left() - 90_000), usage);
+          const content = await dsTool(c.function.name, args, key, f, Math.max(3_000, left() - 90_000), usage, allowedUrls);
           toolResults.push(content);
           return { role: "tool" as const, tool_call_id: c.id, content };
         }),

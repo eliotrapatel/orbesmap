@@ -1,20 +1,33 @@
 import { useEffect, useMemo, useState } from "react";
-import { adjustProgramme, confirmTrip, draftOf, prepare, regenerateDay, useDraftRun } from "../../lib/draft";
+import { adjustProgramme, confirmTrip, draftOf, prepare, preparedElsewhere, regenerateDay, reviewNow, stopPrepare, useDraftRun } from "../../lib/draft";
 import { AiError } from "../../lib/ai";
 import { parseTime } from "../../lib/time";
 import { useStore, useTrip } from "../../lib/store";
 import Shell from "./Shell";
+import { getState, updateTrip } from "../../lib/store";
+
+/** The days not prepared yet are prepared from the review (the review comes back after) */
+async function prepareMissing(tripId: string) {
+  const d = getState().trips[tripId]?.draft as Record<string, unknown> | undefined;
+  if (!d) return;
+  updateTrip(tripId, { draft: { ...d, status: "preparing", error: undefined } });
+}
 
 /** A new trip being prepared by the AI (live progress), then its review (adjust, regenerate, confirm) */
 export default function DraftScreen({ onClose }: { onClose: () => void }) {
   const trip = useTrip();
   useStore((s) => s.trips[trip.id]);
   const d = draftOf(trip.id);
-  const run = useDraftRun();
-  // the preparation starts (or resumes) as soon as this screen shows
+  const run = useDraftRun(trip.id);
+  // the preparation starts (or resumes) as soon as this screen shows, and stops when it closes
   useEffect(() => {
-    if (d?.status === "preparing" && !run.busy && !run.err) void prepare(trip.id);
+    if (d?.status !== "preparing") return;
+    const t = window.setTimeout(() => {
+      if (!run.busy && !run.err) void prepare(trip.id);
+    }, 50);
+    return () => window.clearTimeout(t);
   }, [trip.id, d?.status]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => stopPrepare(), [trip.id]);
   if (!d) return null;
   if (d.status === "preparing") return <Preparing onClose={onClose} />;
   return <Review onClose={onClose} />;
@@ -23,7 +36,8 @@ export default function DraftScreen({ onClose }: { onClose: () => void }) {
 function Preparing({ onClose }: { onClose: () => void }) {
   const trip = useTrip();
   const d = draftOf(trip.id)!;
-  const run = useDraftRun();
+  const run = useDraftRun(trip.id);
+  const elsewhere = !run.busy && preparedElsewhere(trip.id);
   const days = trip.days.filter((x) => x.scheduled && x.dates?.length);
   const done = days.filter((x) => d.days?.[x.dates![0]] === "done").length;
   const pct = Math.round(((d.outline ? 1 : 0) + (d.essentials ? 1 : 0) + done) / (days.length + 2) * 100);
@@ -43,8 +57,9 @@ function Preparing({ onClose }: { onClose: () => void }) {
           <g className="v3-spin"><ellipse cx="100" cy="100" rx="96" ry="30" transform="rotate(-18 100 100)" fill="none" stroke="currentColor" strokeOpacity=".5" /><circle cx="191" cy="70" r="3.5" fill="currentColor" /></g>
           <g className="v3-spin rev"><ellipse cx="100" cy="100" rx="70" ry="22" transform="rotate(24 100 100)" fill="none" stroke="currentColor" strokeOpacity=".22" /></g>
         </svg>
-        <span className="v3-pct"><b>{pct} %</b><small>{run.step || (run.busy ? "…" : "En pause")}</small></span>
+        <span className="v3-pct"><b>{pct} %</b><small>{run.step || (run.busy ? "…" : elsewhere ? "Sur un autre appareil" : "En pause")}</small></span>
       </div>
+      <p className="sr" aria-live="polite">{pct} %. {run.step}</p>
       <h1 className="v3-d v3-h2" style={{ textAlign: "center", fontSize: 30 }}>Nous préparons {trip.title}.</h1>
       <div className="v3-glass v3-days">
         {days.map((x, i) => {
@@ -62,12 +77,14 @@ function Preparing({ onClose }: { onClose: () => void }) {
         <div><span className="v3-lbl">Lieux trouvés</span><b>{run.found || "—"}</b></div>
         <div><span className="v3-lbl">Placés sur la carte</span><b>{run.placed || "—"}</b></div>
       </div>
+      {elsewhere && <p className="v3-note" style={{ textAlign: "center" }}>Ce voyage est en cours de préparation sur un autre appareil.</p>}
       {(run.err || d.error) && !run.busy && (
         <div className="v3-glass" style={{ padding: 14, marginTop: 12 }}>
           <p className="v3-err" style={{ marginTop: 0 }}>{run.err || d.error}</p>
           <button className="v3-btn ghost" style={{ marginTop: 10 }} onClick={() => void prepare(trip.id)}>Reprendre la préparation</button>
         </div>
       )}
+      {!run.busy && done > 0 && <button className="v3-link" style={{ marginTop: 10 }} onClick={() => reviewNow(trip.id)}>Voir le programme avec ce qui est prêt</button>}
       <div className="v3-spacer" />
       <p className="v3-note" style={{ textAlign: "center" }}>Gardez l'app ouverte. Si elle se ferme, la préparation reprend là où elle s'est arrêtée.</p>
     </Shell>
@@ -76,7 +93,8 @@ function Preparing({ onClose }: { onClose: () => void }) {
 
 function Review({ onClose }: { onClose: () => void }) {
   const trip = useTrip();
-  const run = useDraftRun();
+  const run = useDraftRun(trip.id);
+  const missing = trip.days.filter((x) => x.scheduled && x.dates?.length && draftOf(trip.id)?.days?.[x.dates[0]] !== "done").length;
   const days = trip.days.filter((x) => x.scheduled && x.dates?.length);
   const [day, setDay] = useState(days[0]?.key || "");
   const [ask, setAsk] = useState("");
@@ -141,6 +159,11 @@ function Review({ onClose }: { onClose: () => void }) {
           <button type="button" className="v3-chip on" disabled={busy || !ask.trim()} onClick={() => void adjust()}>Ajuster</button>
         </div>
       </div>
+      {missing > 0 && !run.busy && (
+        <button className="v3-btn ghost" style={{ marginTop: 12 }} onClick={() => { const dd0 = draftOf(trip.id); if (dd0) void prepareMissing(trip.id); }}>
+          Préparer {missing === 1 ? "le jour manquant" : `les ${missing} jours manquants`}
+        </button>
+      )}
       <div className="v3-spacer" />
       <button className="v3-btn" disabled={run.busy} onClick={() => confirmTrip(trip.id)}>Valider le voyage ✓</button>
     </Shell>

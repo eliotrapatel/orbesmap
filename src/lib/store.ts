@@ -883,7 +883,7 @@ function adoptAccount(uid: string) {
   }
   if (!prev || prev === uid) return;
   try {
-    for (const k of Object.keys(localStorage)) if (k.startsWith("orbes.v2.") || k === OUTBOX_KEY || k === TRIPS_KEY || k === PROFILE_KEY || k.startsWith("orbes.ask.")) localStorage.removeItem(k);
+    for (const k of Object.keys(localStorage)) if (k.startsWith("orbes.v2.") || k === OUTBOX_KEY || k === TRIPS_KEY || k === PROFILE_KEY || k.startsWith("orbes.ask.") || k.startsWith("orbes.wizard")) localStorage.removeItem(k);
   } catch {
     /* ignore */
   }

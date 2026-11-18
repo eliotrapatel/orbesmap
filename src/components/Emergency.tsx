@@ -41,21 +41,23 @@ export default function Emergency({ trip }: { trip: Trip }) {
         </div>
       </section>
 
+      {em.consulate.name && (
       <section className="em-sec">
         <span className="label">Consulat général de France</span>
         <div className="card em-card">
           <h4>{em.consulate.name}</h4>
           <p>{em.consulate.address}</p>
-          <p className="zh" lang="zh-CN">{em.consulate.cn}</p>
+          {em.consulate.cn && <p className="zh" lang="zh-CN">{em.consulate.cn}</p>}
           {em.consulate.hours && <p className="em-small">{em.consulate.hours}</p>}
           <div className="em-actions">
-            <a className="btn-sm" href={tel(em.consulate.phone)}>Standard {em.consulate.phone}</a>
+            {em.consulate.phone && <a className="btn-sm" href={tel(em.consulate.phone)}>Standard {em.consulate.phone}</a>}
             {em.consulate.emergency && <a className="btn-sm em-red" href={tel(em.consulate.emergency)}>Urgence {em.consulate.emergency}</a>}
-            <button className="btn-sm" onClick={() => setShow({ zh: em.consulate.cn, sub: em.consulate.address })}><IExpand /> Montrer au chauffeur</button>
-            <a className="btn-sm" href={amapDirections({ lat: em.consulate.lat, lng: em.consulate.lng, name: "法国驻上海总领事馆" })} target="_blank" rel="noopener"><INav /> Amap</a>
+            {em.consulate.cn && <button className="btn-sm" onClick={() => setShow({ zh: em.consulate.cn, sub: em.consulate.address })}><IExpand /> Montrer au chauffeur</button>}
+            {em.consulate.cn && Number.isFinite(em.consulate.lat) && <a className="btn-sm" href={amapDirections({ lat: em.consulate.lat, lng: em.consulate.lng, name: "法国驻上海总领事馆" })} target="_blank" rel="noopener"><INav /> Amap</a>}
           </div>
         </div>
       </section>
+      )}
 
       <section className="em-sec">
         <span className="label">Hôpitaux internationaux · du plus proche {fix ? "de vous" : "de l'hôtel"}</span>

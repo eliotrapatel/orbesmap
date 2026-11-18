@@ -70,10 +70,11 @@ export default function CreateWizard({ onCancel, onCreated }: { onCancel: () => 
   };
   const top = (
     <div className="v3-bar">
-      <button className="v3-tool" onClick={w.step === 1 ? close : () => set({ step: w.step - 1 })} aria-label={w.step === 1 ? "Fermer" : "Retour"}>{w.step === 1 ? "✕" : "‹"}</button>
+      {w.step > 1 && <button className="v3-tool" onClick={() => set({ step: w.step - 1 })} aria-label="Retour">‹</button>}
       <div className="v3-stepper">
         {["Où", "Quand", "Vos infos", "Programme"].map((s, i) => <span key={s} className={i + 1 === w.step ? "on" : i + 1 < w.step ? "done" : ""}>{s}</span>)}
       </div>
+      <button className="v3-tool" onClick={close} aria-label="Fermer (le brouillon est effacé)">✕</button>
     </div>
   );
   if (w.step === 1) return <Where w={w} set={set} top={top} />;
@@ -223,8 +224,14 @@ function Know({ w, set, top }: StepProps) {
     setErr(null);
     try {
       const results: IntakeResult[] = [];
-      if (w.know.trim()) results.push(await ai<IntakeResult>("intake", { text: w.know.trim() }, 290_000));
-      for (const f of shots) results.push(await ai<IntakeResult>("intake", { image: await imageToBase64(f, 1600, 0.8) }, 290_000));
+      try {
+        if (w.know.trim()) results.push(await ai<IntakeResult>("intake", { text: w.know.trim() }, 290_000));
+        for (const f of shots) results.push(await ai<IntakeResult>("intake", { image: await imageToBase64(f, 1600, 0.8) }, 290_000));
+      } catch (e) {
+        // what was already sorted is kept
+        if (!results.length) throw e;
+        setErr(e instanceof AiError ? `${e.message} (le reste est gardé)` : "Une partie n'a pas pu être triée (le reste est gardé).");
+      }
       const places = [...w.places];
       const fixed = [...w.fixed];
       const wishes = [...w.wishes];
@@ -257,7 +264,8 @@ function Know({ w, set, top }: StepProps) {
         </div>
         <input ref={file} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) setShots((s) => [...s, f].slice(0, 3)); e.target.value = ""; }} />
       </div>
-      {busy && <p className="v3-note">L'IA lit vos liens et vos captures… jusqu'à 2 minutes.</p>}
+      {busy && <p className="v3-note">L'IA lit vos liens et vos captures… quelques minutes. Gardez l'app ouverte.</p>}
+      {w.know.length > 11000 && <p className="v3-note">Texte très long : seuls les 12 000 premiers caractères seront lus.</p>}
       {msg && !busy && <p className="v3-note">{msg}</p>}
       {err && <p className="v3-err">{err}</p>}
       {w.places.length > 0 && <p className="v3-lbl" style={{ marginTop: 18 }}>Lieux</p>}
@@ -301,19 +309,24 @@ function Programme({ w, set, top, onCreated }: StepProps & { onCreated: (id: str
       if (g) hotelLL = g.ll;
     }
     const rec = newTripRecord({ dest: base, start: w.start, end: w.end, hotel: w.hotelName });
-    const flights = w.flights.map((f, i) => ({
-      code: f.code, airline: f.airline, from: f.from, to: f.to, fromCity: f.fromCity, toCity: f.toCity, terminal: f.terminal || undefined,
-      departAt: f.departAt || undefined, arriveAt: f.arriveAt || undefined,
-      kind: i === w.flights.length - 1 && w.flights.length > 1 ? "departure" : "arrival",
-      at: i === w.flights.length - 1 && w.flights.length > 1 ? f.departAt || f.arriveAt : f.arriveAt || f.departAt,
-    }));
+    // the flight that lands at the start of the trip (arrival) and the one that leaves at its end (departure);
+    // connections stay in the text given to the AI
+    const day = (iso: string) => (iso || "").slice(0, 10);
+    const arr = [...w.flights].filter((f) => f.arriveAt && day(f.arriveAt) <= w.start).sort((a, b) => b.arriveAt.localeCompare(a.arriveAt))[0] || w.flights.find((f) => day(f.arriveAt) === w.start);
+    const dep = [...w.flights].filter((f) => f !== arr && f.departAt && day(f.departAt) >= w.end).sort((a, b) => a.departAt.localeCompare(b.departAt))[0];
+    const flights = [arr && { f: arr, kind: "arrival" as const, at: arr.arriveAt }, dep && { f: dep, kind: "departure" as const, at: dep.departAt }]
+      .filter((x): x is { f: ExtractResult["flights"][number]; kind: "arrival" | "departure"; at: string } => !!x && !!x.at)
+      .map(({ f, kind, at }) => ({ code: f.code, airline: f.airline, from: f.from, to: f.to, fromCity: f.fromCity, toCity: f.toCity, terminal: f.terminal || undefined, departAt: f.departAt || undefined, arriveAt: f.arriveAt || undefined, kind, at }));
+    const flightsText = w.flights.map((f) => `${f.code} ${f.from}→${f.to} départ ${f.departAt} arrivée ${f.arriveAt}`).join(" ; ");
     const draft: Draft = {
+      flightsText,
       status: "preparing",
       cities: w.cities.map((c) => ({ name: c.name, lat: c.lat, lng: c.lng, country: c.country })),
       hotelText: [w.hotelName, w.hotelAddress].filter(Boolean).join(", "),
       pace: w.pace,
       interests: w.interests,
-      wishes: w.wishes.filter((x) => x.keep).map((x) => x.text).concat(w.know.trim() && !w.places.length && !w.wishes.length ? [w.know.trim().slice(0, 1500)] : []),
+      // what was typed stays as said (the cards are what the AI understood of it)
+      wishes: w.wishes.filter((x) => x.keep).map((x) => x.text).concat(w.know.trim() ? [`En vrac : ${w.know.trim().slice(0, 1500)}`] : []),
       dayWishes: w.dayWishes,
       places: w.places.filter((p) => p.keep).map(({ keep: _k, ...p }) => p),
       fixed: w.fixed.filter((f) => f.keep).map(({ keep: _k, ...f }) => f),
@@ -325,12 +338,13 @@ function Programme({ w, set, top, onCreated }: StepProps & { onCreated: (id: str
       timezone: timezoneFor(base.country, base.lng),
       hotel: { name: w.hotelName.trim() || "Hôtel à préciser", lat: hotelLL[1], lng: hotelLL[0] },
       zones: w.cities.map((c) => ({ label: c.name, center: [c.lng, c.lat], zoom: 12 })),
-      flights: flights.filter((f) => f.at),
+      flights,
       draft,
     });
     switchTrip(id);
     onCreated(id);
   };
+  const goSafe = () => go().catch(() => setBusy(false));
   return (
     <Shell ring={false} top={top}>
       <h1 className="v3-d v3-h2" style={{ marginTop: 22 }}>Votre programme idéal</h1>
@@ -355,7 +369,7 @@ function Programme({ w, set, top, onCreated }: StepProps & { onCreated: (id: str
         ))}
       </div>
       <div className="v3-spacer" />
-      <button className="v3-btn" disabled={busy || !days.length} onClick={() => void go()}>{busy ? "Création…" : "✦ Préparer mon voyage"}</button>
+      <button className="v3-btn" disabled={busy || !days.length} onClick={() => void goSafe()}>{busy ? "Création…" : "✦ Préparer mon voyage"}</button>
     </Shell>
   );
 }
