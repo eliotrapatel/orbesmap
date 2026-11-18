@@ -5,6 +5,7 @@ import OrbitMark from "../OrbitMark";
 import Shell from "./Shell";
 import { legalHref } from "./Legal";
 import { t, tk, getLang, setLang } from "../../lib/i18n";
+import "../../styles/landing.css";
 
 type Mode = "email" | "sent" | "password";
 
@@ -159,6 +160,28 @@ export default function Welcome() {
         </div>
       </section>
 
+      <section className="pub-sec pub-asia" aria-labelledby="pub-asia-h">
+        <div>
+          <p className="v3-lbl">{t("Chine et Asie")}</p>
+          <h2 className="v3-d pub-h2" id="pub-asia-h">{t("Là où vos applis habituelles ne marchent plus.")}</h2>
+          <p className="v3-lead">{t("En Chine, Google ne marche pas. Ailleurs en Asie, c'est souvent la langue et l'écriture qui bloquent.")}</p>
+        </div>
+        <div>
+          <ol className="pub-asia-list">
+            {ASIA.map(([f, d], i) => (
+              <li key={f}>
+                <span className="pub-n" aria-hidden="true">{String(i + 1).padStart(2, "0")}</span>
+                <div>
+                  <b>{t(f)}</b>
+                  <p>{t(d)}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+          <p className="pub-asia-else">{t("Et tout cela marche aussi partout ailleurs.")}</p>
+        </div>
+      </section>
+
       <section className="pub-sec pub-free">
         <p className="v3-lbl">{tk("pricing", "Prix")}</p>
         <h2 className="v3-d pub-h2">{t("Gratuit pour commencer.")}</h2>
@@ -200,6 +223,14 @@ const FEATURES: [string, string][] = [
   ["Traduire et parler", "Traduction, phrases utiles, conversion de devises."],
   ["Urgences", "Les numéros du pays, le consulat et votre assurance au même endroit."],
   ["À plusieurs", "Invitez vos compagnons de voyage, en modification ou en lecture seule."],
+];
+
+/** China and Asia: only what the app really does (offline map without Google, the driver screen, phrases + translator, the departure checklist) */
+const ASIA: [string, string][] = [
+  ["Une carte sans Google", "La carte du voyage n'utilise pas Google. Activez le mode hors ligne : elle marche aussi sans réseau, dans le métro ou sans données."],
+  ["L'adresse pour le chauffeur", "Le nom et l'adresse de chaque lieu dans l'écriture locale, en grand à l'écran, avec lecture à voix haute."],
+  ["Phrases utiles et traducteur", "Des phrases avec leur prononciation (pinyin, romaji) à écouter, et un traducteur pour parler avec quelqu'un."],
+  ["Une check-list de départ", "Visa, eSIM, paiements locaux, applis utiles : ce qu'il faut régler avant de partir, avec des dates conseillées."],
 ];
 
 const FAQ: [string, string][] = [
