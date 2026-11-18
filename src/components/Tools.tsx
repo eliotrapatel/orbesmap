@@ -12,6 +12,7 @@ import { phase } from "../lib/time";
 import { ICalPlus, ICopy, IDownload, IOffline, IPlane, ISpeaker } from "./Icons";
 import { cancelOffline, deleteOffline, offlineSupported, prepareOffline, useOffline, verifyOffline } from "../lib/offline";
 import { ShowScreen, copy, speak } from "./ui";
+import { ExpenseReportSheet } from "./Expenses";
 import { track } from "../lib/track";
 import { locale, t } from "../lib/i18n";
 
@@ -314,6 +315,7 @@ export function Practical({ trip }: { trip: Trip }) {
 export function ExportPanel({ trip }: { trip: Trip }) {
   const business = useBusiness(trip);
   const ph = phase(trip);
+  const [expenseReport, setExpenseReport] = useState(false);
   return (
     <div>
       <p style={{ color: "var(--soft)", fontSize: 13.5, marginBottom: 16 }}>{ph !== "before" ? t("Tout le carnet {title} : lieux, statuts, notes, fiches fournisseurs, contacts et visites.", { title: trip.title }) : t("Tout le carnet {title} : lieux, statuts, notes, fiches fournisseurs, contacts.", { title: trip.title })}</p>
@@ -325,6 +327,14 @@ export function ExportPanel({ trip }: { trip: Trip }) {
             <p>{t("Chaque fournisseur : fiche, statut, rendez-vous, contacts, notes, photos et dépenses. À envoyer à l'équipe.")}</p>
           </button>
         )}
+        {business && (
+          <button className="card" style={{ textAlign: "left" }} onClick={() => { if (!hasPro()) return requestPro("business"); setExpenseReport(true); }}>
+            <IDownload width={20} height={20} />
+            <h4 style={{ marginTop: 10 }}>{t("Note de frais")}</h4>
+            <p>{t("Les dépenses jour par jour, en euros, avec les justificatifs. En PDF et en tableur pour la comptabilité.")}</p>
+          </button>
+        )}
+        {expenseReport && <ExpenseReportSheet trip={trip} onClose={() => setExpenseReport(false)} />}
         <button className="card" style={{ textAlign: "left" }} onClick={() => { if (!hasPro()) return requestPro("export"); track("export", "pdf", trip.id); if (!exportPdf(trip, getState().data)) toast(t("Autorisez les fenêtres pop-up pour imprimer le PDF")); }}>
           <IDownload width={20} height={20} />
           <h4 style={{ marginTop: 10 }}>PDF</h4>

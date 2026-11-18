@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Trip } from "../data/types";
 import { TRIP_BY_ID } from "../data/trip";
+import type { Photo } from "./model";
 import { currentAuthor, getState, requestPro, updateRecord, updateTrip, useStore } from "./store";
 import { track } from "./track";
 
@@ -97,6 +98,8 @@ export type Expense = {
   category: string;
   /** its value in euros when it was entered (null: the rate was unknown) */
   eur?: number | null;
+  /** the rate used for `eur` (units of `currency` for 1 €), kept as is; absent on older expenses */
+  rate?: number | null;
   createdBy?: string;
 };
 
@@ -126,6 +129,7 @@ export function expensesOf(records: Record<string, Record<string, unknown>>): Ex
       paidBy: String(r.paidBy || ""), split: Array.isArray(r.split) ? (r.split as unknown[]).map(String) : [],
       placeId: typeof r.placeId === "string" && r.placeId ? r.placeId : undefined, createdBy: typeof r.createdBy === "string" ? r.createdBy : undefined,
       category: typeof r.category === "string" && r.category ? r.category : "other", eur: typeof r.eur === "number" ? r.eur : null,
+      ...(typeof r.rate === "number" && r.rate > 0 ? { rate: r.rate } : {}),
     });
   }
   return out.sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
@@ -135,12 +139,33 @@ export function useExpenses(): Expense[] {
   return useMemo(() => expensesOf(records as Record<string, Record<string, unknown>>), [records]);
 }
 
-export function addExpense(e: Omit<Expense, "id" | "createdBy">, tripId?: string) {
+/** Adds an expense; returns its id (its receipts are photos of the place id `expenseKey(id)`) */
+export function addExpense(e: Omit<Expense, "id" | "createdBy">, tripId?: string): string {
   const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
   updateRecord(PREFIX + id, { ...e, eur: e.eur == null ? null : Math.round(e.eur * 100) / 100, placeId: e.placeId || null, createdBy: currentAuthor() || null });
   track("expense_added", e.category, tripId || getState().tripId);
+  return id;
+}
+/** Changes an expense (only the fields given) */
+export function updateExpense(id: string, patch: Partial<Omit<Expense, "id" | "createdBy">>) {
+  const p: Record<string, unknown> = { ...patch };
+  if ("eur" in patch) p.eur = patch.eur == null ? null : Math.round(patch.eur * 100) / 100;
+  if ("placeId" in patch) p.placeId = patch.placeId || null;
+  updateRecord(PREFIX + id, p);
 }
 export const deleteExpense = (id: string) => updateRecord(PREFIX + id, { deleted: true });
+
+// ---------- receipts ----------
+// A receipt is an ordinary photo (same storage, sync and deletion as a place's photos) attached to the
+// record id "_exp:<id>" instead of a place id: no new table or bucket.
+/** The record id an expense's receipts are attached to */
+export const expenseKey = (id: string) => PREFIX + id;
+/** An expense's receipts, oldest first */
+export const receiptsOf = (photos: Photo[], id: string): Photo[] => photos.filter((p) => p.placeId === PREFIX + id).sort((a, b) => a.createdAt - b.createdAt);
+export function useReceipts(id: string): Photo[] {
+  const photos = useStore((s) => s.data.photos);
+  return useMemo(() => receiptsOf(photos, id), [photos, id]);
+}
 
 /** The trip's travellers who share expenses: the list kept on the trip, else this person */
 export function travellersOf(trip: Trip): string[] {
