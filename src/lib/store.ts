@@ -438,7 +438,7 @@ function flush(fromPull = false): Promise<void> {
           !(o.t === "def" && defsMissing) &&
           !(o.t === "trip" && tripsMissing) &&
           // the shared space's trips: their changes wait for one of its members (never sent by another account)
-          !("trip" in o && TRIP_BY_ID[o.trip] && state.member !== true);
+          !("trip" in o && TRIP_BY_ID[o.trip] && state.member !== true && !["owner", "editor"].includes(state.roles[o.trip] || ""));
         // a trip's record first: its places, notes and photos need it to exist on the server
         const op = outbox.find((o) => o.t === "trip" && ready(o)) || outbox.find(ready);
         if (!op) break;
@@ -730,11 +730,20 @@ export async function pull() {
         }
         if (localNewer) toPush.push({ t: "trip", trip: r.id, id: r.id });
       }
+      // a trip the server no longer returns (left, removed by its owner, deleted): gone from this phone too,
+      // unless it was just created here and not sent yet; the first shared space's trips stay for its members
+      const onServer = new Set((tr.data || []).map((r) => r.id));
+      for (const id of Object.keys(merged)) {
+        if (onServer.has(id) || outbox.some((o) => o.t === "trip" && o.id === id) || (TRIP_BY_ID[id] && state.member === true)) continue;
+        delete merged[id];
+        changed = true;
+      }
       if (changed) setTrips(merged);
     }
     toPush.forEach(enqueue);
     // what the other phone (maybe still on the previous version) changed, copied into the place records
     migrate(trip, true);
+    void joinInvitations();
     subscribePlaces();
     await loadPhotoUrls();
     if (!outbox.length) set({ sync: "idle", syncedAt: Date.now() });
@@ -1034,6 +1043,12 @@ async function pullTripsOnly() {
   tripsKnown = true;
   const merged: Record<string, TripRec> = { ...state.trips };
   let changed = false;
+  const onServer = new Set((data || []).map((r) => r.id));
+  for (const id of Object.keys(merged)) {
+    if (onServer.has(id) || outbox.some((o) => o.t === "trip" && o.id === id) || (TRIP_BY_ID[id] && state.member === true)) continue;
+    delete merged[id];
+    changed = true;
+  }
   for (const r of data || []) {
     if (outbox.some((o) => o.t === "trip" && o.id === r.id)) continue;
     const m = mergePlaceState(state.trips[r.id] as PlaceState, { updatedAt: new Date(r.updated_at).getTime(), ...(r.data as PlaceState) }).merged;
@@ -1070,7 +1085,11 @@ async function joinInvitations() {
 /** This account can change the trip (readers of a shared trip cannot) */
 export const useCanEdit = (tripId?: string) => {
   const id = useStore((s) => tripId ?? s.tripId);
-  return useStore((s) => s.roles[id]) !== "viewer";
+  const role = useStore((s) => s.roles[id]);
+  const member = useStore((s) => s.member);
+  // the first shared space always edits its own trips
+  if (member === true && TRIP_BY_ID[id]) return true;
+  return role !== "viewer";
 };
 
 // ---------- profile (table "profiles") ----------

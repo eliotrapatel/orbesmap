@@ -696,7 +696,7 @@ export default function App() {
             else {
               // a place removed from the programme: put back, then opened
               const r = trip.removed?.find((x) => x.id === id);
-              if (r) {
+              if (r && canEdit) {
                 updateDef(r.id, { removed: false });
                 toast(`« ${r.name} » remis au programme`);
                 openPlace(r);

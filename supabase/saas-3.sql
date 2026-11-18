@@ -40,9 +40,30 @@ drop policy if exists "invites read" on public.trip_invites;
 drop policy if exists "invites create" on public.trip_invites;
 drop policy if exists "invites remove" on public.trip_invites;
 create policy "invites read" on public.trip_invites for select to authenticated
-  using ((select public.can_read_trip(trip_id)) or lower(email) = lower(coalesce(auth.jwt() ->> 'email', '')));
+  using ((select public.can_manage_trip(trip_id)) or lower(email) = lower(coalesce(auth.jwt() ->> 'email', '')));
+drop policy if exists "invites change" on public.trip_invites;
+-- the two trips of the first shared space are not shared this way (yet); 30 invitations per trip at most
+create or replace function public.invites_left(t text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select (select count(*) from public.trip_invites where trip_id = t) < 30;
+$$;
+revoke all on function public.invites_left(text) from public, anon;
+grant execute on function public.invites_left(text) to authenticated;
 create policy "invites create" on public.trip_invites for insert to authenticated
-  with check ((select public.can_manage_trip(trip_id)) and email = lower(trim(email)) and position('@' in email) > 1);
+  with check (
+    (select public.can_manage_trip(trip_id)) and trip_id not in ('sha-2026', 'gz-2026')
+    and email = lower(trim(email)) and position('@' in email) > 1
+    and invited_by = auth.uid() and (select public.invites_left(trip_id))
+  );
+-- inviting the same address again changes its role
+create policy "invites change" on public.trip_invites for update to authenticated
+  using ((select public.can_manage_trip(trip_id)))
+  with check ((select public.can_manage_trip(trip_id)) and invited_by = auth.uid());
 create policy "invites remove" on public.trip_invites for delete to authenticated
   using ((select public.can_manage_trip(trip_id)));
 
@@ -92,15 +113,14 @@ grant execute on function public.trip_people(text) to authenticated;
 drop policy if exists "owner or self removes" on public.trip_members;
 create policy "owner or self removes" on public.trip_members for delete to authenticated
   using (role <> 'owner' and ((select public.can_manage_trip(trip_id)) or user_id = auth.uid()));
+-- adding a traveller directly: never as owner (the owner is the creator, added by the trip's trigger)
+drop policy if exists "owner adds" on public.trip_members;
+create policy "owner adds" on public.trip_members for insert to authenticated
+  with check ((select public.trip_role(trip_id)) = 'owner' and role in ('editor', 'viewer'));
 -- the owner (or the shared space) changes a traveller's role (editor / reader), never to owner
 drop policy if exists "owner changes" on public.trip_members;
 create policy "owner changes" on public.trip_members for update to authenticated
   using ((select public.can_manage_trip(trip_id)) and role <> 'owner')
   with check ((select public.can_manage_trip(trip_id)) and role in ('editor', 'viewer'));
 
--- live updates (a new traveller, an invitation accepted)
-do $$
-begin
-  alter publication supabase_realtime add table public.trip_invites;
-exception when duplicate_object then null;
-end $$;
+-- no live updates on invitations: a deleted row would carry its e-mail to every listener

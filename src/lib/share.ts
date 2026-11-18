@@ -29,7 +29,9 @@ export async function invites(tripId: string): Promise<Invite[]> {
 export async function invite(tripId: string, email: string, role: Invite["role"]) {
   const e = email.trim().toLowerCase();
   if (!/^\S+@\S+\.\S+$/.test(e)) throw new Error("Adresse e-mail invalide.");
-  const { error } = await sb().from("trip_invites").upsert({ trip_id: tripId, email: e, role });
+  if (["sha-2026", "gz-2026"].includes(tripId)) throw new Error("Ces deux voyages sont partagés entre vous deux ; inviter d'autres personnes sera possible plus tard.");
+  const uid = (await sb().auth.getSession()).data.session?.user.id;
+  const { error } = await sb().from("trip_invites").upsert({ trip_id: tripId, email: e, role, invited_by: uid });
   fail(error, "L'invitation");
 }
 export async function removeInvite(tripId: string, email: string) {

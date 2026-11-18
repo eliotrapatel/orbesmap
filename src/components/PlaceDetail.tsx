@@ -79,7 +79,7 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH, onMoveP
             <button className="icon-btn" onClick={onBack} aria-label="Fermer la fiche">
               <IBack />
             </button>
-            <button
+            {canEdit && <button
               className={"icon-btn" + (state.favorite ? " fav-on" : "")}
               aria-pressed={!!state.favorite}
               aria-label={state.favorite ? "Retirer des favoris" : "Ajouter aux favoris"}
@@ -89,7 +89,7 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH, onMoveP
               }}
             >
               <IStar />
-            </button>
+            </button>}
             {canEdit && (
               <button className="icon-btn" aria-label="Modifier la fiche" onClick={() => setEditing(true)}>
                 <IEdit />
@@ -299,9 +299,9 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH, onMoveP
               return (
                 <div className="photo" key={p.id}>
                   {src ? <img src={src} alt="" loading="lazy" onClick={() => setLightbox(src)} /> : null}
-                  <button className="x" aria-label="Supprimer la photo" onClick={() => confirm("Supprimer cette photo ?") && deletePhoto(p.id)}>
+                  {canEdit && <button className="x" aria-label="Supprimer la photo" onClick={() => confirm("Supprimer cette photo ?") && deletePhoto(p.id)}>
                     <IClose width={12} height={12} />
-                  </button>
+                  </button>}
                 </div>
               );
             })}
@@ -324,7 +324,7 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH, onMoveP
                   <small>{c.value}</small>
                 </a>
                 <button className="icon-btn" aria-label={`Copier ${c.value}`} onClick={() => copy(c.value, "Copié", toast)}><ICopy /></button>
-                <button className="icon-btn" aria-label={`Supprimer ${c.name}`} onClick={() => confirm(`Supprimer le contact ${c.name} ?`) && deleteContact(c.id)}><ITrash /></button>
+                {canEdit && <button className="icon-btn" aria-label={`Supprimer ${c.name}`} onClick={() => confirm(`Supprimer le contact ${c.name} ?`) && deleteContact(c.id)}><ITrash /></button>}
               </div>
             );
           })}

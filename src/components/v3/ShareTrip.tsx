@@ -10,9 +10,9 @@ export default function ShareTrip({ onClose }: { onClose: () => void }) {
   const trip = useTrip();
   const me = useStore((s) => s.session?.user.id);
   const myName = useStore((s) => (s.profile.name as string) || "");
-  const member = useStore((s) => s.member);
   const myRole = useStore((s) => s.roles[trip.id]);
-  const canManage = myRole === "owner" || (member === true && !myRole);
+  const legacy = trip.id === "sha-2026" || trip.id === "gz-2026";
+  const canManage = !legacy && myRole === "owner";
   const [list, setList] = useState<Person[]>([]);
   const [pending, setPending] = useState<Invite[]>([]);
   const [email, setEmail] = useState("");
@@ -56,9 +56,9 @@ export default function ShareTrip({ onClose }: { onClose: () => void }) {
         await navigator.share({ title: `ORBES Trips · ${trip.title}`, text: msg });
         return;
       }
-    } catch {
-      /* closed by the user */
-      return;
+    } catch (e) {
+      // closed by the user: nothing to do; any other failure: the message is copied instead
+      if ((e as Error)?.name === "AbortError") return;
     }
     try {
       await navigator.clipboard.writeText(msg);
@@ -101,7 +101,8 @@ export default function ShareTrip({ onClose }: { onClose: () => void }) {
       {err && <p className="v3-err">{err}</p>}
 
       <p className="v3-lbl" style={{ marginTop: 22 }}>Voyageurs</p>
-      {!list.length && !err && <p className="v3-note">{member && !myRole ? "Les deux personnes de l'espace partagé voient déjà ce voyage." : "Vous seul pour l'instant."}</p>}
+      {legacy && <p className="v3-note">Ce voyage est partagé entre vous deux depuis le début. Inviter d'autres personnes sera possible plus tard ; vos nouveaux voyages, eux, se partagent dès maintenant.</p>}
+      {!legacy && !list.length && !err && <p className="v3-note">Vous seul pour l'instant.</p>}
       {list.map((p) => (
         <div key={p.user_id} className="v3-card on" style={{ cursor: "default" }}>
           <span className="v3-grow"><b>{p.name || p.email.split("@")[0]}{p.user_id === me ? " (vous)" : ""}</b><small>{p.email}</small></span>

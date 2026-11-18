@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import type { Trip } from "../data/types";
 import { uid } from "../lib/model";
-import { toast, updateRecord, useStore } from "../lib/store";
+import { toast, updateRecord, useCanEdit, useStore } from "../lib/store";
 import { localDate } from "../lib/time";
 import { ICheck, IPlus, ITrash } from "./Icons";
 
@@ -27,6 +27,8 @@ export function useChecklist(trip: Trip) {
 }
 
 export default function Checklist({ trip }: { trip: Trip }) {
+  // readers of a shared trip see the list without changing it
+  const canEdit = useCanEdit();
   const items = useChecklist(trip);
   const [text, setText] = useState("");
   const [who, setWho] = useState<string>("all");
@@ -46,6 +48,7 @@ export default function Checklist({ trip }: { trip: Trip }) {
   };
 
   return (
+    <fieldset disabled={!canEdit} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
     <div>
       <div className="ck-head">
         <div>
@@ -112,5 +115,6 @@ export default function Checklist({ trip }: { trip: Trip }) {
         <button className="btn primary" disabled={!text.trim()}><IPlus /> Ajouter</button>
       </form>
     </div>
+    </fieldset>
   );
 }
