@@ -1,0 +1,177 @@
+/* Account (lot account): one settings-list structure for the trip's "Compte" panel and the account screen of "Mes voyages".
+   Vault language: hairlines, one gold accent for Pro, display face for names and the plan. Motion = staged entry only. */
+
+.ac { container-type: inline-size; display: flex; flex-direction: column; gap: 30px; padding-bottom: 8px; }
+.ac.is-v3 { padding-top: 14px; }
+
+/* ---------- header: monogram, name, e-mail, sync, plan ---------- */
+.ac-head { display: flex; flex-direction: column; gap: 18px; }
+.ac-id { display: flex; align-items: flex-start; gap: 16px; min-width: 0; }
+.ac-who { padding-top: 6px; }
+.ac-mono { width: 64px; height: 64px; flex: none; border-radius: 50%; display: grid; place-items: center; font: 500 26px/1 var(--display); color: var(--ink);
+  background: radial-gradient(120% 120% at 30% 18%, rgba(246, 242, 234, 0.11), rgba(246, 242, 234, 0.02) 62%); border: 1px solid var(--hair-strong); }
+.ac-mono.is-pro { color: var(--gold); border-color: rgba(216, 196, 126, 0.62); outline: 1px solid rgba(216, 196, 126, 0.22); outline-offset: 3px; }
+.ac-who { min-width: 0; flex: 1; }
+.ac-name { font-size: clamp(26px, 7.6vw, 32px); line-height: 0.95; margin: 0; overflow-wrap: anywhere; }
+.ac-mail { margin-top: 7px; font-size: 13.5px; color: var(--soft); overflow-wrap: anywhere; line-height: 1.35; }
+.ac-status { margin-top: 10px; }
+.ac-status .sync { font-size: 12px; }
+.ac-status .sync.idle i { box-shadow: none; }
+.ac-status .sync.syncing i { animation: none; }
+.ac-status-note { margin-top: 8px; font-size: 12.5px; line-height: 1.45; color: var(--mute); max-width: 46ch; }
+
+.ac-plan { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; padding: 16px 16px 16px 18px; border-radius: 18px; border: 1px solid var(--hair); background: rgba(246, 242, 234, 0.03); color: var(--ink);
+  transition: border-color 0.25s var(--ease), background 0.25s var(--ease), transform 0.16s var(--ease); }
+.ac-plan:hover { border-color: var(--hair-strong); background: rgba(246, 242, 234, 0.05); }
+.ac-plan:active { transform: scale(0.985); }
+.ac-plan-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px; }
+.ac-plan-k { font-size: 10.5px; line-height: 1; letter-spacing: 0.16em; text-transform: uppercase; color: var(--mute); }
+.ac-plan-t { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; font-size: 22px; line-height: 1; }
+.ac-plan-t .v3-d { font-size: 20px; line-height: 1; }
+.ac-plan small { font-size: 12.5px; line-height: 1.4; color: var(--soft); }
+.ac-plan-cta { flex: none; display: inline-flex; align-items: center; gap: 2px; font-size: 13px; color: var(--ink); white-space: nowrap; }
+.ac-plan-cta .ac-chev { color: currentColor; }
+.ac-plan:hover .ac-chev { transform: translateX(2px); }
+.ac-plan.is-pro { border-color: rgba(216, 196, 126, 0.34); background: linear-gradient(180deg, rgba(216, 196, 126, 0.075), rgba(216, 196, 126, 0.012)); }
+.ac-plan.is-pro:hover { border-color: rgba(216, 196, 126, 0.5); }
+.ac-plan.is-pro .ac-plan-k, .ac-plan.is-pro .ac-plan-cta { color: var(--gold); }
+.ac-promark { display: inline-flex; align-items: center; height: 22px; padding: 0 7px 0 9px; border: 1px solid rgba(216, 196, 126, 0.62); border-radius: 6px; font: 500 11px/1 var(--display); letter-spacing: 0.24em; color: var(--gold); }
+
+/* ---------- groups and rows ---------- */
+.ac-group { display: flex; flex-direction: column; min-width: 0; }
+.ac-group-h { margin: 0 4px 10px; font: 500 10.5px/1.2 var(--font); letter-spacing: 0.16em; text-transform: uppercase; color: var(--mute); }
+.ac-list { position: relative; border: 1px solid var(--hair); border-radius: 18px; background: rgba(246, 242, 234, 0.025); overflow: hidden; }
+.ac-foot { margin: 10px 4px 0; font-size: 12px; line-height: 1.45; color: var(--mute); }
+
+.ac-row { position: relative; display: flex; align-items: flex-start; gap: 14px; width: 100%; min-height: 56px; padding: 16px; text-align: left; color: var(--ink); font-size: 14.5px; }
+/* hairline between rows, inset to the text like a settings list */
+.ac-list > * + .ac-row::before, .ac-list > * + .ac-sep::before { content: ""; position: absolute; top: 0; left: 48px; right: 0; height: 1px; background: rgba(246, 242, 234, 0.08); }
+.ac-row.is-tap { cursor: pointer; transition: background 0.2s var(--ease); }
+.ac-row.is-tap:hover { background: rgba(246, 242, 234, 0.04); }
+.ac-row.is-tap:active { background: rgba(246, 242, 234, 0.07); }
+.ac-row:disabled { opacity: 0.5; cursor: default; }
+.ac-row:focus-visible { outline-offset: -3px; border-radius: 16px; }
+.ac-ico { width: 18px; height: 20px; flex: none; display: grid; place-items: center; color: var(--soft); }
+.ac-ico svg { width: 18px; height: 18px; }
+.ac-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.ac-txt b { font-weight: 500; font-size: 14.5px; line-height: 20px; }
+.ac-txt small { font-size: 12.5px; line-height: 1.45; color: var(--soft); }
+.ac-end { flex: none; display: flex; align-items: center; min-height: 20px; color: var(--mute); }
+.ac-end:has(.ac-switch) { margin-top: -4px; }
+.ac-chev { width: 16px; height: 16px; flex: none; color: var(--mute); transition: transform 0.3s var(--ease); }
+.ac-row.is-tap:hover .ac-chev { transform: translateX(2px); }
+.ac-row.is-open .ac-chev, .ac-row.is-open:hover .ac-chev { transform: rotate(90deg); }
+.ac-end-k { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--soft); white-space: nowrap; }
+.ac-row.is-danger, .ac-row.is-danger .ac-ico, .ac-row.is-danger .ac-chev { color: var(--bad); }
+.ac-row.is-danger small { color: rgba(238, 143, 143, 0.72); }
+.ac-danger .ac-list { border-color: rgba(238, 143, 143, 0.22); background: rgba(238, 143, 143, 0.025); }
+.ac-err { position: relative; padding: 0 16px 14px 48px; font-size: 13px; line-height: 1.4; color: var(--bad); }
+
+/* the switch: a checkbox drawn as a track and a knob (ink when on) */
+.ac-switch { appearance: none; -webkit-appearance: none; position: relative; width: 46px; height: 28px; flex: none; margin: 0; border: 0; border-radius: 999px; background: rgba(246, 242, 234, 0.16); cursor: pointer; transition: background 0.28s var(--ease); }
+.ac-switch::before { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: var(--ink); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45); transition: transform 0.32s var(--ease), background 0.28s var(--ease); }
+.ac-switch:checked { background: var(--ink); }
+.ac-switch:checked::before { transform: translateX(18px); background: #0a0a0a; }
+.ac-switch:disabled { opacity: 0.45; cursor: default; }
+.ac-switch:focus-visible { outline: 1.5px solid var(--ink); outline-offset: 3px; border-radius: 999px; }
+
+/* language */
+.ac-lang { align-items: center; flex-wrap: wrap; row-gap: 12px; }
+.ac-seg { margin: 0; padding: 3px; flex: none; }
+.ac-seg button { flex: none; height: 32px; padding: 0 13px; font-size: 13px; }
+
+/* forwarded bookings */
+.ac-fwd { align-items: center; }
+.ac-fwd .ac-ico { align-self: flex-start; }
+.ac-addr { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12px !important; color: var(--ink) !important; overflow-wrap: anywhere; user-select: all; -webkit-user-select: all; }
+.ac-wait { color: var(--mute) !important; }
+.ac-copy { flex: none; height: 34px; padding: 0 14px; font-size: 13px; }
+.ac-empty, .ac-inbox-wait { position: relative; padding: 14px 16px 15px 48px; font-size: 13px; line-height: 1.4; color: var(--mute); }
+.ac-inbox { position: relative; padding: 4px 12px 12px; }
+.ac-empty::before, .ac-inbox-wait::before, .ac-inbox::before, .ac-pw::before, .ac-admin-credit::before { content: ""; position: absolute; top: 0; left: 48px; right: 0; height: 1px; background: rgba(246, 242, 234, 0.08); }
+.ac-inbox-h { padding: 12px 4px 2px 36px; font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--mute); }
+.ac-bk { display: flex; flex-direction: column; gap: 3px; margin-top: 10px; padding: 14px; border-radius: 14px; border: 1px solid var(--hair); background: rgba(246, 242, 234, 0.03); }
+.ac-bk.is-next { border-color: rgba(216, 196, 126, 0.34); background: linear-gradient(180deg, rgba(216, 196, 126, 0.06), rgba(216, 196, 126, 0.01)); }
+.ac-bk-next { display: flex; flex-direction: column; gap: 7px; padding-bottom: 12px; margin-bottom: 8px; border-bottom: 1px solid var(--hair); }
+.ac-bk-k { font-size: 10.5px; line-height: 1; letter-spacing: 0.16em; text-transform: uppercase; color: var(--gold); }
+.ac-bk-next .v3-d { font-size: 20px; line-height: 1.02; overflow-wrap: anywhere; }
+.ac-bk-t { font-weight: 500; font-size: 14px; line-height: 1.35; overflow-wrap: anywhere; }
+.ac-bk-from { font-size: 12px; color: var(--mute); overflow-wrap: anywhere; }
+.ac-bk-parts { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.ac-bk-parts li { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; line-height: 1.35; color: var(--soft); overflow-wrap: anywhere; }
+.ac-bk-parts svg { width: 16px; height: 16px; flex: none; margin-top: 1px; color: var(--mute); }
+.ac-bk-none { margin-top: 6px; font-size: 12.5px; line-height: 1.4; color: var(--mute); }
+.ac-bk-act { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.ac-bk-act .v3-chip { height: 36px; padding: 0 14px; font-size: 13px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* password */
+.ac-pw { position: relative; display: flex; flex-direction: column; gap: 10px; padding: 16px; animation: ac-in 0.34s var(--ease) both; }
+.ac-pw-f { min-height: 58px; }
+.ac-pw-f:has(input[aria-invalid="true"]) { border-color: rgba(238, 143, 143, 0.55); }
+.ac-pw-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; padding: 2px 2px 0; font-size: 12px; color: var(--mute); }
+.ac-pw-rule { display: inline-flex; align-items: center; gap: 7px; transition: color 0.2s; }
+.ac-pw-rule i { width: 7px; height: 7px; border-radius: 50%; border: 1px solid currentColor; transition: background 0.2s; }
+.ac-pw-rule.ok { color: var(--ok); }
+.ac-pw-rule.ok i { background: currentColor; }
+.ac-pw-show { margin-left: auto; padding: 4px 0; font-size: 12.5px; color: var(--soft); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--hair-strong); }
+.ac-pw .ac-err { padding: 0 2px; }
+.ac-pw-act { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; margin-top: 4px; }
+.ac-pw-act .v3-btn { height: 48px; font-size: 14.5px; border-radius: 14px; }
+
+/* this trip (the trip's panel): the offline card and the exports keep their own cards */
+.ac-trip .off-card { margin: 0; }
+.ac-sub { margin: 20px 4px 10px; font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--mute); }
+.ac-admin-credit { position: relative; padding: 4px 16px 16px; }
+.ac-admin-credit > * { margin-top: 12px; }
+
+/* signing out */
+.ac-signout { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; height: 52px; border-radius: 16px; border: 1px solid var(--hair); background: rgba(246, 242, 234, 0.03); color: var(--ink); font-size: 14.5px; font-weight: 500;
+  transition: background 0.2s var(--ease), border-color 0.2s, transform 0.16s var(--ease); }
+.ac-signout:hover { background: rgba(246, 242, 234, 0.07); border-color: var(--hair-strong); }
+.ac-signout:active { transform: scale(0.985); }
+.ac-signout svg { color: var(--soft); }
+
+/* narrow columns (a 344 px phone, the trip's side panel) */
+@container (max-width: 360px) {
+  .ac-end-k > span { display: none; }
+  .ac-fwd { flex-wrap: wrap; row-gap: 12px; }
+  .ac-fwd .ac-txt { flex-basis: calc(100% - 32px); }
+  .ac-fwd .ac-copy { margin-left: 32px; }
+  .ac-seg { flex: 1 1 100%; }
+  .ac-seg button { flex: 1; }
+  .ac-plan { flex-wrap: wrap; row-gap: 12px; }
+  .ac-plan-cta { width: 100%; justify-content: space-between; padding-top: 12px; border-top: 1px solid var(--hair); }
+  .ac-plan.is-pro .ac-plan-cta { border-top-color: rgba(216, 196, 126, 0.22); }
+}
+
+/* ---------- the account screen over "Mes voyages" ---------- */
+.ac-screen { z-index: 95; overscroll-behavior: contain; animation: ac-screen-in 0.44s var(--ease) both; }
+.ac-screen.is-leaving { animation: ac-screen-out 0.2s cubic-bezier(0.4, 0, 1, 1) both; pointer-events: none; }
+@keyframes ac-screen-in { 0% { opacity: 0; transform: translateX(28px); } 35% { opacity: 1; } 100% { opacity: 1; transform: none; } }
+@keyframes ac-screen-out { to { opacity: 0; transform: translateX(18px); } }
+.ac-col { padding-bottom: calc(var(--safe-b) + 40px); }
+.ac-top { position: sticky; top: 0; z-index: 3; margin: calc(-1 * (var(--safe-t) + 10px)) -20px 0; padding: calc(var(--safe-t) + 10px) 20px 0;
+  background: rgba(3, 3, 3, 0.86); -webkit-backdrop-filter: blur(18px) saturate(140%); backdrop-filter: blur(18px) saturate(140%);
+  box-shadow: 0 0 0 100vmax rgba(3, 3, 3, 0.86); clip-path: inset(0 -100vmax); }
+.ac-top-t { text-align: center; }
+
+/* staged entry: the header, then each group */
+.ac > * { animation: ac-in 0.5s var(--ease) both; }
+.ac > :nth-child(2) { animation-delay: 0.04s; }
+.ac > :nth-child(3) { animation-delay: 0.08s; }
+.ac > :nth-child(4) { animation-delay: 0.12s; }
+.ac > :nth-child(5) { animation-delay: 0.16s; }
+.ac > :nth-child(6) { animation-delay: 0.2s; }
+.ac > :nth-child(n + 7) { animation-delay: 0.24s; }
+@keyframes ac-in { from { opacity: 0; transform: translateY(10px); } }
+
+/* the avatar of "Mes voyages" */
+.ac-av { transition: border-color 0.2s var(--ease), background 0.2s, transform 0.16s var(--ease); }
+.ac-av:hover { border-color: var(--hair-strong); background: var(--plate-3); }
+.ac-av:active { transform: scale(0.95); }
+.ac-av.is-pro { color: var(--gold); border-color: rgba(216, 196, 126, 0.6); box-shadow: 0 0 0 2px #030303, 0 0 0 3px rgba(216, 196, 126, 0.24); }
+
+@media (prefers-reduced-motion: reduce) {
+  .ac > *, .ac-pw, .ac-screen, .ac-screen.is-leaving { animation: none; }
+  .ac-chev, .ac-switch, .ac-switch::before { transition: none; }
+}

@@ -1,10 +1,8 @@
 import { useState } from "react";
-import { sendLoginEmail, signInWithPassword, signOutChecked, useStore, useTrip, verifyLoginCode, type SyncState } from "../lib/store";
+import { sendLoginEmail, signInWithPassword, useStore, useTrip, verifyLoginCode, type SyncState } from "../lib/store";
 import { ExportPanel, OfflineCard } from "./Tools";
 import { supabaseConfigured } from "../lib/supabase";
-import AiCredit from "./AiCredit";
-import AccountActions from "./v3/AccountActions";
-import { InboundInbox } from "./v3/AlertsAndInbox";
+import { AccountSections } from "./v3/AccountScreen";
 import { t } from "../lib/i18n";
 
 const SYNC_TEXT: Record<SyncState, string> = {
@@ -35,7 +33,6 @@ export function SyncBadge() {
 
 export default function Account() {
   const session = useStore((s) => s.session);
-  const admin = useStore((s) => !!s.plan?.admin);
   const trip = useTrip();
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -59,23 +56,22 @@ export default function Account() {
 
   if (session) {
     return (
-      <div>
-        <div className="card">
-          <h4>{t("Votre compte")}</h4>
-          <p style={{ marginTop: 6 }}>{t("Connecté avec {email}", { email: session.user.email })}</p>
-          <div style={{ marginTop: 14 }}><SyncBadge /></div>
-            <p style={{ marginTop: 14 }}>{t("Vos voyages sont sauvegardés en ligne et partagés avec les personnes que vous invitez. Ils restent aussi sur cet appareil pour fonctionner sans réseau, jusqu'à la déconnexion.")}</p>
-          {admin && <AiCredit />}
-          <InboundInbox />
-          <AccountActions variant="app" />
-        </div>
-        <div style={{ marginTop: 12 }}><OfflineCard trip={trip} /></div>
-        <h4 className="acct-sec">{t("Exports")}</h4>
-        <ExportPanel trip={trip} />
-        <button className="btn danger block" style={{ marginTop: 22 }} onClick={() => void signOutChecked()}>
-          {t("Se déconnecter")}
-        </button>
-      </div>
+      <AccountSections
+        variant="app"
+        status={
+          <>
+            <SyncBadge />
+            <p className="ac-status-note">{t("Vos voyages sont sauvegardés en ligne et partagés avec les personnes que vous invitez. Ils restent aussi sur cet appareil pour fonctionner sans réseau, jusqu'à la déconnexion.")}</p>
+          </>
+        }
+        trip={
+          <>
+            <OfflineCard trip={trip} />
+            <p className="ac-sub">{t("Exports")}</p>
+            <ExportPanel trip={trip} />
+          </>
+        }
+      />
     );
   }
 

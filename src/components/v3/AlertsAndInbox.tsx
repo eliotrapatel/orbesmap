@@ -34,14 +34,24 @@ const whereWhen = (d: DetectedTrip) => {
   const dates = dateLabel(d.start, d.end && d.end >= d.start ? d.end : d.start);
   return d.city ? `${d.city}, ${dates}` : dates;
 };
-/** What a booking holds, one short line each */
-const bookingLines = (it: InboundItem) => {
+/** What a booking holds, one short part each (a flight, the hotel, a booking) */
+type Part = { kind: "flight" | "hotel" | "fixed"; text: string };
+const bookingParts = (it: InboundItem): Part[] => {
   const x = it.extracted || {};
   return [
-    ...(x.flights || []).map((f) => `✈ ${f.code} ${f.from}→${f.to}`),
-    ...(x.hotel?.name ? [`🏨 ${x.hotel.name}`] : []),
-    ...(x.fixed || []).map((f) => `• ${f.name}${f.date ? ` (${f.date}${f.time ? ` ${f.time}` : ""})` : ""}`),
+    ...(x.flights || []).map((f): Part => ({ kind: "flight", text: `${f.code} ${f.from} → ${f.to}` })),
+    ...(x.hotel?.name ? [{ kind: "hotel", text: x.hotel.name } as Part] : []),
+    ...(x.fixed || []).map((f): Part => ({ kind: "fixed", text: `${f.name}${f.date ? ` (${f.date}${f.time ? ` ${f.time}` : ""})` : ""}` })),
   ];
+};
+/** What a booking holds, one short line each */
+const bookingLines = (it: InboundItem) => bookingParts(it).map((p) => p.text);
+// line icons of a booking's parts (24 grid, 1.6 stroke)
+const ico = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true } as const;
+const PART_ICON: Record<Part["kind"], ReactNode> = {
+  flight: <svg {...ico}><path d="M2.5 15.5 21 8.5c.6-.2 1 .5.5.9L14 15l-1 5-2-1 .5-3.5-4 1.5-1.5 2-1.5-.5.5-2.5-2.5-.5Z" /></svg>,
+  hotel: <svg {...ico}><path d="M4 20V5.5A1.5 1.5 0 0 1 5.5 4h7A1.5 1.5 0 0 1 14 5.5V20M14 10h4.5a1.5 1.5 0 0 1 1.5 1.5V20M3 20h18" /><path d="M8 8h2M8 12h2M8 16h2" /></svg>,
+  fixed: <svg {...ico}><rect x="3.5" y="5" width="17" height="15" rx="2.5" /><path d="M3.5 10h17M8 3v4M16 3v4" /></svg>,
 };
 
 /** Fills the trip creation form with the booking: destination, dates, flights, hotel, bookings. False = not opened. */
@@ -220,15 +230,31 @@ export function AlertsBlock() {
   );
 }
 
-/** Bookings received by e-mail, to add to the open trip */
-export function InboundInbox() {
-  const [items, setItems] = useState<InboundItem[]>([]);
+/**
+ * Bookings received by e-mail. In a trip (its "Compte" panel): to add to the open trip. On "Mes voyages" (`home`): a
+ * booking that announces a new trip is created from here; the others are added from the trip they belong to.
+ * `empty`: what shows once loaded with nothing waiting.
+ */
+export function InboundInbox({ home, empty }: { home?: boolean; empty?: ReactNode } = {}) {
+  const [items, setItems] = useState<InboundItem[] | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
   const tripId = useStore((s) => s.tripId);
+  const tripTitle = useStore((s) => s.trips[s.tripId]?.title as string | undefined);
   // a trip created or changed can cover a "new trip" offer's dates: the booking then shows as one to add
   useStore((s) => s.trips);
   useEffect(() => {
-    void inboundItems().then(setItems);
+    let alive = true;
+    void inboundItems().then(
+      (xs) => {
+        if (alive) setItems(xs);
+      },
+      () => {
+        if (alive) setItems([]);
+      },
+    );
+    return () => {
+      alive = false;
+    };
   }, [tripId]);
   // this inbox shows the new-trip offers itself (see NextTrips)
   useEffect(() => {
@@ -237,38 +263,62 @@ export function InboundInbox() {
       inboxMounted(-1);
     };
   }, []);
-  const flow = useTripFromBooking((id) => setItems((xs) => xs.filter((y) => y.id !== id)));
-  if (!items.length) return <>{flow.overlay}</>;
+  const drop = (id: number) => setItems((xs) => (xs || []).filter((y) => y.id !== id));
+  const flow = useTripFromBooking(drop);
+  if (items === null) return <p className="ac-inbox-wait">{t("Recherche des réservations reçues…")}</p>;
+  if (!items.length) return <>{empty}{flow.overlay}</>;
   return (
-    <div className="card inbox">
-      <h4>{t("Réservations reçues")}</h4>
+    <div className="ac-inbox">
+      <p className="ac-inbox-h">{items.length > 1 ? t("{n} réservations reçues", { n: items.length }) : t("1 réservation reçue")}</p>
       {items.map((it) => {
-        const what = bookingLines(it);
+        const parts = bookingParts(it);
         const next = detectedTrip(it);
         return (
-          <div key={it.id} className={"inbox-item" + (next ? " rt-has-next" : "")}>
-            {next && <span className="rt-inbox-next">{t("Nouveau voyage détecté : {trip}", { trip: whereWhen(next) })}</span>}
-            <b>{it.subject || t("Sans objet")}</b>
-            <small>{it.from_addr}</small>
-            <p>{what.length ? what.join(" · ") : t("Rien de reconnu dans cet e-mail.")}</p>
-            <div className="btn-row" style={{ marginTop: 8 }}>
-              {next && <button className="btn primary rt-create" disabled={flow.busy !== null || busy === it.id} onClick={() => flow.start(it)}>{flow.busy === it.id ? t("Préparation…") : t("Créer ce voyage")}</button>}
-              <button className="btn" disabled={busy === it.id} onClick={async () => { await dismissInbound(it.id); setItems(items.filter((y) => y.id !== it.id)); }}>{t("Ignorer")}</button>
+          <article key={it.id} className={"ac-bk" + (next ? " is-next" : "")}>
+            {next && (
+              <span className="ac-bk-next">
+                <span className="ac-bk-k">{t("Nouveau voyage détecté")}</span>
+                <b className="v3-d">{whereWhen(next)}</b>
+              </span>
+            )}
+            <b className="ac-bk-t">{it.subject || t("Sans objet")}</b>
+            {it.from_addr && <small className="ac-bk-from">{it.from_addr}</small>}
+            {parts.length ? (
+              <ul className="ac-bk-parts">
+                {parts.map((p, i) => <li key={i}>{PART_ICON[p.kind]}<span>{p.text}</span></li>)}
+              </ul>
+            ) : (
+              <p className="ac-bk-none">{t("Rien de reconnu dans cet e-mail.")}</p>
+            )}
+            {home && !next && parts.length > 0 && <p className="ac-bk-none">{t("Ouvrez le voyage concerné pour l'ajouter.")}</p>}
+            <div className="ac-bk-act">
+              {next && <button type="button" className="v3-chip on" disabled={flow.busy !== null || busy === it.id} onClick={() => flow.start(it)}>{flow.busy === it.id ? t("Préparation…") : t("Créer ce voyage")}</button>}
               {/* a booking outside all the trips is never added to the open trip by mistake: only "Créer ce voyage" */}
-              {!next && <button className="btn primary" disabled={busy === it.id || !what.length} onClick={async () => {
-                setBusy(it.id);
-                try {
-                  const r = await addInbound(it, currentTrip());
-                  toast(r.manual.length ? t("{n} ajouté(s) · à placer à la main : {list}", { n: r.added, list: r.manual.join(", ") }) : t("{n} ajouté(s) au voyage", { n: r.added }));
-                  setItems(items.filter((y) => y.id !== it.id));
-                } finally {
-                  setBusy(null);
-                }
-              }}>{busy === it.id ? t("Ajout…") : t("Ajouter au voyage")}</button>}
+              {!next && !home && (
+                <button
+                  type="button"
+                  className="v3-chip on"
+                  disabled={busy === it.id || !parts.length}
+                  onClick={async () => {
+                    setBusy(it.id);
+                    try {
+                      const r = await addInbound(it, currentTrip());
+                      toast(r.manual.length ? t("{n} ajouté(s) · à placer à la main : {list}", { n: r.added, list: r.manual.join(", ") }) : t("{n} ajouté(s) au voyage", { n: r.added }));
+                      drop(it.id);
+                    } finally {
+                      setBusy(null);
+                    }
+                  }}
+                >
+                  {busy === it.id ? t("Ajout…") : tripTitle ? t("Ajouter à {trip}", { trip: tripTitle }) : t("Ajouter au voyage")}
+                </button>
+              )}
+              <button type="button" className="v3-chip" disabled={busy === it.id} onClick={async () => { await dismissInbound(it.id); drop(it.id); }}>{t("Ignorer")}</button>
             </div>
-          </div>
+          </article>
         );
       })}
+      {flow.overlay}
     </div>
   );
 }

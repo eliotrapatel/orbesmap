@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Trip } from "../../data/types";
-import { createTrip, getState, requestPro, signOutChecked, switchTrip, useStore, useTrips } from "../../lib/store";
+import { createTrip, getState, requestPro, switchTrip, useStore, useTrips } from "../../lib/store";
 import { dateLabel, dayCount, newTripRecord, searchCities, type Destination } from "../../lib/newTrip";
 import { daysLeft, phase } from "../../lib/time";
 import { recapDue } from "../../lib/recap";
@@ -10,7 +10,9 @@ import Shell, { Steps } from "./Shell";
 import CreateWizard from "./CreateWizard";
 import Concierge, { CreateChooser } from "./Concierge";
 import { track } from "../../lib/track";
-import AccountActions from "./AccountActions";
+import AccountScreen from "./AccountScreen";
+import { SyncBadge } from "../Account";
+import { IClose } from "../Icons";
 import { t } from "../../lib/i18n";
 
 const greeting = () => {
@@ -25,6 +27,8 @@ export default function Trips({ onOpen, onClose }: { onOpen: (id: string) => voi
   const email = useStore((s) => s.session?.user.email) || "";
   const [creating, setCreatingRaw] = useState<false | "choose" | "form" | "concierge">(false);
   const [menu, setMenu] = useState(false);
+  const avatar = useRef<HTMLButtonElement>(null);
+  const pro = useStore((s) => !!s.plan?.pro);
   // a free account prepares one trip per month with the AI: the next one asks for Pro
   const setCreating = (v: boolean) => {
     const p = getState().plan;
@@ -52,17 +56,17 @@ export default function Trips({ onOpen, onClose }: { onOpen: (id: string) => voi
     <div className="v3-bar">
       <OrbitMark size={20} title="ORBES Trips" />
       <span className="v3-grow" />
-      {onClose && <button className="v3-tool" onClick={onClose} aria-label={t("Revenir à la carte")}>✕</button>}
-      <button type="button" className="v3-av" aria-label={t("Mon compte")} aria-expanded={menu} onClick={() => setMenu((v) => !v)}>{initial}</button>
+      {onClose && <button className="v3-tool" onClick={onClose} aria-label={t("Revenir à la carte")}><IClose width={18} height={18} /></button>}
+      <button ref={avatar} type="button" className={"v3-av ac-av" + (pro ? " is-pro" : "")} aria-label={t("Mon compte")} aria-haspopup="dialog" aria-expanded={menu} onClick={() => setMenu(true)}>{initial}</button>
+      {/* the account as its own screen over the trips: room for the plan, alerts, bookings, password and privacy */}
       {menu && (
-        <div className="v3-acct-wrap" onClick={() => setMenu(false)}>
-          <div className="v3-glass v3-acct" role="dialog" aria-label={t("Mon compte")} onClick={(e) => e.stopPropagation()}>
-            <b>{name || email.split("@")[0]}</b>
-            <small>{email}</small>
-            <AccountActions />
-            <button type="button" className="v3-link" onClick={() => { setMenu(false); void signOutChecked(); }}>{t("Se déconnecter")}</button>
-          </div>
-        </div>
+        <AccountScreen
+          status={<SyncBadge />}
+          onClose={() => {
+            setMenu(false);
+            avatar.current?.focus({ preventScroll: true });
+          }}
+        />
       )}
     </div>
   );
