@@ -17,4 +17,12 @@ export default {
   "Retirer la capture": "Remove the screenshot", "Rien encore : parlez-moi de votre voyage.": "Nothing yet: tell me about your trip.",
   "Votre voyage": "Your trip", "rythme {p}": "{p} pace", "Écrivez, collez un lien, ou dictez…": "Type, paste a link, or dictate…",
   "Échange avec le concierge": "Concierge exchange", "Ajouter un vol ou une réservation": "Add a flight or a booking", "Lecture de la réservation…": "Reading the booking…", "déc.": "Dec",
+  // the concierge as in the validated mockup (direction C)
+  "Brouillon enregistré": "Draft saved", "Dans « Le point »": "In “Review”", "Extrait": "Extracted", "Noté": "Noted", "Incontournable": "Must-see",
+  "Italie": "Italy", "Je crée le voyage…": "Creating the trip…",
+  "Je prépare {city}. Le programme se construit jour par jour : je vous montre où j'en suis.": "I'm preparing {city}. The itinerary is built day by day: I'll show you how it's going.",
+  "La préparation continue dans le voyage": "Planning continues in the trip", "Le concierge écrit…": "The concierge is typing…",
+  "Programme idéal": "Ideal itinerary", "Quelques idées": "A few ideas", "Réservé": "Booked", "Terminal": "Terminal", "Vol": "Flight",
+  "Un long week-end à Rome, en mai": "A long weekend in Rome, in May", "Tokyo au printemps, 6 jours": "Tokyo in spring, 6 days", "Lisbonne, tranquille, à deux": "Lisbon, relaxed, as a couple",
+  "{n} lieux retenus": "{n} places kept", "{n} lieu retenu": "{n} place kept", "lit votre capture": "reading your screenshot", "prépare votre voyage": "preparing your trip", "écrit…": "typing…",
 } satisfies Record<string, string>;

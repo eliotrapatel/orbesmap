@@ -1,0 +1,220 @@
+/* =================== create: the choice, the concierge (Nov 2026) ===================
+   Follows the validated mockup, direction « C · Concierge » (.claude/mockups/saas-v3/index.html, screens 06 to 11):
+   the concierge speaks without bubbles in generous Helvetica, glass cards inside the exchange, Gravesend for the cities
+   and the codes, discreet bubbles for the traveller, a glass composer with line icons. */
+
+.v3-concierge, .cc-chooser {
+  --hair-2: rgba(246, 242, 234, 0.08);
+  --hair-3: rgba(246, 242, 234, 0.3);
+  --cc-glass: rgba(24, 23, 21, 0.55);
+  --cc-ground: #070707;
+}
+.cc-ic { width: 18px; height: 18px; flex: none; }
+.cc-ic.s { width: 15px; height: 15px; }
+.cc-ic.mute { color: var(--mute); }
+.cc-glass { background: var(--cc-glass); -webkit-backdrop-filter: blur(24px) saturate(160%); backdrop-filter: blur(24px) saturate(160%); border: 1px solid var(--hair); border-radius: 22px; }
+
+/* the avatar: the orbit mark in a dark round */
+.cc-av { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(160deg, #22201d, #121110); border: 1px solid var(--hair); display: grid; place-items: center; flex: none; color: var(--ink); }
+.cc-av.lg { width: 64px; height: 64px; }
+.cc-av.xs { width: 24px; height: 24px; }
+.cc-on { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); flex: none; }
+
+/* typing: three dots that rise in turn */
+.cc-dots { display: inline-flex; gap: 4px; align-items: center; flex: none; }
+.cc-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--soft); animation: ccDot 1.3s ease-in-out infinite; }
+.cc-dots i:nth-child(2) { animation-delay: 0.18s; }
+.cc-dots i:nth-child(3) { animation-delay: 0.36s; }
+.cc-dots.sm { gap: 3px; }
+.cc-dots.sm i { width: 4px; height: 4px; }
+@keyframes ccDot { 0%, 60%, 100% { opacity: 0.25; transform: none; } 30% { opacity: 1; transform: translateY(-3px); } }
+
+/* ---------- the page ---------- */
+.v3.v3-concierge { background: var(--cc-ground); }
+.v3-concierge .v3-bg { background:
+  radial-gradient(90% 34% at 50% -6%, rgba(216, 196, 126, 0.1), transparent 72%),
+  radial-gradient(70% 30% at 100% 100%, rgba(246, 242, 234, 0.04), transparent 70%); }
+.v3-concierge .v3-col { padding-bottom: 0; }
+/* the top stays while the conversation scrolls */
+.v3-concierge .v3-top { position: sticky; top: 0; z-index: 6; margin: calc(-10px - var(--safe-t)) -20px 0; padding: calc(var(--safe-t) + 10px) 20px 0;
+  background: rgba(7, 7, 7, 0.82); -webkit-backdrop-filter: blur(20px) saturate(150%); backdrop-filter: blur(20px) saturate(150%); }
+.cc-top { width: 100%; display: flex; flex-direction: column; }
+.cc-bar { height: 56px; display: flex; align-items: center; gap: 10px; }
+.cc-who { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+.cc-who-t { min-width: 0; }
+.cc-who b { display: block; font: 500 13px/1.1 var(--display); letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cc-who small { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 11.5px; line-height: 1.2; color: var(--mute); white-space: nowrap; overflow: hidden; }
+.cc-point { height: 38px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--hair); background: rgba(246, 242, 234, 0.04); font-size: 13px; color: var(--ink); display: inline-flex; align-items: center; gap: 7px; flex: none; white-space: nowrap; transition: background 0.2s, border-color 0.2s, transform 0.16s var(--ease), opacity 0.2s; }
+.cc-point:hover { background: rgba(246, 242, 234, 0.1); border-color: var(--hair-3); }
+.cc-point:active { transform: scale(0.96); }
+.cc-point:disabled { opacity: 0.4; }
+.cc-point .num { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--ink); color: #0a0a0a; font-size: 11px; font-weight: 700; display: grid; place-items: center; }
+
+/* où — quand — infos — programme */
+.cc-steps { display: flex; align-items: center; gap: 8px; padding: 4px 0 10px; border-bottom: 1px solid var(--hair-2); font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--mute); }
+.cc-steps s { flex: 1; min-width: 6px; height: 1px; background: var(--hair); text-decoration: none; transition: background 0.4s; }
+.cc-steps s.on { background: rgba(246, 242, 234, 0.5); }
+.cc-steps span { white-space: nowrap; transition: color 0.3s; }
+.cc-steps span.on { color: var(--ink); }
+.cc-steps span.done { color: var(--soft); }
+
+/* ---------- the thread ---------- */
+.cc-thread { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; gap: 14px; padding: 18px 0 12px; }
+.cc-thread > .in, .cc-turn.in > * { animation: ccIn 0.6s var(--ease) both; }
+.cc-turn.in { animation: none; }
+.cc-turn.in > *:nth-child(2) { animation-delay: 0.12s; }
+.cc-turn.in > *:nth-child(3) { animation-delay: 0.24s; }
+.cc-turn.in > *:nth-child(4) { animation-delay: 0.36s; }
+.cc-ideas.in { animation-delay: 0.2s; }
+@keyframes ccIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.cc-turn { display: flex; flex-direction: column; gap: 14px; }
+/* the concierge: no bubble */
+.cc-ai { font-size: 16.5px; line-height: 1.45; max-width: 94%; white-space: pre-wrap; overflow-wrap: anywhere; transition: color 0.4s; }
+.cc-ai.old { color: var(--soft); }
+.cc-by { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--mute); white-space: normal; }
+.cc-by .orbit-mark { color: var(--ink); }
+.cc-typing { padding: 6px 0; }
+/* the traveller: a discreet bubble */
+.cc-me { align-self: flex-end; max-width: 82%; padding: 11px 15px; border-radius: 20px 20px 6px 20px; background: rgba(246, 242, 234, 0.1); border: 1px solid var(--hair-2); font-size: 15px; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; transition: opacity 0.4s; }
+.cc-me.old, .cc-shot.old { opacity: 0.6; }
+.cc-me.links { display: flex; flex-direction: column; gap: 6px; padding: 8px; min-width: 0; }
+.cc-me-tx { padding: 4px 6px 2px; }
+.cc-link { display: flex; gap: 10px; align-items: center; padding: 8px; border-radius: 14px; background: rgba(246, 242, 234, 0.06); font-size: 13px; line-height: 1.3; min-width: 0; white-space: normal; }
+.cc-link .lg { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; flex: none; background: rgba(246, 242, 234, 0.08); color: var(--soft); }
+.cc-link .tx { min-width: 0; }
+.cc-link small { display: block; color: var(--mute); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* a capture, drawn as a small sheet */
+.cc-shot { width: 150px; height: 96px; border-radius: 14px; border: 1px solid var(--hair); background: #141312; padding: 10px; display: flex; flex-direction: column; gap: 5px; align-self: flex-end; flex: none; }
+.cc-shot i { display: block; height: 5px; border-radius: 3px; background: rgba(246, 242, 234, 0.16); }
+.cc-shot i.h { width: 50%; height: 7px; background: rgba(246, 242, 234, 0.35); }
+.cc-shot i.b { width: 70%; background: rgba(127, 209, 185, 0.35); }
+
+/* ---------- the cards ---------- */
+.cc-rc { padding: 14px; }
+.cc-rc.tight { padding: 4px 14px; }
+.cc-rc-h { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.cc-rc-h .v3-lbl { flex: 1; }
+.cc-rc-h .cc-n { font-size: 13px; font-weight: 600; }
+.cc-dest { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid var(--hair-2); }
+.cc-dest:first-child, .cc-rc-h + .cc-dest { border-top: 0; }
+.cc-dest > .cc-ic { color: var(--soft); }
+.cc-dest > .cc-ic.mute { color: var(--mute); }
+.cc-dest .n { width: 24px; height: 24px; border-radius: 50%; background: var(--ink); color: #0a0a0a; font: 700 11.5px/24px var(--font); text-align: center; flex: none; }
+.cc-dest .t { flex: 1; min-width: 0; font-size: 14.5px; line-height: 1.3; overflow-wrap: anywhere; }
+.cc-dest .t small, .cc-sum .t small, .cc-item .t small { display: block; color: var(--mute); font-size: 12px; margin-top: 1px; }
+/* a flight: the codes large, the dashed route, the plane in gold */
+.cc-fl { display: flex; align-items: center; gap: 10px; }
+.cc-fl .c { font: 500 28px/1 var(--display); text-transform: uppercase; }
+.cc-fl .c.r { text-align: right; }
+.cc-fl .c small { display: block; font: 400 11.5px/1.3 var(--font); text-transform: none; color: var(--soft); margin-top: 5px; white-space: nowrap; }
+.cc-fl .ln { flex: 1; position: relative; height: 18px; min-width: 24px; }
+.cc-fl .ln::before { content: ""; position: absolute; left: 0; right: 0; top: 9px; border-top: 1px dashed var(--hair-3); }
+.cc-fl .ln .cc-ic { position: absolute; left: 50%; top: 1px; width: 16px; height: 16px; margin-left: -8px; transform: rotate(90deg); color: var(--gold); background: transparent; }
+.cc-meta { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--hair); font-size: 12px; color: var(--mute); }
+.cc-meta b { color: var(--ink); font-weight: 600; }
+/* the ideal programme */
+.cc-rowk { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--hair-2); font-size: 14px; }
+.cc-rc-h + .cc-rowk { border-top: 0; }
+.cc-rowk .k { width: 70px; flex: none; font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--mute); }
+.cc-rowk .v { flex: 1; min-width: 0; }
+.cc-tags { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.cc-tags span { height: 28px; padding: 0 11px; border-radius: 999px; border: 1px solid var(--hair); font-size: 12.5px; color: var(--soft); display: inline-flex; align-items: center; }
+/* everything else, sorted */
+.cc-sum { list-style: none; margin: 0; padding: 0; }
+.cc-sum li { display: flex; gap: 12px; align-items: flex-start; padding: 9px 0; border-top: 1px solid var(--hair-2); font-size: 13.5px; line-height: 1.35; }
+.cc-sum li:first-child { border-top: 0; padding-top: 0; }
+.cc-sum li:last-child { padding-bottom: 0; }
+.cc-sum li > .cc-ic { margin-top: 1px; color: var(--soft); }
+.cc-sum .t { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.cc-sum .v3-tag, .cc-item .v3-tag, .cc-dest .v3-tag { flex: none; margin-left: auto; }
+
+/* ---------- first screen: the greeting, a few ideas ---------- */
+.cc-thread.intro { justify-content: space-between; gap: 28px; }
+.cc-hero { padding-top: 26px; }
+.cc-ai.big { font-size: 24px; line-height: 1.25; margin-top: 20px; max-width: none; }
+.cc-sub { font-size: 14.5px; line-height: 1.45; color: var(--soft); margin-top: 10px; max-width: 40ch; }
+.cc-ideas .v3-lbl { margin-bottom: 8px; }
+.cc-ideas .cc-glass { border-radius: 20px; padding: 4px; }
+.cc-prompt { display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px; border-radius: 16px; font-size: 14.5px; line-height: 1.3; text-align: left; color: var(--ink); transition: background 0.2s, transform 0.16s var(--ease); }
+.cc-prompt:hover { background: rgba(246, 242, 234, 0.07); }
+.cc-prompt:active { transform: scale(0.98); }
+.cc-prompt span { flex: 1; min-width: 0; }
+.cc-prompt .cc-ic.s { color: var(--mute); }
+
+/* ---------- ready, preparing ---------- */
+.cc-ready { margin-top: 2px; }
+.cc-prog { height: 3px; border-radius: 2px; background: var(--hair-2); overflow: hidden; }
+.cc-prog i { display: block; height: 100%; background: linear-gradient(90deg, rgba(246, 242, 234, 0.15), var(--ink), rgba(246, 242, 234, 0.15)); background-size: 200% 100%; animation: ccShim 1.4s linear infinite; }
+@keyframes ccShim { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.cc-live { display: flex; gap: 10px; align-items: center; min-height: 20px; font-size: 13px; color: var(--soft); }
+
+/* ---------- the composer ---------- */
+.cc-err { margin: 0 0 4px; }
+.cc-input { position: sticky; bottom: 0; z-index: 5; margin: 0 -20px; padding: 8px 20px calc(8px + var(--safe-b)); display: flex; flex-direction: column; gap: 6px;
+  background: linear-gradient(180deg, rgba(7, 7, 7, 0), var(--cc-ground) 30%); }
+.cc-comp { display: flex; align-items: flex-end; gap: 4px; min-height: 56px; padding: 7px 8px; border-radius: 28px; }
+.cc-comp textarea { flex: 1; min-width: 0; resize: none; background: none; border: 0; outline: 0; color: var(--ink); font: inherit; font-size: 16px; line-height: 1.35; padding: 10px 4px; max-height: 140px; field-sizing: content; }
+.cc-comp textarea::placeholder { color: var(--mute); }
+.cc-comp textarea:placeholder-shown { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cc-comp.quiet { align-items: center; }
+.cc-in { flex: 1; min-width: 0; font-size: 14px; color: var(--soft); }
+.cc-r { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: var(--soft); flex: none; transition: background 0.2s, color 0.2s, transform 0.16s var(--ease), opacity 0.2s; }
+button.cc-r:hover { background: rgba(246, 242, 234, 0.08); color: var(--ink); }
+button.cc-r:active { transform: scale(0.92); }
+.cc-r.go, button.cc-r.go:hover { background: var(--ink); color: #0a0a0a; }
+.cc-r.on, button.cc-r.on:hover { background: rgba(238, 143, 143, 0.16); color: var(--bad); }
+.cc-r:disabled { opacity: 0.35; }
+.cc-att { align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; max-width: 100%; height: 34px; padding: 0 4px 0 12px; border-radius: 999px; border: 1px solid var(--hair); background: var(--cc-glass); font-size: 12.5px; color: var(--soft); }
+.cc-att .nm { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cc-att button { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; color: var(--ink); flex: none; }
+.cc-att button:hover { background: rgba(246, 242, 234, 0.1); }
+.cc-switch { font-size: 12.5px; }
+
+/* ---------- « Le point » ---------- */
+.cc-recap { max-height: 86vh; overflow-y: auto; }
+.cc-recap-h { display: flex; align-items: center; gap: 10px; }
+.cc-recap-h .v3-lbl { flex: 1; }
+.cc-recap-title { font-size: 26px; margin-top: 14px; overflow-wrap: anywhere; }
+.cc-list { margin-top: 12px; border-top: 1px solid var(--hair-2); }
+.cc-item { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--hair-2); font-size: 14px; line-height: 1.35; }
+.cc-item > .cc-ic { color: var(--soft); }
+.cc-item .t { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.cc-x { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; color: var(--soft); flex: none; transition: background 0.2s, color 0.2s; }
+.cc-x:hover { background: rgba(246, 242, 234, 0.08); color: var(--ink); }
+.cc-item .v3-tag + .cc-x { margin-left: 0; }
+
+/* ---------- the choice: the form or the concierge ---------- */
+.ch-card { position: relative; display: flex; flex-direction: column; gap: 12px; width: 100%; margin-top: 14px; padding: 14px; border-radius: 22px; border: 1px solid var(--hair); background: var(--cc-glass); -webkit-backdrop-filter: blur(24px) saturate(160%); backdrop-filter: blur(24px) saturate(160%); text-align: left; color: var(--ink); transition: border-color 0.2s, background 0.25s var(--ease), transform 0.16s var(--ease); }
+.ch-card:hover { border-color: var(--hair-3); background: rgba(30, 29, 27, 0.6); }
+.ch-card:active { transform: scale(0.99); }
+.ch-preview { border-radius: 16px; border: 1px solid var(--hair-2); padding: 12px; display: flex; flex-direction: column; gap: 8px; min-height: 128px; overflow: hidden;
+  background: radial-gradient(90% 40% at 50% -10%, rgba(216, 196, 126, 0.1), transparent 72%), var(--cc-ground); }
+.ch-t { padding-right: 34px; }
+.ch-t b { display: block; font: 500 18px/1.05 var(--display); text-transform: uppercase; }
+.ch-t small { display: block; color: var(--soft); font-size: 13px; margin-top: 4px; line-height: 1.4; }
+.ch-go { position: absolute; right: 16px; bottom: 18px; color: var(--soft); }
+/* the concierge in miniature */
+.ch-mini-top { display: flex; align-items: center; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--hair-2); }
+.ch-mini-top b { font: 500 10.5px/1 var(--display); letter-spacing: 0.08em; text-transform: uppercase; }
+.ch-mini-top small { display: flex; align-items: center; gap: 5px; margin-left: auto; font-size: 10.5px; color: var(--mute); white-space: nowrap; }
+.ch-mini-top .cc-on { width: 5px; height: 5px; }
+.ch-chat .cc-me { font-size: 12px; padding: 7px 11px; border-radius: 14px 14px 4px 14px; max-width: 88%; }
+.ch-chat .cc-ai { font-size: 13px; line-height: 1.4; }
+.ch-mini-card { display: flex; flex-direction: column; padding: 2px 10px; border-radius: 14px; max-width: 88%; }
+.ch-mini-card .cc-dest { gap: 8px; padding: 6px 0; }
+.ch-mini-card .cc-dest .t { font-size: 12px; }
+.ch-mini-card .cc-dest .t small { font-size: 10.5px; }
+.ch-mini-card .cc-dest .n { width: 18px; height: 18px; font-size: 9.5px; line-height: 18px; }
+.ch-mini-card .cc-ic { width: 14px; height: 14px; color: var(--soft); }
+/* the form in miniature */
+.ch-bars { display: flex; gap: 4px; margin-bottom: 4px; }
+.ch-bars i { flex: 1; height: 3px; border-radius: 2px; background: var(--hair); }
+.ch-bars i.on { background: var(--ink); }
+.ch-field { height: 30px; border-radius: 10px; border: 1px solid var(--hair); background: rgba(246, 242, 234, 0.03); display: flex; align-items: center; padding: 0 10px; font-size: 12px; color: var(--soft); }
+.ch-field.dim { border-style: dashed; color: var(--mute); }
+
+@media (max-width: 360px) {
+  .cc-steps { gap: 6px; letter-spacing: 0.08em; }
+  .cc-point { padding: 0 10px; }
+  .cc-fl .c { font-size: 24px; }
+}
