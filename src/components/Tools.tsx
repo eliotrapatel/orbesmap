@@ -189,7 +189,7 @@ export function Flights({ trip }: { trip: Trip }) {
   );
 }
 
-function OfflineCard({ trip }: { trip: Trip }) {
+export function OfflineCard({ trip }: { trip: Trip }) {
   const st = useOffline();
   const mb = (b: number) => t("{n} Mo", { n: Math.max(1, Math.round(b / 1e6)) });
   // places added in the app are already in trip.places
@@ -210,61 +210,87 @@ function OfflineCard({ trip }: { trip: Trip }) {
     };
   }, [st.state, st.at, key]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!offlineSupported) return null;
+  // "Mode hors ligne" = the map of this trip downloaded on the phone (the trip itself is always on it)
+  const missing = st.state === "ready" && check && check !== "busy" ? check.missing : 0;
+  const on = st.state === "ready" && missing === 0;
+  const pro = () => {
+    if (!hasPro()) return false;
+    track("export", "offline", trip.id);
+    prepareOffline(points);
+    return true;
+  };
+  const activate = () => {
+    if (!pro()) requestPro("export");
+  };
   return (
-    <div className="card off-card">
-      <h4><IOffline width={18} height={18} /> {t("Carte hors ligne")}</h4>
+    <div className="card off-card" id="offline-mode">
+      <h4>
+        <IOffline width={18} height={18} /> {t("Mode hors ligne")}
+        <span className={"off-state " + (st.state === "running" ? "busy" : on ? "on" : st.state === "ready" ? "warn" : "")}>
+          {st.state === "running" ? t("Téléchargement") : on ? t("Activé") : st.state === "ready" ? t("À compléter") : t("Désactivé")}
+        </span>
+      </h4>
+      {st.state === "none" && (
+        <p>
+          {t("Sans réseau, votre voyage reste disponible : programme, lieux, notes, statuts, check-list, dépenses et phrases sont toujours sur ce téléphone.")}{" "}
+          <b>{t("Seule la carte a besoin d'être téléchargée.")}</b>{" "}
+          {t("Activez le mode hors ligne une fois, de préférence en Wi-Fi, quelques jours avant le départ : la carte marchera ensuite sans réseau, même dans le métro, sans consommer de données.")}
+        </p>
+      )}
+      {st.state === "running" && (
+        <>
+          <p>{t("Téléchargement de la carte… {done} / {total} · {size}", { done: st.done, total: st.total, size: mb(st.bytes) })}</p>
+          <div className="bar"><span style={{ width: `${st.total ? (st.done / st.total) * 100 : 0}%` }} /></div>
+          <p className="em-small">{t("Vous pouvez continuer à utiliser l'app pendant le téléchargement.")}</p>
+        </>
+      )}
       {st.state === "ready" && (
         <p>
-          {st.at ? t("Prête ({size} sur le téléphone, préparée le {date}).", { size: mb(st.bytes), date: new Date(st.at).toLocaleDateString(locale(), { day: "numeric", month: "long" }) }) : t("Prête ({size} sur le téléphone).", { size: mb(st.bytes) })}{" "}
+          {st.at ? t("La carte de ce voyage est sur le téléphone ({size}, téléchargée le {date}).", { size: mb(st.bytes), date: new Date(st.at).toLocaleDateString(locale(), { day: "numeric", month: "long" }) }) : t("La carte de ce voyage est sur le téléphone ({size}).", { size: mb(st.bytes) })}{" "}
           {shellHost && standalone ? t("La carte, les lieux et votre position marchent sans réseau, même dans le métro.") : t("La carte, les lieux et votre position marchent sans réseau, même dans le métro, tant que cette page reste ouverte.")}
         </p>
       )}
       {st.state === "ready" && check === "busy" && <p className="em-small">{t("Vérification du contenu…")}</p>}
       {st.state === "ready" && check && check !== "busy" && (
         check.missing === 0 ? (
-          <p className="off-ok">{t("✓ Complète : les {n} éléments sont sur ce téléphone (programme, lieux ajoutés, Suzhou, globe).", { n: check.expected.toLocaleString(locale()) })}</p>
+          <p className="off-ok">{t("✓ Complète : la carte autour de tous les lieux du voyage est sur ce téléphone.")}</p>
         ) : (
           <p className="tr-err">{check.missing > 1 ? t("{n} éléments manquants (lieux ajoutés depuis, ou stockage effacé) : touchez « Mettre à jour » en Wi-Fi.", { n: check.missing.toLocaleString(locale()) }) : t("{n} élément manquant (lieux ajoutés depuis, ou stockage effacé) : touchez « Mettre à jour » en Wi-Fi.", { n: check.missing.toLocaleString(locale()) })}</p>
         )
       )}
       {st.state === "ready" && st.error && <p className="tr-err">{st.error}</p>}
-      {st.state === "none" && <p>{t("Téléchargez une fois, en Wi-Fi, les quartiers du programme, Suzhou et vos lieux ajoutés (environ 35 Mo à télécharger, 60 Mo sur le téléphone). Ensuite la carte s'affiche sans réseau et ne consomme plus de données mobiles.")}</p>}
-      {st.state === "running" && (
-        <>
-          <p>{t("Téléchargement… {done} / {total} · {size}", { done: st.done, total: st.total, size: mb(st.bytes) })}</p>
-          <div className="bar"><span style={{ width: `${st.total ? (st.done / st.total) * 100 : 0}%` }} /></div>
-        </>
-      )}
       {st.state === "error" && <p className="tr-err">{st.error}</p>}
       <div className="em-actions">
         {st.state === "running" ? (
           <button className="btn-sm" onClick={cancelOffline}>{t("Arrêter")}</button>
+        ) : st.state === "ready" ? (
+          <button className={"btn-sm" + (missing ? " on" : "")} onClick={activate}>{t("Mettre à jour")}</button>
         ) : (
-          <button className="btn-sm on" onClick={() => { if (!hasPro()) return requestPro("export"); track("export", "offline", trip.id); prepareOffline(points); }}>{st.state === "ready" ? t("Mettre à jour") : t("Préparer hors ligne")}</button>
+          <button className="btn-sm on" onClick={activate}>{t("Activer le mode hors ligne")}</button>
         )}
-        {st.state === "ready" && <button className="btn-sm" onClick={() => { if (confirm(t("Supprimer la carte hors ligne de ce téléphone ?"))) deleteOffline(); }}>{t("Supprimer")}</button>}
+        {st.state === "ready" && <button className="btn-sm" onClick={() => { if (confirm(t("Désactiver le mode hors ligne ? La carte téléchargée est retirée de ce téléphone ; votre voyage, lui, reste."))) deleteOffline(); }}>{t("Désactiver")}</button>}
       </div>
       <details className="off-more">
-        <summary>{t("Ce qui est inclus")}</summary>
+        <summary>{t("Ce qui marche sans réseau")}</summary>
         <p>
-          {t("Inclus : la carte autour de chaque lieu du programme et de vos lieux ajoutés (rues jusqu'au détail), toute la région (Suzhou compris), le globe de l'accueil. Vos notes, statuts, check-list, horaires, fiche d'urgence et phrases sont toujours sur le téléphone, sans téléchargement.")}
+          {t("Inclus : la carte autour de chaque lieu du programme et de vos lieux ajoutés (rues jusqu'au détail) et leurs environs, pour qu'elle reste nette en dézoomant. Vos notes, statuts, check-list, horaires, fiche d'urgence et phrases sont toujours sur le téléphone, sans téléchargement.")}
         </p>
         <p>
           {t("Pas inclus : les itinéraires jamais calculés (l'app affiche une estimation), les photos de l'autre téléphone pas encore ouvertes, et les fonctions IA (Traduire, Demander, Ajouter un lieu) qui ont besoin du réseau.")}
         </p>
         <p>
           {t("Les mises à jour de l'app ne touchent pas à la carte téléchargée. Après un ajout de lieu, la vérification ci-dessus le signale : « Mettre à jour » ne télécharge que ce qui manque.")}
-          {ios && !standalone ? " " + t("Sur iPhone, Safari peut effacer les données d'un site non ouvert pendant 7 jours : préparez la carte 2 ou 3 jours avant le départ et ouvrez l'app régulièrement (ou utilisez l'icône d'écran d'accueil, non concernée).") : ""}
+          {ios && !standalone ? " " + t("Sur iPhone, Safari peut effacer les données d'un site non ouvert pendant 7 jours : activez le mode hors ligne 2 ou 3 jours avant le départ et ouvrez l'app régulièrement (ou utilisez l'icône d'écran d'accueil, non concernée).") : ""}
         </p>
       </details>
       <p className="em-small">
         {shellHost && standalone
           ? t("Cette icône s'ouvre aussi sans réseau.")
           : shellHost && ios
-            ? t("Pour rouvrir l'app sans aucun réseau : ajoutez d'abord cette page à l'écran d'accueil (Partager › Sur l'écran d'accueil), ouvrez l'icône une fois avec réseau, puis préparez la carte depuis l'icône (sur iPhone, l'icône garde ses propres données).")
+            ? t("Pour rouvrir l'app sans aucun réseau : ajoutez d'abord cette page à l'écran d'accueil (Partager › Sur l'écran d'accueil), ouvrez l'icône une fois avec réseau, puis activez le mode hors ligne depuis l'icône (sur iPhone, l'icône garde ses propres données).")
             : shellHost
               ? t("Ajoutez cette page à l'écran d'accueil pour la rouvrir sans réseau.")
-              : t("Pour rouvrir l'app sans aucun réseau, utilisez orbesmap.vercel.app ajoutée à l'écran d'accueil, et préparez la carte depuis cette icône.")}
+              : t("Pour rouvrir l'app sans aucun réseau, utilisez orbesmap.vercel.app ajoutée à l'écran d'accueil, et activez le mode hors ligne depuis cette icône.")}
       </p>
     </div>
   );

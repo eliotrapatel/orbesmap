@@ -3,7 +3,7 @@ import type { Trip } from "../../data/types";
 import { countable } from "../../lib/plan";
 import { liveTrip } from "../../lib/live";
 import { getState, useStore } from "../../lib/store";
-import { clock, countdownParts, dayOfTrip, homeZone, phase, tripEndMs, tripStartMs } from "../../lib/time";
+import { clock, countdownParts, dayOfTrip, homeZone, phase, sameHour, tripEndMs, tripStartMs } from "../../lib/time";
 import { t } from "../../lib/i18n";
 import { dateLabel } from "../../lib/newTrip";
 
@@ -192,7 +192,7 @@ export default function TripHero({ trip: base, onOpen }: { trip: Trip; onOpen: (
           )}
         </span>
         <span className="v3-clocks">
-          {home && <span><small>{home.city}</small><b>{clock(home.zone, d)}</b></span>}
+          {home && !sameHour(home.zone, trip.timezone, d) && <span><small>{home.city}</small><b>{clock(home.zone, d)}</b></span>}
           <span><small>{trip.title}</small><b>{clock(trip.timezone, d)}</b></span>
         </span>
       </span>

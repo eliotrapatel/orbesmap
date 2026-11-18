@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import OrbitMark from "./OrbitMark";
 import type { Trip } from "../data/types";
 import { clock, phase } from "../lib/time";
@@ -10,6 +10,7 @@ import { useChecklist } from "./Checklist";
 import { useStore, useTrips, useCanEdit } from "../lib/store";
 import { openHome, openShare } from "./v3/nav";
 import { supabaseConfigured } from "../lib/supabase";
+import { useOffline } from "../lib/offline";
 import { useEscape } from "./ui";
 import { t } from "../lib/i18n";
 import { setMode } from "../lib/business";
@@ -94,16 +95,34 @@ export function TripMenu({ trip, onPick, onClose, anchor }: { trip: Trip; onPick
 }
 
 /** Always-visible sync state: is everything saved and shared? Tap opens Compte. */
-function SyncPill({ onOpen }: { onOpen: () => void }) {
+function useOnline() {
+  return useSyncExternalStore(
+    (f) => {
+      window.addEventListener("online", f);
+      window.addEventListener("offline", f);
+      return () => {
+        window.removeEventListener("online", f);
+        window.removeEventListener("offline", f);
+      };
+    },
+    () => navigator.onLine,
+  );
+}
+
+function SyncPill({ onOpen, onOffline }: { onOpen: () => void; onOffline: () => void }) {
   const sync = useSyncState();
+  const online = useOnline();
+  const map = useOffline();
   const pending = useStore((s) => s.pending);
   const syncedAt = useStore((s) => s.syncedAt);
   const now = useNow(30_000).getTime();
   if (!supabaseConfigured) return null;
   const ago = syncedAt ? Math.max(0, Math.round((now - syncedAt) / 60000)) : null;
   const agoTxt = ago == null ? "" : ago < 1 ? t("à l'instant") : ago < 60 ? t("il y a {n} min", { n: ago }) : t("il y a {n} h", { n: Math.round(ago / 60) });
-  const s =
-    sync === "local"
+  const mapHint = map.state === "ready" ? t("carte disponible") : t("carte : seulement les quartiers déjà vus (mode hors ligne désactivé)");
+  const s = !online
+    ? { tone: "off", short: t("Hors ligne"), long: (pending ? (pending > 1 ? t("Pas de réseau · {n} modifications partiront au retour du réseau", { n: pending }) : t("Pas de réseau · 1 modification partira au retour du réseau")) : t("Pas de réseau · votre voyage est sur ce téléphone")) + " · " + mapHint }
+    : sync === "local"
       ? { tone: "off", short: t("Local"), long: t("Sur ce téléphone seulement (pas connecté)") }
       : sync === "denied"
         ? { tone: "bad", short: t("Accès refusé"), long: t("Ce compte n'a pas accès à l'espace partagé") }
@@ -113,7 +132,7 @@ function SyncPill({ onOpen }: { onOpen: () => void }) {
             ? { tone: "warn", short: pending ? t("En attente ({n})", { n: pending }) : t("Nouvel essai…"), long: pending ? (pending > 1 ? t("{n} modifications en attente d'envoi (réseau)", { n: pending }) : t("{n} modification en attente d'envoi (réseau)", { n: pending })) : t("Envoi en attente, nouvel essai automatique") }
             : { tone: "ok", short: t("À jour"), long: agoTxt ? t("Synchronisé {ago}", { ago: agoTxt }) : t("Synchronisé") };
   return (
-    <button className={"sync-pill " + s.tone} onClick={onOpen} title={s.long} aria-label={t("{state}. Ouvrir Compte", { state: s.long })}>
+    <button className={"sync-pill " + s.tone} onClick={online ? onOpen : onOffline} title={s.long} aria-label={t("{state}. Ouvrir Compte", { state: s.long })}>
       <i />
       <span className="sp-short">{s.short}</span>
       <span className="sp-long">{s.long}</span>
@@ -149,7 +168,7 @@ export default function TopBar({ trip, tool, onTool, onSearch, onTrip, onHome }:
             <span className="label">{trip.code}</span>
             <IChevron />
           </button>
-          <SyncPill onOpen={() => onTool("account")} />
+          <SyncPill onOpen={() => onTool("account")} onOffline={() => onTool("practical")} />
         </div>
         <button className="tb-search" onClick={onSearch} aria-label={t("Rechercher")}>
           <ISearch />

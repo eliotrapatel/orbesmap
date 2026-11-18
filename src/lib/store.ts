@@ -264,20 +264,17 @@ export function useStore<T>(sel: (s: State) => T): T {
 }
 export const getState = () => state;
 
-/** This phone already holds data of the first version (used without an account): it keeps opening on the map */
-export const hasLocalData = (() => {
+/** A session is saved on this phone: the app can open on its trips at once (even without network) while it is checked */
+export const hasStoredSession = (() => {
   try {
-    return Object.keys(localStorage).some((k) => k.startsWith("orbes.v2.") || k === "orbes.outbox.v2" || k.startsWith("gz_"));
+    return !!localStorage.getItem("orbes.auth");
   } catch {
     return false;
   }
 })();
 
-/**
- * The trips written in the code belong to the first shared space: shown to its members, and signed out or before
- * the membership is known only on a phone that already used them (never to a new account, even for a second)
- */
-const codeTripsVisible = () => state.member === true || ((!state.session || state.member === null) && hasLocalData);
+/** The trips written in the code belong to the first shared space: shown to its members only (never signed out) */
+const codeTripsVisible = () => state.member === true;
 
 const baseCache = new Map<string, { rec: TripRec | undefined; trip: Trip }>();
 /** A trip without its places (they come from the places table): its record over the trip of the code */
@@ -1019,11 +1016,42 @@ export async function verifyLoginCode(email: string, token: string) {
 }
 
 /** Signs out on this device. Unsent changes stay in the outbox and are sent at the next sign-in. */
-export async function signOut() {
-  if (!supabase) return;
+// what stays on the phone after signing out: the device's own settings, never the account's data
+const KEEP_ON_SIGN_OUT = new Set(["orbes.lang", "orbes.vid", "orbes.homeZone", "orbes.offline.v1", "orbes.rate.eurcny"]);
+/**
+ * Signing out: changes still waiting are sent first; if some cannot leave (no network) it stops and says "pending"
+ * (`force` then signs out anyway). The account's copy on this phone (trips, notes, photos, drafts) is wiped and the app
+ * reopens on the sign-in: without an account nothing of a trip shows. The downloaded map (public tiles) stays.
+ */
+export async function signOut(force = false): Promise<"pending" | "done"> {
+  if (!supabase) return "done";
   await flush().catch(() => undefined);
-  await supabase.auth.signOut({ scope: "local" });
-  set({ session: null, member: null, sync: "idle" });
+  if (outbox.length && !force) return "pending";
+  await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+  outbox = [];
+  try {
+    for (const k of Object.keys(localStorage)) if ((k.startsWith("orbes.") && !KEEP_ON_SIGN_OUT.has(k)) || k.startsWith("gz_")) localStorage.removeItem(k);
+    for (const k of Object.keys(sessionStorage)) if (k.startsWith("orbes.")) sessionStorage.removeItem(k);
+  } catch {
+    /* ignore */
+  }
+  try {
+    indexedDB.deleteDatabase("orbes");
+  } catch {
+    /* ignore */
+  }
+  location.replace(location.pathname);
+  return "done";
+}
+
+/** "Se déconnecter" from the app: says what is lost if changes could not be sent (no network), then signs out */
+export async function signOutChecked() {
+  if ((await signOut()) !== "pending") return;
+  const n = outbox.length;
+  const msg = n > 1
+    ? tr("{n} modifications n'ont pas pu être envoyées (pas de réseau). Si vous vous déconnectez maintenant, elles seront perdues. Se déconnecter quand même ?", { n })
+    : tr("Une modification n'a pas pu être envoyée (pas de réseau). Si vous vous déconnectez maintenant, elle sera perdue. Se déconnecter quand même ?");
+  if (confirm(msg)) await signOut(true);
 }
 
 // ---------- places as data (see defs.ts) ----------

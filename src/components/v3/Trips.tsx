@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Trip } from "../../data/types";
-import { createTrip, getState, requestPro, signOut, switchTrip, useStore, useTrips } from "../../lib/store";
+import { createTrip, getState, requestPro, signOutChecked, switchTrip, useStore, useTrips } from "../../lib/store";
 import { dateLabel, dayCount, newTripRecord, searchCities, type Destination } from "../../lib/newTrip";
 import { daysLeft, phase } from "../../lib/time";
 import TripHero from "./TripHero";
@@ -54,7 +54,7 @@ export default function Trips({ onOpen, onClose }: { onOpen: (id: string) => voi
             <b>{name || email.split("@")[0]}</b>
             <small>{email}</small>
             <AccountActions />
-            <button type="button" className="v3-link" onClick={() => { setMenu(false); void signOut(); }}>{t("Se déconnecter")}</button>
+            <button type="button" className="v3-link" onClick={() => { setMenu(false); void signOutChecked(); }}>{t("Se déconnecter")}</button>
           </div>
         </div>
       )}

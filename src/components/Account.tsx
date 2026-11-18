@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { sendLoginEmail, signInWithPassword, signOut, useStore, verifyLoginCode, type SyncState } from "../lib/store";
+import { sendLoginEmail, signInWithPassword, signOutChecked, useStore, useTrip, verifyLoginCode, type SyncState } from "../lib/store";
+import { OfflineCard } from "./Tools";
 import { supabaseConfigured } from "../lib/supabase";
 import AiCredit from "./AiCredit";
 import AccountActions from "./v3/AccountActions";
@@ -35,7 +36,7 @@ export function SyncBadge() {
 export default function Account() {
   const session = useStore((s) => s.session);
   const admin = useStore((s) => !!s.plan?.admin);
-  const pending = useStore((s) => s.pending);
+  const trip = useTrip();
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
@@ -63,21 +64,19 @@ export default function Account() {
           <h4>{t("Votre compte")}</h4>
           <p style={{ marginTop: 6 }}>{t("Connecté avec {email}", { email: session.user.email })}</p>
           <div style={{ marginTop: 14 }}><SyncBadge /></div>
-            <p style={{ marginTop: 14 }}>{t("Vos voyages sont sauvegardés en ligne et partagés avec les personnes que vous invitez. Ils restent aussi sur cet appareil pour fonctionner sans réseau.")}</p>
+            <p style={{ marginTop: 14 }}>{t("Vos voyages sont sauvegardés en ligne et partagés avec les personnes que vous invitez. Ils restent aussi sur cet appareil pour fonctionner sans réseau, jusqu'à la déconnexion.")}</p>
           {admin && <AiCredit />}
           <InboundInbox />
           <AccountActions variant="app" />
           <button
             className="btn danger block"
             style={{ marginTop: 16 }}
-            onClick={() => {
-              if (pending > 0 && !confirm(t("{n} modification(s) ne sont pas encore envoyées. Elles resteront sur cet appareil et partiront à la prochaine connexion. Se déconnecter ?", { n: pending }))) return;
-              void signOut();
-            }}
+            onClick={() => void signOutChecked()}
           >
             {t("Se déconnecter")}
           </button>
         </div>
+        <div style={{ marginTop: 12 }}><OfflineCard trip={trip} /></div>
       </div>
     );
   }

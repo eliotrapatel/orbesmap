@@ -167,7 +167,7 @@ export async function deleteMyAccount() {
   } catch {
     /* ignore */
   }
-  await signOut().catch(() => undefined);
+  await signOut(true).catch(() => undefined);
   location.replace(location.pathname);
 }
 

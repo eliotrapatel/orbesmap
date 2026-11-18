@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import App from "../../App";
 import { supabase } from "../../lib/supabase";
-import { defaultTripId, hasLocalData, switchTrip, useStore, useTrips } from "../../lib/store";
+import { defaultTripId, hasStoredSession, switchTrip, useStore, useTrips } from "../../lib/store";
 import Onboarding from "./Onboarding";
 import Trips from "./Trips";
 import Welcome from "./Welcome";
@@ -83,8 +83,9 @@ function Screen() {
   );
 
   // a phone that already holds trips opens on them at once (the session is checked in the background)
-  if (supabase && !authReady && !hasLocalData && !trips.length) return splash;
-  if (supabase && authReady && !session && !hasLocalData) return <Welcome />;
+  // signed in on this phone: its trips open at once, even without network; signed out: only the sign-in
+  if (supabase && !authReady && !(hasStoredSession && trips.length)) return splash;
+  if (supabase && authReady && !session) return <Welcome />;
   if (session && member !== null && !profile.onboardedAt) return <Onboarding />;
   // "Copier ce voyage" asked before signing in: back to that programme, its copy sheet open
   if (session) {
