@@ -1,3 +1,4 @@
+import { track } from "../../lib/track";
 import { useEffect, useRef, useState } from "react";
 import { ai, AiError, imageToBase64, type ExtractResult, type FixedItem, type IntakeResult } from "../../lib/ai";
 import { dayCount, newTripRecord, searchCities, timezoneFor, type Destination } from "../../lib/newTrip";
@@ -342,6 +343,7 @@ function Programme({ w, set, top, onCreated }: StepProps & { onCreated: (id: str
       draft,
     });
     switchTrip(id);
+    track("trip_created");
     onCreated(id);
   };
   const goSafe = () => go().catch(() => setBusy(false));

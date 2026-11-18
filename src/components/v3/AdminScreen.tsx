@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "../../lib/store";
 import {
-  adminAccounts, adminCodes, adminCreateCode, adminOverview, adminSetCodeActive, adminSetPro, adminWaitlist,
+  adminAccounts, adminCodes, adminCreateCode, adminFunnel, adminOverview, adminSetCodeActive, adminSetPro, adminWaitlist, type Funnel,
   type AccountRow, type CodeRow, type Overview, type WaitRow,
 } from "../../lib/pro";
 import Shell from "./Shell";
@@ -89,7 +89,50 @@ function Figures() {
         </div>
         <p className="v3-note">Hors espace partagé, dont les demandes sont suivies à part.</p>
       </div>
+      <Path />
     </>
+  );
+}
+
+const STEPS: [string, string][] = [
+  ["visit", "Visites de la page publique"],
+  ["signup_email", "E-mails de connexion envoyés"],
+  ["signup_done", "Inscriptions terminées"],
+  ["trip_created", "Voyages créés"],
+  ["trip_validated", "Voyages validés"],
+  ["pro_screen", "Écran Pro vu"],
+  ["waitlist_join", "Liste d'attente rejointe"],
+  ["code_redeemed", "Codes activés"],
+];
+const PRO_WHY: Record<string, string> = { edit: "modifier un voyage validé", prep: "voyage du mois utilisé", export: "exports et hors ligne", info: "depuis le compte" };
+
+/** The visitor's path over 30 days (anonymous steps, supabase/saas-5.sql) */
+function Path() {
+  const { data: f } = useLoad<Funnel | null>(adminFunnel);
+  if (!f) return null;
+  const top = Math.max(1, ...STEPS.map(([k]) => f.steps[k]?.now || 0));
+  const pro = Object.entries(f.pro).sort((a, b) => b[1] - a[1]);
+  return (
+    <div className="v3-glass adm-card">
+      <div className="adm-head"><span className="v3-lbl">Parcours, 30 jours</span><small className="v3-note" style={{ margin: 0 }}>30 jours avant</small></div>
+      <div className="adm-path">
+        {STEPS.map(([k, label]) => {
+          const s = f.steps[k] || { now: 0, before: 0 };
+          return (
+            <div key={k} className="adm-step">
+              <span className="adm-step-bar" style={{ width: `${Math.max(2, (s.now / top) * 100)}%` }} />
+              <span className="v3-grow">{label}</span>
+              <b>{s.now}</b>
+              <small>{s.before}</small>
+            </div>
+          );
+        })}
+      </div>
+      <p className="v3-note">Visites : {f.phones} sur téléphone, {f.computers} sur ordinateur.</p>
+      {f.refs.length > 0 && <p className="v3-note">Venus de : {f.refs.map((r) => `${r.ref} (${r.n})`).join(", ")}.</p>}
+      {pro.length > 0 && <p className="v3-note">Écran Pro : {pro.map(([k, n]) => `${PRO_WHY[k] || k} (${n})`).join(", ")}.</p>}
+      <p className="v3-note">Chiffres anonymes, sans compte, sans cookie ni adresse IP.</p>
+    </div>
   );
 }
 

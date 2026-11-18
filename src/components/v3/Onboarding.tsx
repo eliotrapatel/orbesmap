@@ -1,3 +1,4 @@
+import { track } from "../../lib/track";
 import { useState } from "react";
 import { updateProfile, useStore } from "../../lib/store";
 import Shell, { Steps } from "./Shell";
@@ -36,7 +37,10 @@ export default function Onboarding() {
   const [lang, setLang] = useState<string>(() => (profile.lang as string) || "fr");
   const first = name.trim() || email.split("@")[0];
 
-  const finish = () => updateProfile({ name: name.trim(), travel, interests, pace, budget, lang, onboardedAt: Date.now() });
+  const finish = () => {
+    updateProfile({ name: name.trim(), travel, interests, pace, budget, lang, onboardedAt: Date.now() });
+    track("signup_done");
+  };
   const back = step > 1 ? () => setStep(step - 1) : undefined;
   const top = (
     <div className="v3-bar">

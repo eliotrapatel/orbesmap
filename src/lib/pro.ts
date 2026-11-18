@@ -1,6 +1,7 @@
 // ORBES Trips Pro (supabase/saas-4.sql): codes, waiting list, the admin's screens, an account's data (export, deletion).
 // Online only: these are read from and written to the server.
 import { supabase } from "./supabase";
+import { track } from "./track";
 import { discardPending, getState, listTrips, pullPlan, signOut } from "./store";
 
 const sb = () => {
@@ -28,6 +29,7 @@ export async function redeemCode(code: string): Promise<string | null> {
   fail(error, "L'activation");
   const r = (data || {}) as { ok?: boolean; error?: string; until?: string | null };
   if (!r.ok) throw new Error(CODE_ERRORS[r.error || ""] || "Ce code n'a pas pu être activé.");
+  track("code_redeemed");
   await pullPlan();
   return r.until ?? null;
 }
@@ -38,6 +40,7 @@ export async function joinWaitlist() {
   if (!s?.user.email) throw new Error("Connectez-vous d'abord.");
   const { error } = await sb().from("waitlist").upsert({ user_id: s.user.id, email: s.user.email.toLowerCase(), lang: (getState().profile.lang as string) || "fr" }, { onConflict: "user_id", ignoreDuplicates: true });
   fail(error, "L'inscription");
+  track("waitlist_join");
   await pullPlan();
 }
 
@@ -60,6 +63,17 @@ export async function adminOverview(): Promise<Overview> {
   const { data, error } = await sb().rpc("admin_overview");
   fail(error, "La lecture");
   return data as Overview;
+}
+export type Funnel = {
+  steps: Record<string, { now: number; before: number }>; phones: number; computers: number;
+  refs: { ref: string; n: number }[]; pro: Record<string, number>;
+};
+/** The anonymous path figures (supabase/saas-5.sql); null while that file has not run */
+export async function adminFunnel(): Promise<Funnel | null> {
+  const { data, error } = await sb().rpc("admin_funnel");
+  if (missing(error)) return null;
+  fail(error, "La lecture");
+  return data as Funnel;
 }
 export async function adminAccounts(search = ""): Promise<AccountRow[]> {
   const { data, error } = await sb().rpc("admin_accounts", { p_search: search || null });

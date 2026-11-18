@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { track } from "../../lib/track";
 import { closePro, useStore, type ProReason } from "../../lib/store";
 import { joinWaitlist, proDate, redeemCode } from "../../lib/pro";
 import Shell from "./Shell";
@@ -31,6 +32,7 @@ export default function ProScreen() {
     }
   };
   const pro = !!plan?.pro;
+  useEffect(() => track("pro_screen", why), []); // eslint-disable-line react-hooks/exhaustive-deps
   const top = (
     <div className="v3-bar">
       <button className="v3-tool" onClick={closePro} aria-label="Fermer">✕</button>

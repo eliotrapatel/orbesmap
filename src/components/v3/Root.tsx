@@ -10,6 +10,7 @@ import { openAdmin, openHome, openShare, useAdmin, useHome, useShare } from "./n
 import ShareTrip from "./ShareTrip";
 import ProScreen from "./ProScreen";
 import AdminScreen from "./AdminScreen";
+import Legal, { legalKind } from "./Legal";
 
 
 /**
@@ -20,6 +21,9 @@ import AdminScreen from "./AdminScreen";
 export default function Root() {
   const proAsk = useStore((s) => s.proAsk);
   const admin = useAdmin();
+  // the legal pages have their own address and open without an account
+  const legal = legalKind(new URLSearchParams(location.search).get("p"));
+  if (legal) return <Legal kind={legal} onClose={() => location.assign(location.pathname)} />;
   const screen = <Screen />;
   return (
     <>

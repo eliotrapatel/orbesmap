@@ -2,6 +2,7 @@ import { useState } from "react";
 import { requestPro, useStore } from "../../lib/store";
 import { deleteMyAccount, exportMyData, proDate } from "../../lib/pro";
 import { openAdmin } from "./nav";
+import { legalHref } from "./Legal";
 
 /** What the account's Pro status reads as, in one line */
 export function useProLine(): string | null {
@@ -58,6 +59,7 @@ export default function AccountActions({ variant = "v3" }: { variant?: "v3" | "a
         {busy ? "Suppression…" : "Supprimer mon compte"}
       </button>
       {err && <p className="v3-err" role="alert">{err}</p>}
+      <p className="v3-fine acct-legal"><a href={legalHref("cgu")}>Conditions</a> · <a href={legalHref("confidentialite")}>Confidentialité</a> · <a href="mailto:hello@joinentity.com">Contact</a></p>
     </div>
   );
 }

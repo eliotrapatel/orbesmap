@@ -3,6 +3,7 @@
 // ("draft"), so a closed app picks up where it stopped. One request at a time (the AI is capped per account).
 // The preparation only writes into its own trip: it stops as soon as another trip is opened or the screen
 // closes, and only one phone (or tab) prepares a trip at a time.
+import { track } from "./track";
 import { useSyncExternalStore } from "react";
 import type { Trip } from "../data/types";
 import { TYPE_LABEL } from "../data/trip";
@@ -301,6 +302,7 @@ export async function regenerateDay(tripId: string, date: string) {
 export function confirmTrip(tripId: string) {
   // the moment of the validation: after it, a free account's changes to the programme need Pro (saas-4.sql)
   saveDraft(tripId, { status: "done", doneAt: Date.now(), lease: undefined });
+  track("trip_validated");
 }
 
 const MAX_ADDS = 3;

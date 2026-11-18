@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { track } from "../../lib/track";
 import { sendLoginEmail, signInWithGoogle, signInWithPassword, verifyLoginCode } from "../../lib/store";
 import OrbitMark from "../OrbitMark";
 import Shell from "./Shell";
+import { legalHref } from "./Legal";
 
 type Mode = "email" | "sent" | "password";
 
@@ -17,6 +19,7 @@ export default function Welcome() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const valid = /^\S+@\S+\.\S+$/.test(email.trim());
+  useEffect(() => track("visit"), []);
 
   const run = async (f: () => Promise<void>, fail: string) => {
     setBusy(true);
@@ -67,7 +70,7 @@ export default function Welcome() {
                   e.preventDefault();
                   if (!valid) return;
                   if (mode === "password") void run(() => signInWithPassword(email.trim(), password), "Connexion impossible. Réessayez.");
-                  else void run(async () => { await sendLoginEmail(email.trim()); setMode("sent"); }, "L'e-mail n'a pas pu partir. Réessayez dans un instant.");
+                  else void run(async () => { await sendLoginEmail(email.trim()); setMode("sent"); track("signup_email"); }, "L'e-mail n'a pas pu partir. Réessayez dans un instant.");
                 }}
               >
                 <label className="v3-field">
@@ -94,7 +97,7 @@ export default function Welcome() {
               </form>
             )}
             {err && <p className="v3-err" role="alert">{err}</p>}
-            <p className="v3-fine">Sans mot de passe · gratuit</p>
+            <p className="v3-fine">Sans mot de passe · gratuit · en continuant, vous acceptez les <a href={legalHref("cgu")}>conditions</a> et la <a href={legalHref("confidentialite")}>politique de confidentialité</a></p>
           </div>
           <a className="v3-link pub-more" href="#comment">Comment ça marche ↓</a>
         </div>
@@ -176,7 +179,7 @@ export default function Welcome() {
       <section className="pub-sec pub-end">
         <h2 className="v3-d pub-h2">Votre prochain voyage commence ici.</h2>
         <button type="button" className="v3-btn" onClick={toAccount}>Créer mon premier voyage</button>
-        <p className="v3-fine">ORBES Trips · 2026</p>
+        <p className="v3-fine">ORBES Trips · 2026 · <a href={legalHref("cgu")}>Conditions</a> · <a href={legalHref("confidentialite")}>Confidentialité</a> · <a href="mailto:hello@joinentity.com">Contact</a></p>
       </section>
     </Shell>
   );
