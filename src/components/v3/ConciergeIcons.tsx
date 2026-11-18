@@ -25,6 +25,10 @@ export const CcChev = mk(<path d="m9 6 6 6-6 6" />);
 /** Not in the mockup's sprite: who travels (two people), drawn on the same grid */
 export const CcPeople = mk(<><circle cx="9" cy="8.5" r="3" /><path d="M3.5 19.5c0-3.2 2.4-5.5 5.5-5.5s5.5 2.3 5.5 5.5" /><path d="M15.5 5.7a3 3 0 0 1 0 5.6M17.6 14.3c1.8.8 2.9 2.6 2.9 5.2" /></>);
 export const CcBell = mk(<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15zM10 20.5h4" />);
+/** Not in the concierge's sprite, taken from the mockup's sprite for the form and the review (#i-back, #i-search, #i-refresh) */
+export const CcBack = mk(<path d="m15 6-6 6 6 6" />);
+export const CcSearch = mk(<><circle cx="11" cy="11" r="6.5" /><path d="m20 20-4.2-4.2" /></>);
+export const CcRefresh = mk(<><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3" /><path d="M19.5 4.5v4h-4" /></>);
 export const CcClip = mk(<path d="M9 4.5h6M9 4.5a1.5 1.5 0 0 0 0 3h6a1.5 1.5 0 0 0 0-3M8 5.5H6.5A1.5 1.5 0 0 0 5 7v12a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 19V7a1.5 1.5 0 0 0-1.5-1.5H16" />);
 
 // The orbit mark as in the mockup's sprite: #orbit (line 28) for the small avatar, #orbit-lg (line 18) for the large one
