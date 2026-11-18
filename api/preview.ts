@@ -144,8 +144,9 @@ export async function GET(req: Request): Promise<Response> {
     status: 200,
     headers: {
       "content-type": "text/html; charset=utf-8",
-      // per address (one per link): 10 minutes fresh, a day served stale while it refreshes; the generic card 1 minute
-      "cache-control": data ? "public, max-age=0, s-maxage=600, stale-while-revalidate=86400" : "public, max-age=0, s-maxage=60",
+      // per address (one per link): 10 minutes fresh, 1 more minute served stale while it refreshes (a closed link stops
+      // showing its card soon); the generic card 1 minute
+      "cache-control": data ? "public, max-age=0, s-maxage=600, stale-while-revalidate=60" : "public, max-age=0, s-maxage=60",
       "x-robots-tag": "noindex",
     },
   });

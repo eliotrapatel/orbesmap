@@ -53,6 +53,10 @@
           }
           if (L.hostname !== "theorbes.com" && L.hostname !== "www.theorbes.com") return;
           if ((window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || navigator.standalone) return;
+          // a phone on China's time zone stays here: *.vercel.app is often unreachable there, theorbes.com sometimes is
+          var tz = "";
+          try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (e) {}
+          if (/^(Asia\/(Shanghai|Chongqing|Chungking|Harbin|Urumqi|Kashgar)|PRC)$/.test(tz)) return;
           var all = L.search + "&" + L.hash.replace(/^#/, "&");
           if (/[?&](access_token|refresh_token|error|error_code|error_description|code|reset|token_hash)=/.test(all) || /type=recovery/.test(all)) return;
           var store = window.localStorage;

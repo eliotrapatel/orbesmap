@@ -33,7 +33,7 @@ export function passUntil(tripEnd: string | null | undefined, nowMs: number): st
 
 const SLUG = /^[a-z0-9]{10,24}$/;
 const HOSTS = /^(www\.)?theorbes\.com$|^orbesmap(-[a-z0-9-]+)?\.vercel\.app$|^localhost$|^127\.0\.0\.1$/;
-/** A public trip's slug from what was pasted: its link (theorbes.com/maps?t=… or orbesmap.vercel.app/?t=…) or
+/** A public trip's slug from what was pasted: its link (theorbes.com/maps?t=…, orbesmap.vercel.app/?t=… or /p/<slug>) or
  *  the slug alone; null when it is not one */
 export function parsePublicSlug(text: string): string | null {
   const s = String(text || "").trim();
@@ -42,6 +42,9 @@ export function parsePublicSlug(text: string): string | null {
   try {
     const u = new URL(/^[a-z]+:\/\//i.test(s) ? s : `https://${s}`);
     if (!HOSTS.test(u.hostname.toLowerCase())) return null;
+    // the public link handed out since lot acquisition: orbesmap.vercel.app/p/<slug>(?src=…&by=…)
+    const p = /^\/p\/([a-z0-9]{10,24})\/?$/i.exec(u.pathname);
+    if (p) return p[1].toLowerCase();
     const t = (u.searchParams.get("t") || "").toLowerCase();
     return SLUG.test(t) ? t : null;
   } catch {

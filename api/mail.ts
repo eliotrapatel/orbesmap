@@ -19,7 +19,9 @@ const DAY_MS = 864e5;
 const EMAIL = /^[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']+$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export type InviteRec = InviteRow & { expires_at: string; created_at?: string };
+// share_token: the link given to the inviter (share sheet, WhatsApp), never the e-mail's own token, so a link the
+// inviter holds never tells whether the address has an account (invite_preview, supabase/saas-14.sql)
+export type InviteRec = InviteRow & { expires_at: string; created_at?: string; share_token?: string | null };
 export interface MailDeps {
   now(): Date;
   /** the unsubscribe signing key ("" = links cannot be checked) */
@@ -83,7 +85,7 @@ export async function handleMail(req: Request, d: MailDeps): Promise<Response> {
     if (!(await d.ready())) return json({ fallback: true }, 200, h);
     const now = d.now();
     let row = await d.getInvite(trip, email);
-    const fresh = { token: d.token(), invited_by: me.id, expires_at: new Date(now.getTime() + 30 * DAY_MS).toISOString() };
+    const fresh = { token: d.token(), share_token: d.token(), invited_by: me.id, expires_at: new Date(now.getTime() + 30 * DAY_MS).toISOString() };
     if (!row) {
       const lang = langOf((await d.emailLang(email).catch(() => null)) || b.lang);
       row = (await d.insertInvite({ ...fresh, trip_id: trip, email, lang })) || (await d.getInvite(trip, email));
@@ -94,7 +96,14 @@ export async function handleMail(req: Request, d: MailDeps): Promise<Response> {
       await d.patchInvite(row.id, patch);
       row = { ...row, ...patch } as InviteRec;
     }
-    const link = `${APP_URL}/?join=${row.token}&src=invite`;
+    if (!row.share_token) {
+      const share_token = d.token();
+      await d.patchInvite(row.id, { share_token });
+      row = { ...row, share_token };
+    }
+    // the inviter's link (returned in every answer) and the e-mail's own link: two tokens
+    const link = `${APP_URL}/?join=${row.share_token}&src=invite`;
+    const mailLink = `${APP_URL}/?join=${row.token}&src=invite`;
     if (action === "link") return json({ ok: true, sent: false, link }, 200, h);
     if (await d.optedOut(email)) return json({ ok: true, sent: false, link, optout: true }, 200, h);
     if (row.sent_at && now.getTime() - Date.parse(row.sent_at) < DAY_MS) return json({ ok: true, sent: false, link, already: true }, 200, h);
@@ -105,7 +114,7 @@ export async function handleMail(req: Request, d: MailDeps): Promise<Response> {
     if (!(by < CAP_INVITER) || !(all < CAP_ALL)) return json({ ok: true, sent: false, link, capped: true }, 200, h);
     const t = (await d.trip(trip)) || {};
     const lang = langOf(row.lang || b.lang);
-    const m = inviteMail({ lang, inviter: await d.profileName(me.id).catch(() => ""), title: String(t.title || ""), start: String(t.start || ""), end: String(t.end || ""), link, unsub: unsubInvite(d.secret, row.id) });
+    const m = inviteMail({ lang, inviter: await d.profileName(me.id).catch(() => ""), title: String(t.title || ""), start: String(t.start || ""), end: String(t.end || ""), link: mailLink, unsub: unsubInvite(d.secret, row.id) });
     // claimed before sending: two taps at the same moment send one e-mail
     const before = { sent_at: row.sent_at, send_count: row.send_count || 0 };
     if (!(await d.claimSend(row.id, since, now.toISOString(), before.send_count + 1))) return json({ ok: true, sent: false, link, already: true }, 200, h);

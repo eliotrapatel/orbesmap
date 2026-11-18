@@ -643,6 +643,11 @@ const body = (r) => r.json();
   check(again.already === true && w.mails.length === 1, "never twice within 24 h");
   const link = await body(await w.post({ action: "link", trip: "t1", email: "guest@y.fr" }));
   check(link.link === j.link && w.mails.length === 1, "\"link\" gives the same link, no e-mail");
+  const row = w.invites[0];
+  check(row.share_token && row.share_token !== row.token && j.link.includes(`join=${row.share_token}&`) && m.text.includes(`join=${row.token}&`) && !(m.text + m.html).includes(row.share_token), "the inviter's link and the e-mail's link carry two different tokens");
+  const sql = readFileSync(new URL("../supabase/saas-14.sql", import.meta.url), "utf8");
+  check(/'email', case when shared then null else r\.email end/.test(sql) && /'has_account', not shared and r\.sent_at is not null/.test(sql), "invite_preview: the inviter's link never shows the address nor whether it has an account");
+  check(/where token = p_token or share_token = p_token/.test(sql) && /perform 'public\.my_ref_code\(\)'::regprocedure;/.test(sql), "invite_claim accepts both links; saas-14.sql needs saas-12.sql first (offline_ready)");
 }
 {
   const w = mailWorld({ optout: ["guest@y.fr"] });
@@ -716,6 +721,55 @@ console.log("Texts");
     }
   }
   check(miss.length === 0, `every text of the lot has its English${miss.length ? ": " + miss.join(" | ") : ""}`);
+}
+
+// ---------- 10. the « stop these e-mails » link and the service worker (public/sw.js) ----------
+console.log("Service worker");
+{
+  const { runInNewContext } = await import("node:vm");
+  const src = readFileSync(new URL("../public/sw.js", import.meta.url), "utf8");
+  /** sw.js in a fake worker: the stored app, the network's answers, what each navigation got */
+  function worker(answers) {
+    const store = new Map([["/", { body: "APP", headers: new Map([["content-type", "text/html"]]) }]]);
+    const handlers = [];
+    const mkRes = (url, a) => ({ ok: a.status === 200, status: a.status, url: a.final || url, body: a.body, headers: { get: (k) => (k === "content-type" ? a.type : null) }, clone() { return this; } });
+    const cache = { match: async (k) => store.get(typeof k === "string" ? k : k.url) || undefined, put: async (k, r) => void store.set(k, { body: r.body, headers: new Map() }), add: async () => undefined, keys: async () => [] };
+    const ctx = {
+      self: { location: { origin: "https://orbesmap.vercel.app" }, addEventListener: (t, f) => t === "fetch" && handlers.push(f), skipWaiting() {}, clients: { matchAll: async () => [], claim: async () => undefined }, registration: {} },
+      caches: { open: async () => cache, keys: async () => [], delete: async () => true },
+      fetch: async (req) => { const url = typeof req === "string" ? req : req.url; return mkRes(url, answers(new URL(url).pathname)); },
+      Request: class { constructor(u) { this.url = u; } },
+      URL, AbortController, setTimeout, clearTimeout, Response: { error: () => ({ error: true }) },
+    };
+    runInNewContext(src, ctx);
+    return {
+      store,
+      async go(url) {
+        let got = null;
+        const waits = [];
+        const e = { request: { method: "GET", mode: "navigate", url }, respondWith: (p) => (got = p), waitUntil: (p) => waits.push(p) };
+        for (const h of handlers) h(e);
+        const res = got ? await got : null;
+        await Promise.all(waits);
+        return res;
+      },
+    };
+  }
+  const html = { status: 200, type: "text/html; charset=utf-8", body: "UNSUB PAGE" };
+  const w = worker((path) => (path.startsWith("/api/") ? html : { status: 200, type: "text/html", body: "APP v2" }));
+  const r = await w.go("https://orbesmap.vercel.app/api/mail?u=abc&s=def");
+  check(r === null, "the unsubscribe link goes to the network (the server's page), never the stored app");
+  check(w.store.get("/").body === "APP", "…and the stored app is left as it is");
+  const w2 = worker(() => html);
+  await w2.go("https://orbesmap.vercel.app/p/abcdefghijkl");
+  check(w2.store.get("/").body === "APP", "an address that is not the app's page is shown, never stored as the app");
+  const w3 = worker(() => ({ status: 200, type: "text/html", body: "APP v2", final: "https://orbesmap.vercel.app/?t=abcdefghijkl" }));
+  const r3 = await w3.go("https://orbesmap.vercel.app/p/abcdefghijkl");
+  check(r3?.body === "APP" && w3.store.get("/").body === "APP v2", "the app's own page (after the /p/ redirect) still refreshes the stored app");
+  const w4 = worker(() => ({ status: 200, type: "text/html", body: "APP v2" }));
+  const r4 = await w4.go("https://orbesmap.vercel.app/?join=tok&src=invite");
+  check(r4?.body === "APP" && w4.store.get("/").body === "APP v2", "any other address of the app: the stored app at once, refreshed behind (as today)");
+  check(/const SHELL = "orbes-shell-v2";/.test(src), "the stored app's name is unchanged (an update never empties it)");
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

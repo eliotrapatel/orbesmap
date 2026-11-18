@@ -7,7 +7,9 @@
 //   the trip of the month and the detected bookings, each in its own try/catch (a failure never stops the alerts).
 // - once, 2 to 36 hours after a sign-up never confirmed (lot acquisition): the confirmation e-mail again (api/_confirm.ts).
 // Needs on Vercel: SUPABASE_SERVICE_ROLE_KEY, VAPID_PRIVATE_KEY, RESEND_API_KEY (MAIL_FROM optional).
-// Optional: CYCLE_PAUSE=1 stops every message of the cycle, CYCLE_DAY_CAP (default 150 e-mails a day).
+// Optional: CYCLE_PAUSE=1 stops every message of the cycle (the confirmation reminder too), CYCLE_DAY_CAP (default 150
+// e-mails a day), CONFIRM_REMINDER_PAUSE=1 stops only the confirmation reminder, CONFIRM_REMINDER_ADMIN=1 lets it read
+// the Auth admin API before supabase/saas-15.sql (off by default: before that file, no reminder leaves).
 import webpush from "web-push";
 import { kickStale } from "./prepare.js";
 import { deriveUnsub, restDeps, runCycle } from "./_cycle.js";
@@ -293,38 +295,48 @@ ${FOOTER}</div>`;
   }
   // the single reminder of a sign-up never confirmed (lot acquisition, R07), only with time left in this run; a failure
   // here never touches what was sent above
+  // It starts only within the first 30 s of the run (the cycle may use up to 40 s, the function stops at 60 s), and
+  // CYCLE_PAUSE=1 or CONFIRM_REMINDER_PAUSE=1 stops it from Vercel without a new deploy.
   let reminders = 0;
-  try {
-    reminders = (await confirmReminders(reminderDeps(key, now, t0))).sent;
-  } catch (e) {
-    warnings.push(`confirm: ${String((e as Error)?.message || e).slice(0, 120)}`);
+  const remindOff = process.env.CYCLE_PAUSE === "1" || process.env.CONFIRM_REMINDER_PAUSE === "1";
+  if (!remindOff && Date.now() - t0 <= REMIND_START_MS) {
+    try {
+      reminders = (await confirmReminders(reminderDeps(key, now, t0))).sent;
+    } catch (e) {
+      warnings.push(`confirm: ${String((e as Error)?.message || e).slice(0, 120)}`);
+    }
   }
   return json({ ok: true, trips: trips.length, ...sent, ...(reminders ? { reminders } : {}), ...(restarted ? { restarted } : {}), ...(warnings.length ? { warnings } : {}), ...(resend ? {} : { warning_mail: "RESEND_API_KEY missing" }) });
 }
 
+/** The confirmation reminder starts only before this point of the run (ms) */
+const REMIND_START_MS = 30_000;
+/** Every database call of the reminder stops after 5 s (the resend after 8 s): the run always ends before 60 s */
+const remindSignal = () => AbortSignal.timeout(5000);
 /** The real database, Auth and clock for the reminder of api/_confirm.ts */
 function reminderDeps(key: string, now: Date, t0: number) {
   const h = { apikey: key, authorization: `Bearer ${key}`, "content-type": "application/json" };
   return {
     now,
     elapsed: () => Date.now() - t0,
+    adminFallback: process.env.CONFIRM_REMINDER_ADMIN === "1",
     listSql: async (): Promise<Unconfirmed[] | "missing"> => {
-      const r = await fetch(`${SUPA_URL}/rest/v1/rpc/unconfirmed_signups`, { method: "POST", headers: h, body: JSON.stringify({ p_min_hours: REMIND.minHours, p_max_hours: REMIND.maxHours, p_limit: 50 }) });
+      const r = await fetch(`${SUPA_URL}/rest/v1/rpc/unconfirmed_signups`, { method: "POST", headers: h, body: JSON.stringify({ p_min_hours: REMIND.minHours, p_max_hours: REMIND.maxHours, p_limit: 50 }), signal: remindSignal() });
       if (r.status === 404) return "missing";
       if (!r.ok) throw new Error(`db ${r.status} unconfirmed_signups`);
       return ((await r.json()) as Unconfirmed[]) || [];
     },
     listAdmin: async (page: number): Promise<Unconfirmed[]> => {
-      const r = (await db(`/auth/v1/admin/users?page=${page}&per_page=200`, key)) as { users?: Unconfirmed[] } | null;
+      const r = (await db(`/auth/v1/admin/users?page=${page}&per_page=200`, key, { signal: remindSignal() })) as { users?: Unconfirmed[] } | null;
       return Array.isArray(r?.users) ? r.users : [];
     },
-    claims: async () => ((await db("/rest/v1/alert_log?key=like.confirm:*&select=key,at", key)) as { key: string; at: string }[]) || [],
+    claims: async () => ((await db("/rest/v1/alert_log?key=like.confirm:*&select=key,at", key, { signal: remindSignal() })) as { key: string; at: string }[]) || [],
     claim: async (k: string) => {
-      const r = (await db("/rest/v1/alert_log", key, { method: "POST", headers: { prefer: "resolution=ignore-duplicates,return=representation" }, body: JSON.stringify({ key: k }) })) as unknown[];
+      const r = (await db("/rest/v1/alert_log", key, { method: "POST", headers: { prefer: "resolution=ignore-duplicates,return=representation" }, body: JSON.stringify({ key: k }), signal: remindSignal() })) as unknown[];
       return Array.isArray(r) && r.length > 0;
     },
     unclaim: async (k: string) => {
-      await db(`/rest/v1/alert_log?key=eq.${encodeURIComponent(k)}`, key, { method: "DELETE" });
+      await db(`/rest/v1/alert_log?key=eq.${encodeURIComponent(k)}`, key, { method: "DELETE", signal: remindSignal() });
     },
     resend: async (email: string) => {
       // never more than 8 s: a call that hangs gives 0 (the claim is kept, nothing sent twice)
@@ -335,7 +347,7 @@ function reminderDeps(key: string, now: Date, t0: number) {
       return r ? r.status : 0;
     },
     log: async (userId: string, detail: string) => {
-      await fetch(`${SUPA_URL}/rest/v1/events`, { method: "POST", headers: { ...h, prefer: "return=minimal" }, body: JSON.stringify({ user_id: userId, name: "confirm_resent", detail }) });
+      await fetch(`${SUPA_URL}/rest/v1/events`, { method: "POST", headers: { ...h, prefer: "return=minimal" }, body: JSON.stringify({ user_id: userId, name: "confirm_resent", detail }), signal: remindSignal() });
     },
   };
 }

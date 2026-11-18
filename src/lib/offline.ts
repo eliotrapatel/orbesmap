@@ -6,7 +6,7 @@ import { useSyncExternalStore } from "react";
 import { t } from "./i18n";
 import type { Trip } from "../data/types";
 import { packSummary, phaseUpdate, readStatus, type PackCheck, type PackStatus } from "./packPlan";
-import { clearPack, fetchPhotos, flushOfflineUse, getLeg, markOfflineUse, packFor, photosHeld, putLeg, readyReportedToday, reportReady, routesHeld, tripHeld, type PackSpec } from "./offlinePack";
+import { clearPack, fetchPhotos, flushOfflineUse, getLeg, markOfflineUse, packFor, photosHeld, putLeg, quietCheckDue, reportReady, routesHeld, tripHeld, type PackSpec } from "./offlinePack";
 import { osrmRoute } from "./route";
 import { currentTrip } from "./store";
 
@@ -459,7 +459,9 @@ async function quietCheck() {
   try {
     if (status.state !== "ready" || !status.trip || running || packing) return;
     const trip = currentTrip();
-    if (trip.id !== status.trip || readyReportedToday(trip.id)) return;
+    // without network the report could not leave anyway; else once a day per trip (never a full re-read at every opening)
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+    if (trip.id !== status.trip || !quietCheckDue(trip.id)) return;
     const c = await verifyPack(packFor(trip), trip);
     if (!c) return;
     const s = packSummary(c);

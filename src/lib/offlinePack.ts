@@ -208,6 +208,17 @@ export function reportReady(tripId: string, full: boolean) {
 }
 /** Reported "full" today already: the quiet check at start-up is skipped */
 export const readyReportedToday = (tripId: string) => !!readMap(READY_KEY)[`${tripId}|full|${today()}`];
+/** The quiet check at start-up runs at most once a day per trip, whatever it finds (an incomplete pack is not checked
+ *  again at every opening): true = run it now (and it is marked for today) */
+export function quietCheckDue(tripId: string): boolean {
+  if (!tripId || readyReportedToday(tripId)) return false;
+  const k = `${tripId}|checked|${today()}`;
+  const m = readMap(READY_KEY);
+  if (m[k]) return false;
+  m[k] = 1;
+  writeMap(READY_KEY, m);
+  return true;
+}
 const marked = new Set<string>();
 /** The pack used without network ("map", "route", "app"): queued here, recorded once the network is back */
 export function markOfflineUse(tripId: string, what: "map" | "route" | "app") {

@@ -63,7 +63,7 @@ class Store {
   }
 }
 /** Runs the script in a fake page; returns where it went and what it kept */
-function page(url, { local = {}, session = {}, standalone = false, referrer = "", throws = false } = {}) {
+function page(url, { local = {}, session = {}, standalone = false, referrer = "", throws = false, tz = "Europe/Paris" } = {}) {
   const u = new URL(url);
   const out = { replaced: null, state: null, local: new Store(local, throws), session: new Store(session) };
   const location = {
@@ -83,6 +83,7 @@ function page(url, { local = {}, session = {}, standalone = false, referrer = ""
     navigator: { standalone },
     matchMedia: (q) => ({ matches: standalone && q.includes("standalone") }),
     document: { referrer },
+    Intl: { DateTimeFormat: () => ({ resolvedOptions: () => ({ timeZone: tz }) }) },
   };
   ctx.window = ctx;
   let threw = false;
@@ -107,6 +108,9 @@ function page(url, { local = {}, session = {}, standalone = false, referrer = ""
   check(!!page("https://www.theorbes.com/maps").replaced, "www.theorbes.com too");
   check(a.leaving && !page("https://orbesmap.vercel.app/").leaving, "the page left behind records nothing (window.__orbesLeaving), only when it is sent away");
   check(/__orbesLeaving\) return;/.test(read("src/lib/track.ts")), "track() skips everything on a page being left");
+  const cn = ["Asia/Shanghai", "Asia/Urumqi", "Asia/Chongqing", "Asia/Harbin", "PRC"].map((tz) => page("https://theorbes.com/maps?join=abc", { tz }));
+  check(cn.every((p) => p.replaced === null && !p.threw && !p.leaving), "a phone on China's time zone stays on theorbes.com (vercel.app is often unreachable there)");
+  check(!!page("https://theorbes.com/maps", { tz: "Asia/Hong_Kong" }).replaced && !!page("https://theorbes.com/maps", { tz: "Asia/Tokyo" }).replaced, "…Hong Kong or Tokyo are still sent to orbesmap.vercel.app");
 }
 const stays = [
   ["signed in", { local: { "orbes.auth": "{}" } }],
@@ -187,13 +191,14 @@ check(C.resendLeft(0, Date.now()) === 0 && C.resendLeft(1000, 1000) === 60 && C.
 section("R07 · the single reminder of the cron (api/_confirm.ts)");
 const R = await import("../api/_confirm.ts");
 /** A fake world: accounts, the alert log, Supabase's resend answers, a clock */
-function remindWorld({ at = "2026-11-18T10:05:00Z", users = [], sql = true, resend = () => 200, elapsed = 1000, claims = [] } = {}) {
+function remindWorld({ at = "2026-11-18T10:05:00Z", users = [], sql = true, resend = () => 200, elapsed = 1000, claims = [], admin = true } = {}) {
   const now = new Date(at);
   const log = new Map(claims.map((c) => [c.key, c.at]));
   const calls = { sent: [], events: [], admin: 0, sql: 0 };
   const deps = {
     now,
     elapsed: () => elapsed,
+    adminFallback: admin,
     listSql: async () => {
       calls.sql++;
       if (!sql) return "missing";
@@ -304,6 +309,9 @@ for (const [at, ok, what] of [
   check(rl.sent === 0 && late.calls.admin === 0, "…read only at the first run of each hour");
   const conf = remindWorld({ users: [acct("a", 3, { email_confirmed_at: hoursAgo(NOW, 1) })], sql: false });
   check((await R.confirmReminders(conf.deps)).sent === 0, "…never a confirmed account");
+  const off = remindWorld({ users: [acct("a", 3)], sql: false, admin: false });
+  const ro = await R.confirmReminders(off.deps);
+  check(ro.sent === 0 && off.calls.admin === 0 && ro.skipped === "missing", "before saas-15.sql without CONFIRM_REMINDER_ADMIN=1: nothing read, nothing sent (as today)");
   const slow = remindWorld({ users: [acct("a", 3)], elapsed: 41_000 });
   const rs = await R.confirmReminders(slow.deps);
   check(rs.sent === 0 && slow.calls.sql === 0, "the run has used 40 s: nothing is read or sent");
@@ -317,6 +325,8 @@ for (const [at, ok, what] of [
   check(iReturn > 0 && iRemind > iReturn && block.length < 40, "the reminder runs after the alerts and the welcome-back e-mails, inside its own try/catch");
   check(/redirect_to=\$\{encodeURIComponent\(`\$\{APP_URL\}\/`\)\}/.test(cron) && /type: "signup"/.test(cron), "the same « Confirm signup » e-mail, back to orbesmap.vercel.app");
   check(!/autoconfirm|email_confirm:\s*true|confirm_email/i.test(cron + read("api/_confirm.ts")), "nothing confirms an account: the confirmation stays on");
+  check(/process\.env\.CYCLE_PAUSE === "1" \|\| process\.env\.CONFIRM_REMINDER_PAUSE === "1"/.test(cron) && /if \(!remindOff && Date\.now\(\) - t0 <= REMIND_START_MS\)/.test(cron) && /REMIND_START_MS = 30_000/.test(cron), "CYCLE_PAUSE=1 or CONFIRM_REMINDER_PAUSE=1 stops the reminder; it starts only within the first 30 s of the run");
+  check(/adminFallback: process\.env\.CONFIRM_REMINDER_ADMIN === "1"/.test(cron) && (cron.match(/signal: remindSignal\(\)/g) || []).length === 6, "the Auth admin API only with CONFIRM_REMINDER_ADMIN=1; each database call of the reminder stops after 5 s");
 }
 
 // ---------------------------------------------------------------- R14 / R10: the intent kept until after the confirmation
@@ -397,7 +407,7 @@ const PV = await import("../api/preview.ts");
     const r1 = await get("?t=abcdefghijkl&src=wa&by=x1");
     const b1 = await r1.text();
     check(r1.status === 200 && /Kyoto · 1 jour/.test(b1) && calls[0].body.p_slug === "abcdefghijkl", "?src= and ?by= are ignored: the slug alone is read");
-    check(/s-maxage=600/.test(r1.headers.get("cache-control")) && /stale-while-revalidate=86400/.test(r1.headers.get("cache-control")), "kept 10 minutes by the CDN, per link");
+    check(/s-maxage=600/.test(r1.headers.get("cache-control")) && /stale-while-revalidate=60(?!\d)/.test(r1.headers.get("cache-control")), "kept 10 minutes by the CDN, per link; a closed link never shows its old card past one more minute");
     await new Promise((r) => setTimeout(r, 10));
     const tr = calls.find((c) => c.url.includes("track_step"));
     check(tr?.body.p_name === "link_preview" && tr.body.p_detail === "abcdefghijkl" && tr.body.p_ref === "whatsapp", "counted as link_preview (whatsapp); before saas-15.sql the 404 is ignored");

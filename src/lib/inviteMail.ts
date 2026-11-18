@@ -6,6 +6,8 @@ import { apiUrl } from "./ai";
 import { getLang, t } from "./i18n";
 import { sendInviteMessage, whatsappInviteUrl } from "./share";
 import { toast } from "./store";
+import { tagUrl } from "./source";
+import { refCode } from "./track";
 
 export type InviteMailResult = { link: string | null; sent: boolean; fallback: boolean; optout: boolean; capped: boolean; failed: boolean; already: boolean };
 const none = (over: Partial<InviteMailResult> = {}): InviteMailResult => ({ link: null, sent: false, fallback: false, optout: false, capped: false, failed: false, already: false, ...over });
@@ -38,10 +40,24 @@ export async function sendInvite(tripId: string, email: string, send: boolean): 
   }
 }
 
+/** The server's link as the inviter sends it himself: its channel (invite or whatsapp) and his opaque code (R11,
+ *  same tagging as lib/share.ts inviteMessage); the server's own src=invite is replaced, the rest is unchanged */
+export function sharedLink(link: string, src: string): string {
+  try {
+    const u = new URL(link);
+    u.searchParams.delete("src");
+    u.searchParams.delete("by");
+    return tagUrl(u.toString(), src, refCode());
+  } catch {
+    return link;
+  }
+}
 /** The invitation message with the trip's own link */
-export const inviteText = (title: string, inviter: string, link: string) =>
-  inviter ? t("{inviter} vous invite à rejoindre le voyage « {title} » sur ORBES Trips : {link}", { inviter, title, link }) : t("Vous êtes invité à rejoindre le voyage « {title} » sur ORBES Trips : {link}", { title, link });
-export const whatsappUrl = (title: string, inviter: string, link: string | null) => (link ? `https://wa.me/?text=${encodeURIComponent(inviteText(title, inviter, link))}` : whatsappInviteUrl(title, inviter));
+export const inviteText = (title: string, inviter: string, link: string, src = "invite") => {
+  const l = sharedLink(link, src);
+  return inviter ? t("{inviter} vous invite à rejoindre le voyage « {title} » sur ORBES Trips : {link}", { inviter, title, link: l }) : t("Vous êtes invité à rejoindre le voyage « {title} » sur ORBES Trips : {link}", { title, link: l });
+};
+export const whatsappUrl = (title: string, inviter: string, link: string | null) => (link ? `https://wa.me/?text=${encodeURIComponent(inviteText(title, inviter, link, "whatsapp"))}` : whatsappInviteUrl(title, inviter));
 
 /** The phone's share sheet (else a copy), with the link when there is one, else today's message */
 export async function shareInvite(title: string, inviter: string, to: string, link: string | null) {

@@ -16,6 +16,9 @@ export type ConfirmDeps = {
   elapsed: () => number;
   /** rpc unconfirmed_signups (saas-15.sql); "missing" before that file */
   listSql: () => Promise<Unconfirmed[] | "missing">;
+  /** before saas-15.sql, read the Auth admin API (true only when CONFIRM_REMINDER_ADMIN=1 on Vercel): off, nothing is
+   *  sent before that file, as today */
+  adminFallback?: boolean;
   /** the Auth admin API, one page of 200 accounts (fallback before saas-15.sql) */
   listAdmin: (page: number) => Promise<Unconfirmed[]>;
   /** the keys `confirm:*` of alert_log, with when they were claimed */
@@ -59,6 +62,7 @@ export async function confirmReminders(d: ConfirmDeps): Promise<{ sent: number; 
   if (min < REMIND.from || min >= REMIND.to) return { sent: 0, failed: 0, skipped: "night" };
   let list = await d.listSql();
   if (list === "missing") {
+    if (!d.adminFallback) return { sent: 0, failed: 0, skipped: "missing" };
     // before saas-15.sql: the Auth admin API, read only at the first run of each hour (the cron runs every 10 minutes)
     if (min % 60 >= 10) return { sent: 0, failed: 0, skipped: "hourly" };
     const all: Unconfirmed[] = [];

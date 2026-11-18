@@ -1,7 +1,8 @@
 -- ORBES Trips — the cycle: invitations sent by e-mail, reminders before and after a trip, offline follow-up
 -- (lot "cycle", R09 R15 R18 R19, Nov 2026).
 -- Run once in the Supabase SQL editor (Dashboard → SQL Editor → New query → paste this whole file → Run).
--- Safe to run twice. Can run before or after saas-12, saas-13 and saas-15 (it never redefines their functions).
+-- Safe to run twice. Run it after saas-12.sql (which records the offline packs it reads: offline_ready); before or after
+-- saas-13 and saas-15 (it never redefines their functions).
 --
 -- What it adds:
 -- - mail_log: every new e-mail or notification of this lot, kept for good (one row per account and message, so
@@ -20,6 +21,13 @@ begin
   perform 'public.link_visitor(text)'::regprocedure;
 exception when undefined_function then
   raise exception 'Lancez d''abord supabase/saas-3.sql, saas-4.sql, saas-5.sql et saas-7.sql, puis ce fichier.';
+end $$;
+-- saas-12.sql first: only its track_event records offline_ready, read below for the J-3 / J-2 offline lines
+do $$
+begin
+  perform 'public.my_ref_code()'::regprocedure;
+exception when undefined_function then
+  raise exception 'Lancez d''abord supabase/saas-12.sql, puis ce fichier.';
 end $$;
 do $$
 begin
@@ -82,6 +90,10 @@ create table if not exists public.invite_mails (
   inviter_notified_at timestamptz,
   unique (trip_id, email)
 );
+-- the link given to the inviter himself (share sheet, WhatsApp): its own token, so it never says whether the address
+-- has an account nor shows the address (invite_preview below); the e-mail keeps `token`
+alter table public.invite_mails add column if not exists share_token text check (share_token ~ '^[A-Za-z0-9_-]{20,64}$');
+create unique index if not exists invite_mails_share on public.invite_mails (share_token);
 create index if not exists invite_mails_email on public.invite_mails (email, created_at desc);
 create index if not exists invite_mails_by on public.invite_mails (invited_by, sent_at desc);
 alter table public.invite_mails enable row level security;
@@ -127,13 +139,19 @@ declare
   tr jsonb;
   n int := 0;
   inviter text := '';
+  shared boolean := false;
 begin
   if p_token is null or p_token !~ '^[A-Za-z0-9_-]{20,64}$' then
     return jsonb_build_object('ok', false);
   end if;
   select * into r from public.invite_mails where token = p_token;
   if not found then
-    return jsonb_build_object('ok', false);
+    -- the inviter's own link (share sheet, WhatsApp)
+    select * into r from public.invite_mails where share_token = p_token;
+    if not found then
+      return jsonb_build_object('ok', false);
+    end if;
+    shared := true;
   end if;
   if r.accepted_at is not null or r.claimed_at is not null then
     return jsonb_build_object('ok', false, 'used', true);
@@ -158,10 +176,10 @@ begin
     'end', tr ->> 'end',
     'places', n,
     'inviter', left(coalesce(inviter, ''), 40),
-    'email', r.email,
-    -- only once the e-mail went to that address (the link is then its owner's): a link made by hand never tells
-    -- whether an address has an account
-    'has_account', r.sent_at is not null and exists (select 1 from auth.users u where lower(u.email) = r.email)
+    -- the address and whether it has an account: only on the e-mail's own link, once the e-mail went to that address
+    -- (the link is then its owner's); the inviter's link (shared, maybe in a group) tells neither
+    'email', case when shared then null else r.email end,
+    'has_account', not shared and r.sent_at is not null and exists (select 1 from auth.users u where lower(u.email) = r.email)
   );
 end;
 $$;
@@ -187,7 +205,7 @@ begin
     if p_token !~ '^[A-Za-z0-9_-]{20,64}$' then
       return jsonb_build_object('reason', 'none');
     end if;
-    select * into r from public.invite_mails where token = p_token;
+    select * into r from public.invite_mails where token = p_token or share_token = p_token;
     if not found then
       return jsonb_build_object('reason', 'none');
     end if;

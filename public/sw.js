@@ -57,6 +57,9 @@ async function refresh(cache, req, old) {
     const res = await fetch(req, { signal: ctl.signal, cache: "no-store" });
     clearTimeout(t);
     if (!res.ok) return null;
+    // only the app's own page is stored as the app (an address that answers something else is shown, never kept)
+    const path = new URL(res.url || req.url).pathname;
+    if ((path !== "/" && path !== "/index.html") || !(res.headers.get("content-type") || "").includes("text/html")) return res;
     await cache.put("/", res.clone());
     if (old && sig(old) && sig(res) && sig(old) !== sig(res)) {
       for (const c of await self.clients.matchAll({ type: "window" })) c.postMessage({ type: "orbes-update" });
@@ -69,6 +72,8 @@ async function refresh(cache, req, old) {
 self.addEventListener("fetch", (e) => {
   const req = e.request;
   if (req.method !== "GET" || req.mode !== "navigate" || new URL(req.url).origin !== self.location.origin) return;
+  // the server's own pages (the e-mails' « stop these e-mails » link, /api/mail): always the network, never the app
+  if (new URL(req.url).pathname.startsWith("/api/")) return;
   e.respondWith(
     (async () => {
       const cache = await caches.open(SHELL);
