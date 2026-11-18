@@ -4,6 +4,7 @@ import { AiError } from "../../lib/ai";
 import { parseTime } from "../../lib/time";
 import { useStore, useTrip } from "../../lib/store";
 import Shell from "./Shell";
+import InviteTravellers from "./InviteTravellers";
 import { getState, updateTrip } from "../../lib/store";
 import { t } from "../../lib/i18n";
 
@@ -86,6 +87,8 @@ function Preparing({ onClose }: { onClose: () => void }) {
         </div>
       )}
       {!run.busy && done > 0 && <button className="v3-link" style={{ marginTop: 10 }} onClick={() => reviewNow(trip.id)}>{t("Voir le programme avec ce qui est prêt")}</button>}
+      {/* the waiting time is the moment to invite who travels with you */}
+      <InviteTravellers />
       <div className="v3-spacer" />
       <p className="v3-note" style={{ textAlign: "center" }}>{t("Gardez l'app ouverte. Si elle se ferme, la préparation reprend là où elle s'est arrêtée.")}</p>
     </Shell>
@@ -165,6 +168,7 @@ function Review({ onClose }: { onClose: () => void }) {
           {missing === 1 ? t("Préparer le jour manquant") : t("Préparer les {n} jours manquants", { n: missing })}
         </button>
       )}
+      <InviteTravellers />
       <div className="v3-spacer" />
       <button className="v3-btn" disabled={run.busy} onClick={() => confirmTrip(trip.id)}>{t("Valider le voyage ✓")}</button>
     </Shell>
