@@ -77,6 +77,19 @@ export default function JoinTripPage({ token }: { token: string }) {
       <div style={{ marginTop: 14 }}>
         <AuthBox mode={mode} onMode={setMode} lockedEmail={p.email || undefined} />
       </div>
+      {/* another address on this device (a shared phone, an account under another address): the usual welcome */}
+      <div style={{ display: "flex", justifyContent: "center", marginTop: 6 }}>
+        <button
+          type="button"
+          className="v3-link auth-back"
+          onClick={() => {
+            forgetJoin();
+            setP("none");
+          }}
+        >
+          {t("Utiliser une autre adresse")}
+        </button>
+      </div>
     </Shell>
   );
 }

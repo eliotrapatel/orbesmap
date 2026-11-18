@@ -105,12 +105,35 @@ export function sliceFromFix(coords: [number, number][], fix: LL, maxOff = SLICE
   return { coords: [[fix.lng, fix.lat], on, ...coords.slice(bestI + 1)], off: best, left: left + best, total };
 }
 
+export type StoredRoute = { coords: [number, number][]; distance: number; duration: number; raw?: number };
+/**
+ * The route to `to` from where the traveller stands, cut from the best stored route of the pack (the one passing
+ * closest to them, same mode, ending within 30 m of the place). Null when none fits. Used by offlinePack packRoute.
+ */
+export function routeFromStored(entries: { key: string; route: StoredRoute | { failed: true } | null }[], from: LL, to: LL, mode: PackMode): { coords: [number, number][]; distance: number; duration: number; estimate: false; raw?: number } | null {
+  if (!validLL(from) || !validLL(to)) return null;
+  let best: { r: StoredRoute; s: NonNullable<ReturnType<typeof sliceFromFix>> } | null = null;
+  for (const e of entries) {
+    const p = parseRouteKey(e.key);
+    if (!p || p.mode !== mode || haversine(p.to, to) > 30) continue;
+    const v = e.route;
+    if (!v || "failed" in v || !Array.isArray(v.coords)) continue;
+    const s = sliceFromFix(v.coords, from);
+    if (s && (!best || s.off < best.s.off)) best = { r: v, s };
+  }
+  if (!best) return null;
+  const { r, s } = best;
+  const ratio = s.total > 0 ? Math.min(1, s.left / s.total) : 1;
+  return { coords: s.coords, distance: r.distance * ratio, duration: r.duration * ratio, estimate: false, raw: r.raw != null ? r.raw * ratio : undefined };
+}
+
 export type PackCheck = {
   /** the map tiles (null = this browser keeps no map) */
   map: { expected: number; missing: number } | null;
   routes: { total: number; have: number; failed: number };
-  /** null = photos are not kept here (only the installed app on orbesmap.vercel.app keeps them) */
-  photos: { total: number; have: number } | null;
+  /** null = photos are not kept here (only the installed app on orbesmap.vercel.app keeps them); failed = gone for
+   * good on the server (answered 4xx), like a route known impossible */
+  photos: { total: number; have: number; failed?: number } | null;
   /** the trip record and its places are in this phone's storage */
   trip: boolean;
   /** places with their local name to show a driver (informative: never makes the pack incomplete) */
@@ -118,11 +141,11 @@ export type PackCheck = {
 };
 export type PackSummary = { mapOk: boolean; routesOk: boolean; photosOk: boolean; complete: boolean };
 
-/** Complete = the map, every route (or known impossible) and every photo kept here */
+/** Complete = the map, every route (or known impossible) and every photo kept here (or gone for good) */
 export function packSummary(c: PackCheck): PackSummary {
   const mapOk = !!c.map && c.map.missing === 0;
   const routesOk = c.routes.have + c.routes.failed >= c.routes.total;
-  const photosOk = !c.photos || c.photos.have >= c.photos.total;
+  const photosOk = !c.photos || c.photos.have + (c.photos.failed || 0) >= c.photos.total;
   return { mapOk, routesOk, photosOk, complete: mapOk && routesOk && photosOk && c.trip };
 }
 

@@ -39,10 +39,14 @@ create table if not exists public.mail_log (
   email   text,
   kind    text not null,
   trip_id text,
-  channel text not null check (channel in ('email', 'push')),
+  channel text not null check (channel in ('email', 'push', 'none')),
   tips    boolean not null default true,
   at      timestamptz not null default now()
 );
+-- 'none' = decided without sending anything (a booking already covered by a trip, a notification with no phone left):
+-- never counted in the daily e-mail cap. Rewritten on each run so a table made by an earlier copy of this file gets it.
+alter table public.mail_log drop constraint if exists mail_log_channel_check;
+alter table public.mail_log add constraint mail_log_channel_check check (channel in ('email', 'push', 'none'));
 create index if not exists mail_log_user on public.mail_log (user_id, at desc);
 create index if not exists mail_log_email on public.mail_log (email, at desc);
 alter table public.mail_log enable row level security;
@@ -155,7 +159,9 @@ begin
     'places', n,
     'inviter', left(coalesce(inviter, ''), 40),
     'email', r.email,
-    'has_account', exists (select 1 from auth.users u where lower(u.email) = r.email)
+    -- only once the e-mail went to that address (the link is then its owner's): a link made by hand never tells
+    -- whether an address has an account
+    'has_account', r.sent_at is not null and exists (select 1 from auth.users u where lower(u.email) = r.email)
   );
 end;
 $$;

@@ -22,6 +22,7 @@ export default {
   "Connectez-vous avec l'adresse de l'invitation : le voyage vous attend.": "Sign in with the invited address: the trip is waiting for you.",
   "Créez votre compte avec l'adresse de l'invitation : le voyage s'ouvrira dès la confirmation.": "Create your account with the invited address: the trip opens as soon as you confirm it.",
   "Adresse de l'invitation": "Invited address",
+  "Utiliser une autre adresse": "Use another address",
   // tips and reminders
   "Conseils et rappels par e-mail": "Tips and reminders by email",
   "Premier voyage, départ, réservation détectée, voyage du mois. Jamais plus d'un tous les 2 jours.": "First trip, departure, detected booking, trip of the month. Never more than one every 2 days.",
@@ -40,6 +41,9 @@ export default {
   "Voyage : à ouvrir une fois avec réseau": "Trip: open it once with a network",
   "Cartes chauffeur : {n} / {total} lieux": "Driver cards: {n} / {total} places",
   "{n} lieux sans nom local à montrer au chauffeur.": "{n} places without a local name to show a driver.",
+  "1 lieu sans nom local à montrer au chauffeur.": "1 place without a local name to show a driver.",
+  "{n} photos introuvables : elles ne s'afficheront pas.": "{n} photos could not be found: they will not show.",
+  "1 photo introuvable : elle ne s'affichera pas.": "1 photo could not be found: it will not show.",
   "✓ Complète : la carte, les trajets de chaque jour et les photos du programme sont sur ce téléphone.": "✓ Complete: the map, each day's routes and the programme's photos are on this phone.",
   "La carte marche déjà sans réseau. Trajets et photos : touchez « Mettre à jour » pour les ajouter.": "The map already works without a network. Routes and photos: tap “Update” to add them.",
   "Pas inclus : les trajets depuis un endroit hors du programme (l'app affiche une estimation), les photos de l'autre téléphone pas encore ouvertes, et les fonctions IA (Traduire, Demander, Ajouter un lieu) qui ont besoin du réseau.": "Not included: routes from somewhere outside the programme (the app shows an estimate), photos from the other phone not opened yet, and the AI features (Translate, Ask, Add a place) that need a network.",

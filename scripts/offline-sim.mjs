@@ -1,6 +1,7 @@
-// Checks the offline pack's plan (src/lib/packPlan.ts) and the entry keys of an address (src/lib/entryKeys.ts), no
-// browser needed:  node scripts/offline-sim.mjs   (Node 22.6+ strips the TypeScript types on import). Exit 1 on failure.
-import { haversine, legacyPack, legsFor, MAX_LEGS, packSummary, parseRouteKey, phaseUpdate, readStatus, routeKey, sliceFromFix, WALK_MAX_M } from "../src/lib/packPlan.ts";
+// Checks the offline pack's plan (src/lib/packPlan.ts), the entry keys of an address (src/lib/entryKeys.ts) and the
+// invitation check at sign-in (src/lib/joinGate.ts), no browser needed:  node scripts/offline-sim.mjs   (Node 22.6+ strips the TypeScript types on import). Exit 1 on failure.
+import { haversine, legacyPack, legsFor, MAX_LEGS, packSummary, parseRouteKey, phaseUpdate, readStatus, routeFromStored, routeKey, sliceFromFix, WALK_MAX_M } from "../src/lib/packPlan.ts";
+import { claimOutcome, gateDecision } from "../src/lib/joinGate.ts";
 import { readEntry, withoutKeys, ENTRY_KEYS } from "../src/lib/entryKeys.ts";
 
 let ok = 0;
@@ -67,6 +68,27 @@ console.log("A stored route from where the traveller stands");
   check(sliceFromFix(coords, { lat: 31.26, lng: 121.52 }) === null, "too far from it (> 300 m): not used");
   check(sliceFromFix([[1, 2]], near) === null, "a route of one point: not used");
 }
+{
+  // packRoute's choice among the stored routes (src/lib/offlinePack.ts reads them from the Cache API)
+  const coords = [[hotel.lng, hotel.lat], [121.484, 31.236], [121.478, 31.233], [A.lng, A.lat]];
+  const stored = { coords, distance: 2000, duration: 1500, raw: 1400 };
+  const near = { lat: 31.2345, lng: 121.481 };
+  const entries = [
+    { key: routeKey("walk", hotel, A), route: stored },
+    { key: routeKey("car", hotel, A), route: { coords, distance: 2500, duration: 600 } },
+    { key: routeKey("walk", B, C), route: { coords: [[B.lng, B.lat], [C.lng, C.lat]], distance: 2100, duration: 1600 } },
+    { key: routeKey("walk", C, A), route: { failed: true } },
+    { key: "not-a-route", route: stored },
+  ];
+  const r = routeFromStored(entries, near, A, "walk");
+  check(!!r && r.estimate === false && r.coords[0][0] === near.lng && r.distance < 2000 && r.distance > 0 && r.raw < 1400, "a stored walking route to the place, cut from the traveller, shorter");
+  const c = routeFromStored(entries, near, A, "car");
+  check(!!c && c.duration < 600, "the driving one for driving");
+  check(routeFromStored(entries, near, B, "walk") === null, "no stored route ends at that place: none");
+  check(routeFromStored(entries, { lat: 31.26, lng: 121.52 }, A, "walk") === null, "the traveller far from every stored route: none");
+  check(routeFromStored([{ key: routeKey("walk", C, A), route: { failed: true } }], near, A, "walk") === null, "a route known impossible is never used");
+  check(routeFromStored(entries, { lat: 0, lng: 0 }, A, "walk") === null, "no position: none");
+}
 
 console.log("Complete or not");
 {
@@ -77,6 +99,8 @@ console.log("Complete or not");
   check(!packSummary({ ...base, routes: { total: 10, have: 7, failed: 0 } }).complete, "routes missing: not complete");
   check(packSummary({ ...base, routes: { total: 10, have: 8, failed: 2 } }).complete, "routes known impossible count as done (an estimate shows)");
   check(!packSummary({ ...base, photos: { total: 20, have: 19 } }).complete, "a photo missing: not complete");
+  check(packSummary({ ...base, photos: { total: 20, have: 19, failed: 1 } }).complete, "a photo gone for good on the server (4xx): no longer keeps the pack incomplete");
+  check(!packSummary({ ...base, photos: { total: 20, have: 18, failed: 1 } }).complete, "but another photo missing still does");
   check(packSummary({ ...base, photos: null }).complete, "photos not kept in this browser: not counted");
   check(!packSummary({ ...base, trip: false }).complete, "the trip not on this phone: not complete");
   check(packSummary({ ...base, cards: { have: 0, total: 0 } }).complete, "no driver cards: never makes it incomplete");
@@ -107,6 +131,38 @@ console.log("Entry keys of an address");
   const bad = readEntry("?new=yes&booking=1x&join=short");
   check(!bad.new && bad.booking === null && bad.join === null, "malformed values ignored");
   check(withoutKeys("?join=abcdefghijklmnopqrstuvwx&src=invite", ["join"]) === "?src=invite", "the invitation token leaves once remembered, src stays");
+}
+
+console.log("Invitation check at sign-in");
+{
+  const H = 3600_000;
+  const D = 24 * H;
+  const now = 1_800_000_000_000;
+  const base = { uid: "u1", ran: "", token: null, onboarded: false, age: 2 * H, online: true, startedAt: null, now };
+  const g = gateDecision(base);
+  check(g.wants && g.limit === 1500 && g.hold, "a brand-new account (< 1 day): checked, waits at most 1.5 s");
+  check(!gateDecision({ ...base, startedAt: now - 1600 }).hold, "after 1.5 s: never held longer");
+  const link = gateDecision({ ...base, token: "abcdefghijklmnopqrstuvwx", onboarded: true, age: 400 * D });
+  check(link.wants && link.limit === 6000 && link.hold, "with an invitation link: checked even for an old account, waits at most 6 s");
+  check(!gateDecision({ ...base, token: "abcdefghijklmnopqrstuvwx", startedAt: now - 6100 }).hold, "after 6 s: never held longer");
+  const old = gateDecision({ ...base, onboarded: true, age: 30 * D });
+  check(!old.wants && !old.hold, "an onboarded account without a link: never checked, never held (the Shanghai accounts)");
+  const week = gateDecision({ ...base, age: 3 * D });
+  check(week.wants && !week.hold, "a new account of 3 days, another device: checked in the background, never held");
+  check(!gateDecision({ ...base, age: 8 * D }).wants, "not onboarded but older than 7 days: not checked");
+  check(!gateDecision({ ...base, ran: "u1" }).wants, "checked once per account and opening");
+  const off = gateDecision({ ...base, online: false });
+  check(off.wants && !off.hold, "without network: nothing held");
+  check(!gateDecision({ ...base, uid: "" }).wants, "signed out: nothing");
+  const t = "abcdefghijklmnopqrstuvwx";
+  const opened = claimOutcome({ trip: "t9" }, t);
+  check(opened.open === "t9" && opened.forget && !opened.otherEmail, "invitation claimed: the trip opens, the link is forgotten");
+  const other = claimOutcome({ reason: "other_email" }, t);
+  check(!other.open && other.forget && other.otherEmail, "signed in with another address: the link is forgotten, the person told");
+  const none = claimOutcome({ reason: "not_member" }, t);
+  check(!none.open && none.forget && !none.otherEmail, "a link that opens nothing: forgotten quietly");
+  const quiet = claimOutcome({ reason: "none" }, null);
+  check(!quiet.open && !quiet.forget, "no link and nothing to open: nothing changes");
 }
 
 console.log(`\n${ok} passed, ${ko} failed`);

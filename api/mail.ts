@@ -2,9 +2,9 @@
 // - POST {action:"invite"|"link", trip, email} with the inviter's session: the invitation made in the app (trip_invites,
 //   checked by its own rules) gets a private link to the trip (?join=…); "invite" also sends it by e-mail (Resend),
 //   at most 20 per inviter and 200 for everyone per 24 h, never twice within 24 h, never to an address that opted out.
-// - GET ?u=<account>&s=<signature> or ?i=<invitation>&s=…: the unsubscribe page; its script confirms at once (a
-//   button when scripts are off), so a mail scanner opening the link alone changes nothing. POST on the same address
-//   (the page, or a mail app's own "unsubscribe" button, RFC 8058) records the opt-out (mail_optout).
+// - GET ?u=<account>&s=<signature> or ?i=<invitation>&s=…: the unsubscribe page, a "Confirm" button only (no script),
+//   so a mail scanner opening the link, even in a real browser, changes nothing. POST on the same address (that
+//   button, or a mail app's own one-click "unsubscribe", RFC 8058) records the opt-out (mail_optout).
 // Before supabase/saas-14.sql: {fallback:true}, the app keeps today's invitation message. Never 5xx on a missing table.
 // Needs on Vercel: SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY (MAIL_FROM optional), both already set for api/cron.
 import { randomBytes } from "node:crypto";
@@ -33,8 +33,10 @@ export interface MailDeps {
   getInvite(trip: string, email: string): Promise<InviteRec | null>;
   insertInvite(row: Json): Promise<InviteRec | null>;
   patchInvite(id: number, patch: Json): Promise<void>;
-  /** invitation e-mails sent since a moment, by one inviter (or everyone with null) */
+  /** invitation e-mails sent since a moment, by one inviter (or everyone with null); a failed count = Infinity (capped) */
   sentSince(by: string | null, sinceIso: string): Promise<number>;
+  /** marks the invitation as sent now, only if it was not sent since `sinceIso` (atomic); false = sent meanwhile */
+  claimSend(id: number, sinceIso: string, nowIso: string, sendCount: number): Promise<boolean>;
   optedOut(email: string): Promise<boolean>;
   emailLang(email: string): Promise<string | null>;
   profileName(uid: string): Promise<string>;
@@ -97,12 +99,20 @@ export async function handleMail(req: Request, d: MailDeps): Promise<Response> {
     if (await d.optedOut(email)) return json({ ok: true, sent: false, link, optout: true }, 200, h);
     if (row.sent_at && now.getTime() - Date.parse(row.sent_at) < DAY_MS) return json({ ok: true, sent: false, link, already: true }, 200, h);
     const since = new Date(now.getTime() - DAY_MS).toISOString();
-    if ((await d.sentSince(me.id, since)) >= CAP_INVITER || (await d.sentSince(null, since)) >= CAP_ALL) return json({ ok: true, sent: false, link, capped: true }, 200, h);
+    // a count that fails counts as the cap reached (never more e-mails than the caps)
+    const by = await d.sentSince(me.id, since).catch(() => Infinity);
+    const all = by >= CAP_INVITER ? 0 : await d.sentSince(null, since).catch(() => Infinity);
+    if (!(by < CAP_INVITER) || !(all < CAP_ALL)) return json({ ok: true, sent: false, link, capped: true }, 200, h);
     const t = (await d.trip(trip)) || {};
     const lang = langOf(row.lang || b.lang);
     const m = inviteMail({ lang, inviter: await d.profileName(me.id).catch(() => ""), title: String(t.title || ""), start: String(t.start || ""), end: String(t.end || ""), link, unsub: unsubInvite(d.secret, row.id) });
-    if (!(await d.mail({ to: email, ...m }).catch(() => false))) return json({ ok: true, sent: false, link, failed: true }, 200, h);
-    await d.patchInvite(row.id, { sent_at: now.toISOString(), send_count: (row.send_count || 0) + 1 }).catch(() => undefined);
+    // claimed before sending: two taps at the same moment send one e-mail
+    const before = { sent_at: row.sent_at, send_count: row.send_count || 0 };
+    if (!(await d.claimSend(row.id, since, now.toISOString(), before.send_count + 1))) return json({ ok: true, sent: false, link, already: true }, 200, h);
+    if (!(await d.mail({ to: email, ...m }).catch(() => false))) {
+      await d.patchInvite(row.id, before).catch(() => undefined);
+      return json({ ok: true, sent: false, link, failed: true }, 200, h);
+    }
     await d.event({ user_id: me.id, name: "invite_email_sent", detail: "invite", trip_id: trip }).catch(() => undefined);
     return json({ ok: true, sent: true, link }, 200, h);
   } catch (e) {
@@ -138,13 +148,12 @@ async function unsubscribe(req: Request, url: URL, d: MailDeps): Promise<Respons
       await d.event({ user_id: u || null, name: "mail_unsubscribed", detail: u ? "tips" : "invite", trip_id: "trip_id" in who ? who.trip_id : null }).catch(() => undefined);
       return page(lang, `<p style="font-size:15px;line-height:1.5">${esc(u ? T.unsubDone : T.unsubDoneGuest)}</p>`);
     }
-    // GET: a person opened the link; a mail scanner that only reads it changes nothing
-    const done = u ? T.unsubDone : T.unsubDoneGuest;
+    // GET: only the question and a button (no script): a mail scanner opening the link, even one that runs pages in a
+    // real browser, changes nothing; the person confirms with the button (a POST)
     return page(
       lang,
-      `<p id="m" style="font-size:15px;line-height:1.5">${esc(T.unsubAsk)}</p>
-<noscript><form method="post"><button style="font:inherit;background:#0a0a0a;color:#f6f2ea;border:0;padding:12px 20px;border-radius:12px">${esc(T.unsubConfirm)}</button></form></noscript>
-<script>fetch(location.href,{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded"},body:"confirm=1"}).then(function(r){if(r.ok)document.getElementById("m").textContent=${JSON.stringify(done).replace(/</g, "\\u003c")};}).catch(function(){});</script>`,
+      `<p style="font-size:15px;line-height:1.5">${esc(T.unsubAsk)}</p>
+<form method="post"><input type="hidden" name="confirm" value="1"><button style="font:inherit;background:#0a0a0a;color:#f6f2ea;border:0;padding:12px 20px;border-radius:12px;cursor:pointer">${esc(T.unsubConfirm)}</button></form>`,
     );
   } catch (e) {
     return page("fr", `<p style="font-size:15px">${esc(TXT.fr.unsubBad)}</p>`, missing(e) ? 404 : 503);
@@ -160,9 +169,10 @@ function realDeps(): MailDeps | null {
   const from = process.env.MAIL_FROM || "ORBES Trips <trips@auth.theorbes.com>";
   const enc = encodeURIComponent;
   const count = async (path: string) => {
-    const r = await fetch(`${SUPA_URL}${path}&select=id&limit=1`, { method: "HEAD", headers: { apikey: key, authorization: `Bearer ${key}`, prefer: "count=exact" } });
-    const n = Number((r.headers.get("content-range") || "").split("/")[1]);
-    return r.ok && Number.isFinite(n) ? n : 0;
+    const r = await fetch(`${SUPA_URL}${path}&select=id&limit=1`, { method: "HEAD", headers: { apikey: key, authorization: `Bearer ${key}`, prefer: "count=exact" }, signal: AbortSignal.timeout(8000) }).catch(() => null);
+    const n = Number((r?.headers.get("content-range") || "").split("/")[1]);
+    // not counted (error, slow answer): treated as the cap reached
+    return r?.ok && Number.isFinite(n) ? n : Infinity;
   };
   return {
     now: () => new Date(),
@@ -209,6 +219,10 @@ function realDeps(): MailDeps | null {
     async sentSince(by, sinceIso) {
       return count(`/rest/v1/invite_mails?sent_at=gte.${enc(sinceIso)}${by ? `&invited_by=eq.${by}` : ""}`);
     },
+    async claimSend(id, sinceIso, nowIso, sendCount) {
+      const r = (await db(`/rest/v1/invite_mails?id=eq.${id}&or=(sent_at.is.null,sent_at.lt.${enc(sinceIso)})`, { method: "PATCH", headers: { prefer: "return=representation" }, body: JSON.stringify({ sent_at: nowIso, send_count: sendCount }) })) as unknown[];
+      return Array.isArray(r) && r.length > 0;
+    },
     async optedOut(email) {
       const r = (await db(`/rest/v1/mail_optout?email=eq.${enc(email)}&select=email`)) as unknown[];
       return Array.isArray(r) && r.length > 0;
@@ -235,6 +249,7 @@ function realDeps(): MailDeps | null {
         method: "POST",
         headers: { authorization: `Bearer ${resend}`, "content-type": "application/json" },
         body: JSON.stringify({ from, to: [m.to], subject: m.subject, html: m.html, text: m.text, ...(m.headers ? { headers: m.headers } : {}) }),
+        signal: AbortSignal.timeout(8000),
       }).catch(() => null);
       return !!r?.ok;
     },

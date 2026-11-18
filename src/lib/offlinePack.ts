@@ -7,12 +7,14 @@ import type { Mode, Route } from "./route";
 import { dayStops, isHotel } from "./plan";
 import { PHOTO_CACHE, photoUrl } from "./placePhotos";
 import { isRef } from "./photoData";
-import { legsFor, parseRouteKey, sliceFromFix, validLL, haversine, type Leg, type LL } from "./packPlan";
+import { legsFor, parseRouteKey, routeFromStored, validLL, haversine, type Leg, type LL } from "./packPlan";
 import { getState } from "./store";
 import { track } from "./track";
 
 export const PACK_CACHE = "orbes-pack-v1";
 const ROUTE_URL = "https://pack.orbes.local/route/";
+/** A photo the server no longer has (4xx): noted in the pack's cache, so the pack can still be complete */
+const PHOTO_GONE_URL = "https://pack.orbes.local/photo-gone/";
 const hasCache = typeof caches !== "undefined";
 
 export type PackSpec = {
@@ -69,7 +71,7 @@ async function storedKeys(): Promise<string[]> {
   if (!hasCache) return [];
   try {
     const ks = await (await caches.open(PACK_CACHE)).keys();
-    return ks.map((r) => decodeURIComponent(r.url.slice(ROUTE_URL.length))).filter(Boolean);
+    return ks.filter((r) => r.url.startsWith(ROUTE_URL)).map((r) => decodeURIComponent(r.url.slice(ROUTE_URL.length))).filter(Boolean);
   } catch {
     return [];
   }
@@ -93,39 +95,45 @@ export async function routesHeld(legs: Leg[]): Promise<{ have: number; failed: n
  */
 export async function packRoute(from: LL, to: LL, mode: Mode): Promise<Route | null> {
   if (!hasCache || !validLL(from) || !validLL(to)) return null;
-  let best: { r: Route; s: NonNullable<ReturnType<typeof sliceFromFix>> } | null = null;
+  const entries: { key: string; route: Stored | null }[] = [];
   for (const k of await storedKeys()) {
     const p = parseRouteKey(k);
+    // only the stored routes that end at this place are read
     if (!p || p.mode !== mode || haversine(p.to, to) > 30) continue;
-    const v = await getLeg(k);
-    if (!v || "failed" in v || !Array.isArray(v.coords)) continue;
-    const s = sliceFromFix(v.coords, from);
-    if (s && (!best || s.off < best.s.off)) best = { r: v, s };
+    entries.push({ key: k, route: await getLeg(k) });
   }
-  if (!best) return null;
-  const { r, s } = best;
-  const ratio = s.total > 0 ? Math.min(1, s.left / s.total) : 1;
-  return { coords: s.coords, distance: r.distance * ratio, duration: r.duration * ratio, estimate: false, raw: r.raw != null ? r.raw * ratio : undefined };
+  return routeFromStored(entries, from, to, mode);
 }
 
 // ---------- photos ----------
 const photoCacheOk = () => typeof caches !== "undefined" && !!navigator.serviceWorker?.controller && location.hostname.endsWith(".vercel.app");
-/** How many of these photos are kept here (null: photos are not kept in this browser) */
-export async function photosHeld(urls: string[]): Promise<{ total: number; have: number } | null> {
+const goneReq = (url: string) => new Request(PHOTO_GONE_URL + encodeURIComponent(url));
+/** How many of these photos are kept here, and how many the server no longer has (null: not kept in this browser) */
+export async function photosHeld(urls: string[]): Promise<{ total: number; have: number; failed: number } | null> {
   if (!photoCacheOk()) return null;
   try {
     const cache = await caches.open(PHOTO_CACHE);
+    const pack = await caches.open(PACK_CACHE);
     let have = 0;
-    for (const u of urls) if (await cache.match(u)) have++;
-    return { total: urls.length, have };
+    let failed = 0;
+    for (const u of urls) {
+      if (await cache.match(u)) have++;
+      else if (await pack.match(goneReq(u))) failed++;
+    }
+    return { total: urls.length, have, failed };
   } catch {
     return null;
   }
 }
-/** Downloads the missing photos, 3 at a time; returns how many are kept (null: not kept in this browser) */
+/**
+ * Downloads the missing photos, 3 at a time; returns how many are kept (null: not kept in this browser). A photo the
+ * server answers 4xx for is noted as gone (tried again at each update, it no longer keeps the pack incomplete); a
+ * network or server error is not (fetched again at the next update).
+ */
 export async function fetchPhotos(urls: string[], signal: AbortSignal, onStep: (done: number) => void): Promise<number | null> {
   if (!photoCacheOk()) return null;
   const cache = await caches.open(PHOTO_CACHE);
+  const pack = await caches.open(PACK_CACHE);
   let done = 0;
   let i = 0;
   const worker = async () => {
@@ -134,8 +142,13 @@ export async function fetchPhotos(urls: string[], signal: AbortSignal, onStep: (
       try {
         if (!(await cache.match(u))) {
           const r = await fetch(u, { mode: "cors", credentials: "omit", signal });
-          if (r.ok) await cache.put(u, r);
-          else continue;
+          if (r.ok) {
+            await cache.put(u, r);
+            await pack.delete(goneReq(u)).catch(() => false);
+          } else {
+            if (r.status >= 400 && r.status < 500 && r.status !== 408 && r.status !== 429) await pack.put(goneReq(u), new Response("1")).catch(() => undefined);
+            continue;
+          }
         }
         done++;
         onStep(done);

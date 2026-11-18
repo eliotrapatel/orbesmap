@@ -56,7 +56,7 @@ function world(o = {}) {
     pushes: [],
     mailOk: true,
     gone: new Set(),
-    mailsToday: 0,
+    mailsToday: 0, // e-mails sent today before the sim (the log's own e-mail rows are added)
     throwIn: o.throwIn || null,
   };
   const person = (uid) => {
@@ -94,7 +94,8 @@ function world(o = {}) {
       return last;
     },
     async mailsToday() {
-      return w.mailsToday;
+      // as the real count: e-mail rows only (channel "none" markers are not e-mails)
+      return w.mailsToday + [...w.log.values()].filter((r) => r.channel === "email").length;
     },
     // the SQL filters (supabase/saas-14.sql), modelled: not sent before, tips rules
     async firstTrip(limit) {
@@ -141,7 +142,6 @@ function world(o = {}) {
     async mail(m) {
       if (!w.mailOk) return false;
       w.mails.push(m);
-      w.mailsToday++;
       return true;
     },
     async push(uid, payload) {
@@ -354,7 +354,7 @@ const j3trip = (extra) => trip("t3", "2026-11-21", extra);
   w.gone.add("pro");
   w.members.t3 = [{ uid: "pro", role: "owner", pro: true }];
   await w.run();
-  check(w.log.get("j3:pro:t3")?.channel === "email", "J-3 to phones all gone: noted for the J-2 e-mail");
+  check(w.log.get("j3:pro:t3")?.channel === "none", "J-3 to phones all gone: noted (channel none, not an e-mail) for the J-2 e-mail");
 }
 
 // ---------- 4. the 48 h rule, the trip of the month, bookings ----------
@@ -405,6 +405,7 @@ console.log("Trip of the month, bookings, 48 h rule");
   w3.bookings = [book(9, { start: "2027-01-10", end: "2027-01-15", city: "Lisbonne" })];
   await w3.run();
   check(w3.pushes.length === 0 && w3.mails.length === 0 && w3.log.has("booking:9"), "booking now covered by a trip: never sent");
+  check(w3.log.get("booking:9")?.channel === "none", "booking covered: noted with channel none (never counted as an e-mail)");
   const w4 = world();
   w4.people.u1 = { email: "a@x.fr", phones: 1 };
   w4.bookings = [book(10, { start: "2026-11-01", end: "2026-11-05" })];
@@ -427,6 +428,21 @@ const inv = (o) => ({ id: 1, token: "abcdefghijklmnopqrstuvwx", trip_id: "t9", e
   check(evs(w, "invite_email_sent", "invite_reminder").length === 1 && w.invites[0].reminded_at, "event invite_email_sent / invite_reminder, noted");
   await w.run();
   check(mailsTo(w, "guest@y.fr").length === 1, "reminder: once");
+  // invited again (a new link, the row reset by api/mail): its own reminder
+  w.now = T0 + 4 * D; // past the 48 h between two tips e-mails
+  Object.assign(w.invites[0], { token: "zyxwvutsrqponmlkjihgfedc", sent_at: new Date(w.now - 3.5 * D).toISOString(), reminded_at: null });
+  await w.run();
+  check(mailsTo(w, "guest@y.fr").length === 2 && mailsTo(w, "guest@y.fr")[1].html.includes("?join=zyxwvutsrqponmlkjihgfedc"), "invited again with a new link: a second reminder");
+}
+{
+  // a reminder already noted (a run that stopped before marking the row): never read again, nothing sent
+  const w = world({ trips: [trip("t9", "2026-12-20", { end: "2026-12-27" })] });
+  w.people.own = { email: "own@x.fr" };
+  w.pending.t9 = ["guest@y.fr"];
+  w.invites = [inv()];
+  w.log.set("invite_reminder:1:abcdefghijklmnopqrstuvwx", { key: "invite_reminder:1:abcdefghijklmnopqrstuvwx", channel: "email", tips: true, at: T0 - H });
+  await w.run();
+  check(w.mails.length === 0 && !!w.invites[0].reminded_at, "reminder already noted: the row is marked, no second e-mail");
 }
 {
   const w = world({ trips: [trip("t9", "2026-12-20")] });
@@ -456,6 +472,9 @@ const inv = (o) => ({ id: 1, token: "abcdefghijklmnopqrstuvwx", trip_id: "t9", e
   check(evs(w, "reminder_sent", "invite_joined_push").length === 1 && w.invites[0].inviter_notified_at, "event reminder_sent / invite_joined_push, noted");
   await w.run();
   check(w.pushes.length === 1, "inviter told once");
+  Object.assign(w.invites[0], { token: "zyxwvutsrqponmlkjihgfedc", accepted_at: new Date(T0 - H).toISOString(), inviter_notified_at: null });
+  await w.run();
+  check(w.pushes.length === 2, "joined again after a new invitation: the inviter is told again");
   const w2 = world({ trips: [trip("t9", "2026-12-20")] });
   w2.people.own = { email: "own@x.fr", phones: 0, tips: false };
   w2.invites = [inv({ accepted_at: new Date(T0 - H).toISOString() })];
@@ -475,6 +494,17 @@ console.log("Caps");
   check(w.mails.length === 30, "at most 30 e-mails per run");
   await w.run();
   check(w.mails.length === 40, "the rest at the next run");
+}
+
+{
+  // 149 e-mails today and many "none" markers: one e-mail still goes
+  const w = world();
+  w.people.u1 = { email: "a@x.fr" };
+  w.firstTrip = ["u1"];
+  w.mailsToday = 149;
+  for (let i = 0; i < 30; i++) w.log.set(`booking:${100 + i}`, { key: `booking:${100 + i}`, channel: "none", tips: false, at: T0 - H });
+  await w.run({ dayCap: 150 });
+  check(w.mails.length === 1, "daily cap: rows with channel none are not counted");
 }
 
 // ---------- 7. unsubscribe links ----------
@@ -528,6 +558,8 @@ function mailWorld(o = {}) {
       return w.invites.find((i) => i.trip_id === trip && i.email === email) || null;
     },
     async insertInvite(row) {
+      // unique (trip_id, email), as the table: the second insert at the same moment gets nothing (read back)
+      if (w.invites.some((i) => i.trip_id === row.trip_id && i.email === row.email)) return null;
       const r = { id: ++w.seq, sent_at: null, send_count: 0, accepted_at: null, claimed_at: null, ...row };
       w.invites.push(r);
       return r;
@@ -536,7 +568,16 @@ function mailWorld(o = {}) {
       Object.assign(w.invites.find((i) => i.id === id), patch);
     },
     async sentSince(by) {
-      return by ? w.sentBy : w.sentAll;
+      const v = by ? w.sentBy : w.sentAll;
+      if (v === "throw") throw new Error("count failed");
+      return v;
+    },
+    async claimSend(id, sinceIso, nowIso, n) {
+      const r = w.invites.find((i) => i.id === id);
+      if (!r || (r.sent_at && r.sent_at >= sinceIso)) return false;
+      r.sent_at = nowIso;
+      r.send_count = n;
+      return true;
     },
     async optedOut(email) {
       return w.optout.has(email);
@@ -551,6 +592,8 @@ function mailWorld(o = {}) {
       return { title: w.title, start: "2026-11-24", end: "2026-11-29" };
     },
     async mail(m) {
+      if (w.mailFail) return false;
+      await new Promise((r) => setTimeout(r, 5));
       w.mails.push(m);
       return true;
     },
@@ -594,7 +637,7 @@ const body = (r) => r.json();
   const m = w.mails[0];
   check(m.to === "guest@y.fr" && m.subject === "Eliot vous invite à « Shanghai VIP »", "subject: first name, title cleaned");
   check(!/evil|x\.io|<b>/i.test(m.html + m.text + m.subject), "no link or markup from the inviter's text");
-  check(m.text.includes("Ne plus recevoir d'e-mails d'ORBES Trips") && m.html.includes("/api/mail?i=") && !!m.headers?.["List-Unsubscribe"], "unsubscribe link and headers");
+  check(m.text.includes("Ne plus recevoir ces e-mails d'invitation et de conseils") && m.html.includes("/api/mail?i=") && !!m.headers?.["List-Unsubscribe"], "unsubscribe link (says what stops) and headers");
   check(w.events.length === 1 && w.events[0].name === "invite_email_sent" && w.events[0].detail === "invite", "event invite_email_sent / invite");
   const again = await body(await w.post({ action: "invite", trip: "t1", email: "guest@y.fr" }));
   check(again.already === true && w.mails.length === 1, "never twice within 24 h");
@@ -611,6 +654,28 @@ const body = (r) => r.json();
   const w3 = mailWorld({ sentAll: M.CAP_ALL });
   const j3 = await body(await w3.post({ action: "invite", trip: "t1", email: "guest@y.fr" }));
   check(j3.capped === true && !w3.mails.length, "200 invitation e-mails for everyone per 24 h");
+  const w4 = mailWorld({ sentBy: Infinity });
+  const j4 = await body(await w4.post({ action: "invite", trip: "t1", email: "guest@y.fr" }));
+  check(j4.capped === true && !w4.mails.length, "a count that fails (Infinity) counts as capped");
+  const w5 = mailWorld({ sentAll: "throw" });
+  const j5 = await body(await w5.post({ action: "invite", trip: "t1", email: "guest@y.fr" }));
+  check(j5.capped === true && !w5.mails.length, "a count that throws counts as capped");
+}
+{
+  // two taps at the same moment: one e-mail
+  const w = mailWorld();
+  const [a, b] = await Promise.all([w.post({ action: "invite", trip: "t1", email: "guest@y.fr" }), w.post({ action: "invite", trip: "t1", email: "guest@y.fr" })]);
+  const ja = await body(a);
+  const jb = await body(b);
+  check(w.mails.length === 1 && [ja, jb].filter((j) => j.sent).length === 1, "two sends at the same moment: one e-mail");
+  // Resend refuses: the row is not left marked as sent (the person can try again)
+  const w2 = mailWorld();
+  w2.mailFail = true;
+  const jf = await body(await w2.post({ action: "invite", trip: "t1", email: "guest@y.fr" }));
+  check(jf.failed === true && w2.invites[0].sent_at === null, "e-mail refused: not marked as sent");
+  w2.mailFail = false;
+  const jr = await body(await w2.post({ action: "invite", trip: "t1", email: "guest@y.fr" }));
+  check(jr.sent === true && w2.mails.length === 1, "and the next try sends it");
 }
 {
   const w = mailWorld();
@@ -618,7 +683,8 @@ const body = (r) => r.json();
   const url = C.unsubUser(SECRET, uid);
   const g = await M.handleMail(new Request(url), w.deps);
   const html = await g.text();
-  check(g.status === 200 && !w.out.length && html.includes("method:\"POST\""), "GET alone (a mail scanner) does not opt out; the page confirms by POST");
+  check(g.status === 200 && !w.out.length && /<form method="post">/.test(html), "GET alone (a mail scanner) does not opt out; a button confirms by POST");
+  check(!/<script/i.test(html), "the GET page runs no script (a scanner running pages in a browser changes nothing)");
   const p = await M.handleMail(new Request(url, { method: "POST", body: "List-Unsubscribe=One-Click", headers: { "content-type": "application/x-www-form-urlencoded" } }), w.deps);
   check(p.status === 200 && w.out[0] === "own@x.fr" && w.events.some((e) => e.name === "mail_unsubscribed"), "POST (one-click) opts out, event mail_unsubscribed");
   const bad = await M.handleMail(new Request(url.replace(/s=[^&]+/, "s=AAAAAAAAAAAAAAAAAAAAAAAA"), { method: "POST" }), w.deps);

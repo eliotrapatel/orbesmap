@@ -97,7 +97,7 @@ export const TXT = {
     seeTrip: "Voir le voyage",
     inviteHow: "Créez votre compte avec cette adresse : le voyage s'ouvrira dès la confirmation.",
     inviteWhy: (who: string) => (who ? `Vous recevez cet e-mail car ${who} a saisi votre adresse.` : "Vous recevez cet e-mail car quelqu'un a saisi votre adresse."),
-    stopAll: "Ne plus recevoir d'e-mails d'ORBES Trips",
+    stopAll: "Ne plus recevoir ces e-mails d'invitation et de conseils",
     reminderSubject: (title: string) => `Rappel : « ${title} » vous attend`,
     reminderIntro: (who: string) => (who ? `${who} vous a invité il y a 3 jours. Le voyage est prêt : il ne manque que vous.` : "Vous avez été invité il y a 3 jours. Le voyage est prêt : il ne manque que vous."),
     joinedTitle: (name: string, title: string) => `${name} a rejoint « ${title} »`,
@@ -128,9 +128,9 @@ export const TXT = {
     bookingButton: "Préparer ce voyage",
     // unsubscribe page
     unsubConfirm: "Confirmer",
-    unsubAsk: "Ne plus recevoir ces e-mails d'ORBES Trips ?",
+    unsubAsk: "Ne plus recevoir ces e-mails d'invitation et de conseils ?",
     unsubDone: "C'est fait : vous ne recevrez plus ces e-mails. Vous pouvez les réactiver dans l'app : menu du compte → Alertes.",
-    unsubDoneGuest: "C'est fait : vous ne recevrez plus d'e-mails d'ORBES Trips.",
+    unsubDoneGuest: "C'est fait : vous ne recevrez plus ces e-mails d'invitation et de conseils.",
     unsubBad: "Ce lien n'est pas valide.",
   },
   en: {
@@ -140,7 +140,7 @@ export const TXT = {
     seeTrip: "See the trip",
     inviteHow: "Create your account with this address: the trip opens as soon as you confirm it.",
     inviteWhy: (who: string) => (who ? `You are receiving this email because ${who} entered your address.` : "You are receiving this email because someone entered your address."),
-    stopAll: "Stop emails from ORBES Trips",
+    stopAll: "Stop these invitation and tip emails",
     reminderSubject: (title: string) => `Reminder: “${title}” is waiting for you`,
     reminderIntro: (who: string) => (who ? `${who} invited you 3 days ago. The trip is ready: only you are missing.` : "You were invited 3 days ago. The trip is ready: only you are missing."),
     joinedTitle: (name: string, title: string) => `${name} joined “${title}”`,
@@ -169,9 +169,9 @@ export const TXT = {
     bookingBody: (w: string) => `A forwarded booking announces a new trip: ${w}. The form is ready, filled in from the booking.`,
     bookingButton: "Plan this trip",
     unsubConfirm: "Confirm",
-    unsubAsk: "Stop these emails from ORBES Trips?",
+    unsubAsk: "Stop these invitation and tip emails?",
     unsubDone: "Done: you will no longer receive these emails. You can turn them back on in the app: account menu → Alerts.",
-    unsubDoneGuest: "Done: you will no longer receive emails from ORBES Trips.",
+    unsubDoneGuest: "Done: you will no longer receive these invitation and tip emails.",
     unsubBad: "This link is not valid.",
   },
 };
@@ -221,7 +221,8 @@ export type Person = { user_id: string; email: string; lang: string; name: strin
 export type Alerts = { email?: boolean; push?: boolean };
 export type Profiled = Person & { alerts: Alerts; tips: boolean; opted_out: boolean; phones: number };
 export type TripPerson = Profiled & { role: string; pro: boolean; offline_full: boolean; bookings: number };
-export type MailRow = { key: string; user_id: string | null; email: string | null; kind: string; trip_id: string | null; channel: "email" | "push"; tips: boolean };
+/** channel "none": a message decided without sending anything (never counted in the daily e-mail cap) */
+export type MailRow = { key: string; user_id: string | null; email: string | null; kind: string; trip_id: string | null; channel: "email" | "push" | "none"; tips: boolean };
 export type InviteRow = { id: number; token: string; trip_id: string; email: string; invited_by: string | null; lang: string | null; sent_at: string | null; reminded_at: string | null; accepted_at: string | null; accepted_user: string | null; claimed_at: string | null; inviter_notified_at: string | null; send_count?: number };
 export type BookingRow = { id: number; user_id: string; received_at: string; extracted: Json };
 export type Mail = { to: string; subject: string; html: string; text: string; headers?: Record<string, string> };
@@ -234,10 +235,10 @@ export interface CycleDeps {
   claim(row: MailRow): Promise<boolean>;
   release(key: string): Promise<void>;
   logRow(key: string): Promise<{ channel: string } | null>;
-  setChannel(key: string, channel: "email" | "push"): Promise<void>;
+  setChannel(key: string, channel: "email" | "push" | "none"): Promise<void>;
   /** the last tips e-mail to this account or address (ms), the "Bon retour" e-mail included */
   lastTipsAt(userId: string | null, email: string): Promise<number | null>;
-  /** e-mails of this lot sent since midnight UTC */
+  /** e-mails of this lot sent since midnight UTC (channel "email" only: "none" rows are not e-mails) */
   mailsToday(): Promise<number>;
   firstTrip(limit: number): Promise<Person[]>;
   quota(limit: number): Promise<Person[]>;
@@ -370,7 +371,8 @@ export async function runCycle(deps: CycleDeps, o: CycleOpts): Promise<CycleResu
       const T = TXT[langOf(who.lang)];
       const name = firstName(joiner?.name) || inv.email.split("@")[0].slice(0, 40);
       const title = titleOf(inv.trip_id);
-      const key = `invite_joined:${inv.id}`;
+      // the link's token in the key: an address invited again (new link) is told about again
+      const key = `invite_joined:${inv.id}:${inv.token}`;
       // already told (a run that stopped before noting it): noted now
       if (await deps.logRow(key)) {
         await deps.patchInvite(inv.id, { inviter_notified_at: o.now.toISOString() });
@@ -408,8 +410,8 @@ export async function runCycle(deps: CycleDeps, o: CycleOpts): Promise<CycleResu
         const T = TXT[langOf(p.lang)];
         const key = `j3:${p.user_id}:${trip.id}`;
         const n = await sendPush({ key, user_id: p.user_id, email: p.email, kind: "j3", trip_id: trip.id, channel: "push", tips: false }, p.user_id, { title: T.j3Title, body: p.pro ? T.j3Body(title) : T.j3Free(title), url: `${APP_URL}/?offline=1&src=push_offline#${trip.id}`, tag: `offline-${trip.id}` }, { user_id: p.user_id, name: "offline_reminder_sent", detail: p.pro ? "push" : "free", trip_id: trip.id });
-        // every phone gone: kept as handled, the J-2 e-mail carries the line
-        if (n === 0) await deps.setChannel(key, "email");
+        // every phone gone: kept as handled (nothing sent), the J-2 e-mail carries the line
+        if (n === 0) await deps.setChannel(key, "none");
       }
     }
   });
@@ -453,7 +455,8 @@ export async function runCycle(deps: CycleDeps, o: CycleOpts): Promise<CycleResu
       if (!canMailNow()) break;
       if (inv.accepted_at || inv.claimed_at || inv.reminded_at || !inv.sent_at) continue;
       const trip = tripById.get(inv.trip_id);
-      const key = `invite_reminder:${inv.id}`;
+      // the link's token in the key: an address invited again (new link) gets its own reminder
+      const key = `invite_reminder:${inv.id}:${inv.token}`;
       const end = String(trip?.data.end || trip?.data.start || "");
       if (!trip || trip.data.deleted === true || (ISO_DAY.test(end) && end < today) || !(await deps.invitePending(inv.trip_id, inv.email)) || (await deps.optedOut(inv.email))) {
         // nothing to remind any more: never looked at again
@@ -465,6 +468,8 @@ export async function runCycle(deps: CycleDeps, o: CycleOpts): Promise<CycleResu
       const m = inviteMail({ lang, inviter: inviter?.name || "", title: String(trip.data.title || ""), start: String(trip.data.start || ""), end: String(trip.data.end || ""), link: `${APP_URL}/?join=${inv.token}&src=invite_reminder`, unsub: unsubInvite(o.secret, inv.id), reminder: true });
       const okSent = await sendMail({ key, user_id: null, email: inv.email, kind: "invite_reminder", trip_id: inv.trip_id, channel: "email", tips: true }, { to: inv.email, ...m }, { user_id: inv.invited_by, name: "invite_email_sent", detail: "invite_reminder", trip_id: inv.trip_id });
       if (okSent) await deps.patchInvite(inv.id, { reminded_at: o.now.toISOString(), send_count: (inv.send_count || 1) + 1 });
+      // already reminded (a run that stopped before noting it): noted now, never read again
+      else if (await deps.logRow(key).catch(() => null)) await deps.patchInvite(inv.id, { reminded_at: o.now.toISOString() });
     }
   });
 
@@ -506,7 +511,7 @@ export async function runCycle(deps: CycleDeps, o: CycleOpts): Promise<CycleResu
       const covered = end < today || (await deps.userTrips(b.user_id)).some((t) => ISO_DAY.test(t.start) && ISO_DAY.test(t.end) && shiftDay(t.start, -2) <= end && shiftDay(t.end, 2) >= d.start!);
       if (covered) {
         // a trip covers it now (or it is past): never sent
-        await deps.claim({ key, user_id: b.user_id, email: null, kind: "booking", trip_id: null, channel: "email", tips: false }).catch(() => false);
+        await deps.claim({ key, user_id: b.user_id, email: null, kind: "booking", trip_id: null, channel: "none", tips: false }).catch(() => false);
         continue;
       }
       const p = await deps.person(b.user_id);
@@ -548,7 +553,8 @@ export const missing = (e: unknown) => e instanceof DbError && (e.status === 404
 
 export function restDb(url: string, key: string, f: typeof fetch = fetch) {
   return async function db(path: string, init: RequestInit = {}): Promise<unknown> {
-    const r = await f(`${url}${path}`, { ...init, headers: { apikey: key, authorization: `Bearer ${key}`, "content-type": "application/json", ...(init.headers || {}) } });
+    // 10 s at most per call: the cron stops at 60 s, a claim must always be followed by its send or its release
+    const r = await f(`${url}${path}`, { signal: AbortSignal.timeout(10_000), ...init, headers: { apikey: key, authorization: `Bearer ${key}`, "content-type": "application/json", ...(init.headers || {}) } });
     const text = await r.text();
     if (!r.ok) throw new DbError(r.status, text.slice(0, 300), path);
     return text ? JSON.parse(text) : null;
@@ -607,7 +613,7 @@ export function restDeps(o: { url: string; key: string; resend: string; from: st
     },
     async mailsToday() {
       const since = new Date().toISOString().slice(0, 10) + "T00:00:00Z";
-      const r = await fetch(`${o.url}/rest/v1/mail_log?channel=eq.email&at=gte.${enc(since)}&select=key&limit=1`, { method: "HEAD", headers: { apikey: o.key, authorization: `Bearer ${o.key}`, prefer: "count=exact" } });
+      const r = await fetch(`${o.url}/rest/v1/mail_log?channel=eq.email&at=gte.${enc(since)}&select=key&limit=1`, { method: "HEAD", headers: { apikey: o.key, authorization: `Bearer ${o.key}`, prefer: "count=exact" }, signal: AbortSignal.timeout(8000) });
       const n = Number((r.headers.get("content-range") || "").split("/")[1]);
       return r.ok && Number.isFinite(n) ? n : 0;
     },
@@ -661,11 +667,18 @@ export function restDeps(o: { url: string; key: string; resend: string; from: st
     },
     async mail(m) {
       if (!o.resend) return false;
+      let timedOut = false;
       const r = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { authorization: `Bearer ${o.resend}`, "content-type": "application/json" },
         body: JSON.stringify({ from: o.from, to: [m.to], subject: m.subject, html: m.html, text: m.text, ...(m.headers ? { headers: m.headers } : {}) }),
-      }).catch(() => null);
+        signal: AbortSignal.timeout(8000),
+      }).catch((e) => {
+        timedOut = (e as Error)?.name === "TimeoutError";
+        return null;
+      });
+      // no answer within 8 s: Resend may have sent it, so it stays noted (a lost tip rather than the same e-mail twice)
+      if (timedOut) return true;
       return !!r?.ok;
     },
     async push(userId, payload) {

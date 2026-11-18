@@ -252,7 +252,8 @@ ${FOOTER}</div>`;
   } catch (e) {
     warnings.push(`return: ${String((e as Error)?.message || e).slice(0, 120)}`);
   }
-  // the cycle's messages, after every alert above, within 45 s of the start (the cron stops at 60 s)
+  // the cycle's messages, after every alert above: nothing new starts after 40 s (the cron stops at 60 s; each send
+  // or database call gives up after 8-10 s, so a message noted as sent is always sent or released)
   try {
     const deps = restDeps({
       url: SUPA_URL,
@@ -261,7 +262,7 @@ ${FOOTER}</div>`;
       from,
       pushTo: async (s, payload) => {
         try {
-          await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(payload), { TTL: 6 * 3600 });
+          await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(payload), { TTL: 6 * 3600, timeout: 8000 });
           return "ok";
         } catch (e) {
           const code = (e as { statusCode?: number }).statusCode;
@@ -272,7 +273,7 @@ ${FOOTER}</div>`;
     const cyc = await runCycle(deps, {
       trips: allTrips,
       now,
-      deadline: started + 45_000,
+      deadline: started + 40_000,
       secret: deriveUnsub(key),
       canMail: !!resend,
       canPush: !!vapid,
