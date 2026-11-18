@@ -80,13 +80,15 @@ async function reserve(token: string, task: string, trip: string | null, f: type
   }
 }
 /** After the answer: its cost and whether it worked (best effort) */
-async function finish(token: string, id: number, usd: number, ok: boolean, f: typeof fetch): Promise<void> {
+async function finish(token: string, id: number, usd: number, ok: boolean, f: typeof fetch, detail?: Json): Promise<void> {
+  const headers = { apikey: SUPA_KEY, authorization: `Bearer ${token}`, "content-type": "application/json" };
   try {
-    await f(`${SUPA_URL}/rest/v1/rpc/finish_ai_call`, {
-      method: "POST",
-      headers: { apikey: SUPA_KEY, authorization: `Bearer ${token}`, "content-type": "application/json" },
-      body: JSON.stringify({ p_id: id, p_usd: usd, p_ok: ok }),
-    });
+    // the detail (tokens, web searches, duration, model, trip) since supabase/saas-11.sql; the cost alone before
+    if (detail) {
+      const r = await f(`${SUPA_URL}/rest/v1/rpc/finish_ai_call2`, { method: "POST", headers, body: JSON.stringify({ p_id: id, p_usd: usd, p_ok: ok, p_detail: detail }) });
+      if (r.ok || r.status !== 404) return;
+    }
+    await f(`${SUPA_URL}/rest/v1/rpc/finish_ai_call`, { method: "POST", headers, body: JSON.stringify({ p_id: id, p_usd: usd, p_ok: ok }) });
   } catch {
     /* best effort */
   }
@@ -924,10 +926,15 @@ export async function handle(req: Request, deps: Deps = {}): Promise<Response> {
     const usage = newUsage();
     const started = Date.now();
     // the log is written after the answer has left (the function stays alive until it is done)
-    const log = (ok: boolean) => {
-      // the account's booked request gets its cost, then the shared space's detailed spending log
+    const tripId = body.trip && typeof body.trip === "object" && typeof (body.trip as Json).id === "string" ? String((body.trip as Json).id).slice(0, 64) : null;
+    const log = (ok: boolean, err?: unknown) => {
+      // the account's booked request gets its cost and its detail, then the shared space's detailed spending log
       if (booked != null) {
-        const mine = finish(token, booked, Math.round(usage.usd * 1e6) / 1e6, ok, f);
+        const detail = {
+          trip: tripId, provider, model: provider === "deepseek" ? DS_MODEL : "claude", hit: usage.hit, miss: usage.miss, out: usage.out,
+          search: usage.search, fetch: usage.fetch, ms: Date.now() - started, error: ok ? null : String((err as { kind?: string; message?: string })?.kind || (err as Error)?.message || "error").slice(0, 200),
+        };
+        const mine = finish(token, booked, Math.round(usage.usd * 1e6) / 1e6, ok, f, detail);
         try {
           if (deps.fetch) void mine;
           else waitUntil(mine);
@@ -949,7 +956,7 @@ export async function handle(req: Request, deps: Deps = {}): Promise<Response> {
       log(true);
       return json(out, 200, origin);
     } catch (e) {
-      log(false);
+      log(false, e);
       throw e;
     }
   } catch (e) {
