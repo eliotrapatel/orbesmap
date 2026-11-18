@@ -281,10 +281,23 @@ function askSystem(p: Persona): string {
     .replace(/Eliot/g, p.name);
 }
 function photoSystem(p: Persona): string {
-  return `Tu aides ${p.name}, en voyage (${p.tripTxt}).\n${rest(PHOTO_SYSTEM)}`.replace(" (utile pour ORBES)", "").replace(/Eliot/g, p.name);
+  return `Tu aides ${p.name}, en voyage (${p.tripTxt}).\n${rest(PHOTO_SYSTEM)}`.replace(" (utile pour ORBES)", "").replace("chinois d'origine (zh)", "texte d'origine dans sa langue (zh)").replace(/Eliot/g, p.name);
 }
-function interpretSystem(p: Persona): string {
-  return `Tu es l'interprète de ${p.name} (francophone), en voyage (${p.tripTxt}) : boutiques, restaurants, taxis, hôtels, guichets.\n${rest(INTERPRET_SYSTEM)}`;
+/** The local language of the account's trip (sent by the app); Chinese when unknown */
+function langOf(body: Json): { code: string; name: string } {
+  const l = body.lang && typeof body.lang === "object" ? (body.lang as Json) : {};
+  const code = clean(l.code, 12).toLowerCase();
+  const name = clean(l.name, 30);
+  return code && name ? { code, name } : { code: "zh-cn", name: "chinois" };
+}
+function interpretSystem(p: Persona, l: { code: string; name: string }): string {
+  if (l.code.startsWith("zh")) return `Tu es l'interprète de ${p.name} (francophone), en voyage (${p.tripTxt}) : boutiques, restaurants, taxis, hôtels, guichets.\n${rest(INTERPRET_SYSTEM)}`;
+  return `Tu es l'interprète de ${p.name} (francophone), en voyage (${p.tripTxt}) : boutiques, restaurants, taxis, hôtels, guichets.
+Traduis fidèlement le message, sans rien ajouter ni commenter.
+- Du français vers le ${l.name} : langue parlée naturelle et polie, écriture locale ; pinyin = la transcription en alphabet latin si l'écriture n'est pas latine, sinon "".
+- Du ${l.name} vers le français : français naturel ; pinyin = "".
+- note : seulement si un point culturel ou un risque de malentendu mérite d'être signalé (sinon "").
+Latency-sensitive; begin your visible answer immediately.`;
 }
 function enrichSystem(p: Persona): string {
   return `Tu rédiges la fiche complète d'un lieu ajouté à la carte de voyage de ${p.name} (app ORBES Trips). ${p.intro} Ville et dates du voyage dans la demande.\n${rest(ENRICH_SYSTEM)}`
@@ -766,8 +779,11 @@ export async function handle(req: Request, deps: Deps = {}): Promise<Response> {
     const from = body.from === "zh" ? "zh" : "fr";
     if (!text) return json({ error: "bad", message: "Rien à traduire." }, 400, origin);
     const history = Array.isArray(body.history) ? (body.history as { from: string; text: string; translation: string }[]).slice(-6) : [];
-    const ctx = history.length ? `Échanges précédents (contexte) :\n${history.map((h) => `${h.from === "zh" ? "Chinois" : "Français"} : ${String(h.text).slice(0, 300)} → ${String(h.translation).slice(0, 300)}`).join("\n")}\n\n` : "";
-    job = { task: "interpret", system: acc.member ? INTERPRET_SYSTEM : interpretSystem(personaOf(body)), text: `${ctx}Traduis ${from === "fr" ? "du français vers le chinois" : "du chinois vers le français"} :\n${text}`, schema: INTERPRET_SCHEMA, effort: "low", maxTokens: 2000 };
+    // the members' trips are in China (unchanged); an account's trip speaks its own language
+    const lang = acc.member ? { code: "zh-cn", name: "chinois" } : langOf(body);
+    const Lang = lang.name.charAt(0).toUpperCase() + lang.name.slice(1);
+    const ctx = history.length ? `Échanges précédents (contexte) :\n${history.map((h) => `${h.from === "zh" ? Lang : "Français"} : ${String(h.text).slice(0, 300)} → ${String(h.translation).slice(0, 300)}`).join("\n")}\n\n` : "";
+    job = { task: "interpret", system: acc.member ? INTERPRET_SYSTEM : interpretSystem(personaOf(body), lang), text: `${ctx}Traduis ${from === "fr" ? `du français vers le ${lang.name}` : `du ${lang.name} vers le français`} :\n${text}`, schema: INTERPRET_SCHEMA, effort: "low", maxTokens: 2000 };
   } else if (body.task === "place") {
     const url = typeof body.url === "string" ? body.url.slice(0, 1000) : "";
     const text = typeof body.text === "string" ? body.text.slice(0, 3000) : "";

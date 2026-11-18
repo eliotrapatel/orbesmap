@@ -6,7 +6,7 @@ import { currentTrip, getState } from "./store";
 function aiContext() {
   const p = getState().profile;
   const t = currentTrip();
-  return { who: { name: p.name, interests: p.interests, travel: p.travel, pace: p.pace, budget: p.budget, lang: p.lang }, trip: { title: t.title, dates: t.dateLabel } };
+  return { who: { name: p.name, interests: p.interests, travel: p.travel, pace: p.pace, budget: p.budget, lang: p.lang }, trip: { title: t.title, dates: t.dateLabel }, lang: t.lang };
 }
 
 const ENDPOINT = (() => {

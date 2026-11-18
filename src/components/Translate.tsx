@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import type { Trip } from "../data/types";
 import { ai, AiError, imageToBase64, type InterpretResult, type PhotoResult } from "../lib/ai";
-import { addContact, toast, useStore } from "../lib/store";
+import { addContact, toast, useStore, useTrip } from "../lib/store";
 import { ICamera, ICopy, IExpand, ISpeaker } from "./Icons";
-import { ShowScreen, copy, speak } from "./ui";
+import { ShowScreen, copy, localSpeech, speak } from "./ui";
 
 // ---------------- speech recognition (Safari/Chrome; iOS needs Siri & Dictation on) ----------------
 type SR = {
@@ -199,6 +199,10 @@ function PhotoTab({ trip }: { trip: Trip }) {
 type Turn = { id: number; from: "fr" | "zh"; text: string; translation: string; pinyin: string; note: string };
 
 function TalkTab() {
+  // the other person speaks the trip's language (Chinese for the first trips, with its own wording)
+  const tripNow = useTrip();
+  const zhTrip = !tripNow.lang || tripNow.lang.code.toLowerCase().startsWith("zh");
+  const langName = tripNow.lang?.name || "chinois";
   const [turns, setTurns] = useState<Turn[]>([]);
   const [listening, setListening] = useState<"fr" | "zh" | null>(null);
   const [interim, setInterim] = useState("");
@@ -226,7 +230,7 @@ function TalkTab() {
       const r = await ai<InterpretResult>("interpret", { from, text: t, history: turns.slice(-6).map((x) => ({ from: x.from, text: x.text, translation: x.translation })) }, 30_000);
       const turn: Turn = { id: ++n.current, from, text: t, ...r };
       setTurns((ts) => [...ts, turn]);
-      if (autoSpeak) speak(r.translation, from === "fr" ? "zh-CN" : "fr-FR");
+      if (autoSpeak) speak(r.translation, from === "fr" ? localSpeech() : "fr-FR");
     } catch (e) {
       setErr(e instanceof AiError ? e.message : "La traduction a échoué.");
     } finally {
@@ -252,7 +256,7 @@ function TalkTab() {
     }
     window.speechSynthesis?.cancel();
     const r = new SRClass();
-    r.lang = lang === "fr" ? "fr-FR" : "zh-CN";
+    r.lang = lang === "fr" ? "fr-FR" : localSpeech();
     r.interimResults = true;
     r.continuous = false;
     finalText.current = "";
@@ -304,14 +308,14 @@ function TalkTab() {
 
       <div className={"talk-pane them" + (faceToFace ? " flip" : "")} lang="zh-CN">
         <div className="talk-big">
-          {listening === "zh" ? interim || "请说话…" : last ? (last.from === "fr" ? last.translation : last.text) : "请按下面的按钮说中文"}
+          {listening === "zh" ? interim || (zhTrip ? "请说话…" : "…") : last ? (last.from === "fr" ? last.translation : last.text) : zhTrip ? "请按下面的按钮说中文" : `🎤 ${langName}`}
         </div>
         {last?.from === "fr" && last.pinyin && <div className="talk-sub">{last.pinyin}</div>}
         <div className="talk-row">
           <button className={"talk-mic" + (listening === "zh" ? " on" : "")} onClick={() => listen("zh")} disabled={busy || listening === "fr"}>
-            {listening === "zh" ? "说完了" : "🎤 说中文"}
+            {listening === "zh" ? (zhTrip ? "说完了" : "■") : zhTrip ? "🎤 说中文" : `🎤 ${langName}`}
           </button>
-          {last?.from === "fr" && <button className="btn-sm" onClick={() => speak(last.translation, "zh-CN")}>🔊 再听一次</button>}
+          {last?.from === "fr" && <button className="btn-sm" onClick={() => speak(last.translation, localSpeech())}>🔊 {zhTrip ? "再听一次" : "↻"}</button>}
         </div>
         <form className="talk-type" onSubmit={(e) => { e.preventDefault(); unlockTts(); translate("zh", zhText); setZhText(""); }}>
           <input className="input" value={zhText} onChange={(e) => setZhText(e.target.value)} placeholder="或者在这里打字…" />

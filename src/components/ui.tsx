@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { isMobileSheet, useSheetGesture } from "../lib/sheetDrag";
-import { onToast } from "../lib/store";
+import { onToast, currentTrip } from "../lib/store";
 import { IClose, ISpeaker } from "./Icons";
 
 /** Overlays are rendered in <body> so they are never trapped inside a transformed panel */
@@ -79,7 +79,9 @@ export function Modal({ title, intro, onClose, children, className }: { title: s
   );
 }
 
-export function speak(text: string, lang = "zh-CN") {
+/** Voice of the current trip's language (Chinese for the first trips) */
+export const localSpeech = () => currentTrip().lang?.speech || "zh-CN";
+export function speak(text: string, lang = localSpeech()) {
   try {
     const synth = window.speechSynthesis;
     if (!synth) return false;

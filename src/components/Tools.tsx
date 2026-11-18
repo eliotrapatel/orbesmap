@@ -22,14 +22,14 @@ export function Phrases({ trip }: { trip: Trip }) {
     .filter((g) => g.items.length);
   return (
     <div>
-      <input className="input" placeholder="Chercher une phrase (français ou pinyin)…" value={q} onChange={(e) => setQ(e.target.value)} style={{ marginBottom: 14 }} />
+      <input className="input" placeholder={trip.lang && !trip.lang.code.toLowerCase().startsWith("zh") ? "Chercher une phrase (français ou transcription)…" : "Chercher une phrase (français ou pinyin)…"} value={q} onChange={(e) => setQ(e.target.value)} style={{ marginBottom: 14 }} />
       {groups.map((g) => (
         <div className="phr-group" key={g.title}>
           <span className="label">{g.title}</span>
           {g.items.map((p) => (
             <div className="phr" key={g.title + p.zh}>
               <button className="phr-main" onClick={() => setShow({ zh: p.zh, sub: `${p.pinyin} — ${p.fr}` })}>
-                <span className="zh" lang="zh-CN">{p.zh}</span>
+                <span className="zh" lang={trip.lang?.code || "zh-CN"}>{p.zh}</span>
                 <small>{p.pinyin}</small>
                 <small className="fr">{p.fr}</small>
               </button>
