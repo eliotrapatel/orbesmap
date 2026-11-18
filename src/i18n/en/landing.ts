@@ -99,4 +99,12 @@ export default {
   "Temps de trajet": "Travel times",
   "«\u00a0Aujourd'hui\u00a0» montre le prochain lieu et son heure. Le programme se lit sans réseau, et ceux qui partent avec vous le suivent sur leur téléphone.": "“Today” shows the next place and its time. The itinerary reads with no signal, and the people travelling with you follow it on their phones.",
   "Avant de commencer.": "Before you start.",
+  // the reviewed landing: two truths only, the questions with their non-breaking spaces
+  "Rien ne se perd": "Nothing gets lost",
+  "Ce qui ne rentre pas dans une journée reste dans vos pistes, à voir si le temps le permet.": "What doesn't fit in a day stays in your ideas, to see if time allows.",
+  "Faut-il un mot de passe\u00a0?": "Do I need a password?",
+  "Pour quelles destinations\u00a0?": "Which destinations?",
+  "Et sans réseau\u00a0?": "What about offline?",
+  "Votre programme et vos fiches restent sur votre téléphone\u00a0: ils se lisent même sans connexion, et se synchronisent au retour du réseau.": "Your itinerary and place details stay on your phone: you can read them offline, and they sync when you're back online.",
+  "Qui voit mon voyage\u00a0?": "Who can see my trip?",
 } satisfies Record<string, string>;

@@ -20,9 +20,11 @@ const PITCH = 58;
 
 type LL = [lng: number, lat: number];
 type Stop = { at: string; name: string; ll: LL };
-type City = { name: () => string; country: () => string; day: () => string; at: LL; bearing: number; stops: Stop[] };
+/** `legs`: the walk between two stops, along the streets (baked once from OpenStreetMap foot routing, never fetched at
+ *  run time); `walk`: its minutes on foot */
+type City = { name: () => string; country: () => string; day: () => string; at: LL; bearing: number; stops: Stop[]; walk: number[]; legs: LL[][] };
 
-/** Real places, real coordinates (the city's own centre for the board's line) */
+/** Real places, real coordinates (the city's own centre for the board's line), real walks between them */
 const CITIES: City[] = [
   {
     name: () => "Florence",
@@ -35,6 +37,12 @@ const CITIES: City[] = [
       { at: "11:00", name: "Galleria dell'Accademia", ll: [11.2589, 43.7768] },
       { at: "14:00", name: "Duomo di Firenze", ll: [11.256, 43.7731] },
       { at: "18:30", name: "Ponte Vecchio", ll: [11.2531, 43.768] },
+    ],
+    walk: [8, 9, 9],
+    legs: [
+      [[11.2534, 43.7766], [11.25352, 43.77623], [11.25487, 43.77673], [11.25565, 43.77634], [11.25619, 43.7771], [11.25816, 43.77635], [11.25866, 43.7769]],
+      [[11.25866, 43.7769], [11.25601, 43.7735], [11.25538, 43.77353], [11.25538, 43.77273], [11.25585, 43.77272], [11.25584, 43.77285]],
+      [[11.25584, 43.77285], [11.25577, 43.77221], [11.25536, 43.77222], [11.25528, 43.77021], [11.25446, 43.77021], [11.25442, 43.7696], [11.25311, 43.768]],
     ],
   },
   {
@@ -49,6 +57,12 @@ const CITIES: City[] = [
       { at: "12:30", name: "Yasaka-jinja", ll: [135.7786, 35.0036] },
       { at: "17:00", name: "Gion Shirakawa", ll: [135.7747, 35.0059] },
     ],
+    walk: [7, 14, 8],
+    legs: [
+      [[135.78518, 34.99487], [135.78521, 34.99472], [135.78489, 34.99468], [135.78478, 34.9948], [135.78439, 34.99477], [135.78369, 34.99501], [135.78373, 34.9951], [135.78333, 34.99522], [135.78308, 34.99551], [135.78213, 34.99553], [135.78079, 34.99618], [135.78096, 34.99651]],
+      [[135.78096, 34.99651], [135.78106, 34.9975], [135.78097, 34.9979], [135.77977, 34.99833], [135.77901, 34.99844], [135.77902, 34.99855], [135.77877, 34.99856], [135.77879, 35.00022], [135.77864, 35.00096], [135.7785, 35.00304], [135.77853, 35.00332], [135.77863, 35.00331], [135.77867, 35.0035], [135.77864, 35.00354]],
+      [[135.77864, 35.00354], [135.77886, 35.00353], [135.77888, 35.00374], [135.77827, 35.00381], [135.77809, 35.00418], [135.77754, 35.00428], [135.77774, 35.00528], [135.77757, 35.00529], [135.7776, 35.00555], [135.77477, 35.00579]],
+    ],
   },
   {
     name: () => t("Lisbonne"),
@@ -62,6 +76,12 @@ const CITIES: City[] = [
       { at: "13:00", name: "Sé de Lisboa", ll: [-9.1335, 38.7099] },
       { at: "18:00", name: "Praça do Comércio", ll: [-9.1364, 38.7075] },
     ],
+    walk: [6, 6, 8],
+    legs: [
+      [[-9.13332, 38.71335], [-9.13289, 38.71278], [-9.13304, 38.71248], [-9.13297, 38.71218], [-9.1319, 38.71237], [-9.13147, 38.71201], [-9.13048, 38.71187], [-9.13048, 38.71178], [-9.13022, 38.71171]],
+      [[-9.13022, 38.71171], [-9.13053, 38.71163], [-9.13061, 38.71101], [-9.13092, 38.71069], [-9.13205, 38.71019], [-9.13215, 38.71006], [-9.13318, 38.71004], [-9.13341, 38.70986]],
+      [[-9.13341, 38.70986], [-9.13365, 38.70978], [-9.13448, 38.71011], [-9.1345, 38.70985], [-9.13626, 38.70947], [-9.13589, 38.70829], [-9.13609, 38.70824], [-9.13636, 38.70747]],
+    ],
   },
 ];
 
@@ -72,7 +92,7 @@ const T_DRAW = 1500; // the first leg starts
 const LEG = 1900; // one leg drawn
 const STAY = 700; // a pause at each stop
 const T_OUT = T_DRAW + 3 * LEG + 2 * STAY + 4400; // the map fades out
-const T_END = T_OUT + 1000; // the next city
+const T_END = T_OUT + 1400; // the next city, once the map's fade-out (1.4 s, .lp2-map) is over
 const T_STILL = T_OUT - 1; // with less motion: everything shown
 const DRIFT_BEARING = 16; // degrees over a scene
 const DRIFT_ZOOM = 0.32;
@@ -90,48 +110,31 @@ const easeInOut = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 
 // ---------------------------------------------------------------- geometry
 
 const rad = Math.PI / 180;
-function meters(a: LL, b: LL) {
-  const p1 = a[1] * rad, p2 = b[1] * rad;
-  const h = Math.sin((p2 - p1) / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(((b[0] - a[0]) * rad) / 2) ** 2;
-  return 2 * 6371000 * Math.asin(Math.sqrt(h));
-}
-/** Minutes on foot between two stops (the straight line, lengthened for the streets) */
-export const walkMin = (a: LL, b: LL) => Math.max(3, Math.round((meters(a, b) * 1.3) / 80));
 
-/** The day's line: a gentle curve from stop to stop (an itinerary, not a turn-by-turn route), and where each stop
- *  falls along it (0–1, by length on the map) */
+/** The day's line: the walk along the streets from stop to stop, each leg ending exactly on its stops, and where each
+ *  stop falls along it (0–1, by length on the map) */
 function routeOf(c: City) {
   const lat0 = c.stops[0].ll[1] * rad;
-  const pts: LL[] = [];
+  const pts: LL[] = [c.stops[0].ll];
   const at: number[] = [0];
+  const run: number[] = [0];
+  const legs: number[] = [];
   let len = 0;
   const xy = (p: LL) => [p[0] * Math.cos(lat0), p[1]] as const;
-  const legs: number[] = [];
-  const run: number[] = [0];
-  c.stops.forEach((s, i) => {
-    if (i === 0) {
-      pts.push(s.ll);
-      return;
-    }
-    const a = c.stops[i - 1].ll, b = s.ll;
-    const [ax, ay] = xy(a), [bx, by] = xy(b);
-    const dx = bx - ax, dy = by - ay;
-    const bend = (i % 2 ? 1 : -1) * 0.14;
-    const mx = (ax + bx) / 2 - dy * bend, my = (ay + by) / 2 + dx * bend;
-    let px = ax, py = ay, l = 0;
-    for (let k = 1; k <= 24; k++) {
-      const f = k / 24;
-      const x = (1 - f) ** 2 * ax + 2 * (1 - f) * f * mx + f * f * bx;
-      const y = (1 - f) ** 2 * ay + 2 * (1 - f) * f * my + f * f * by;
-      l += Math.hypot(x - px, y - py);
-      px = x;
-      py = y;
-      pts.push([x / Math.cos(lat0), y]);
+  for (let i = 1; i < c.stops.length; i++) {
+    const way = [c.stops[i - 1].ll, ...(c.legs[i - 1] || []), c.stops[i].ll];
+    let l = 0;
+    for (let k = 1; k < way.length; k++) {
+      const [ax, ay] = xy(way[k - 1]), [bx, by] = xy(way[k]);
+      const d = Math.hypot(bx - ax, by - ay);
+      if (d < 1e-7) continue;
+      l += d;
+      pts.push(way[k]);
       run.push(len + l);
     }
     legs.push(l);
     len += l;
-  });
+  }
   let acc = 0;
   for (const l of legs) {
     acc += l;
@@ -342,7 +345,8 @@ export default function LandingHero({ children, copyRef }: { children: ReactNode
           interactive: false,
           attributionControl: false,
           fadeDuration: 0,
-          pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
+          // a phone draws the 3D city every frame: a lighter canvas there
+          pixelRatio: Math.min(window.devicePixelRatio || 1, window.innerWidth < 700 ? 1.5 : 2),
           canvasContextAttributes: { antialias: true },
         });
       } catch {
@@ -350,6 +354,10 @@ export default function LandingHero({ children, copyRef }: { children: ReactNode
         return;
       }
       s.map = map;
+      // the vignette inside the map, over the city but under the line and the stops (they stay at full light)
+      const vig = document.createElement("div");
+      vig.className = "lp2-vig";
+      map.getCanvasContainer().append(vig);
       // the day's line: drawn over the city (a line on the ground would hide behind the buildings), under the stops
       const svg = document.createElementNS(SVG, "svg");
       svg.setAttribute("class", "lp2-line");
@@ -439,7 +447,8 @@ export default function LandingHero({ children, copyRef }: { children: ReactNode
     const s = st.current;
     const map = s.map;
     const box = hero.current;
-    if (!map || !box) return;
+    // the stops are measured below: nothing to frame before they exist (goToScene frames the city itself)
+    if (!map || !box || !s.markers.length) return;
     const c = CITIES[n];
     const hr = box.getBoundingClientRect();
     const cr = copyRef.current?.getBoundingClientRect();
@@ -447,15 +456,20 @@ export default function LandingHero({ children, copyRef }: { children: ReactNode
     const W = hr.width, H = hr.height;
     let pad: { top: number; bottom: number; left: number; right: number };
     if (W < 1024) {
-      // phone and tablet: between the board's line at the top and the headline below
-      const top = br ? Math.max(96, br.top - hr.top + 64) : 120;
-      const bottom = cr ? Math.max(120, hr.bottom - cr.top + 8) : H * 0.5;
-      pad = { top, bottom, left: 24, right: 24 };
+      // phone and tablet: between the city's line at the top of the board (its rows step aside once the map shows)
+      // and the headline below
+      const city = board.current?.querySelector(".lp2-city")?.getBoundingClientRect();
+      // the first line of the copy that shows (the small label above the headline is hidden on a phone)
+      const first = Array.from(copyRef.current?.children || []).find((e) => (e as HTMLElement).offsetHeight > 0)?.getBoundingClientRect();
+      const top = city ? city.bottom - hr.top + 12 : br ? br.top - hr.top + 72 : 120;
+      const bottom = first ? hr.bottom - first.top + 16 : cr ? hr.bottom - cr.top + 8 : H * 0.5;
+      pad = { top, bottom, left: W >= 700 ? 40 : 24, right: 24 };
     } else {
       // computer: the upper right, beside the headline, above the board
       const left = cr ? Math.min(W * 0.5, cr.right - hr.left + 24) : W * 0.42;
       const bottom = br ? Math.max(H * 0.3, hr.bottom - br.top + 8) : H * 0.38;
-      pad = { top: 104, bottom, left, right: 96 };
+      // never in the dark band under the header
+      pad = { top: Math.max(104, H * 0.24), bottom, left, right: 96 };
     }
     // never an impossible frame on a small window
     if (pad.top + pad.bottom > H - 80) {
@@ -471,46 +485,52 @@ export default function LandingHero({ children, copyRef }: { children: ReactNode
     // fitted on screen, in perspective: the stops' box (plus room for their labels) brought to the open area,
     // in a few passes (a bounds fit ignores the tilt and leaves the city far too small)
     const n0 = c.stops.length;
+    // a label is 24 px tall (20 on a phone): two stops need at least that much, plus air, between them
+    const minGap = W < 700 ? 26 : 44;
+    const vMargin = W < 700 ? 12 : 16;
     let center = new maplibregl.LngLat(c.stops.reduce((a, p) => a + p.ll[0], 0) / n0, c.stops.reduce((a, p) => a + p.ll[1], 0) / n0);
     let zoom = 15.4;
     // the labels keep their size while the city scales: measured
     const lw = s.markers.map((mk) => (mk.el.firstElementChild as HTMLElement | null)?.offsetWidth || 160);
     const maxLw = Math.max(...lw);
     // the city turned so that the day reads down the open area, labels on the right, each stop on its own line:
-    // of every heading, the one that frames the day largest with at least a label's height between two stops
-    // (the tilt flattens the height: about half), the city's own view breaking ties
-    const en = c.stops.map((p) => [(p.ll[0] - c.stops[0].ll[0]) * Math.cos(p.ll[1] * rad) * 111320, (p.ll[1] - c.stops[0].ll[1]) * 110540] as const);
+    // of every heading, the one that frames the day largest with at least a label's height between two stops, measured
+    // on the real tilted view (the camera is only moved here, nothing is drawn), the city's own view breaking ties
     const near = (x: number) => Math.abs(((((x - c.bearing) % 360) + 540) % 360) - 180);
+    const seen = (h: number) => {
+      map.jumpTo({ center, zoom, bearing: h, pitch: PITCH, padding: pad });
+      return c.stops.map((p) => map.project(p.ll));
+    };
+    const zoomRange = [2 ** (13.2 - zoom), 2 ** (16.6 - zoom)];
     let bearing = c.bearing, best = -Infinity;
-    for (let b = -180; b < 180; b += 3) {
-      const at = (h: number) => {
-        const cb = Math.cos(h * rad), sb = Math.sin(h * rad);
-        return { xs: en.map(([e, nn]) => e * cb - nn * sb), ys: en.map(([e, nn]) => -(e * sb + nn * cb) * 0.5) };
-      };
-      const { xs, ys } = at(b);
-      const bw = Math.max(...xs) - Math.min(...xs) + 1, bh = Math.max(...ys) - Math.min(...ys) + 1;
-      const scale = Math.min(Math.max(40, W - pad.left - pad.right - 24 - maxLw) / bw, Math.max(40, H - pad.top - pad.bottom - 40) / bh);
+    for (let b = -180; b < 180; b += 4) {
+      const pts = seen(b);
+      const xs = pts.map((p) => p.x), ys0 = pts.map((p) => p.y);
+      const bw = Math.max(...xs) - Math.min(...xs) + 1, bh = Math.max(...ys0) - Math.min(...ys0) + 1;
+      const fit = Math.min(Math.max(40, W - pad.left - pad.right - 24 - maxLw) / bw, Math.max(40, H - pad.top - pad.bottom - 2 * vMargin) / bh);
+      const scale = Math.max(zoomRange[0], Math.min(zoomRange[1], fit));
       // the drift turns the city by a few degrees: the stops must stay apart all along
       let gap = Infinity;
       for (const h of [b - DRIFT_BEARING / 2, b, b + DRIFT_BEARING / 2]) {
-        const sy = [...at(h).ys].sort((u, v) => u - v);
-        for (let i = 1; i < sy.length; i++) gap = Math.min(gap, (sy[i] - sy[i - 1]) * scale);
+        const sy = (h === b ? ys0 : seen(h).map((p) => p.y)).sort((u, v) => u - v);
+        // (the drift starts a little back: the stops a little closer)
+        for (let i = 1; i < sy.length; i++) gap = Math.min(gap, (sy[i] - sy[i - 1]) * scale * 2 ** (-DRIFT_ZOOM / 2));
       }
-      const score = (gap >= 44 ? 1000 + scale * 100 : gap) - near(b) * 0.02;
+      const score = (gap >= minGap ? 1000 + scale * 100 : gap) - near(b) * 0.02;
       if (score > best) {
         best = score;
         bearing = b;
       }
     }
     const aw = Math.max(80, W - pad.left - pad.right - 24);
-    const ah = Math.max(60, H - pad.top - pad.bottom - 40);
+    const ah = Math.max(60, H - pad.top - pad.bottom - 2 * vMargin);
     for (let k = 0; k < 6; k++) {
       map.jumpTo({ center, zoom, bearing, pitch: PITCH, padding: pad });
       const pts = c.stops.map((p) => map.project(p.ll));
       const x0 = Math.min(...pts.map((p) => p.x - 6));
       const x1 = Math.max(...pts.map((p, i) => p.x + lw[i]));
       const ys = pts.map((p) => p.y);
-      const y0 = Math.min(...ys) - 16, y1 = Math.max(...ys) + 16;
+      const y0 = Math.min(...ys) - vMargin, y1 = Math.max(...ys) + vMargin;
       center = map.unproject([(x0 + x1) / 2, (y0 + y1) / 2]);
       zoom = Math.max(13.2, Math.min(16.6, zoom + 0.8 * Math.log2(Math.min(aw / Math.max(1, x1 - x0), ah / Math.max(1, y1 - y0)))));
     }
@@ -583,6 +603,9 @@ export default function LandingHero({ children, copyRef }: { children: ReactNode
     if (still || !active) return;
     let raf = 0;
     let last = performance.now();
+    // a phone moves the camera every second frame (about 30 a second: the drift is slow enough not to show it)
+    const half = window.innerWidth < 700;
+    let odd = false;
     const loop = (now: number) => {
       const dt = Math.min(64, now - last);
       last = now;
@@ -598,7 +621,8 @@ export default function LandingHero({ children, copyRef }: { children: ReactNode
         setStep(k);
         syncMarkers();
       }
-      if (s.phase === "ready" && s.on) place(s.ms);
+      odd = !odd;
+      if (s.phase === "ready" && s.on && (!half || odd)) place(s.ms);
       if (s.on && s.ms >= T_OUT) {
         s.on = false;
         setMapOn(false);
@@ -620,13 +644,11 @@ export default function LandingHero({ children, copyRef }: { children: ReactNode
   }, [active, still]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const c = CITIES[scene];
-  const legs = c.stops.map((p, i) => (i ? walkMin(c.stops[i - 1].ll, p.ll) : 0));
 
   return (
     <section ref={hero} className={"lp2-hero" + (mapOn ? " map-on" : "")} aria-labelledby="lp2-h1">
       <div className="lp2-stage" aria-hidden="true">
         <div ref={mapBox} className={"lp2-map" + (mapOn ? " on" : "")} />
-        <div className="lp2-vig" />
       </div>
       <div className="lp2-hero-in lp2-grid">
         <div ref={board} className="lp2-board">
@@ -651,7 +673,7 @@ export default function LandingHero({ children, copyRef }: { children: ReactNode
                 <li key={p.name} className={i < step ? "on" : ""}>
                   <span className="lp2-tm">{p.at}</span>
                   <span className="lp2-nm">{p.name}</span>
-                  <span className="lp2-walk">{i ? t("{n} min à pied", { n: legs[i] }) : ""}</span>
+                  <span className="lp2-walk">{i ? t("{n} min à pied", { n: c.walk[i - 1] }) : ""}</span>
                 </li>
               ))}
             </ol>

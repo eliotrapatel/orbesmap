@@ -229,7 +229,7 @@ export default function Welcome() {
           </div>
         </section>
 
-        {/* ---------- privacy, in one line of three ---------- */}
+        {/* ---------- privacy, in one line of two ---------- */}
         <section className="lp2-sec lp2-grid lp2-trust" aria-label={t("Confiance")}>
           {TRUST.map(([title, text]) => (
             <div key={title} className="rv">
@@ -242,7 +242,7 @@ export default function Welcome() {
         {/* ---------- the account ---------- */}
         <section className="lp2-sec lp2-grid lp2-end" id="compte-sec" aria-labelledby="lp2-end-h">
           <div className="lp2-end-text rv" id="compte-top">
-            <p className="v3-lbl">{mode === "signup" ? t("Créer un compte") : t("Se connecter")}</p>
+            <p className="v3-lbl">{t("Compte")}</p>
             <h2 className="lp2-h2" id="lp2-end-h">{t("Votre prochain voyage commence ici.")}</h2>
             <p className="lp2-lead">{mode === "signup" ? t("Un e-mail, un mot de passe, et votre premier voyage se prépare. Un voyage préparé par l'IA est offert chaque mois.") : t("Content de vous revoir. Vos voyages vous attendent, sur ce téléphone comme sur un ordinateur.")}</p>
           </div>
@@ -318,10 +318,9 @@ const CHAPTERS: [string, string, string[]][] = [
   ["Sur place, tout est là", "« Aujourd'hui » montre le prochain lieu et son heure. Le programme se lit sans réseau, et ceux qui partent avec vous le suivent sur leur téléphone.", ["Aujourd'hui", "Hors ligne", "À plusieurs"]],
 ];
 
+/** Only what the chapters above do not already say */
 const TRUTHS: [string, string][] = [
-  ["Des lieux vérifiés", "Les horaires d'ouverture, les jours de fermeture et les temps de trajet sont vérifiés avant de placer un lieu. Ce qui ne rentre pas reste dans vos pistes."],
-  ["La vue « Aujourd'hui »", "Sur place, l'écran du jour : le prochain lieu, son heure, ce qu'il reste à voir. Le programme se lit même sans réseau."],
-  ["À plusieurs", "Invitez vos compagnons de voyage : chacun suit le programme sur son téléphone, en modification ou en lecture seule."],
+  ["Rien ne se perd", "Ce qui ne rentre pas dans une journée reste dans vos pistes, à voir si le temps le permet."],
   ["Les dépenses", "Chacun note ce qu'il paie, en monnaie locale et en euros. L'app calcule qui doit combien à qui."],
 ];
 
@@ -343,16 +342,15 @@ const ASIA: [string, string][] = [
 ];
 
 const FAQ: [string, string][] = [
-  ["Faut-il un mot de passe ?", "Oui, celui que vous choisissez en créant votre compte. Oublié ? « Mot de passe oublié » vous envoie un lien pour en choisir un nouveau."],
-  ["Pour quelles destinations ?", "Partout. L'IA cherche et vérifie les lieux pour la ville que vous indiquez, dans la langue du pays pour les adresses."],
-  ["Et sans réseau ?", "Votre programme et vos fiches restent sur votre téléphone : ils se lisent même sans connexion, et se synchronisent au retour du réseau."],
-  ["Qui voit mon voyage ?", "Vous seul, et les personnes que vous invitez. Vous choisissez si elles peuvent modifier ou seulement consulter."],
+  ["Faut-il un mot de passe\u00a0?", "Oui, celui que vous choisissez en créant votre compte. Oublié\u00a0? «\u00a0Mot de passe oublié\u00a0» vous envoie un lien pour en choisir un nouveau."],
+  ["Pour quelles destinations\u00a0?", "Partout. L'IA cherche et vérifie les lieux pour la ville que vous indiquez, dans la langue du pays pour les adresses."],
+  ["Et sans réseau\u00a0?", "Votre programme et vos fiches restent sur votre téléphone\u00a0: ils se lisent même sans connexion, et se synchronisent au retour du réseau."],
+  ["Qui voit mon voyage\u00a0?", "Vous seul, et les personnes que vous invitez. Vous choisissez si elles peuvent modifier ou seulement consulter."],
 ];
 
 const TRUST: [string, string][] = [
   ["Privé par défaut", "Vos voyages ne sont visibles que par vous et les personnes que vous invitez."],
   ["Sur votre téléphone", "Le programme est gardé sur l'appareil et se lit sans réseau."],
-  ["Sans carte bancaire", "Un e-mail et un mot de passe suffisent pour commencer."],
 ];
 
 // ---------------------------------------------------------------- line icons (24 grid, 1.5 stroke)

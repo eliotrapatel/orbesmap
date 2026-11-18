@@ -58,9 +58,11 @@
 .lp2-headcta { display: none; }
 @media (min-width: 700px) {
   .lp2-top-in { padding-right: max(var(--m), env(safe-area-inset-right, 0px)); }
-  .lp2-headcta { display: inline-flex; align-items: center; height: 36px; padding: 0 16px; margin-left: 8px; border-radius: 10px; background: var(--ink); color: #0a0a0a; font: 600 13px/1 var(--font); white-space: nowrap; opacity: 0; transform: translateY(-4px); pointer-events: none; transition: opacity 0.35s var(--ease), transform 0.35s var(--ease), background 0.2s; }
-  .lp2-headcta:hover { background: #fffaf2; }
-  .lp2.lp2-scrolled .lp2-headcta { opacity: 1; transform: none; pointer-events: auto; }
+  /* always there, so the header ends on the grid's edge: a hairline outline over the city, filled once the page moves */
+  .lp2-headcta { display: inline-flex; align-items: center; height: 36px; padding: 0 16px; margin-left: 8px; border-radius: 10px; border: 1px solid var(--hair-strong); background: transparent; color: var(--ink); font: 600 13px/1 var(--font); white-space: nowrap; transition: background 0.35s var(--ease), color 0.35s var(--ease), border-color 0.35s var(--ease); }
+  .lp2-headcta:hover { border-color: rgba(246, 242, 234, 0.4); background: rgba(246, 242, 234, 0.06); }
+  .lp2.lp2-scrolled .lp2-headcta { background: var(--ink); border-color: var(--ink); color: #0a0a0a; }
+  .lp2.lp2-scrolled .lp2-headcta:hover { background: #fffaf2; }
   .lp2-brand { font-size: 12.5px; }
 }
 @media (max-width: 359.98px) {
@@ -99,7 +101,7 @@
 .lp2-tm { font-size: 13px; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
 .lp2-nm { font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lp2-walk { font-size: 11.5px; color: var(--mute); white-space: nowrap; font-variant-numeric: tabular-nums; opacity: 0; transition: opacity 0.6s var(--ease); }
-.lp2-rows li.on .lp2-walk { opacity: 1; }
+.lp2-rows li.on .lp2-walk { opacity: 1; color: var(--soft); }
 /* phone and tablet: once the city is drawn, the stops speak on the map and the board keeps its caption */
 @media (max-width: 1023.98px) {
   .lp2-hero.map-on .lp2-rows, .lp2-hero.map-on .lp2-day { opacity: 0; }
@@ -119,7 +121,7 @@
 .lp2-quiet:active { transform: scale(0.98); }
 .lp2-arrow { width: 18px; height: 18px; flex: none; transition: transform 0.3s var(--ease); }
 .lp2-btn:hover .lp2-arrow { transform: translateX(3px); }
-.lp2-fine { margin-top: 16px; font-size: 12px; color: var(--mute); letter-spacing: 0.01em; }
+.lp2-fine { margin-top: 16px; font-size: 12px; color: var(--soft); letter-spacing: 0.01em; }
 
 @media (max-width: 699.98px) {
   .lp2-copy > .v3-lbl { display: none; }
@@ -127,11 +129,30 @@
 }
 @media (max-width: 359.98px) {
   .lp2-btn, .lp2-quiet { padding: 0 14px; font-size: 14.5px; }
+  /* the quiet door becomes a text link, so both stay on one line */
+  .lp2-quiet { height: 52px; padding: 0 12px; border-color: transparent; }
+  .lp2-ctas .lp2-btn { flex: 0 1 auto; }
+}
+/* short phones (375 × 667, 344 × 640): the headline, both buttons and the fine print all on the first screen */
+@media (max-width: 699.98px) and (max-height: 760px) {
+  .lp2-hero-in { padding-top: calc(var(--top) + var(--safe-t)); padding-bottom: 36px; }
+  .lp2-day { display: none; }
+  .lp2-city { margin-top: 12px; }
+  .lp2-rows { margin-top: 12px; }
+  .lp2-rows li { height: 32px; }
+  .lp2-copy { padding-top: 16px; }
+  .lp2-h1 { font-size: clamp(36px, 11vw, 48px); }
+  .lp2-sub { margin-top: 12px; font-size: 14.5px; line-height: 1.45; }
+  .lp2-ctas { margin-top: 20px; }
+  .lp2-fine { margin-top: 12px; }
 }
 
 /* the map's credits: discreet, only while the map shows */
-.lp2-attrib { position: absolute; right: max(var(--m), env(safe-area-inset-right, 0px)); bottom: 8px; display: flex; gap: 8px; font-size: 9.5px; line-height: 16px; color: var(--mute); opacity: 0; pointer-events: none; transition: opacity 1s var(--ease); }
-.lp2-attrib.on { opacity: 0.8; pointer-events: auto; }
+/* ends on the grid's edge (the content box), not the screen's; hidden for real while the map is off (no invisible
+   links under the keyboard); each link 44 px tall for a finger, the text still 9.5 px */
+.lp2-attrib { position: absolute; right: max(var(--m), env(safe-area-inset-right, 0px), calc((100% - var(--maxw)) / 2)); bottom: -6px; display: flex; gap: 8px; font-size: 9.5px; line-height: 16px; color: var(--mute); opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 1s var(--ease), visibility 0s linear 1s; }
+.lp2-attrib a { padding: 14px 0; }
+.lp2-attrib.on { opacity: 0.8; visibility: visible; pointer-events: auto; transition: opacity 1s var(--ease), visibility 0s; }
 .lp2-attrib a:hover { color: var(--soft); }
 
 /* the stops on the map (MapLibre moves the element itself: only its inner parts move here) */
@@ -144,10 +165,16 @@
 .lp2-mk span { display: inline-flex; align-items: baseline; gap: 8px; padding: 5px 8px; border-radius: 6px; background: rgba(3, 3, 3, 0.8); border: 1px solid var(--hair); font-size: 12px; line-height: 1.2; color: var(--ink); white-space: nowrap; transform: translateX(-4px); transition: transform 0.7s var(--ease); }
 .lp2-mk.on span { transform: none; }
 .lp2-mk b { font-weight: 400; color: var(--soft); font-variant-numeric: tabular-nums; }
+/* a phone: the same labels, tighter (the open band of the city is short) */
+@media (max-width: 699.98px) {
+  .lp2-mk { gap: 6px; }
+  .lp2-mk span { gap: 6px; padding: 3px 6px; font-size: 11.5px; border-radius: 5px; }
+  .lp2-mk i { width: 8px; height: 8px; }
+}
 
 /* tablet: the copy wider, the board on the left half */
 @media (min-width: 700px) {
-  .lp2-board { grid-column: 1 / 6; }
+  .lp2-board { grid-column: 1 / 8; }
   .lp2-copy { grid-column: 1 / 8; }
   .lp2-h1 { font-size: clamp(56px, 8vw, 72px); }
   .lp2-sub { font-size: 17px; max-width: 40ch; }
@@ -169,7 +196,10 @@
   .lp2-sub { margin-top: 24px; font-size: 18px; max-width: 34ch; }
   .lp2-ctas { margin-top: 32px; }
   .lp2-city .v3-d { font-size: 26px; }
-  .lp2-attrib { bottom: 12px; }
+  .lp2-attrib { bottom: -2px; }
+}
+@media (min-width: 1024px) and (max-width: 1279.98px) {
+  .lp2-copy { grid-column: 1 / 8; }
 }
 
 /* ---------- sections ---------- */
@@ -184,12 +214,16 @@
 .lp2-chapters { list-style: none; margin-top: 48px; }
 .lp2-chapter { display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); column-gap: var(--gap); align-items: baseline; padding: 24px 0 32px; border-top: 1px solid var(--hair); }
 .lp2-chapter:last-child { border-bottom: 1px solid var(--hair); }
-.lp2-num { grid-column: 1; font: 300 40px/1 var(--font); letter-spacing: -0.03em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.lp2-num { grid-column: 1; font: 500 36px/1 var(--display); letter-spacing: 0.02em; color: var(--ink); font-variant-numeric: tabular-nums; }
 .lp2-h3 { grid-column: 2 / -1; font: 500 22px/1 var(--display); text-transform: uppercase; text-wrap: balance; }
 .lp2-chapter-body { grid-column: 2 / -1; margin-top: 16px; }
 .lp2-chapter-body > p { font-size: 15px; line-height: 1.55; color: var(--soft); max-width: 46ch; }
 .lp2-facts { list-style: none; display: flex; flex-wrap: wrap; margin-top: 16px; font-size: 11px; line-height: 20px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink); }
-.lp2-facts li:not(:last-child)::after { content: "/"; margin: 0 10px; color: var(--mute); }
+/* each fact keeps its separator in front; the list starts 20 px early and that strip is clipped, so a separator that
+   lands at the start of a line is never seen (no "/" left hanging at either end of a line) */
+.lp2-facts { margin-left: -20px; clip-path: inset(0 0 0 20px); }
+.lp2-facts li { position: relative; padding-left: 20px; white-space: nowrap; }
+.lp2-facts li::before { content: "/"; position: absolute; left: 0; width: 20px; text-align: center; color: var(--mute); }
 
 /* what changes everything: four truths, then the pocket index */
 .lp2-truths { display: grid; grid-template-columns: minmax(0, 1fr); margin-top: 48px; }
@@ -223,7 +257,7 @@
 .lp2-plans-group + .lp2-plan, .lp2-g-free ~ .lp2-plan:not(.pro) { border-top: 0; }
 .lp2-plan-name { grid-column: 1; grid-row: 1; align-self: baseline; font-weight: 500; font-size: 15px; }
 .lp2-plan-price { grid-column: 2; grid-row: 1; align-self: baseline; text-align: right; font: 300 28px/1 var(--font); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.lp2-plan-unit { grid-column: 2; grid-row: 2; text-align: right; margin-top: 6px; font-size: 12px; color: var(--mute); white-space: nowrap; }
+.lp2-plan-unit { grid-column: 2; grid-row: 2; text-align: right; margin-top: 6px; font-size: 12px; color: var(--soft); white-space: nowrap; }
 .lp2-plan-line { grid-column: 1; grid-row: 2 / span 2; margin-top: 6px; font-size: 13.5px; line-height: 1.5; color: var(--soft); max-width: 40ch; }
 .lp2-plan.pro .lp2-plan-name { color: var(--ink); }
 
@@ -243,12 +277,13 @@
 .lp2-trust span { display: block; margin-top: 4px; font-size: 13.5px; line-height: 1.5; color: var(--soft); }
 
 /* the account */
-.lp2-end { row-gap: 32px; align-items: center; }
+.lp2-end { row-gap: 32px; align-items: start; }
 .lp2-end-text { scroll-margin-top: calc(var(--top) + 24px); }
 .lp2-end-box { scroll-margin: calc(var(--top) + 24px); }
 .lp2 .auth-box { background: #0a0a0a; -webkit-backdrop-filter: none; backdrop-filter: none; border-radius: 18px; padding: 16px; }
 .lp2 .auth-box .v3-field, .lp2 .auth-box .v3-btn, .lp2 .auth-tabs { border-radius: var(--r); }
 .lp2 .auth-tabs button, .lp2 .auth-ink { border-radius: 9px; }
+.lp2 .auth-box .auth-fine { text-align: left; }
 
 /* footer */
 .lp2-foot { margin-top: 120px; padding-top: 24px; padding-bottom: 24px; border-top: 1px solid var(--hair); row-gap: 16px; align-items: center; color: var(--mute); font-size: 12.5px; }
@@ -271,12 +306,11 @@
   .lp2-sec { padding-top: 128px; }
   .lp2-h2 { font-size: 48px; }
   .lp2-lead { font-size: 16.5px; }
-  .lp2-num { font-size: 56px; }
+  .lp2-num { font-size: 48px; }
   .lp2-h3 { font-size: 26px; }
   .lp2-truths { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--gap); }
   .lp2-pocket ul { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--gap); }
   .lp2-trust > div { grid-column: span 4; }
-  .lp2-trust > div:last-child { grid-column: 1 / span 4; }
 
   /* the plans as a table: one column each, rows shared (subgrid) so names, figures, units and lines align */
   .lp2-plans { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: auto repeat(4, auto); column-gap: var(--gap); }
@@ -306,14 +340,14 @@
 
   .lp2-chapters { margin-top: 64px; }
   .lp2-chapter { padding: 32px 0 40px; }
-  .lp2-chapter > .lp2-num { grid-column: 1 / 3; font-size: 72px; }
+  .lp2-chapter > .lp2-num { grid-column: 1 / 3; font-size: 64px; }
   .lp2-chapter > .lp2-h3 { grid-column: 3 / 7; font-size: 30px; padding-right: 24px; }
   .lp2-chapter > .lp2-chapter-body { grid-column: 8 / 13; grid-row: 1; margin-top: 0; }
   .lp2-chapter-body > p { font-size: 16px; }
 
-  .lp2-truths { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 64px; }
+  .lp2-truths { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 64px; }
   .lp2-truths > div { padding: 24px 0 0; }
-  .lp2-truths dt { font-size: 20px; min-height: 2.1em; }
+  .lp2-truths dt { font-size: 22px; }
   .lp2-pocket { grid-column: 1 / -1; margin-top: 96px; }
   .lp2-pocket ul { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 24px; }
   .lp2-pocket li { padding: 20px 0 24px; }
@@ -332,7 +366,7 @@
   .lp2-qa > .lp2-head { grid-column: 1 / 6; }
 
   .lp2-trust { padding-top: 128px; }
-  .lp2-trust > div, .lp2-trust > div:last-child { grid-column: span 4; }
+  .lp2-trust > div { grid-column: span 6; }
 
   .lp2-end-text { grid-column: 1 / 7; }
   .lp2-end-box { grid-column: 8 / 13; }
