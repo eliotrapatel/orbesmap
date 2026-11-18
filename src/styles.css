@@ -690,6 +690,7 @@ a { color: inherit; text-decoration: none; }
 .off-card h4 { display: flex; align-items: center; gap: 8px; }
 .off-card p { font-size: 13.5px; margin-top: 6px; line-height: 1.45; }
 .off-card .bar { margin-top: 10px; }
+.acct-sec { margin: 22px 2px 10px; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--mute); font-weight: 500; }
 .off-state { margin-left: auto; height: 22px; padding: 0 8px; border-radius: 7px; display: inline-flex; align-items: center; font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--soft); background: rgba(246, 242, 234, 0.07); }
 .off-state.on { color: var(--ok); background: rgba(127, 209, 185, 0.12); }
 .off-state.warn { color: var(--gold); background: rgba(216, 196, 126, 0.12); }

@@ -4,7 +4,7 @@ import type { Trip } from "../data/types";
 import { clock, phase } from "../lib/time";
 import { useWeather } from "../lib/weather";
 import { useSyncState } from "./Account";
-import { ICal, IChat, IChevron, IDownload, IGrid, IInfo, IPlane, ISearch, IUser, ICheck, ITranslate, IChecklist, ISos, IAsk } from "./Icons";
+import { ICal, IChevron, IGrid, IInfo, IPlane, ISearch, IUser, ICheck, ITranslate, IChecklist, ISos, IAsk } from "./Icons";
 import { WxIcon } from "./WxIcon";
 import { useChecklist } from "./Checklist";
 import { useStore, useTrips, useCanEdit } from "../lib/store";
@@ -20,18 +20,19 @@ export type ToolKey = "overview" | "agenda" | "ask" | "translate" | "phrases" | 
 export const TOOLS: { key: ToolKey; label: string; icon: React.ReactElement; wide?: boolean }[] = [
   { key: "overview", label: "Aperçu", icon: <IGrid />, wide: true },
   { key: "agenda", label: "Agenda", icon: <ICal /> },
-  { key: "ask", label: "Demander", icon: <IAsk /> },
+  { key: "ask", label: "Concierge", icon: <IAsk /> },
   { key: "translate", label: "Traduire", icon: <ITranslate /> },
   { key: "emergency", label: "Urgence", icon: <ISos /> },
-  { key: "phrases", label: "Phrases", icon: <IChat /> },
   { key: "converter", label: "Devises", icon: <span style={{ fontWeight: 600, fontSize: 15, lineHeight: 1 }}>¥</span> },
   { key: "expenses", label: "Dépenses", icon: <span style={{ fontWeight: 600, fontSize: 15, lineHeight: 1 }}>€</span> },
   { key: "checklist", label: "Check-list", icon: <IChecklist /> },
   { key: "flights", label: "Vols", icon: <IPlane /> },
   { key: "practical", label: "Infos", icon: <IInfo /> },
-  { key: "export", label: "Export", icon: <IDownload /> },
   { key: "account", label: "Compte", icon: <IUser /> },
 ];
+
+/** The tools shown for a trip: "Infos" only when the trip has practical information */
+export const toolsFor = (trip: Trip) => TOOLS.filter((tl) => tl.key !== "practical" || !!trip.practical?.length);
 
 function useNow(ms = 30_000) {
   const [now, setNow] = useState(() => new Date());
@@ -168,14 +169,14 @@ export default function TopBar({ trip, tool, onTool, onSearch, onTrip, onHome }:
             <span className="label">{trip.code}</span>
             <IChevron />
           </button>
-          <SyncPill onOpen={() => onTool("account")} onOffline={() => onTool("practical")} />
+          <SyncPill onOpen={() => onTool("account")} onOffline={() => onTool("account")} />
         </div>
         <button className="tb-search" onClick={onSearch} aria-label={t("Rechercher")}>
           <ISearch />
           <span>{t("Rechercher un lieu, une phrase, une action…")}</span>
           <span className="kbd">{isMac ? "⌘K" : "Ctrl K"}</span>
         </button>
-        <nav className="tb-tools" aria-label={t("Outils")}>{TOOLS.map((tl) => toolBtn(tl))}</nav>
+        <nav className="tb-tools" aria-label={t("Outils")}>{toolsFor(trip).map((tl) => toolBtn(tl))}</nav>
         <div className="tb-meta" aria-label={t("Heure à {city} et à Paris", { city: trip.title })}>
           <span>
             {trip.title} <b>{clock(trip.timezone, now)}</b>
@@ -191,7 +192,7 @@ export default function TopBar({ trip, tool, onTool, onSearch, onTrip, onHome }:
           )}
         </div>
       </header>
-      <nav className="m-tools glass" aria-label={t("Outils")}>{TOOLS.map((tl) => toolBtn(tl, true))}</nav>
+      <nav className="m-tools glass" aria-label={t("Outils")}>{toolsFor(trip).map((tl) => toolBtn(tl, true))}</nav>
       {menu && (
         <TripMenu
           trip={trip}

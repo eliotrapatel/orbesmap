@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { sendLoginEmail, signInWithPassword, signOutChecked, useStore, useTrip, verifyLoginCode, type SyncState } from "../lib/store";
-import { OfflineCard } from "./Tools";
+import { ExportPanel, OfflineCard } from "./Tools";
 import { supabaseConfigured } from "../lib/supabase";
 import AiCredit from "./AiCredit";
 import AccountActions from "./v3/AccountActions";
@@ -68,15 +68,13 @@ export default function Account() {
           {admin && <AiCredit />}
           <InboundInbox />
           <AccountActions variant="app" />
-          <button
-            className="btn danger block"
-            style={{ marginTop: 16 }}
-            onClick={() => void signOutChecked()}
-          >
-            {t("Se déconnecter")}
-          </button>
         </div>
         <div style={{ marginTop: 12 }}><OfflineCard trip={trip} /></div>
+        <h4 className="acct-sec">{t("Exports")}</h4>
+        <ExportPanel trip={trip} />
+        <button className="btn danger block" style={{ marginTop: 22 }} onClick={() => void signOutChecked()}>
+          {t("Se déconnecter")}
+        </button>
       </div>
     );
   }

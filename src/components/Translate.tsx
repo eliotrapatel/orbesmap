@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import type { Trip } from "../data/types";
 import { ai, AiError, imageToBase64, type InterpretResult, type PhotoResult } from "../lib/ai";
 import { addContact, toast, useStore, useTrip } from "../lib/store";
-import { ICamera, ICopy, IExpand, ISpeaker } from "./Icons";
+import { IChat, ICamera, ICopy, IExpand, ISpeaker } from "./Icons";
+import { Phrases } from "./Tools";
 import { ShowScreen, copy, localSpeech, speak } from "./ui";
 import { locale, t, getLang } from "../lib/i18n";
 
@@ -46,14 +47,15 @@ const readHist = (): Saved[] => {
 };
 
 export default function Translate({ trip }: { trip: Trip }) {
-  const [tab, setTab] = useState<"photo" | "talk">("photo");
+  const [tab, setTab] = useState<"photo" | "talk" | "phrases">("photo");
   return (
     <div>
       <div className="seg tr-tabs" role="tablist">
         <button role="tab" aria-selected={tab === "photo"} className={tab === "photo" ? "on" : ""} style={{ ["--c" as string]: "var(--ink)" }} onClick={() => setTab("photo")}><ICamera /> {t("Photo")}</button>
         <button role="tab" aria-selected={tab === "talk"} className={tab === "talk" ? "on" : ""} style={{ ["--c" as string]: "var(--ink)" }} onClick={() => setTab("talk")}><ISpeaker /> {t("Conversation")}</button>
+        {trip.phrases.length > 0 && <button role="tab" aria-selected={tab === "phrases"} className={tab === "phrases" ? "on" : ""} style={{ ["--c" as string]: "var(--ink)" }} onClick={() => setTab("phrases")}><IChat /> {t("Phrases")}</button>}
       </div>
-      {tab === "photo" ? <PhotoTab trip={trip} /> : <TalkTab />}
+      {tab === "photo" ? <PhotoTab trip={trip} /> : tab === "talk" ? <TalkTab /> : <Phrases trip={trip} />}
     </div>
   );
 }

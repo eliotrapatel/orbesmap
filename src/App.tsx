@@ -4,7 +4,7 @@ import Account from "./components/Account";
 import Agenda from "./components/Agenda";
 import CommandPalette from "./components/CommandPalette";
 import DayBar from "./components/DayBar";
-import { ICube, ILink, ILocate, IPinPlus } from "./components/Icons";
+import { ICube, ILocate, IPinPlus, IPlus } from "./components/Icons";
 import AddPlace, { type Found } from "./components/AddPlace";
 import { placeSearch } from "./lib/placeSearch";
 import Expenses from "./components/Expenses";
@@ -632,7 +632,7 @@ export default function App() {
                     <IPinPlus />
                   </button>
                   <button className="ctl" onClick={() => !needPro() && setAddLink(true)} aria-label={t("Ajouter un lieu : lien, nom ou description")} title={t("Ajouter un lieu (lien, nom ou description)")}>
-                    <ILink />
+                    <IPlus />
                   </button>
                 </>
               )}
