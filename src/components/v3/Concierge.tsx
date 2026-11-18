@@ -7,6 +7,8 @@ import Shell from "./Shell";
 import { clearWizardDraft, CONCIERGE_KEY, createTripFromWizard, lastWay, LinkTile, linkCard, rememberWay, URL_RE, useKeyboardFit, useOnline, WIZARD_KEY, wizardDraft, wizHasContent, type Wiz } from "./CreateWizard";
 import { INTERESTS, PACES, TRAVEL } from "./Onboarding";
 import { CcArrow, CcBed, CcBell, CcCal, CcCheck, CcClip, CcClock, CcClose, CcImg, CcMic, CcPeople, CcPin, CcPlane, CcPlus, CcRefresh, CcSend, CcSpark, ConciergeOrbit } from "./ConciergeIcons";
+import { QuotaNote } from "./Quota";
+import type { Prefill } from "./CreateOptions";
 import "../../styles/concierge.css";
 import "../../styles/creation.css";
 
@@ -128,6 +130,7 @@ export function CreateChooser({ onPick, onCancel }: { onPick: (k: "concierge" | 
       <p className="v3-lbl" style={{ marginTop: 18 }}>{t("Créer un voyage")}</p>
       <h1 className="v3-d v3-h2">{t("Comment préférez-vous ?")}</h1>
       <p className="ch-lead">{t("Les deux mènent au même voyage préparé. Vous pouvez passer du concierge au formulaire à tout moment, sans rien perdre.")}</p>
+      <QuotaNote />
       <div className={"ch-grid" + (resume ? " resume" : "")}>
         {formFirst ? [formCard, concierge] : [concierge, formCard]}
       </div>
@@ -477,7 +480,9 @@ function daysOf(start: string, end: string): string[] {
 type Quick = { label: string; on?: boolean; act: () => void };
 
 /** Creating a trip by talking: the concierge understands each answer, turns it into cards and asks what is missing */
-export default function Concierge({ onCancel, onCreated, onForm }: { onCancel: () => void; onCreated: (id: string) => void; onForm: () => void }) {
+/** `onQuota`: the AI trip of the month is used when the preparation is launched: the creation options open with what
+ *  the conversation knows (without it, the Pro screen, as before); the conversation stays saved */
+export default function Concierge({ onCancel, onCreated, onForm, onQuota }: { onCancel: () => void; onCreated: (id: string) => void; onForm: () => void; onQuota?: (prefill: Prefill) => void }) {
   const name = useStore((s) => (s.profile.name as string) || "");
   const plan = useStore((s) => s.plan);
   const [state, setState] = useState<Saved>(() => load() || {
@@ -675,7 +680,7 @@ export default function Concierge({ onCancel, onCreated, onForm }: { onCancel: (
   const launch = async () => {
     if (!canLaunch || launching) return;
     const p = getState().plan;
-    if (p && !p.pro && p.prepLeft <= 0) return requestPro("prep");
+    if (p && !p.pro && p.prepLeft <= 0) return onQuota ? onQuota({ dest: f.cities[0], start: f.start, end: f.end, hotel: f.hotel?.name || "" }) : requestPro("prep");
     setRecap(false);
     setLaunching(true);
     try {

@@ -14,6 +14,7 @@ import { PeakSlot } from "./ui/PeakCard";
 import { adminChannels, adminCohorts, adminUserSources, pct, span, type CohortPeriod, type Cohorts, type Channels, type UserSources } from "../../lib/measure";
 import { CHANNELS } from "../../lib/source";
 import "../../styles/measure.css";
+import { AdminAiBudget, AdminTripPass } from "./AdminTripPass";
 
 type Tab = "figures" | "profiles" | "accounts" | "codes" | "waitlist";
 const TABS: [Tab, string][] = [["figures", "Chiffres"], ["profiles", "Profils"], ["accounts", "Comptes"], ["codes", "Codes"], ["waitlist", "Attente"]];
@@ -147,6 +148,7 @@ function Figures() {
       <CohortView />
       <SourcesView />
       <AiBySteps />
+      <AdminAiBudget />
     </>
   );
 }
@@ -431,6 +433,7 @@ function AccountSheet({ row, onClose }: { row: AccountRow; onClose: () => void }
                   <div className="v3-grow adm-main">
                     <b>{tr.title || t("Sans titre")}</b>
                     <small>{tr.dates || ""} · {tr.role === "owner" ? t("créé") : tr.role === "editor" ? t("invité (modifie)") : t("invité (lecture)")} {day(tr.created_at)} · {tr.places > 1 ? t("{n} lieux", { n: tr.places }) : t("{n} lieu", { n: tr.places })} · {tr.status === "done" ? t("validé") : tr.status === "review" ? t("en revue") : tr.status === "preparing" ? t("en préparation") : t("sans préparation")}</small>
+                    <AdminTripPass tripId={tr.id} />
                   </div>
                 </div>
               ))}

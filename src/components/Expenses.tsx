@@ -6,7 +6,7 @@ import {
 } from "../lib/business";
 import { exportExpenseCsv, exportExpenseReport, payersOf, reportLines } from "../lib/expenseReport";
 import { locale, t } from "../lib/i18n";
-import { addPhoto, deletePhoto, getState, hasPro, photoSrc, requestPro, toast, useCanEdit, useStore } from "../lib/store";
+import { addPhoto, deletePhoto, getState, photoSrc, requestPro, toast, tripHasPro, useCanEdit, useStore } from "../lib/store";
 import { localDate } from "../lib/time";
 import { track } from "../lib/track";
 import { dateLabel } from "../lib/newTrip";
@@ -86,7 +86,7 @@ export default function Expenses({ trip }: { trip: Trip }) {
       </div>
 
       {business && (
-        <button className="btn block exp-report-btn" onClick={() => { if (!hasPro()) return requestPro("business"); setReport(true); }}>
+        <button className="btn block exp-report-btn" onClick={() => { if (!tripHasPro(trip.id)) return requestPro("business"); setReport(true); }}>
           <IDownload /> {t("Note de frais")}
         </button>
       )}

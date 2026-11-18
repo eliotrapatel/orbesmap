@@ -1,0 +1,59 @@
+/* =================== the free plan and Pro per trip (lot "gratuit-pro", Nov 2026) ===================
+   The AI trip of the month under "Créer un voyage", the creation options once it is used, the Pass line in a trip,
+   the Pro screen's "Pro sur ce voyage" and account buttons, the admin's Pass. Pro is blue (--pro tokens). */
+
+/* "1 voyage préparé par l'IA offert ce mois-ci" / "… utilisé · revient le …": a quiet line under the button */
+.qn-note { margin: 10px 0 0; font-size: 12.5px; line-height: 1.4; color: var(--mute); text-align: center; }
+.qn-note.used { color: var(--soft); }
+.hx-empty .qn-note, .v3-hero-next .qn-note { text-align: left; }
+
+/* the creation options: one column on a phone, three side by side on a computer */
+.co-opts .co-quota { text-align: left; margin-top: 10px; }
+.co-grid { display: flex; flex-direction: column; margin-top: 4px; }
+.co-card { gap: 10px; min-height: 0; }
+.co-card .ch-name { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.co-card .ch-name .v3-tag { font-family: var(--font); height: 19px; font-size: 9.5px; }
+.co-card .ch-name .pro-tag { flex: none; }
+.co-copy { cursor: default; }
+.co-copy:active { transform: none; }
+.co-copy .ch-t { padding-right: 0; }
+.co-copy .v3-field { min-height: 48px; }
+.co-copy .v3-field input { height: 46px; }
+.co-copy .v3-err { margin: 0; }
+.co-open { align-self: flex-start; height: 40px; }
+.co-open:disabled { opacity: 0.4; }
+@media (min-width: 900px) {
+  .co-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
+  .co-card { margin-top: 14px; }
+}
+
+/* in a trip's Infos tab: its Pass, or "Compléter avec l'IA" on a trip created by hand */
+.tp-line { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 16px; border-color: color-mix(in srgb, var(--pro, #2f6bff) 38%, transparent); }
+.tp-line > p { margin: 0; flex: 1; min-width: 0; font-size: 13.5px; color: var(--ink); }
+.tp-manual { border-color: var(--hair); }
+.tp-manual > p { color: var(--soft); }
+.tp-ai { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px; font-size: 13px; color: var(--ink); }
+
+/* the Pro screen: this trip's Pro, and the account buttons when signed out */
+.pm-trip { display: flex; align-items: flex-start; gap: 10px; margin: 14px 0 0; padding: 12px 14px; border-radius: 14px; background: var(--pro-soft, rgba(47, 107, 255, 0.14)); font-size: 13px; line-height: 1.45; color: var(--soft); }
+.pm-trip .pro-tag { margin-top: 1px; flex: none; }
+.pm-trip b { font-weight: 600; color: var(--pro-ink, #8fb0ff); }
+.pm-auth { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.pm-auth .v3-btn { height: 48px; font-size: 14.5px; }
+@media (max-width: 359px) {
+  .pm-auth { grid-template-columns: 1fr; }
+}
+
+/* the admin: a trip's Pass, the AI by plan */
+.atp-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+.atp-line small { color: var(--soft); font-size: 12px; }
+.atp-off { color: var(--mute) !important; }
+.atp-btn { height: 32px; padding: 0 12px; font-size: 12.5px; }
+.atp-btn.sure { color: var(--ink); border-color: var(--pro, #2f6bff); }
+.atp-err { flex-basis: 100%; margin: 0; }
+/* each row is its own grid: the number columns get fixed widths so the headers and the rows stay aligned at every
+   width; on a narrow phone they scroll sideways, as the admin's other tables (the e-mail keeps room to be read) */
+.adm-tr.atp-tr { grid-template-columns: minmax(150px, 1fr) 80px 72px; min-width: 314px; }
+.adm-tr.atp-tr4 { grid-template-columns: minmax(96px, 1fr) 72px 80px 72px 64px; min-width: 408px; }
+.adm-tr.atp-tr > span:not(:first-child), .adm-tr.atp-tr4 > span:not(:first-child) { white-space: nowrap; }
+.atp-mail { overflow-wrap: anywhere; }

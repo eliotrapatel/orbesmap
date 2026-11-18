@@ -99,7 +99,8 @@ type DayPlace = {
   type: string; start: string; end: string; desc: string; why: string; tip: string; metro: string; website: string; source: string; fixed: boolean; confidence: string;
 };
 type DayResult = { theme: string; places: DayPlace[] };
-type Booking = { id: number; task: string };
+/** `cheap`: booked above the free monthly budget (the cheaper provider answers, as in api/ai.ts) */
+type Booking = { id: number; task: string; cheap?: boolean };
 /** What only the server keeps for a preparation (never in the trip's record) */
 export type Scratch = {
   run: string;
@@ -160,11 +161,11 @@ export type Db = {
   /** one step of the account's path (supabase/saas-5.sql events: prep_started, prep_ready, prep_failed) */
   event?(userId: string, name: string, detail: string | null, tripId: string): Promise<void>;
 };
-export type BookResult = { id: number } | { refused: "cap" | "pro" | "prep" | "auth" | "error" };
+export type BookResult = { id: number; cheap?: boolean } | { refused: "cap" | "pro" | "prep" | "auth" | "error" };
 export type Deps = {
   db: Db;
   /** the AI (runTask of api/ai.ts) */
-  ai: (task: "outline" | "essentials" | "day", body: Json) => Promise<TaskRun>;
+  ai: (task: "outline" | "essentials" | "day", body: Json, opts?: { cheap?: boolean }) => Promise<TaskRun>;
   /** books one AI request with the traveller's own session (rpc reserve_ai) */
   reserve: (token: string, task: string, tripId: string) => Promise<BookResult>;
   /** the account of a session, null when it is not valid */
@@ -664,7 +665,7 @@ async function unit(deps: Deps, tripId: string, s: Scratch, c: Claim, t0: number
     s.inflight = b.id;
     await mustSave(deps, tripId, s);
     try {
-      out = await deps.ai(task as "outline", payload);
+      out = await deps.ai(task as "outline", payload, b.cheap ? { cheap: true } : undefined);
     } catch (e) {
       const f = e instanceof TaskFailure ? e : new TaskFailure("upstream", { hit: 0, miss: 0, out: 0, search: 0, fetch: 0, usd: 0 }, "", "", 0);
       s.inflight = null;
@@ -1219,8 +1220,9 @@ export async function handle(req: Request, depsIn?: Deps): Promise<Response> {
     }
     const b = await deps.reserve(token, task, tripId).catch(() => ({ refused: "error" as const }));
     if ("id" in b) {
-      booked.push({ id: b.id, task });
-      newly.push({ id: b.id, task });
+      const one: Booking = b.cheap === true ? { id: b.id, task, cheap: true } : { id: b.id, task };
+      booked.push(one);
+      newly.push(one);
       continue;
     }
     const why = refusalOf(b.refused);
@@ -1481,7 +1483,7 @@ function realDeps(): Deps | null {
   const from = process.env.MAIL_FROM || "ORBES Trips <trips@auth.theorbes.com>";
   return {
     db: restDb(key, f),
-    ai: (task, body) => runTask(task, body, { deadlineMs: AI_DEADLINE }),
+    ai: (task, body, o) => runTask(task, body, { deadlineMs: AI_DEADLINE, cheap: o?.cheap === true }),
     reserve: (token, task, tripId) => reserve(token, task, tripId, f),
     async verify(token) {
       const r = await f(`${SUPA_URL}/auth/v1/user`, { headers: { apikey: SUPA_KEY, authorization: `Bearer ${token}` } });

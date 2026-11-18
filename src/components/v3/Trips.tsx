@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Trip } from "../../data/types";
-import { createTrip, getState, requestPro, switchTrip, useStore, useTrips } from "../../lib/store";
+import { createTrip, getState, switchTrip, useStore, useTrips } from "../../lib/store";
 import { dateLabel, dayCount, newTripRecord, searchCities, type Destination } from "../../lib/newTrip";
 import { daysLeft, phase } from "../../lib/time";
 import { coordText, recapDue } from "../../lib/recap";
@@ -13,6 +13,8 @@ import Shell, { Steps } from "./Shell";
 import CreateWizard from "./CreateWizard";
 import Concierge, { CreateChooser } from "./Concierge";
 import { track } from "../../lib/track";
+import CreateOptions, { type Prefill } from "./CreateOptions";
+import { QuotaNote } from "./Quota";
 import AccountScreen from "./AccountScreen";
 import { SyncBadge } from "../Account";
 import { IClose } from "../Icons";
@@ -28,17 +30,23 @@ export default function Trips({ onOpen, onClose }: { onOpen: (id: string) => voi
   const trips = useTrips();
   const profile = useStore((s) => s.profile);
   const email = useStore((s) => s.session?.user.email) || "";
-  const [creating, setCreatingRaw] = useState<false | "choose" | "form" | "concierge">(false);
+  const [creating, setCreatingRaw] = useState<false | "choose" | "form" | "concierge" | "options">(false);
+  // what the concierge already knew when the AI trip of the month turned out to be used (the options screen)
+  const [prefill, setPrefill] = useState<Prefill | undefined>(undefined);
   const [menu, setMenu] = useState(false);
   const avatar = useRef<HTMLButtonElement>(null);
   const pro = useStore((s) => !!s.plan?.pro);
-  // a free account prepares one trip per month with the AI: the next one asks for Pro
+  // a free account prepares one trip per month with the AI: once it is used, the options (AI with Pro, by hand, a copy)
   const setCreating = (v: boolean) => {
     const p = getState().plan;
-    const quota = !!(v && p && !p.pro && p.prepLeft <= 0);
-    // the intention to create, counted before the quota (« quota »: the Pro screen opened instead)
-    if (v) track("create_started", quota ? "quota" : null);
-    if (quota) return requestPro("prep");
+    if (v && p && !p.pro && p.prepLeft <= 0) {
+      // the intention to create, counted before the quota (« quota »: the options open instead of the AI)
+      track("create_started", "quota");
+      track("tool_opened", "create_options");
+      setPrefill(undefined);
+      return setCreatingRaw("options");
+    }
+    if (v) track("create_started", null);
     setCreatingRaw(v ? "choose" : false);
   };
   const name = (profile.name as string) || "";
@@ -66,7 +74,8 @@ export default function Trips({ onOpen, onClose }: { onOpen: (id: string) => voi
   }, [coverlessKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (creating === "choose") return <CreateChooser onCancel={() => setCreating(false)} onPick={(k) => { track("tool_opened", `create_${k}`); setCreatingRaw(k); }} />;
-  if (creating === "concierge") return <Concierge onCancel={() => setCreating(false)} onForm={() => setCreatingRaw("form")} onCreated={(id) => { setCreating(false); onOpen(id); }} />;
+  if (creating === "options") return <CreateOptions prefill={prefill} onCancel={() => setCreating(false)} onCreated={(id) => { setCreating(false); onOpen(id); }} />;
+  if (creating === "concierge") return <Concierge onCancel={() => setCreating(false)} onForm={() => setCreatingRaw("form")} onCreated={(id) => { setCreating(false); onOpen(id); }} onQuota={(pf) => { track("tool_opened", "create_options"); setPrefill(pf); setCreatingRaw("options"); }} />;
   if (creating) return <CreateWizard onCancel={() => setCreating(false)} onCreated={(id) => { setCreating(false); onOpen(id); }} />;
 
   const top = (
@@ -97,6 +106,7 @@ export default function Trips({ onOpen, onClose }: { onOpen: (id: string) => voi
           <h1 className="v3-d hx-empty-h">{t("Votre premier voyage commence\u00a0ici.")}</h1>
           <p className="v3-lead">{t("Une destination et des dates suffisent. Le reste se construit avec vous.")}</p>
           <button className="v3-btn" onClick={() => setCreating(true)}>{t("＋ Créer un voyage")}</button>
+          <QuotaNote />
         </div>
         <div className="v3-spacer" />
       </Shell>
@@ -115,6 +125,7 @@ export default function Trips({ onOpen, onClose }: { onOpen: (id: string) => voi
           <h2 className="v3-d">{t("Où allez-vous ensuite ?")}</h2>
           <p className="v3-lead">{t("Une destination et des dates suffisent. Le reste se construit avec vous.")}</p>
           <button className="v3-btn" onClick={() => setCreating(true)}>{t("＋ Créer un voyage")}</button>
+          <QuotaNote />
         </section>
       )}
       {others.length > 0 && (
@@ -124,6 +135,7 @@ export default function Trips({ onOpen, onClose }: { onOpen: (id: string) => voi
         </>
       )}
       {!between && <button className="v3-btn ghost" style={{ marginTop: 18 }} onClick={() => setCreating(true)}>{t("＋ Créer un voyage")}</button>}
+      {!between && <QuotaNote />}
       <div style={{ height: 24 }} />
     </Shell>
   );
@@ -182,16 +194,17 @@ function TripCard({ t: trip, onOpen }: { t: Trip; onOpen: (id: string) => void }
   );
 }
 
-/** Creating a trip: where, then when (+ the hotel if known). The AI preparation comes with the next steps. */
-export function CreateTrip({ onCancel, onCreated }: { onCancel: () => void; onCreated: (id: string) => void }) {
-  const [step, setStep] = useState(1);
-  const [q, setQ] = useState("");
-  const [results, setResults] = useState<Destination[]>([]);
+/** Creating a trip by hand: where, then when (+ the hotel if known); no AI preparation, the trip stays editable.
+ *  `initial`: what is already known (a city given starts on the dates). */
+export function CreateTrip({ onCancel, onCreated, initial }: { onCancel: () => void; onCreated: (id: string) => void; initial?: Prefill }) {
+  const [step, setStep] = useState(initial?.dest ? 2 : 1);
+  const [q, setQ] = useState(initial?.dest?.name || "");
+  const [results, setResults] = useState<Destination[]>(initial?.dest ? [initial.dest] : []);
   const [searching, setSearching] = useState(false);
-  const [dest, setDest] = useState<Destination | null>(null);
-  const [start, setStart] = useState("");
-  const [end, setEnd] = useState("");
-  const [hotel, setHotel] = useState("");
+  const [dest, setDest] = useState<Destination | null>(initial?.dest || null);
+  const [start, setStart] = useState(initial?.start || "");
+  const [end, setEnd] = useState(initial?.end && initial.end >= (initial.start || "") ? initial.end : initial?.start || "");
+  const [hotel, setHotel] = useState(initial?.hotel || "");
   const ctl = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -272,6 +285,7 @@ export function CreateTrip({ onCancel, onCreated }: { onCancel: () => void; onCr
         onClick={() => {
           if (!dest || !n) return;
           const id = createTrip(newTripRecord({ dest, start, end, hotel }));
+          track("trip_created", "manual", id);
           switchTrip(id);
           onCreated(id);
         }}

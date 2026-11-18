@@ -389,3 +389,6 @@
   .ch-grid.resume .ch-way:first-child .ch-preview > * { flex: none; }
   .ch-grid.resume .ch-way:nth-child(2) .ch-card { gap: 8px; }
 }
+/* before « Valider le voyage », a free account reads what validating changes */
+.dr-foot p.dr-lock { max-width: 46ch; margin: 0 auto; line-height: 1.45; color: var(--soft); }
+.dr-lock .pro-tag { margin-right: 6px; }

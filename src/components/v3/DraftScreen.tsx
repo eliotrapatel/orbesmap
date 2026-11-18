@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSPro
 import { addWish, adjustProgramme, confirmTrip, draftOf, prepare, prepareAgain, preparedElsewhere, regenerateDay, reviewNow, serverBusy, serverStarting, stopPrepare, useDraftRun, watchServer } from "../../lib/draft";
 import { AiError } from "../../lib/ai";
 import { parseTime } from "../../lib/time";
-import { useStore, useTrip } from "../../lib/store";
+import { useStore, useTrip, useTripHasPro } from "../../lib/store";
 import { TYPE_LABEL } from "../../data/trip";
 import Shell from "./Shell";
 import InviteTravellers from "./InviteTravellers";
@@ -369,6 +369,10 @@ function Review({ onClose }: { onClose: () => void }) {
     return k && days.some((x) => x.key === k) ? k : days[0]?.key || "";
   });
   const redo = useRedoing(trip.id);
+  // a free account (plan known, the trip not Pro): what validating changes, said before it (the rule itself is unchanged)
+  const freePlan = useStore((s) => !!s.plan && !s.plan.pro);
+  const tripPro = useTripHasPro(trip.id);
+  const lockAhead = freePlan && !tripPro;
   // the day prepared again that did not come back ready: said on its card, with « Réessayer »
   const [redoFail, setRedoFail] = useState<{ date: string; msg: string } | null>(null);
   const [slide, setSlide] = useState(0);
@@ -540,6 +544,7 @@ function Review({ onClose }: { onClose: () => void }) {
       <div className="v3-spacer" />
       <div className="dr-foot">
         <p>{missing > 0 ? (missing > 1 ? t("{n} jours ne sont pas encore prêts.", { n: missing }) : t("1 jour n'est pas encore prêt.")) : t("Tout est prêt.")}</p>
+        {lockAhead && <p className="dr-lock"><span className="pro-tag">PRO</span> {t("Après validation, le programme ne se modifie plus qu'avec Pro. Notes, photos, dépenses, check-list et partage restent libres.")}</p>}
         <button className="v3-btn" disabled={run.busy || !!redo} onClick={() => setFinal(true)}><CcSpark />{t("Valider le voyage")}</button>
       </div>
     </Shell>

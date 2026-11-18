@@ -50,10 +50,35 @@ const DAILY_CAP = Number(process.env.AI_FREE_DAILY_CAP) || 25;
 const PRO_CAP = Number(process.env.AI_PRO_DAILY_CAP) || 400;
 /** Requests per 24 h for the whole service outside the shared space (a ceiling on total spending) */
 const GLOBAL_CAP = Number(process.env.AI_GLOBAL_DAILY_CAP) || 1500;
-export type Booking = { id: number } | { refused: "cap" | "pro" | "prep" | "auth" | "error" };
+/** A number from the environment (unset or invalid: the default; 0 is kept, it turns the rule off) */
+const envNum = (v: string | undefined, def: number) => {
+  const n = v == null || v.trim() === "" ? NaN : Number(v);
+  return Number.isFinite(n) && n >= 0 ? n : def;
+};
+/** The free accounts' monthly AI budget in dollars (supabase/saas-13.sql): above it the cheaper provider answers,
+ * above twice it at most AI_FREE_SLOW_DAILY_CAP requests a day outside the trip preparation. Never a hard stop.
+ * Members, admins and Pro accounts have no budget. */
+const FREE_MONTHLY_USD = envNum(process.env.AI_FREE_MONTHLY_USD, 1);
+const FREE_SLOW_CAP = Math.max(1, Math.round(envNum(process.env.AI_FREE_SLOW_DAILY_CAP, 5)));
+/** `cheap`: above the free budget (the cheaper provider answers). A refusal: `scope` says whose limit (the account's,
+ * with its plan and its limit, or the whole service's: absent before saas-13.sql); `why: "manual"`: a trip created by
+ * hand (sent as "prep" so api/prepare.ts keeps today's values). */
+export type Booking =
+  | { id: number; cheap?: boolean }
+  | { refused: "cap" | "pro" | "prep" | "auth" | "error"; why?: "manual"; scope?: "account" | "global"; plan?: "free" | "pro"; limit?: number; slowed?: boolean };
+/** reserve_ai2's refusal, in the relay's terms */
+function refusalOf(b: Json): Booking {
+  const why = String(b.refused || "error");
+  if (why === "manual") return { refused: "prep", why: "manual" };
+  if (why === "cap") {
+    if (b.scope === "global") return { refused: "cap", scope: "global" };
+    return { refused: "cap", scope: "account", plan: b.plan === "pro" ? "pro" : "free", limit: Number(b.limit) || undefined, slowed: b.slowed === true };
+  }
+  return { refused: (["pro", "prep", "auth"].includes(why) ? why : "error") as "pro" };
+}
 /** Books one request for the account before the AI is called (server function, atomic, with the plan's rules:
- * daily cap, the free trip of the month, a validated trip's programme reserved to Pro). Falls back to the lot 2
- * function while supabase/saas-4.sql has not run. */
+ * daily cap, the free trip of the month, a validated trip's programme reserved to Pro, the free monthly budget).
+ * reserve_ai2 (saas-13.sql) first; missing or failing: today's reserve_ai; before saas-4.sql: the lot 2 function. */
 export async function reserve(token: string, task: string, trip: string | null, f: typeof fetch): Promise<Booking> {
   const call = (fn: string, args: Json) =>
     f(`${SUPA_URL}/rest/v1/rpc/${fn}`, {
@@ -61,6 +86,17 @@ export async function reserve(token: string, task: string, trip: string | null, 
       headers: { apikey: SUPA_KEY, authorization: `Bearer ${token}`, "content-type": "application/json" },
       body: JSON.stringify(args),
     });
+  try {
+    const r2 = await call("reserve_ai2", { p_task: task, p_trip: trip, p_cap: DAILY_CAP, p_pro_cap: PRO_CAP, p_global_cap: GLOBAL_CAP, p_budget: FREE_MONTHLY_USD, p_slow_cap: FREE_SLOW_CAP });
+    if (r2.ok) {
+      const b = (await r2.json().catch(() => null)) as Json | null;
+      if (b && typeof b.id === "number") return b.cheap === true ? { id: b.id, cheap: true } : { id: b.id };
+      if (b && typeof b.refused === "string") return refusalOf(b);
+    }
+    // not there (404) or broken (any other answer): today's function, so saas-13.sql can never take the AI down
+  } catch {
+    /* today's function below */
+  }
   try {
     const r = await call("reserve_ai", { p_task: task, p_trip: trip, p_cap: DAILY_CAP, p_pro_cap: PRO_CAP, p_global_cap: GLOBAL_CAP });
     if (r.ok) {
@@ -514,7 +550,36 @@ class Upstream extends Error {
 }
 
 // ---------------- Claude ----------------
-async function runClaude(client: Anthropic, job: Job, deadline: number): Promise<Json> {
+/** Claude list prices (USD / 1M tokens: new input, output, cache read, cache write) per model; another model is priced
+ * as claude-opus-5-5. Web search 0.01 $ each; web fetch costs its tokens only. */
+const CLAUDE_PRICE: Record<string, { in: number; out: number; read: number; write: number }> = {
+  "claude-opus-5-5": { in: 4, out: 20, read: 0.2, write: 5 },
+  "claude-opus-5": { in: 5, out: 25, read: 0.5, write: 6.25 },
+  "claude-opus-4-8": { in: 5, out: 25, read: 0.5, write: 6.25 },
+};
+const priceOf = (model: string) => CLAUDE_PRICE[model] || CLAUDE_PRICE[Object.keys(CLAUDE_PRICE).find((k) => model.startsWith(k + "-")) || ""] || CLAUDE_PRICE[MODEL];
+/** Adds one Claude answer's tokens, searches and cost (at the price of the model that answered) to the request's usage */
+export function addClaudeUsage(usage: Usage, res: { model?: unknown; usage?: unknown }, seen?: { model: string }) {
+  const u = (res.usage && typeof res.usage === "object" ? res.usage : {}) as Record<string, unknown>;
+  const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 0);
+  const tools = (u.server_tool_use && typeof u.server_tool_use === "object" ? u.server_tool_use : {}) as Record<string, unknown>;
+  const model = typeof res.model === "string" && res.model ? res.model : MODEL;
+  const p = priceOf(model);
+  const fresh = n(u.input_tokens);
+  const write = n(u.cache_creation_input_tokens);
+  const read = n(u.cache_read_input_tokens);
+  const out = n(u.output_tokens);
+  const search = n(tools.web_search_requests);
+  usage.hit += read;
+  usage.miss += fresh + write;
+  usage.out += out;
+  usage.search += search;
+  usage.fetch += n(tools.web_fetch_requests);
+  usage.usd += (fresh * p.in + write * p.write + read * p.read + out * p.out) / 1e6 + search * 0.01;
+  if (seen) seen.model = model;
+}
+
+async function runClaude(client: Anthropic, job: Job, deadline: number, usage?: Usage, seen?: { model: string }): Promise<Json> {
   const content: Anthropic.Beta.BetaContentBlockParam[] = [];
   if (job.image) content.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: job.image } });
   content.push({ type: "text", text: job.text });
@@ -539,6 +604,8 @@ async function runClaude(client: Anthropic, job: Job, deadline: number): Promise
       if (e instanceof Anthropic.RateLimitError) throw new Upstream("busy");
       throw new Upstream("upstream");
     }
+    // every answer is paid, the paused ones too
+    if (usage) addClaudeUsage(usage, res, seen);
     if (res.stop_reason === "pause_turn") {
       messages.push({ role: "assistant", content: res.content });
       continue;
@@ -838,14 +905,18 @@ export class TaskFailure extends Error {
   }
 }
 /** Runs "outline", "essentials" or "day" with the same instructions as the relay; the body is the app's request */
-export async function runTask(task: "outline" | "essentials" | "day", body: Json, opts: { env?: Record<string, string | undefined>; fetch?: typeof fetch; client?: Anthropic; deadlineMs?: number } = {}): Promise<TaskRun> {
+export async function runTask(task: "outline" | "essentials" | "day", body: Json, opts: { env?: Record<string, string | undefined>; fetch?: typeof fetch; client?: Anthropic; deadlineMs?: number; cheap?: boolean } = {}): Promise<TaskRun> {
   const env = opts.env || process.env;
   const f = opts.fetch || fetch;
-  const { provider, dsKey, claudeKey } = pickProvider(env, opts.client);
+  const picked = pickProvider(env, opts.client);
+  const { dsKey, claudeKey } = picked;
+  // above the free monthly budget (the booking says `cheap`): the cheaper provider answers, when its key is set
+  const provider = opts.cheap && dsKey ? "deepseek" : picked.provider;
   const usage = newUsage();
   const started = Date.now();
   if (!provider) throw new TaskFailure("config", usage, "", "", 0);
-  const model = provider === "deepseek" ? DS_MODEL : "claude";
+  const seen = { model: provider === "deepseek" ? DS_MODEL : MODEL };
+  const model = seen.model;
   const cj = creationJob({ ...body, task });
   if ("bad" in cj) throw new TaskFailure("bad", usage, provider, model, 0);
   const job = cj;
@@ -853,10 +924,10 @@ export async function runTask(task: "outline" | "essentials" | "day", body: Json
   if (englishAccount(body)) job.system += EN_ANSWER;
   const deadline = Date.now() + (opts.deadlineMs ?? (job.research ? 250_000 : 90_000));
   try {
-    const out = provider === "deepseek" ? await runDeepSeek(dsKey, job, f, deadline, usage) : await runClaude(opts.client || new Anthropic({ apiKey: claudeKey, maxRetries: 1 }), job, deadline);
-    return { out, usage, provider, model, ms: Date.now() - started };
+    const out = provider === "deepseek" ? await runDeepSeek(dsKey, job, f, deadline, usage) : await runClaude(opts.client || new Anthropic({ apiKey: claudeKey, maxRetries: 1 }), job, deadline, usage, seen);
+    return { out, usage, provider, model: seen.model, ms: Date.now() - started };
   } catch (e) {
-    throw new TaskFailure(e instanceof Upstream ? e.kind : "upstream", usage, provider, model, Date.now() - started);
+    throw new TaskFailure(e instanceof Upstream ? e.kind : "upstream", usage, provider, seen.model || model, Date.now() - started);
   }
 }
 
@@ -880,7 +951,9 @@ export async function handle(req: Request, deps: Deps = {}): Promise<Response> {
   const by = acc.email ? acc.email.split("@")[0] : "membre";
   const f = deps.fetch || fetch;
 
-  const { provider, dsKey, claudeKey } = pickProvider(env, deps.client);
+  const picked = pickProvider(env, deps.client);
+  const { dsKey, claudeKey } = picked;
+  let provider = picked.provider;
   if (!provider) return json({ error: "config", message: "La clé IA n'est pas configurée sur Vercel (DEEPSEEK_API_KEY)." }, 503, origin);
 
   let body: Json;
@@ -901,11 +974,19 @@ export async function handle(req: Request, deps: Deps = {}): Promise<Response> {
     const b = await reserve(token, String(body.task || ""), tripId, f);
     if ("refused" in b) {
       if (b.refused === "pro") return json({ error: "pro", message: "Ce voyage est validé : modifier son programme est réservé à ORBES Trips Pro." }, 403, origin);
+      if (b.refused === "prep" && b.why === "manual") return json({ error: "pro", reason: "manual", message: "Ce voyage a été créé à la main : le compléter avec l'IA fait partie de Pro." }, 403, origin);
       if (b.refused === "prep") return json({ error: "pro", message: "Votre voyage offert de ce mois a déjà été préparé. Passez à Pro pour en préparer d'autres." }, 403, origin);
-      if (b.refused === "cap") return json({ error: "busy", message: "Limite du jour atteinte pour les demandes à l'IA. Elle repart dans les 24 heures." }, 429, origin);
+      // the same French message as before (older apps show it); the newer app reads whose limit it is
+      if (b.refused === "cap")
+        return json({
+          error: "busy", message: "Limite du jour atteinte pour les demandes à l'IA. Elle repart dans les 24 heures.",
+          ...(b.scope === "global" ? { reason: "cap", scope: "global" } : b.scope ? { reason: "cap", scope: b.scope, plan: b.plan, limit: b.limit, pro: PRO_CAP, slowed: !!b.slowed } : {}),
+        }, 429, origin);
       return json({ error: "unavailable", message: "Le service ne répond pas, réessayez dans un instant." }, 503, origin);
     }
     booked = b.id;
+    // above the free monthly budget: the cheaper provider answers, when its key is set
+    if (b.cheap && dsKey) provider = "deepseek";
   }
 
   // DeepSeek balance (official API) + our own spending log (DeepSeek has no history API)
@@ -1030,6 +1111,7 @@ export async function handle(req: Request, deps: Deps = {}): Promise<Response> {
     // always answer (with CORS headers) before Vercel cuts the function at 300 s
     const deadline = Date.now() + (job.research ? 270_000 : 90_000);
     const usage = newUsage();
+    const seen = { model: provider === "deepseek" ? DS_MODEL : MODEL };
     const started = Date.now();
     // the log is written after the answer has left (the function stays alive until it is done)
     const tripId = body.trip && typeof body.trip === "object" && typeof (body.trip as Json).id === "string" ? String((body.trip as Json).id).slice(0, 64) : null;
@@ -1037,7 +1119,7 @@ export async function handle(req: Request, deps: Deps = {}): Promise<Response> {
       // the account's booked request gets its cost and its detail, then the shared space's detailed spending log
       if (booked != null) {
         const detail = {
-          trip: tripId, provider, model: provider === "deepseek" ? DS_MODEL : "claude", hit: usage.hit, miss: usage.miss, out: usage.out,
+          trip: tripId, provider, model: seen.model, hit: usage.hit, miss: usage.miss, out: usage.out,
           search: usage.search, fetch: usage.fetch, ms: Date.now() - started, error: ok ? null : String((err as { kind?: string; message?: string })?.kind || (err as Error)?.message || "error").slice(0, 200),
         };
         const mine = finish(token, booked, Math.round(usage.usd * 1e6) / 1e6, ok, f, detail);
@@ -1058,7 +1140,7 @@ export async function handle(req: Request, deps: Deps = {}): Promise<Response> {
       }
     };
     try {
-      const out = provider === "deepseek" ? await runDeepSeek(dsKey, job, f, deadline, usage) : await runClaude(deps.client || new Anthropic({ apiKey: claudeKey, maxRetries: 1 }), job, deadline);
+      const out = provider === "deepseek" ? await runDeepSeek(dsKey, job, f, deadline, usage) : await runClaude(deps.client || new Anthropic({ apiKey: claudeKey, maxRetries: 1 }), job, deadline, usage, seen);
       log(true);
       return json(out, 200, origin);
     } catch (e) {

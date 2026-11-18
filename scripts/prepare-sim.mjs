@@ -686,5 +686,36 @@ console.log("15. The account's path: prep_started, prep_ready, prep_failed");
   }
 }
 
+console.log("16. Above the free monthly budget (the booking says cheap): every task of the run asks the cheaper provider");
+{
+  const w = world();
+  seedTrip(w);
+  const book = w.deps.reserve;
+  const ai = w.deps.ai;
+  const asked = [];
+  w.deps.reserve = async (...a) => {
+    const b = await book(...a);
+    return "id" in b ? { ...b, cheap: true } : b;
+  };
+  w.deps.ai = (task, body, o) => {
+    asked.push({ task, cheap: o?.cheap === true });
+    return ai(task, body);
+  };
+  const r = await P.handle(user({ action: "start", trip: "trip-1", ctx }), w.deps);
+  await drain(w);
+  check(r.status === 200 && draft(w).status === "review", `the run goes to the review (${draft(w).status})`);
+  check(asked.length === 5 && asked.every((x) => x.cheap), `outline, essentials and each day asked with cheap (${asked.map((x) => `${x.task}:${x.cheap}`).join(", ")})`);
+  const again = [];
+  w.deps.reserve = book;
+  w.deps.ai = (task, body, o) => {
+    again.push(o?.cheap === true);
+    return ai(task, body);
+  };
+  const dates = Object.keys(draft(w).days);
+  const r2 = await P.handle(user({ action: "day", trip: "trip-1", date: dates[0], ctx }), w.deps);
+  await drain(w);
+  check(r2.status === 200 && again.length === 1 && again[0] === false, "a booking without cheap: today's provider (no cheap flag)");
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

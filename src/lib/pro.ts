@@ -185,3 +185,55 @@ export async function adminAi(userId?: string, hours = 720): Promise<AiRow[]> {
   fail(error, "La lecture");
   return (data || []) as AiRow[];
 }
+
+// ---------- Pro per trip and the AI budget (supabase/saas-13.sql) ----------
+export { rememberOffer, pendingOffer, clearOffer } from "./store";
+
+/** The free account's AI limit last told by the server (the Pro screen shows the numbers) */
+export type CapInfo = { limit: number; pro: number; slowed: boolean };
+let capInfo: CapInfo | null = null;
+export const setCapInfo = (c: CapInfo | null) => {
+  capInfo = c;
+};
+export const getCapInfo = () => capInfo;
+
+export type TripPassRow = { trip_id: string; trip_end: string | null; until: string | null; payer_email: string | null; source: string | null };
+/** The Passes of these trips (each existing trip once, with its end date); null while saas-13.sql has not run */
+export async function adminTripPasses(ids: string[]): Promise<TripPassRow[] | null> {
+  const { data, error } = await sb().rpc("admin_trip_passes", { p_trips: ids });
+  if (missing(error)) return null;
+  fail(error, "La lecture");
+  return (data || []) as TripPassRow[];
+}
+const PASS_ERRORS: Record<string, string> = {
+  trip: "Ce voyage n'existe plus sur le serveur.",
+  payer: "Ce compte ne fait pas partie de ce voyage.",
+  days: "Durée impossible.",
+};
+/** Gives a Pass on a trip (days: null = the Pass rule, 0 = removed); returns its end, null = removed; throws when
+ *  saas-13.sql has not run ("missing") or the server refuses */
+export async function adminGrantTripPass(tripId: string, payer: string | null, days: number | null): Promise<string | null> {
+  const { data, error } = await sb().rpc("admin_grant_trip_pass", { p_trip: tripId, p_payer: payer, p_days: days });
+  if (missing(error)) throw new Error(t("Lancez supabase/saas-13.sql"));
+  fail(error, "Le changement");
+  const r = (data || {}) as { until?: string | null; error?: string };
+  if (r.error) throw new Error(t(PASS_ERRORS[r.error] || "Le changement n'a pas pu se faire. Vérifiez le réseau et réessayez."));
+  return r.until ?? null;
+}
+export type AiBudgetRow = { email: string; usd: number; requests: number; last: string | null };
+export type AiBudget = {
+  budget: number; proAlertAt: number;
+  plans: { plan: "free" | "pro" | "team" | "shared"; accounts: number; requests: number; usd: number }[];
+  over: AiBudgetRow[]; proAlert: AiBudgetRow[];
+};
+/** 30 % of Pro annuel's monthly price (39 € / 12), in dollars: a Pro account above it this month is shown (alert only) */
+export const PRO_ALERT_USD = 1.05;
+/** The free monthly AI budget the relay uses by default (api/ai.ts AI_FREE_MONTHLY_USD) */
+export const FREE_BUDGET_USD = 1;
+/** The AI cost by plan, who is above the free budget, the Pro accounts above the alert; null while saas-13.sql has not run */
+export async function adminAiBudget(): Promise<AiBudget | null> {
+  const { data, error } = await sb().rpc("admin_ai_budget", { p_budget: FREE_BUDGET_USD, p_pro_alert: PRO_ALERT_USD });
+  if (missing(error)) return null;
+  fail(error, "La lecture");
+  return data as AiBudget;
+}

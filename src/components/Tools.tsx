@@ -5,7 +5,7 @@ import { exportCsv, exportPdf, exportReport } from "../lib/export";
 import { useBusiness } from "../lib/business";
 import { exportIcs } from "../lib/ics";
 import { useLiveRate } from "../lib/rates";
-import { getState, hasPro, requestPro, setEurRate, toast, useCanEdit, useStore } from "../lib/store";
+import { getState, requestPro, setEurRate, toast, tripHasPro, useCanEdit, useStore } from "../lib/store";
 import { ai, AiError, imageToBase64, type ExtractResult } from "../lib/ai";
 import { applyBookings } from "../lib/alerts";
 import { phase } from "../lib/time";
@@ -14,6 +14,7 @@ import { cancelOffline, deleteOffline, offlineSupported, prepareOffline, useOffl
 import { ShowScreen, copy, speak } from "./ui";
 import { ExpenseReportSheet } from "./Expenses";
 import { track } from "../lib/track";
+import TripPassLine from "./v3/TripPass";
 import { locale, t } from "../lib/i18n";
 
 const fmt = (n: number) => (Number.isFinite(n) ? (Math.round(n * 100) / 100).toLocaleString("fr-FR", { maximumFractionDigits: 2 }) : "");
@@ -215,7 +216,7 @@ export function OfflineCard({ trip }: { trip: Trip }) {
   const missing = st.state === "ready" && check && check !== "busy" ? check.missing : 0;
   const on = st.state === "ready" && missing === 0;
   const pro = () => {
-    if (!hasPro()) return false;
+    if (!tripHasPro(trip.id)) return false;
     track("export", "offline", trip.id);
     prepareOffline(points);
     return true;
@@ -298,9 +299,10 @@ export function OfflineCard({ trip }: { trip: Trip }) {
 }
 
 export function Practical({ trip }: { trip: Trip }) {
-  if (!trip.practical?.length) return <div className="cards"><OfflineCard trip={trip} /></div>;
+  if (!trip.practical?.length) return <div className="cards"><TripPassLine trip={trip} /><OfflineCard trip={trip} /></div>;
   return (
     <div className="cards">
+      <TripPassLine trip={trip} />
       <OfflineCard trip={trip} />
       {trip.practical.map((c) => (
         <div className="card" key={c.title}>
@@ -321,31 +323,31 @@ export function ExportPanel({ trip }: { trip: Trip }) {
       <p style={{ color: "var(--soft)", fontSize: 13.5, marginBottom: 16 }}>{ph !== "before" ? t("Tout le carnet {title} : lieux, statuts, notes, fiches fournisseurs, contacts et visites.", { title: trip.title }) : t("Tout le carnet {title} : lieux, statuts, notes, fiches fournisseurs, contacts.", { title: trip.title })}</p>
       <div className="cards">
         {business && (
-          <button className="card" style={{ textAlign: "left" }} onClick={() => { if (!hasPro()) return requestPro("business"); track("export", "report", trip.id); if (!exportReport(trip, getState().data)) toast(t("Autorisez les fenêtres pop-up pour imprimer le PDF")); }}>
+          <button className="card" style={{ textAlign: "left" }} onClick={() => { if (!tripHasPro(trip.id)) return requestPro("business"); track("export", "report", trip.id); if (!exportReport(trip, getState().data)) toast(t("Autorisez les fenêtres pop-up pour imprimer le PDF")); }}>
             <IDownload width={20} height={20} />
             <h4 style={{ marginTop: 10 }}>{t("Compte-rendu fournisseurs")}</h4>
             <p>{t("Chaque fournisseur : fiche, statut, rendez-vous, contacts, notes, photos et dépenses. À envoyer à l'équipe.")}</p>
           </button>
         )}
         {business && (
-          <button className="card" style={{ textAlign: "left" }} onClick={() => { if (!hasPro()) return requestPro("business"); setExpenseReport(true); }}>
+          <button className="card" style={{ textAlign: "left" }} onClick={() => { if (!tripHasPro(trip.id)) return requestPro("business"); setExpenseReport(true); }}>
             <IDownload width={20} height={20} />
             <h4 style={{ marginTop: 10 }}>{t("Note de frais")}</h4>
             <p>{t("Les dépenses jour par jour, en euros, avec les justificatifs. En PDF et en tableur pour la comptabilité.")}</p>
           </button>
         )}
         {expenseReport && <ExpenseReportSheet trip={trip} onClose={() => setExpenseReport(false)} />}
-        <button className="card" style={{ textAlign: "left" }} onClick={() => { if (!hasPro()) return requestPro("export"); track("export", "pdf", trip.id); if (!exportPdf(trip, getState().data)) toast(t("Autorisez les fenêtres pop-up pour imprimer le PDF")); }}>
+        <button className="card" style={{ textAlign: "left" }} onClick={() => { if (!tripHasPro(trip.id)) return requestPro("export"); track("export", "pdf", trip.id); if (!exportPdf(trip, getState().data)) toast(t("Autorisez les fenêtres pop-up pour imprimer le PDF")); }}>
           <IDownload width={20} height={20} />
           <h4 style={{ marginTop: 10 }}>PDF</h4>
           <p>{t("Carnet imprimable, jour par jour.")}</p>
         </button>
-        <button className="card" style={{ textAlign: "left" }} onClick={() => { if (!hasPro()) return requestPro("export"); track("export", "csv", trip.id); exportCsv(trip, getState().data); toast(t("Fichier CSV téléchargé")); }}>
+        <button className="card" style={{ textAlign: "left" }} onClick={() => { if (!tripHasPro(trip.id)) return requestPro("export"); track("export", "csv", trip.id); exportCsv(trip, getState().data); toast(t("Fichier CSV téléchargé")); }}>
           <IDownload width={20} height={20} />
           <h4 style={{ marginTop: 10 }}>{t("Tableur (CSV)")}</h4>
           <p>{t("Pour Excel ou Numbers.")}</p>
         </button>
-        <button className="card" style={{ textAlign: "left" }} onClick={() => { if (!hasPro()) return requestPro("export"); track("export", "ics", trip.id); exportIcs(trip, getState().data.places); toast(t("Calendrier téléchargé")); }}>
+        <button className="card" style={{ textAlign: "left" }} onClick={() => { if (!tripHasPro(trip.id)) return requestPro("export"); track("export", "ics", trip.id); exportIcs(trip, getState().data.places); toast(t("Calendrier téléchargé")); }}>
           <ICalPlus width={20} height={20} />
           <h4 style={{ marginTop: 10 }}>{t("Calendrier (.ics)")}</h4>
           <p>{t("Le programme et les vols dans Calendrier ou Google Agenda.")}</p>

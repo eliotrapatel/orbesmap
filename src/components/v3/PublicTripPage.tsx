@@ -154,12 +154,15 @@ function CopySheet({ pub, onClose }: { pub: PublicTrip; onClose: () => void }) {
   const [start, setStart] = useState(srcStart && srcStart > today() ? srcStart : addDays(today(), 30));
   const valid = /^\d{4}-\d{2}-\d{2}$/.test(start);
   const end = valid ? addDays(start, n - 1) : "";
+  // a free account: copies arrive validated, so what stays free is said before copying
+  const freePlan = useStore((s) => !!s.session && !!s.plan && !s.plan.pro);
   return (
     <div className="v3-acct-wrap pt-sheet-wrap" onClick={onClose}>
       <div className="v3-glass pt-sheet" role="dialog" aria-label={t("Copier ce voyage")} onClick={(e) => e.stopPropagation()}>
         <span className="v3-lbl">{t("Copier ce voyage")}</span>
         <h2 className="v3-d" style={{ fontSize: 26, marginTop: 8 }}>{pub.trip.title}</h2>
         <p className="v3-note">{n > 1 ? t("{n} jours", { n }) : t("{n} jour", { n })} · {t("le programme, les lieux et leurs fiches arrivent dans vos voyages.")}</p>
+        {freePlan && <p className="v3-note">{t("Le voyage copié arrive validé : son programme ne se modifie qu'avec Pro. Notes, photos, dépenses, check-list et partage restent libres.")}</p>}
         <label className="v3-field col" style={{ marginTop: 14 }}>
           <span>{t("Premier jour")}</span>
           <input type="date" value={start} min={today()} onChange={(e) => setStart(e.target.value)} />
