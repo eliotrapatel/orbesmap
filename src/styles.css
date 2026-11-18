@@ -1286,3 +1286,22 @@ button.v3-brand { color: var(--ink); background: none; border: 0; padding: 0; cu
 .exp-item b { font-weight: 500; display: block; }
 .exp-item small { color: var(--soft); font-size: 12px; display: block; }
 .exp-amt { text-align: right; font-variant-numeric: tabular-nums; flex: none; }
+
+/* =================== votes and comments (lot 6f) =================== */
+.vote-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.vote-btn { height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--hair-strong); display: inline-flex; align-items: center; gap: 6px; font-size: 14px; }
+.vote-btn b { font-weight: 500; font-variant-numeric: tabular-nums; }
+.vote-btn.on { background: var(--ink); color: var(--ground); border-color: var(--ink); }
+.vote-btn:disabled { opacity: 0.6; cursor: default; }
+.vote-who { flex: 1 1 100%; color: var(--soft); font-size: 12.5px; }
+.row-vote { font-size: 11px; font-weight: 600; color: var(--ok); font-variant-numeric: tabular-nums; }
+.row-vote.neg { color: var(--warn); }
+.ag-cmts { margin: 4px 0 0 66px; display: grid; gap: 8px; }
+.ag-cmt { padding: 8px 12px; border-radius: 12px; background: rgba(246, 242, 234, 0.04); border: 1px solid var(--hair); font-size: 13px; }
+.ag-cmt b { font-weight: 500; margin-right: 6px; }
+.ag-cmt small { display: block; color: var(--mute); font-size: 11.5px; margin-top: 2px; }
+.ag-cmt small .link-btn { font-size: 11.5px; padding: 0; }
+.ag-cmt-form { display: flex; gap: 6px; align-items: center; }
+.ag-cmt-form .input { flex: 1; min-width: 0; height: 36px; font-size: 13.5px; }
+.ag-cmt-open { justify-self: start; font-size: 12.5px; }
+@media (max-width: 899px) { .ag-cmts { margin-left: 0; } .ag-cmt-form .input { font-size: 16px; } }

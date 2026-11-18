@@ -11,6 +11,9 @@ import RemovedList, { removeFromProgramme } from "./RemovedList";
 import { useCanEdit, hasPro, requestPro } from "../lib/store";
 import { track } from "../lib/track";
 import { t } from "../lib/i18n";
+import { useState } from "react";
+import { addComment, deleteComment, useComments } from "../lib/social";
+import { ago } from "../lib/notes";
 
 export default function Agenda({ trip, states, pins = [], onOpen, onOpenPin, onShowDay, onOptimize }: { trip: Trip; states: Record<string, PlaceState>; pins?: Pin[]; onOpen: (p: Place) => void; onOpenPin?: (p: Pin) => void; onShowDay: (d: string) => void; onOptimize: (d: string) => void }) {
   const canEdit = useCanEdit();
@@ -127,11 +130,39 @@ export default function Agenda({ trip, states, pins = [], onOpen, onOpenPin, onS
                   ))}
                 </div>
               )}
+              <DayComments day={d.key} canEdit={canEdit} />
             </section>
           );
         })}
       <RemovedList trip={trip} />
       <p style={{ fontSize: 12, color: "var(--mute)" }}>{t("Temps de trajet estimés en voiture. Une heure de rendez-vous saisie dans la fiche d'un lieu le replace dans la journée.")}</p>
+    </div>
+  );
+}
+
+/** The travellers' comments on a day (anyone who can edit the trip can write; each person deletes their own) */
+function DayComments({ day, canEdit }: { day: string; canEdit: boolean }) {
+  const list = useComments(day);
+  const [text, setText] = useState("");
+  const [open, setOpen] = useState(false);
+  if (!list.length && !canEdit) return null;
+  return (
+    <div className="ag-cmts">
+      {list.map((c) => (
+        <div key={c.id} className="ag-cmt">
+          <b>{c.name}</b>
+          <span className="ag-cmt-text">{c.text}</span>
+          <small>{ago(c.at)}{c.mine && canEdit && <> · <button className="link-btn" onClick={() => { if (confirm(t("Supprimer ce commentaire ?"))) deleteComment(c.id); }}>{t("Supprimer")}</button></>}</small>
+        </div>
+      ))}
+      {canEdit && (open || list.length > 0 ? (
+        <form className="ag-cmt-form" onSubmit={(e) => { e.preventDefault(); if (text.trim()) { addComment(day, text); setText(""); } }}>
+          <input className="input" value={text} onChange={(e) => setText(e.target.value)} placeholder={t("Commenter cette journée…")} maxLength={1000} aria-label={t("Commenter cette journée")} />
+          <button className="btn-sm" disabled={!text.trim()}>{t("Envoyer")}</button>
+        </form>
+      ) : (
+        <button className="link-btn ag-cmt-open" onClick={() => setOpen(true)}>{t("+ Commenter cette journée")}</button>
+      ))}
     </div>
   );
 }

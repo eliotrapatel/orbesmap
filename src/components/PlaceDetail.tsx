@@ -19,6 +19,7 @@ import type { Mode } from "../lib/route";
 import { t, locale } from "../lib/i18n";
 import { money, useBusiness, useExpenses } from "../lib/business";
 import { exportReport } from "../lib/export";
+import { vote, votesOf } from "../lib/social";
 
 export default function PlaceDetail({ trip, place, onBack, onGo, sheetH, onMovePoint }: { trip: Trip; place: Place; onBack: () => void; onGo: (m: Mode) => void; sheetH?: string; onMovePoint?: () => void }) {
   const state = useStore((s) => s.data.places[place.id]) || {};
@@ -285,6 +286,8 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH, onMoveP
           )}
         </div>
 
+        {!hotel && <VoteRow placeId={place.id} state={state as Record<string, unknown>} canEdit={canEdit} />}
+
         {canEdit && (
         <Notes
             rec={state as Record<string, unknown>}
@@ -411,6 +414,27 @@ function SupplierMoney({ trip, placeId }: { trip: Trip; placeId: string }) {
           : t("Aucune dépense chez ce fournisseur. Ajoutez-en depuis l'outil Dépenses.")}
       </span>
       <button className="btn-sm" onClick={() => { if (!exportReport(trip, getState().data, placeId)) toast(t("Autorisez les fenêtres pop-up pour imprimer le PDF")); }}>{t("Compte-rendu PDF")}</button>
+    </div>
+  );
+}
+
+/** The travellers' votes on this place: for / against, and who */
+function VoteRow({ placeId, state, canEdit }: { placeId: string; state: Record<string, unknown>; canEdit: boolean }) {
+  const v = votesOf(state);
+  if (!canEdit && !v.up.length && !v.down.length) return null;
+  return (
+    <div className="sec vote-sec">
+      <span className="label">{t("Votes")}</span>
+      <div className="vote-row">
+        <button className={"vote-btn" + (v.mine === 1 ? " on" : "")} disabled={!canEdit} aria-pressed={v.mine === 1} aria-label={t("Pour ({n})", { n: v.up.length })} onClick={() => vote(placeId, 1)}>👍 <b>{v.up.length}</b></button>
+        <button className={"vote-btn" + (v.mine === -1 ? " on" : "")} disabled={!canEdit} aria-pressed={v.mine === -1} aria-label={t("Contre ({n})", { n: v.down.length })} onClick={() => vote(placeId, -1)}>👎 <b>{v.down.length}</b></button>
+        <span className="vote-who">
+          {v.up.length > 0 && t("Pour : {list}", { list: v.up.join(", ") })}
+          {v.up.length > 0 && v.down.length > 0 && " · "}
+          {v.down.length > 0 && t("Contre : {list}", { list: v.down.join(", ") })}
+          {!v.up.length && !v.down.length && t("Votez pour aider le groupe à choisir.")}
+        </span>
+      </div>
     </div>
   );
 }
