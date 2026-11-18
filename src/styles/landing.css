@@ -15,3 +15,7 @@
   .pub-asia-list b { font-size: 16px; }
   .pub-asia-list p { font-size: 14px; }
 }
+/* 900–1080 px: two equal columns, so the long title words (HABITUELLES) stay in their column */
+@media (min-width: 900px) and (max-width: 1080px) {
+  .pub-asia { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 48px; }
+}

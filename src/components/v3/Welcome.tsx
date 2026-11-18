@@ -225,9 +225,9 @@ const FEATURES: [string, string][] = [
   ["À plusieurs", "Invitez vos compagnons de voyage, en modification ou en lecture seule."],
 ];
 
-/** China and Asia: only what the app really does (offline map without Google, the driver screen, phrases + translator, the departure checklist) */
+/** China and Asia: only what the app really does (map without Google, offline with Pro, the driver screen, phrases + translator, the departure checklist) */
 const ASIA: [string, string][] = [
-  ["Une carte sans Google", "La carte du voyage n'utilise pas Google. Activez le mode hors ligne : elle marche aussi sans réseau, dans le métro ou sans données."],
+  ["Une carte sans Google", "La carte du voyage n'utilise pas Google. Avec Pro, activez le mode hors ligne : elle marche aussi sans réseau, dans le métro ou sans données."],
   ["L'adresse pour le chauffeur", "Le nom et l'adresse de chaque lieu dans l'écriture locale, en grand à l'écran, avec lecture à voix haute."],
   ["Phrases utiles et traducteur", "Des phrases avec leur prononciation (pinyin, romaji) à écouter, et un traducteur pour parler avec quelqu'un."],
   ["Une check-list de départ", "Visa, eSIM, paiements locaux, applis utiles : ce qu'il faut régler avant de partir, avec des dates conseillées."],

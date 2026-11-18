@@ -4,7 +4,7 @@ export default {
   "Là où vos applis habituelles ne marchent plus.": "Where your usual apps stop working.",
   "En Chine, Google ne marche pas. Ailleurs en Asie, c'est souvent la langue et l'écriture qui bloquent.": "In China, Google doesn't work. Elsewhere in Asia, it's often the language and the script that get in the way.",
   "Une carte sans Google": "A map without Google",
-  "La carte du voyage n'utilise pas Google. Activez le mode hors ligne : elle marche aussi sans réseau, dans le métro ou sans données.": "The trip map doesn't use Google. Turn on offline mode and it also works with no signal, in the metro or without data.",
+  "La carte du voyage n'utilise pas Google. Avec Pro, activez le mode hors ligne : elle marche aussi sans réseau, dans le métro ou sans données.": "The trip map doesn't use Google. With Pro, turn on offline mode and it also works with no signal, in the metro or without data.",
   "L'adresse pour le chauffeur": "The address for the driver",
   "Le nom et l'adresse de chaque lieu dans l'écriture locale, en grand à l'écran, avec lecture à voix haute.": "Each place's name and address in the local script, shown large on screen, with read-aloud.",
   "Phrases utiles et traducteur": "Useful phrases and translator",
