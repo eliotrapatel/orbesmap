@@ -80,7 +80,8 @@ export interface PhotoRef {
   /** ms */
   at: number;
 }
-export interface PhotoNone { v: 1; none: true; at: number }
+/** v 2: written since the name variants (a v 1 « none » is looked up again) */
+export interface PhotoNone { v: 1 | 2; none: true; at: number }
 export type PlacePhoto = PhotoRef | PhotoNone;
 export type TripCover = (PhotoRef & { from: "city" | "place"; placeId?: string }) | PhotoNone;
 

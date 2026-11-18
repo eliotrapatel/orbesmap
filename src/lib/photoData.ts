@@ -40,7 +40,7 @@ function ref(o: Record<string, unknown>): PhotoRef | undefined {
 export function asPhoto(v: unknown): PlacePhoto | undefined {
   if (!v || typeof v !== "object") return undefined;
   const o = v as Record<string, unknown>;
-  if (o.none === true) return { v: 1, none: true, at: num(o.at) } satisfies PhotoNone;
+  if (o.none === true) return { v: o.v === 2 ? 2 : 1, none: true, at: num(o.at) } satisfies PhotoNone;
   return ref(o);
 }
 
@@ -56,12 +56,12 @@ export const isRef = (p: PlacePhoto | TripCover | undefined | null): p is PhotoR
 export const isNone = (p: PlacePhoto | TripCover | undefined | null): p is PhotoNone => !!p && "none" in p && p.none === true;
 
 /**
- * A place still to look up: no photo yet, a "none" older than 30 days, or a name / position changed after the
- * photo was chosen. `fieldsAt` is the place record's (on the phone: getState().data.defs[id]?.fieldsAt).
+ * A place still to look up: no photo yet, a "none" older than 30 days (or written before the name variants: version
+ * 1), or a name / position changed after the photo was chosen. `fieldsAt` is the place record's (on the phone: getState().data.defs[id]?.fieldsAt).
  */
 export function needsLookup(photo: PlacePhoto | undefined, fieldsAt: Record<string, number> | undefined, now = Date.now()): boolean {
   if (!photo) return true;
-  if (isNone(photo) && now - (photo.at || 0) > NONE_TTL) return true;
+  if (isNone(photo) && (photo.v !== 2 || now - (photo.at || 0) > NONE_TTL)) return true;
   const fa = fieldsAt || {};
   const at = photo.at || 0;
   return ["name", "lat", "lng"].some((k) => (Number(fa[k]) || 0) > at);

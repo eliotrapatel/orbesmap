@@ -52,13 +52,15 @@ function world(fx = {}) {
   const leases = new Map();
   const members = new Map();
   const store = new Map(); // bucket objects
-  const log = { urls: [], nom: [], wmInflight: 0, wmMax: 0, sleeps: [], uploads: [], heads: [], downloads: [], patches: [], kicks: [], bucket: 0, member: [], firstPatchAt: null, lastCopyAt: 0, msgs: [] };
+  const log = { urls: [], nom: [], searches: [], wmInflight: 0, wmMax: 0, sleeps: [], uploads: [], heads: [], downloads: [], patches: [], kicks: [], bucket: 0, member: [], firstPatchAt: null, lastCopyAt: 0, msgs: [] };
   let bucketMade = false;
   const json = (o, status = 200, headers = {}) => new Response(JSON.stringify(o), { status, headers: { "content-type": "application/json", ...headers } });
   // the Commons file fixtures: title → { w, h, mime, license, artist, licenseUrl }
   const files = fx.files || {};
   const thumbFor = (title, f, step) => {
     const name = encodeURIComponent(title.replace(/^File:/, "").replace(/ /g, "_"));
+    // Commons now answers some thumbnails on thumb.wikimedia.org, with a tracking query (fixture: thumbHost)
+    if (f.w > step && f.thumbHost) return { thumburl: `https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ab/${name}/${step}px-${name}?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail`, thumbwidth: step, thumbheight: Math.round((step * f.h) / f.w) };
     if (f.w > step) return { thumburl: `https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/${name}/${step}px-${name}`, thumbwidth: step, thumbheight: Math.round((step * f.h) / f.w) };
     // not wider than the step: the API answers with the original (throttled) file
     return { thumburl: `https://upload.wikimedia.org/wikipedia/commons/a/ab/${name}`, thumbwidth: f.w, thumbheight: f.h };
@@ -85,7 +87,8 @@ function world(fx = {}) {
       if (fx.nom429) return new Response("", { status: 429 });
       if (fx.nomCost) clock.t += fx.nomCost;
       const q = u.searchParams.get("q");
-      const hits = (fx.nom || {})[q] || [];
+      // the fake OpenStreetMap names its hits as asked, unless a fixture names them otherwise
+      const hits = ((fx.nom || {})[q] || []).map((h) => ({ name: q, ...h }));
       return json(hits);
     }
     if (u.host === "www.wikidata.org") {
@@ -96,7 +99,7 @@ function world(fx = {}) {
         for (const q of ids) {
           const e = (fx.ents || {})[q];
           if (!e) continue;
-          out[q] = { claims: e.p18 ? { P18: [{ rank: "normal", mainsnak: { datavalue: { value: e.p18 } } }] } : {}, sitelinks: Object.fromEntries(Object.entries(e.sitelinks || {}).map(([k, v]) => [k, { title: v }])) };
+          out[q] = { claims: { ...(e.p18 ? { P18: [{ rank: "normal", mainsnak: { datavalue: { value: e.p18 } } }] } : {}), ...(e.at ? { P625: [{ rank: "normal", mainsnak: { datavalue: { value: { latitude: e.at[0], longitude: e.at[1], globe: "http://www.wikidata.org/entity/Q2" } } } }] } : {}) }, sitelinks: Object.fromEntries(Object.entries(e.sitelinks || {}).map(([k, v]) => [k, { title: v }])) };
         }
         return json({ entities: out });
       }
@@ -126,6 +129,19 @@ function world(fx = {}) {
       });
       return json({ query: { pages } });
     }
+    if (/\.wikipedia\.org$/.test(u.host) && u.pathname === "/w/api.php") {
+      // the search: fx.search["lang:query"] = pages ({ title, lat, lng, qid, image })
+      const lang = u.host.split(".")[0];
+      const q = u.searchParams.get("gsrsearch");
+      log.searches.push(`${lang}:${q}`);
+      const pages = ((fx.search || {})[`${lang}:${q}`] || []).map((p, i) => ({
+        title: p.title, index: i + 1,
+        ...(p.lat != null ? { coordinates: [{ lat: p.lat, lon: p.lng, primary: true, globe: "earth" }] } : {}),
+        pageprops: { ...(p.qid ? { wikibase_item: p.qid } : {}), ...(p.image ? { page_image_free: p.image } : {}), ...(p.disambiguation ? { disambiguation: "" } : {}) },
+        ...(p.image || p.localImage ? { pageimage: p.image || p.localImage } : {}),
+      }));
+      return json({ batchcomplete: true, query: { pages } });
+    }
     if (/\.wikipedia\.org$/.test(u.host)) {
       const lang = u.host.split(".")[0];
       const title = decodeURIComponent(u.pathname.split("/page/summary/")[1] || "").replace(/_/g, " ");
@@ -134,10 +150,11 @@ function world(fx = {}) {
     }
     if (u.host === "api.openverse.org" && u.pathname === "/v1/images/") {
       if (fx.ov429) return new Response("", { status: 429 });
+      if (fx.ovCost) clock.t += fx.ovCost;
       const q = u.searchParams.get("q");
       return json({ results: (fx.ov || {})[q] || [] });
     }
-    if (u.host === "upload.wikimedia.org" || (u.host === "api.openverse.org" && u.pathname.includes("/thumb"))) {
+    if (u.host === "upload.wikimedia.org" || u.host === "thumb.wikimedia.org" || (u.host === "api.openverse.org" && u.pathname.includes("/thumb"))) {
       log.downloads.push({ url: String(url), at: clock.t, accept: init.headers?.accept });
       if (fx.dlCost) clock.t += fx.dlCost;
       if (fx.dl429 && log.downloads.length > fx.dl429) return new Response("", { status: 429, headers: { "retry-after": "60" } });
@@ -327,7 +344,8 @@ check(X.namesPlace("The Bund, Shanghai", "Bund", "Shanghai") && !X.namesPlace("A
 check(X.namesPlace("Paris - L'Orangerie, musée", "Musée de l'Orangerie", "Paris") && !X.namesPlace("Yu garden style", "Yu Garden Shanghai", "Shanghai") && X.namesPlace("佳家汤包 2019", "Jia Jia Tang Bao", "Shanghai", "佳家汤包"), "Openverse: city words dropped only with 2 distinctive words left; the Chinese name");
 check(X.ovLicense("by-sa", "2.0") === "CC BY-SA 2.0" && X.ovLicense("cc0", "1.0") === "CC0" && X.ovLicense("pdm", "") === "Public domain", "Openverse licence labels");
 const now0 = T0;
-check(X.needsLookup(undefined, {}, now0) && !X.needsLookup({ v: 1, none: true, at: now0 - 86_400_000 }, {}, now0) && X.needsLookup({ v: 1, none: true, at: now0 - 31 * 86_400_000 }, {}, now0), "a « none » is looked up again after 30 days");
+check(X.needsLookup(undefined, {}, now0) && !X.needsLookup({ v: 2, none: true, at: now0 - 86_400_000 }, {}, now0) && X.needsLookup({ v: 2, none: true, at: now0 - 31 * 86_400_000 }, {}, now0), "a « none » is looked up again after 30 days");
+check(X.needsLookup({ v: 1, none: true, at: now0 - 86_400_000 }, {}, now0) && X.needsLookup({ none: true, at: now0 - 1000 }, {}, now0), "a « none » written before the name variants (v 1, or no version) is looked up again at once");
 check(X.needsLookup({ v: 1, path: "c/x-500.jpg", thumb: "c/x-500.jpg", at: 100 }, { name: 200 }, now0) && !X.needsLookup({ v: 1, path: "c/x-500.jpg", thumb: "c/x-500.jpg", at: 300 }, { name: 200, lat: 1 }, now0), "a place renamed or moved after its photo is looked up again");
 
 // ---------- 2. a whole pass ----------
@@ -416,7 +434,7 @@ const PLACES = [
   check(!w.log.urls.some((x) => /Shanghai_Museum_logo/.test(x.url)), "the summary's local /wikipedia/en/ file is never used");
   const p3 = photoOf(w, "trip-p", "p3");
   check(p3?.source === "openverse" && p3?.path === `o/${OV1}-500.jpg` && p3.path === p3.thumb && p3.author === "Ann" && p3.license === "CC BY 2.0" && p3.sourceUrl === "https://www.flickr.com/photos/x/1", "3.3 ratio refused → Openverse: the title naming the place, not the first result");
-  check(photoOf(w, "trip-p", "p4")?.none === true, "nothing acceptable → { none: true } (Openverse title without the place's name refused)");
+  check(photoOf(w, "trip-p", "p4")?.none === true && photoOf(w, "trip-p", "p4")?.v === 2, "nothing acceptable → { v: 2, none: true } (Openverse title without the place's name refused)");
   const p5 = photoOf(w, "trip-p", "p5");
   check(/-960\.jpg$/.test(p5?.path) && /-500\.jpg$/.test(p5?.thumb), `1021 px wide → large from the 960 batch (${p5?.path})`);
   const p6 = photoOf(w, "trip-p", "p6");
@@ -755,6 +773,116 @@ console.log("7. Credits, OpenStreetMap refusals, busy downloads, the app's coold
   const db = P.restDb("test-service-key", f);
   const got = await db.claimPhotos("trip-1", "h1", 1763460000000, 600_000);
   check(got === false && /and=\(or\(data->>hold\.is\.null,data->>at\.lt\.1763459640000\),or\(data->>done\.is\.null,data->>done\.lt\.1763459400000\)\)/.test(sent[1].url), "the app's claim also asks the last finished pass to be 10 minutes old");
+}
+
+
+// ---------- 8. name variants, titles, positions (the matcher) ----------
+console.log("8. The name variants, the page titles, the positions");
+{
+  const V = (name, extra = {}) => X.nameVariants({ name, type: "landmark", ...extra }, "Shanghai");
+  const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  let v = V("Jardin Yu & temple du Dieu de la ville", { type: "jardin", addressCn: "上海市黄浦区福佑路168号 豫园（城隍庙：方浜中路249号）" });
+  check(eq(v, ["Jardin Yu", "temple du Dieu de la ville", "豫园", "Jardin Yu & temple du Dieu de la ville"]), `« & » split, the Chinese name from the address's end (its brackets dropped), the whole name last (${v.join(" | ")})`);
+  v = V("Shanghai Museum (People's Square)", { type: "musee", addressCn: "上海市黄浦区人民大道201号 上海博物馆" });
+  check(eq(v, ["Shanghai Museum", "上海博物馆", "Shanghai Museum (People's Square)"]), `brackets removed; « People's Square » (where a museum stands) never alone (${v.join(" | ")})`);
+  v = V("Le Bund (Waitan)");
+  check(eq(v, ["Le Bund", "Waitan", "Le Bund (Waitan)"]), `a landmark's other name in brackets kept alone (${v.join(" | ")})`);
+  v = V("Suzhou – Jardin de l'Administrateur humble", { type: "jardin", addressCn: "江苏省苏州市姑苏区东北街178号 拙政园" });
+  check(eq(v, ["Jardin de l'Administrateur humble", "拙政园", "Suzhou – Jardin de l'Administrateur humble"]), `the nearby city it starts with dropped (${v.join(" | ")})`);
+  v = V("Suzhou – Jardin de la Persistance (Liu Yuan)", { type: "jardin", addressCn: "江苏省苏州市姑苏区留园路338号 留园" });
+  check(v.length === 4 && eq(v.slice(0, 3), ["Jardin de la Persistance", "留园", "Liu Yuan"]), `4 variants at most (${v.join(" | ")})`);
+  v = V("Sir Elly's Terrace (The Peninsula)", { type: "bar", addressCn: "上海市黄浦区中山东一路32号上海半岛酒店13楼" });
+  check(eq(v, ["Sir Elly's Terrace", "The Peninsula", "Sir Elly's Terrace (The Peninsula)"]), `the hotel a bar stands in kept; an address with no space gives no Chinese name (${v.join(" | ")})`);
+  const noAlias = [["Perrotin Shanghai – Lynn Chadwick (Huqiu Road)", "galerie", "Huqiu Road"], ["Rockbund Art Museum (RAM)", "musee", "RAM"], ["Gare de Shanghai Hongqiao (TGV)", "transport", "TGV"], ["INS Land (Fuxing Park)", "club", "Fuxing Park"], ["Shanghai Museum East (Pudong)", "musee", "Pudong"], ["Suzhou Museum (I.M. Pei)", "musee", "I.M. Pei"], ["Lei Garden (iapm)", "restaurant", "iapm"], ["Flair (Ritz-Carlton Pudong, 58e)", "bar", "58e"]];
+  check(noAlias.every(([n, type, a]) => !V(n, { type }).includes(a)), "never alone: a street, an acronym, « TGV », a park for a club, a district, a person, a mall, a floor");
+  check(V("Flair (Ritz-Carlton Pudong, 58e)", { type: "bar" }).includes("Ritz-Carlton Pudong"), "a bracket's parts split on commas (« Ritz-Carlton Pudong » kept)");
+  check(eq(V("Aéroport de Pudong (PVG) – Terminal 1", { type: "transport" }).slice(0, 1), ["Aéroport de Pudong"]) && eq(V("Unitree – boutique d'expérience", { type: "tech" }).slice(0, 1), ["Unitree"]) && V("Shanghai Tower – Top of Shanghai (118e)").includes("Shanghai Tower"), "« Terminal 1 », « boutique d'expérience » dropped; « Shanghai Tower » kept (a kind of place)");
+  check(X.cnName("上海市黄浦区黄河路127号") === "" && X.cnName("上海市浦东新区启航路900号 浦东国际机场T1航站楼（国际出发）") === "浦东国际机场" && X.cnName("上海市静安区富民路184号（近长乐路）蕾虎 LABELHOOD") === "" && X.cnName("上海市静安区南京西路1686号 静安寺") === "静安寺", "Chinese name: the CJK run after the last space only (never an address)");
+  check(X.isWalk("Balade Concession française : Wukang Lu → Anfu Lu → Fuxing Xi Lu") && !X.isWalk("Wukang Road & Wukang Mansion"), "a walk is told apart");
+
+  const T = (title, variant, name = variant) => X.titleNames(title, variant, { name }, "Shanghai");
+  check(T("Yu Garden", "Jardin Yu", "Jardin Yu & temple du Dieu de la ville") && T("The Bund", "Le Bund", "Le Bund (Waitan)") && T("Bund (Shanghai)", "Le Bund") && T("Jing'an Temple", "Temple Jing'an") && T("Peace Hotel", "Fairmont Peace Hotel") && T("The Peninsula Shanghai", "The Peninsula") && T("Astor House Hotel (Shanghai)", "Astor House", "China Securities Museum (Astor House)"), "titles naming the place across languages accepted (Yu Garden, The Bund, Jing'an Temple, Peace Hotel, The Peninsula, Astor House)");
+  check(T("Shanghai Museum", "Shanghai Museum") && T("Suzhou Museum", "Suzhou Museum") && !T("Shanghai Museum", "Shanghai Museum East") && !T("Shanghai History Museum", "Shanghai Museum"), "a name with no distinctive word needs the same phrase (never the main museum for its East branch)");
+  check(!T("Pudong", "Museum of Art Pudong") && !T("Jing'an District", "Temple Jing'an") && !T("Shanghai Science and Technology Museum station", "Shanghai Science and Technology Museum") && !T("Shanghai", "Le Bund") && !T("Fosun International", "Fosun Foundation Shanghai") && !T("Huaihai Road", "flagship Huaihai") && !T("List of museums in China", "Rockbund Art Museum"), "never its district, its metro station, the city, the company, a road, a list");
+  check(T("上海博物馆", "上海博物馆") && T("龙美术馆 (西岸馆)", "龙美术馆西岸馆") && !T("黄浦区", "上海博物馆") && !T("龙美术馆 (西岸馆)", "西岸美术馆") && !T("豫园站", "豫园"), "Chinese titles: the same name (or one inside the other), never a district or a station");
+
+  const museum = { name: "Rockbund Art Museum", type: "musee", lat: 31.2430, lng: 121.4843 };
+  const garden = { name: "Jardin botanique de Chenshan", type: "jardin", lat: 31.0733, lng: 121.1772 };
+  check(X.radiusOf(museum) === 1.5 && X.radiusOf(garden) === 3 && X.radiusOf({ name: "Le Bund (Waitan)", type: "landmark" }) === 3, "1.5 km for a building, 3 km for a garden or the Bund");
+  check(X.nearEnough(museum, { lat: 31.2430 + 0.0108, lng: 121.4843 }) && !X.nearEnough(museum, { lat: 31.2430 + 0.018, lng: 121.4843 }) && X.nearEnough(garden, { lat: 31.0733 + 0.0225, lng: 121.1772 }) && !X.nearEnough(garden, { lat: 31.0733 + 0.03, lng: 121.1772 }) && !X.nearEnough(museum, null), "a page 1.2 km away kept, 2 km away refused (a garden: 2.5 km kept, 3.3 km refused), a page with no position never on its own");
+  const hosp = { lat: "31.2337", lon: "121.4628", category: "amenity", type: "hospital", name: "中国人民解放军海军军医大学第二附属医院（上海长征医院）", namedetails: { name: "中国人民解放军海军军医大学第二附属医院（上海长征医院）" } };
+  check(!X.okHit(hosp, { name: "Zhangyuan", type: "luxe" }, "张园", "Shanghai") && X.okHit({ ...hosp, category: "tourism", type: "museum", name: "Shanghai Museum", namedetails: { name: "上海博物馆", "name:en": "Shanghai Museum" } }, { name: "Shanghai Museum", type: "musee" }, "上海博物馆", "Shanghai"), "an OpenStreetMap hit must be named as asked (« 张园 » never a hospital on a street of that name)");
+  check(!X.okHit({ lat: "0", lon: "0", category: "railway", type: "station", name: "Yuyuan Garden" }, { name: "Yu Garden", type: "jardin" }, "Yu Garden", "Shanghai") && !X.okHit({ lat: "0", lon: "0", category: "highway", type: "bus_stop", name: "上海博物馆" }, { name: "Shanghai Museum", type: "musee" }, "上海博物馆", "Shanghai"), "never its metro station or its bus stop");
+  check(X.thumbUrl("https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a1/X.jpg/500px-X.jpg?utm_source=commons.wikimedia.org") === "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a1/X.jpg/500px-X.jpg", "thumb.wikimedia.org thumbnails without their tracking query");
+}
+{
+  // a whole pass on human-written names: OpenStreetMap by the Chinese name, then the Wikipedia search
+  const fx = {
+    nom: {
+      "豫园": [{ ...nomHit(31.2272, 121.4921, "Q31"), name: "Yu Yuan Garden", namedetails: { name: "豫园", "name:en": "Yu Yuan Garden" } }],
+      "张园": [{ ...nomHit(31.2337, 121.4628, "Q39"), name: "长征医院", namedetails: { name: "长征医院" }, category: "amenity", type: "hospital" }],
+    },
+    ents: {
+      Q31: { p18: "Yu Garden.jpg" },
+      Q32: { p18: "Peace Hotel facade.jpg" },
+      Q33: { p18: "Shanghai Museum East.jpg", at: [31.2195, 121.5490] },
+      Q34: { p18: "Pudong skyline.jpg", at: [31.2215, 121.5440] },
+      Q35: { p18: "Far Museum.jpg" },
+      Q39: { p18: "Hospital.jpg" },
+      Q40: { p18: "Wukang Road.jpg" },
+    },
+    files: {
+      "File:Yu Garden.jpg": { w: 3000, h: 2000, thumbHost: true },
+      "File:Peace Hotel facade.jpg": { w: 3000, h: 2000 },
+      "File:Shanghai Museum East.jpg": { w: 3000, h: 2000, license: "CC0" },
+      "File:Pudong skyline.jpg": { w: 3000, h: 2000 },
+      "File:Far Museum.jpg": { w: 3000, h: 2000 },
+      "File:Hospital.jpg": { w: 3000, h: 2000 },
+      "File:Rockbund local.jpg": { w: 3000, h: 2000 },
+    },
+    search: {
+      "en:Terrace 9:15 Shanghai": [{ title: "Shanghai", lat: 31.2304, lng: 121.4737, qid: "Q8686" }],
+      "en:Fairmont Peace Hotel Shanghai": [{ title: "Peace Hotel", lat: 31.2405, lng: 121.4880, qid: "Q32" }],
+      "en:Shanghai Museum East": [{ title: "Pudong", qid: "Q34" }, { title: "Shanghai Museum East", qid: "Q33" }],
+      "en:Far Art Museum Shanghai": [{ title: "Far Art Museum", lat: 31.2700, lng: 121.4700, qid: "Q35" }],
+      "en:Rockbund Art Museum Shanghai": [{ title: "Rockbund Art Museum", lat: 31.2430, lng: 121.4843, localImage: "Rockbund local.jpg" }],
+    },
+  };
+  const w = world(fx);
+  seed(w, "trip-v", [
+    { id: "v1", name: "Jardin Yu & temple du Dieu de la ville", type: "jardin", lat: 31.2273, lng: 121.4922, photo: { v: 1, none: true, at: T0 - 86_400_000 } },
+    { id: "v2", name: "Terrace 9:15 (Fairmont Peace Hotel)", type: "bar", lat: 31.2406, lng: 121.4881 },
+    { id: "v3", name: "Shanghai Museum East (Pudong)", type: "musee", lat: 31.2196, lng: 121.5489 },
+    { id: "v4", name: "Far Art Museum", type: "musee", lat: 31.2300, lng: 121.4700 },
+    { id: "v5", name: "Rockbund Art Museum (RAM)", type: "musee", lat: 31.2431, lng: 121.4844 },
+    { id: "v6", name: "Zhangyuan", type: "luxe", lat: 31.2298, lng: 121.4561 },
+    { id: "v7", name: "Balade Concession française : Wukang Lu → Anfu Lu", type: "lifestyle", lat: 31.2083, lng: 121.4385 },
+    { id: "v8", name: "Old Spot", type: "landmark", lat: 31.2300, lng: 121.4700, photo: { v: 2, none: true, at: T0 - 86_400_000 } },
+  ]);
+  w.places.get("trip-v").get("v1").data.cn = "上海市黄浦区福佑路168号 豫园（城隍庙：方浜中路249号）";
+  w.places.get("trip-v").get("v6").data.cn = "上海市静安区威海路590弄 张园";
+  await P.runPhotos("trip-v", w.deps, {});
+  const ph = (id) => photoOf(w, "trip-v", id);
+  check(ph("v1")?.key === "File:Yu Garden.jpg" && /^c\//.test(ph("v1")?.path) && w.log.urls.some((x) => x.host === "nominatim.openstreetmap.org" && new URL(x.url).searchParams.get("q") === "豫园"), "a « none » of version 1 looked up again: found by the Chinese name at the end of its address (cn)");
+  check(w.log.downloads.some((d) => /^https:\/\/thumb\.wikimedia\.org\/wikipedia\/commons\/thumb\/.+500px-Yu_Garden\.jpg$/.test(d.url)), "a thumb.wikimedia.org thumbnail accepted and downloaded without its query");
+  check(ph("v2")?.key === "File:Peace Hotel facade.jpg" && ph("v2")?.source === "wikidata" && ph("v2")?.qid === "Q32", "nothing in OpenStreetMap → the Wikipedia search by the hotel in brackets (« Shanghai » refused) → its P18");
+  check(ph("v3")?.key === "File:Shanghai Museum East.jpg" && ph("v3")?.license === "CC0", "a page with no position: its Wikidata position checked (« Pudong » refused by its kind)");
+  check(ph("v4")?.none === true && !w.log.urls.some((x) => /Q35/.test(decodeURIComponent(x.url))), "a page 4.5 km away refused (its Wikidata id never asked)");
+  check(ph("v5")?.none === true && !w.log.urls.some((x) => x.host === "commons.wikimedia.org" && /Rockbund local/.test(decodeURIComponent(String(x.body)))), "a page image that is not free is never asked");
+  check(ph("v6")?.none === true && !w.log.urls.some((x) => /Q39/.test(decodeURIComponent(x.url))), "an OpenStreetMap hit not named as asked is dropped");
+  check(ph("v7")?.none === true && ph("v7")?.v === 2 && !w.log.urls.some((x) => /Wukang|Balade/.test(decodeURIComponent(x.url))), "a walk is never looked up (« none »)");
+  check(ph("v8")?.at === T0 - 86_400_000 && !w.log.urls.some((x) => /Old Spot/.test(decodeURIComponent(x.url))), "a « none » of version 2 waits its 30 days");
+  check(w.log.searches.length > 0 && !w.log.searches.some((q) => /^\w+:(RAM|Pudong|Wukang Lu|Balade)\b/.test(q)), `the searches never use an acronym, a district alone or a walk (${w.log.searches.length} searches)`);
+  check(w.log.wmMax <= 3, `the searches keep ≤3 Wikimedia requests in flight (${w.log.wmMax})`);
+}
+{
+  // the time budget runs out during Openverse: the places every source answered are « none », the others retried
+  const w = world({ ovCost: 15_000 });
+  const ts = Array.from({ length: 6 }, (_, i) => ({ id: `b${i}`, name: `Quiet Spot ${i}`, lat: 31.23 + i * 0.001, lng: 121.47, type: "landmark" }));
+  const res = await X.lookupPlaces(ts, { city: "Shanghai", country: "cn", langs: ["en", "fr"] }, w.io, T0 + 50_000);
+  const got = ts.map((t) => res.get(t.id));
+  check(got.slice(0, 3).every((r) => r === "none") && got.slice(3).every((r) => r === "retry"), `cut during Openverse: answered places « none », the rest to retry (${got.join(", ")})`);
+  check(w.log.searches.length === ts.length * 2, `the Wikipedia searches ran while OpenStreetMap was asked (${w.log.searches.length} searches)`);
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

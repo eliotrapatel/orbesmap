@@ -16,7 +16,7 @@ import { createCipheriv, createDecipheriv, createHmac, randomBytes, randomUUID, 
 import webpush from "web-push";
 import { waitUntil } from "@vercel/functions";
 import { reserve, runTask, TaskFailure, type TaskRun } from "./ai.js";
-import { Busy, copyToBucket, ensureBucket, lookupCity, lookupPlaces, needsLookup as photoNeeded, type Found, type Io, type PhotoRef, type Target } from "./_photos.js";
+import { Busy, copyToBucket, ensureBucket, lookupCity, lookupPlaces, needsLookup as photoNeeded, NONE_V as PHOTO_NONE_V, type Found, type Io, type PhotoRef, type Target } from "./_photos.js";
 
 type Json = Record<string, unknown>;
 const SUPA_URL = process.env.SUPABASE_URL || "https://ifugaqjneprbtigvegeb.supabase.co";
@@ -811,6 +811,8 @@ async function unit(deps: Deps, tripId: string, s: Scratch, c: Claim, t0: number
 }
 
 // ---------- the photos of the places and of the trip ----------
+/** a place's Chinese address (« cn » in the code trips, « addressCn » in prepared ones): its end is often its Chinese name */
+const cnText = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 200) : undefined);
 const isPhotoRef = (v: unknown): v is PhotoRef => !!v && typeof v === "object" && typeof (v as PhotoRef).path === "string" && typeof (v as PhotoRef).thumb === "string";
 const staleNone = (v: unknown, now: number) => !!v && typeof v === "object" && (v as { none?: boolean }).none === true && now - (Number((v as { at?: number }).at) || 0) > 30 * 86_400_000;
 const sameSpot = (row: PlaceRow, t: Target) => String(row.data.name || "").trim() === t.name && Number(row.data.lat) === t.lat && Number(row.data.lng) === t.lng;
@@ -849,7 +851,7 @@ export async function runPhotos(tripId: string, deps: Deps, opts: { hop?: number
     const order = (r: PlaceRow) => Number(r.data.order) || 0;
     const live = (await db.listPlaces(tripId)).filter((r) => r.id !== "__meta" && r.data.deleted !== true && r.data.removed !== true && typeof r.data.name === "string" && r.data.name.trim() && typeof r.data.lat === "number" && typeof r.data.lng === "number" && Number.isFinite(r.data.lat) && Number.isFinite(r.data.lng));
     const todo = live.filter((r) => photoNeeded(r.data.photo, r.data.fieldsAt, now)).sort((a, b) => order(a) - order(b) || a.id.localeCompare(b.id));
-    const targets: Target[] = todo.slice(0, PHOTO_CAP).map((r) => ({ id: r.id, name: String(r.data.name).trim(), nameCn: typeof r.data.nameCn === "string" && r.data.nameCn.trim() ? r.data.nameCn.trim() : undefined, lat: r.data.lat as number, lng: r.data.lng as number, type: String(r.data.type || "") }));
+    const targets: Target[] = todo.slice(0, PHOTO_CAP).map((r) => ({ id: r.id, name: String(r.data.name).trim(), nameCn: typeof r.data.nameCn === "string" && r.data.nameCn.trim() ? r.data.nameCn.trim() : undefined, addressCn: cnText(r.data.cn) || cnText(r.data.addressCn), lat: r.data.lat as number, lng: r.data.lng as number, type: String(r.data.type || "") }));
     const leftOver = todo.length > targets.length;
     // the trip's city: the preparation's first city, else the trip's own title and centre (never the app's input)
     const d = draftOf(row.data);
@@ -886,7 +888,7 @@ export async function runPhotos(tripId: string, deps: Deps, opts: { hop?: number
     let writeError: unknown = null;
     const writeOne = async (id: string) => {
       const res = results.get(id);
-      const photo: Json | null = res === "none" ? { v: 1, none: true } : res && res !== "retry" && refs.has(id) ? { ...refs.get(id)! } : null;
+      const photo: Json | null = res === "none" ? { v: PHOTO_NONE_V, none: true } : res && res !== "retry" && refs.has(id) ? { ...refs.get(id)! } : null;
       if (!photo) return;
       let ok = await write(id, photo);
       if (ok === false) {
