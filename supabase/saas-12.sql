@@ -123,8 +123,11 @@ begin
     end;
   end if;
   if not coalesce(ok, false) then return; end if;
+  -- written only by the server (the invitation trigger below, api/prepare.ts with the service key): never from here,
+  -- so that no early or forged row takes the place of the real one
+  if p_name in ('invite_accepted', 'prep_started', 'prep_ready', 'prep_failed') then return; end if;
   -- written once per account: never from a device that is not signed in
-  if p_name in ('email_confirmed', 'invite_accepted') and auth.uid() is null then return; end if;
+  if p_name = 'email_confirmed' and auth.uid() is null then return; end if;
   -- limits: 5,000 steps a day per account or device, 500,000 for the whole service
   if (select count(*) from public.events where at > now() - interval '1 day'
       and ((auth.uid() is not null and user_id = auth.uid()) or (auth.uid() is null and v is not null and visitor = v))) >= 5000
@@ -182,7 +185,8 @@ $$;
 revoke all on function public.track_event(text, text, text, text, text, text, text, text, text, text, text) from public;
 grant execute on function public.track_event(text, text, text, text, text, text, text, text, text, text, text) to anon, authenticated;
 
--- the first version (supabase/saas-5.sql, the app's direct fallback): same signature and defaults, same list
+-- the first version (supabase/saas-5.sql, the app's direct fallback): same signature and defaults, same list, and its
+-- own limits kept as in saas-6.sql (2,000 steps a day per account or device, 200,000 for the whole service)
 create or replace function public.track_event(p_name text, p_detail text default null, p_device text default null, p_ref text default null,
                                               p_visitor text default null, p_trip text default null)
 returns void
@@ -190,7 +194,14 @@ language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  v text := nullif(left(regexp_replace(coalesce(p_visitor, ''), '[^a-zA-Z0-9-]', '', 'g'), 40), '');
 begin
+  if (select count(*) from public.events where at > now() - interval '1 day'
+      and ((auth.uid() is not null and user_id = auth.uid()) or (auth.uid() is null and v is not null and visitor = v))) >= 2000
+     or (select count(*) from public.events where at > now() - interval '1 day') >= 200000 then
+    return;
+  end if;
   perform public.track_event(p_name, p_detail, p_device, p_ref, p_visitor, p_trip, null::text, null::text, null::text, null::text, null::text,
                              null::text, null::text);
 end;
@@ -232,7 +243,8 @@ drop trigger if exists trip_members_invite_accepted on public.trip_members;
 create trigger trip_members_invite_accepted after insert on public.trip_members for each row execute function public.log_invite_accepted();
 
 -- 5. the admin's views ----------------------------------------------------------------------------------------------
--- (internal) when an account validated its first trip: the step, else a trip it owns marked done
+-- (internal) when an account validated its first trip: the step, else a trip it owns marked done (a copied public
+-- programme is marked done at once: never counted as validated)
 create or replace function public.m_validated_at(p_user uuid)
 returns timestamptz
 language sql
@@ -244,6 +256,7 @@ as $$
     (select min(e.at) from public.events e where e.user_id = p_user and e.name = 'trip_validated'),
     (select min(to_timestamp((t.data -> 'draft' ->> 'doneAt')::double precision / 1000)) from public.trips t
      where t.owner = p_user and coalesce(t.data ->> 'deleted', 'false') <> 'true'
+       and coalesce(t.data -> 'draft' ->> 'copiedFrom', '') = ''
        and (t.data -> 'draft' ->> 'doneAt') ~ '^[0-9]{10,14}(\.[0-9]+)?$'));
 $$;
 -- (internal) when its first programme was ready (server preparations)
@@ -378,7 +391,7 @@ begin
                count(*) filter (where public.m_validated_at(f.id) <= f.created_at + interval '7 days') as activations
         from firsts f where f.src is not null group by f.src
       ), vis as (
-        select e.src, count(distinct coalesce(e.user_id::text, e.visitor)) as visits
+        select e.src, count(distinct coalesce(e.user_id::text, e.visitor)) filter (where e.by_user is null or e.user_id is distinct from e.by_user) as visits
         from public.events e where e.src is not null and e.at > since group by e.src
       ), ret as (
         select e.src, count(distinct e.user_id) as back
@@ -398,7 +411,8 @@ begin
                        order by s.visits desc, s.signups desc)
       from (
         select e.by_user,
-               count(distinct coalesce(e.user_id::text, e.visitor)) as visits,
+               -- the sharer opening their own link (signed out, then linked to their account) is not their own visit
+               count(distinct coalesce(e.user_id::text, e.visitor)) filter (where e.user_id is distinct from e.by_user) as visits,
                count(distinct e.user_id) filter (where x.created_at > since and e.user_id <> e.by_user) as signups
         from public.events e left join auth.users x on x.id = e.user_id
         where e.by_user is not null and e.at > since

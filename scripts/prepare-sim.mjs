@@ -276,7 +276,7 @@ console.log("1. Full run: outline, essentials, three days, review, notice");
   check(w.calls.ai.every((c) => c.body.who?.name === "Eliot" && c.body.task), "every AI request carries the app's context");
   check(w.calls.reserve.join(",") === "outline,essentials,day,day,day", `bookings in order (${w.calls.reserve.join(",")})`);
   check([...w.usage.values()].length === 5 && [...w.usage.values()].every((u) => u.ok === true && u.usd > 0 && u.provider === "deepseek" && u.trip_id === "trip-1"), "every booking settled with its cost and detail");
-  check(w.calls.push.length === 1 && w.calls.push[0].title === "Votre voyage est prêt" && w.calls.push[0].url.endsWith("/?src=push_ready#trip-1"), "one notification, in French, opening the trip (its link says src=push_ready)");
+  check(w.calls.push.length === 1 && w.calls.push[0].title === "Votre voyage est prêt" && w.calls.push[0].url.endsWith("/#trip-1"), "one notification, in French, opening the trip");
   check(w.calls.mail.length === 0, "no e-mail when a phone got the notification");
   check(w.scratch.get("trip-1").done === true && w.scratch.get("trip-1").bookings.length === 0, "scratch closed, no booking left");
   // a late duplicate call after the end changes nothing and never notifies twice

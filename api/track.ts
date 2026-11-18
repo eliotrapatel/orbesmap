@@ -23,6 +23,18 @@ function device(ua: string): { os: string; browser: string } {
   return { os, browser };
 }
 
+/**
+ * The steps renamed by supabase/saas-12.sql, under the name production's database knows before that file runs
+ * (its track_event drops an unknown name without an error): sign-ups and finished welcomes were « signup_done »,
+ * public links created and their button clicked were « link_opened » (same details as today).
+ */
+const OLD_NAMES: Record<string, string> = {
+  signup_submitted: "signup_done",
+  onboarding_done: "signup_done",
+  public_link_created: "link_opened",
+  public_cta_clicked: "link_opened",
+};
+
 export function OPTIONS(req: Request) {
   return new Response(null, { status: 204, headers: cors(req.headers.get("origin")) });
 }
@@ -46,10 +58,14 @@ export async function POST(req: Request): Promise<Response> {
   // the link's channel and sharer (supabase/saas-12.sql), only when the step has them; checked again by the database
   const src = typeof b.src === "string" ? b.src.slice(0, 24) : null;
   const by = typeof b.by === "string" ? b.by.slice(0, 16) : null;
-  let r = src || by ? await call({ ...full, p_src: src, p_by: by }).catch(() => null) : null;
-  // before supabase/saas-12.sql: the step without its source
-  if (!r || !r.ok) r = await call(full).catch(() => null);
+  // a renamed step (supabase/saas-12.sql) is always tried on the full version: its absence (404) is the only sign
+  const old = typeof b.name === "string" && Object.hasOwn(OLD_NAMES, b.name) ? OLD_NAMES[b.name] : null;
+  let r = src || by || old ? await call({ ...full, p_src: src, p_by: by }).catch(() => null) : null;
+  if (r && r.ok) return new Response(null, { status: 204, headers: h });
+  // before supabase/saas-12.sql (404): the step without its source, under the name the database knows today
+  const p_name = r && r.status === 404 && old ? old : base.p_name;
+  r = await call({ ...full, p_name }).catch(() => null);
   // before supabase/saas-8.sql: the step without place and device
-  if (r && r.status === 404) r = await call(base).catch(() => null);
+  if (r && r.status === 404) r = await call({ ...base, p_name }).catch(() => null);
   return new Response(null, { status: 204, headers: h });
 }

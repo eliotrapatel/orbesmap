@@ -111,22 +111,42 @@ console.log("2. api/track.ts: 13 → 11 → 6 arguments");
   check(r.res.status === 204 && r.sent.length === 0, "JSON null: 204, nothing sent");
   r = await run({ ...step, src: "x".repeat(200), by: "y".repeat(200) }, [204]);
   check(r.sent[0].args.p_src.length === 24 && r.sent[0].args.p_by.length === 16, "long values are cut before the database checks them");
+  // the renamed steps: never lost between this deploy and supabase/saas-12.sql
+  const signup = { ...step, name: "signup_submitted" };
+  r = await run(signup, [204]);
+  check(r.sent.length === 1 && Object.keys(r.sent[0].args).length === 13 && r.sent[0].args.p_name === "signup_submitted" && r.sent[0].args.p_src === null, "renamed step, saas-12 there: its new name, on the 13-argument version");
+  r = await run(signup, [404, 204]);
+  check(r.sent.length === 2 && Object.keys(r.sent[1].args).length === 11 && r.sent[1].args.p_name === "signup_done", "renamed step before saas-12.sql (404): recorded as today's signup_done");
+  r = await run({ ...step, name: "onboarding_done" }, [404, 404, 204]);
+  check(r.sent.length === 3 && Object.keys(r.sent[2].args).length === 6 && r.sent[2].args.p_name === "signup_done", "before saas-8.sql too: the first version, still signup_done");
+  r = await run({ ...step, name: "public_cta_clicked", detail: "brand_cta" }, [404, 204]);
+  check(r.sent[1]?.args.p_name === "link_opened" && r.sent[1]?.args.p_detail === "brand_cta", "public_cta_clicked before saas-12: link_opened « brand_cta », as today");
+  r = await run({ ...step, name: "public_link_created", trip: "t1" }, [404, 204]);
+  check(r.sent[1]?.args.p_name === "link_opened" && r.sent[1]?.args.p_trip === "t1", "public_link_created before saas-12: link_opened on its trip, as today");
+  r = await run(signup, ["throw", 204]);
+  check(r.sent.length === 2 && r.sent[1].args.p_name === "signup_submitted", "network error (not a 404): the new name is kept");
+  r = await run(signup, [500, 204]);
+  check(r.sent.length === 2 && r.sent[1].args.p_name === "signup_submitted", "server error (not a 404): the new name is kept");
+  r = await run({ ...step, name: "create_started" }, [204]);
+  check(r.sent.length === 1 && Object.keys(r.sent[0].args).length === 11, "a new step that was never named otherwise: the 11-argument version, as before");
   globalThis.fetch = realFetch;
 }
 
 // ---------- 3. the « ready » notification and e-mail ----------
-console.log("3. api/prepare.ts sendReady: tagged links");
+console.log("3. api/prepare.ts sendReady: e-mail link tagged, notification link plain");
 {
   const pushed = [];
   const mailed = [];
   const db = { profile: async () => ({ name: "Eliot", lang: "fr" }), pushSubs: async () => [{ endpoint: "e", p256dh: "p", auth: "a" }], dropPushSub: async () => {}, email: async () => "e@x.test" };
   const deps = { db, push: async (_s, payload) => void pushed.push(payload), mail: async (to, subject, html, text) => (mailed.push({ html, text }), true) };
   check((await P.sendReady(deps, "trip-1", { title: "Florence" }, "user-1")) === "push", "a phone: notification");
-  check(pushed[0]?.url === "https://orbesmap.vercel.app/?src=push_ready#trip-1", "notification link: src=push_ready, #trip kept");
+  check(pushed[0]?.url === "https://orbesmap.vercel.app/#trip-1", "notification link: the plain /#trip (an open app is never reloaded by its click)");
   const noPhone = { ...deps, db: { ...db, pushSubs: async () => [] } };
   check((await P.sendReady(noPhone, "trip-1", { title: "Florence" }, "user-1")) === "mail", "no phone: e-mail");
   check(mailed[0]?.html.includes('href="https://orbesmap.vercel.app/?src=email_ready#trip-1"') && mailed[0]?.text.includes("https://orbesmap.vercel.app/?src=email_ready#trip-1"), "e-mail link (button and text): src=email_ready, #trip kept");
 }
+
+check(/missed > 0\) ev\(deps, s\.user, "prep_failed", s\.capHit \? "cap" : "days", tripId\)/.test(read("api/prepare.ts")), "prepare.ts: days missing after the daily cap: prep_failed « cap », as the draft's message");
 
 // ---------- 4. api/cron.ts ----------
 console.log("4. api/cron.ts: e-mail links tagged, notification links unchanged");
@@ -153,7 +173,16 @@ console.log("5. supabase/saas-12.sql");
   check(asked.every((n) => steps.includes(n) && listed.has(n)), "the 26 names the other lots will send: in the app's list and the server's");
   check(/to_regclass\('public\.event_names'\)/.test(fn13) && /execute 'select exists \(select 1 from public\.event_names where name = \$1\)'/.test(fn13), "names registered by other lots in event_names are accepted too (when that table exists)");
   check(/>= 5000/.test(fn13) && />= 500000/.test(fn13) && /interval '13 months' order by id limit 100/.test(fn13), "same limits and same 13-month cleaning as saas-11.sql");
-  check(/p_name in \('email_confirmed', 'invite_accepted'\) and auth\.uid\(\) is null then return/.test(fn13), "steps written once: never from a device not signed in");
+  check(/if p_name = 'email_confirmed' and auth\.uid\(\) is null then return/.test(fn13), "email_confirmed: never from a device not signed in");
+  const body13 = fn13.slice(0, fn13.indexOf("\n$$;"));
+  check(/if p_name in \('invite_accepted', 'prep_started', 'prep_ready', 'prep_failed'\) then return; end if;/.test(body13) && body13.indexOf("'prep_failed') then return") < body13.indexOf("insert into public.events"), "server-only steps (invitation accepted, preparation) refused from the app: no forged row takes the real one's place");
+  const fn6 = sql.slice(sql.indexOf("create or replace function public.track_event(p_name text, p_detail text default null"));
+  const body6 = fn6.slice(0, fn6.indexOf("\n$$;"));
+  check(/>= 2000/.test(body6) && />= 200000/.test(body6) && body6.indexOf(">= 2000") < body6.indexOf("perform public.track_event("), "6-argument version: its own limits of saas-6.sql (2,000 / 200,000) kept before it calls the full one");
+  const mv = sql.slice(sql.indexOf("create or replace function public.m_validated_at("));
+  check(/coalesce\(t\.data -> 'draft' ->> 'copiedFrom', ''\) = ''/.test(mv.slice(0, mv.indexOf("\n$$;"))), "a copied public programme never counts as a validated trip");
+  const ch = sql.slice(sql.indexOf("create or replace function public.admin_channels("));
+  check(/count\(distinct coalesce\(e\.user_id::text, e\.visitor\)\) filter \(where e\.user_id is distinct from e\.by_user\) as visits/.test(ch) && /filter \(where e\.by_user is null or e\.user_id is distinct from e\.by_user\) as visits/.test(ch), "a sharer opening their own link is not counted among their visits (sharers and channels)");
   check(/if b = auth\.uid\(\) then b := null/.test(fn13), "nobody counts as their own sharer");
   // the older versions: same signatures and defaults, calling the full one
   check(/create or replace function public\.track_event\(p_name text, p_detail text default null, p_device text default null, p_ref text default null,\s*p_visitor text default null, p_trip text default null\)/.test(sql), "6-argument version: same parameter names and defaults as saas-5/6");
@@ -205,7 +234,8 @@ console.log("6. The app's steps (R03 clean-up)");
   check(has("src/components/v3/InviteTravellers.tsx", /onClick=\{\(\) => track\("trip_shared_whatsapp", "invite", trip\.id\)\}/), "trip_shared_whatsapp sent at last");
   const tr = read("src/lib/track.ts");
   check(/const SOURCED = new Set<Step>\(\["visit", "app_open", "public_view"\]\)/.test(tr) && /history\.replaceState\(history\.state, ""/.test(tr), "track.ts: the source goes with visit / app_open / public_view and leaves the address");
-  check(/rpc\("track_event", \{ p_name: body\.name, p_detail: body\.detail, p_device: body\.device, p_ref: body\.ref, p_visitor: body\.visitor, p_trip: body\.trip \}\)/.test(tr), "track.ts: the direct fallback (6 arguments) unchanged");
+  check(/rpc\("track_event", \{ p_name: name, p_detail: body\.detail, p_device: body\.device, p_ref: body\.ref, p_visitor: body\.visitor, p_trip: body\.trip \}\)/.test(tr) && /if \(!old\) return void first\(body\.name\);/.test(tr), "track.ts: the direct fallback (6 arguments) unchanged for every step not renamed");
+  check(/\["PGRST202", "42883"\]\.includes\(String\(error\.code\)\) \? first\(old\)/.test(tr) && /signup_submitted: "signup_done", onboarding_done: "signup_done", public_link_created: "link_opened", public_cta_clicked: "link_opened"/.test(tr), "track.ts: a renamed step goes under its old name when saas-12's version is missing");
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

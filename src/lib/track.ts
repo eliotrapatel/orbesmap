@@ -79,9 +79,22 @@ export function track(name: Step, detail?: string | null, trip?: string | null) 
     .then((r) => {
       if (!r.ok) throw new Error(String(r.status));
     })
-    .catch(() =>
-      supabase!.rpc("track_event", { p_name: body.name, p_detail: body.detail, p_device: body.device, p_ref: body.ref, p_visitor: body.visitor, p_trip: body.trip }).then(() => undefined, () => undefined),
-    );
+    .catch(() => direct(body));
+}
+
+/** The steps renamed by supabase/saas-12.sql, under their name before it (see api/track.ts): never lost in between */
+const OLD_NAMES: Partial<Record<Step, Step>> = { signup_submitted: "signup_done", onboarding_done: "signup_done", public_link_created: "link_opened", public_cta_clicked: "link_opened" };
+type Body = { name: Step; detail: string | null; device: string; ref: string | null; visitor: string | null; trip: string | null };
+/** Straight to the database (api/track unreachable): the first version, as before; a renamed step asks saas-12's first */
+function direct(body: Body) {
+  const old = OLD_NAMES[body.name];
+  const first = (name: Step) =>
+    supabase!.rpc("track_event", { p_name: name, p_detail: body.detail, p_device: body.device, p_ref: body.ref, p_visitor: body.visitor, p_trip: body.trip }).then(() => undefined, () => undefined);
+  if (!old) return void first(body.name);
+  const none = null as string | null;
+  void supabase!
+    .rpc("track_event", { p_name: body.name, p_detail: body.detail, p_device: body.device, p_ref: body.ref, p_visitor: body.visitor, p_trip: body.trip, p_city: none, p_country: none, p_region: none, p_os: none, p_browser: none, p_src: none, p_by: none })
+    .then(({ error }) => (error && ["PGRST202", "42883"].includes(String(error.code)) ? first(old) : error ? first(body.name) : undefined), () => first(body.name));
 }
 
 /** A step counted once per `key` on this device (e.g. the first day opened of each trip) */

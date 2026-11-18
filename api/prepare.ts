@@ -609,7 +609,7 @@ async function unit(deps: Deps, tripId: string, s: Scratch, c: Claim, t0: number
       }
     }
     // the whole trip asked, some days could not be prepared
-    if (res?.changed && !s.only && missed > 0) ev(deps, s.user, "prep_failed", "days", tripId);
+    if (res?.changed && !s.only && missed > 0) ev(deps, s.user, "prep_failed", s.capHit ? "cap" : "days", tripId);
     await giveBack(deps, tripId, s);
     // the photos of the places, in a call of their own: the trip is already ready (never slowed by them)
     if (res?.changed) await deps.kickPhotos?.(tripId, 0).catch(() => false);
@@ -1017,8 +1017,9 @@ export async function sendReady(deps: Deps, tripId: string, data: Json, userId: 
   const T = READY[prof.lang === "en" ? "en" : "fr"];
   const alerts = (prof.alerts || {}) as { email?: boolean; push?: boolean };
   const title = String(data.title || "ORBES Trips");
-  // the app opens on this trip; the link says where it came from (?src=, read once by the app)
-  const url = `${APP_URL}/?src=push_ready#${tripId}`;
+  // the app opens on this trip (same plain link as the alerts of api/cron.ts: an app already open is never reloaded);
+  // only the e-mail's link says where it came from (?src=, read once by the app)
+  const url = `${APP_URL}/#${tripId}`;
   const mailUrl = `${APP_URL}/?src=email_ready#${tripId}`;
   let pushed = 0;
   if (deps.push && alerts.push !== false) {
