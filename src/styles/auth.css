@@ -1,0 +1,64 @@
+/* Accounts with e-mail + password: the form of the public page (AuthBox) and "Choisissez un nouveau mot de passe"
+   (PasswordRecovery). This file loads before styles.css: rules are scoped (.auth-*) or more specific than the v3 ones. */
+
+.auth-box { padding: 14px 16px 16px; }
+
+/* the two modes, one sliding ink under the chosen one */
+.auth-tabs { position: relative; display: grid; grid-template-columns: 1fr 1fr; height: 46px; padding: 4px; margin-bottom: 14px; border-radius: 15px; background: rgba(246, 242, 234, 0.04); border: 1px solid var(--hair); }
+.auth-tabs button { position: relative; z-index: 1; border-radius: 11px; font-size: 13.5px; color: var(--soft); white-space: nowrap; transition: color 0.35s var(--ease); }
+.auth-tabs button:hover { color: var(--ink); }
+.auth-tabs button.on { color: #0a0a0a; font-weight: 600; }
+.auth-ink { position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc(50% - 4px); border-radius: 11px; background: var(--ink); transition: transform 0.45s var(--ease); }
+.auth-ink[data-on="signin"] { transform: translateX(100%); }
+
+.auth-swap { display: flex; flex-direction: column; gap: 10px; animation: auth-swap 0.45s var(--ease) backwards; }
+@keyframes auth-swap { from { opacity: 0; transform: translateY(6px); } }
+
+/* fields: a visible label above the value */
+.v3-field.col.auth-field { min-height: 60px; padding: 9px 14px 0; cursor: text; }
+.v3-field.col.auth-field input { height: 38px; }
+.v3-field.col .auth-pw { display: flex; align-items: center; font-size: inherit; letter-spacing: normal; text-transform: none; color: inherit; }
+.v3-field.col .auth-pw input { flex: 1; min-width: 0; }
+.auth-eye { width: 42px; height: 38px; margin-right: -12px; display: grid; place-items: center; flex: none; border-radius: 10px; color: var(--mute); transition: color 0.2s; }
+.auth-eye:hover, .auth-eye[aria-pressed="true"] { color: var(--ink); }
+.auth-eye svg { width: 19px; height: 19px; }
+
+/* strength of a new password */
+.auth-strength { display: flex; align-items: center; gap: 10px; min-height: 20px; padding: 0 2px; }
+.auth-bars { display: flex; gap: 4px; flex: none; }
+.auth-bars i { width: 22px; height: 3px; border-radius: 2px; background: var(--hair); transition: background 0.35s var(--ease); }
+.auth-strength small { font-size: 12px; color: var(--mute); }
+.auth-strength.s1 .auth-bars i.on { background: var(--soft); }
+.auth-strength.s2 .auth-bars i.on { background: var(--ink); }
+.auth-strength.s3 .auth-bars i.on { background: var(--ok); }
+.auth-strength.s3 small { color: var(--ok); }
+
+.auth-row { display: flex; justify-content: flex-end; margin-top: -2px; }
+.auth-forgot { font-size: 13px; color: var(--soft); padding: 4px 2px; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--hair-strong); transition: color 0.2s; }
+.auth-forgot:hover { color: var(--ink); }
+.auth-go { margin-top: 4px; }
+.auth-title { font: 500 20px/1.05 var(--display); text-transform: uppercase; margin-top: 2px; }
+.auth-sub { font-size: 12.5px; color: var(--mute); line-height: 1.5; }
+.auth-first { text-align: center; padding: 2px 8px 0; }
+.auth-note { font-size: 13px; color: var(--soft); line-height: 1.5; padding: 12px 14px; border-radius: 14px; background: rgba(127, 209, 185, 0.07); border: 1px solid rgba(127, 209, 185, 0.25); }
+.auth-note b { color: var(--ink); font-weight: 600; }
+.auth-badge { width: 46px; height: 46px; border-radius: 50%; border: 1px solid rgba(127, 209, 185, 0.4); color: var(--ok); display: grid; place-items: center; }
+.auth-badge svg { width: 20px; height: 20px; }
+.auth-err { line-height: 1.45; }
+.auth-inline { color: var(--ink); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; padding: 0; }
+.auth-fine { margin-top: 14px; line-height: 1.5; }
+
+/* "Choisissez un nouveau mot de passe": full screen, over every screen of the app */
+.v3.auth-recovery { z-index: 200; }
+.auth-rec-col { position: relative; width: 100%; max-width: 440px; min-height: 100%; margin: 0 auto; display: flex; flex-direction: column; padding: calc(var(--safe-t) + 22px) max(20px, env(safe-area-inset-right, 0px)) calc(var(--safe-b) + 24px) max(20px, env(safe-area-inset-left, 0px)); }
+.auth-rec-col > .orbit-mark { color: var(--ink); flex: none; }
+.auth-rec-body { margin: auto 0; padding: 40px 0; display: flex; flex-direction: column; gap: 12px; }
+.auth-rec-body .v3-h2 { margin-bottom: 4px; }
+.auth-rec-body .v3-lead { margin-bottom: 12px; }
+.auth-rec-body .v3-link { margin-top: 4px; }
+.auth-rec-body .v3-lbl.auth-rec-mail { text-transform: none; letter-spacing: 0.02em; font-size: 12.5px; color: var(--soft); }
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-swap { animation: none; }
+  .auth-ink, .auth-tabs button, .auth-bars i { transition: none; }
+}

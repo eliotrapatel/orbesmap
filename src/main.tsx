@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import Root from "./components/v3/Root";
+import PasswordRecovery from "./components/v3/PasswordRecovery";
 import { initAuth, toast } from "./lib/store";
 import "./styles.css";
 
@@ -18,5 +19,7 @@ if ("serviceWorker" in navigator && location.hostname.endsWith(".vercel.app")) {
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <Root />
+    {/* "Choisissez un nouveau mot de passe" after a reset link, over any screen */}
+    <PasswordRecovery />
   </StrictMode>,
 );

@@ -987,6 +987,7 @@ if (typeof window !== "undefined") {
   });
 }
 
+/** Sign-in link / code by e-mail: no longer offered on the sign-in screen (accounts use a password); kept for other screens */
 export async function sendLoginEmail(email: string) {
   if (!supabase) throw new Error("not configured");
   const redirect = window.location.origin + window.location.pathname;
@@ -1002,10 +1003,47 @@ export async function signInWithGoogle() {
   if (error) throw error;
 }
 
-/** Sign in with the e-mail + password created for each member in Supabase (no e-mail is sent). */
+/** Sign in with the account's e-mail + password (no e-mail is sent). */
 export async function signInWithPassword(email: string, password: string) {
   if (!supabase) throw new Error("not configured");
   const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw error;
+}
+
+/**
+ * Creates an account with an e-mail + password. "signed_in": the account is open (the session arrives through
+ * onAuthStateChange); "confirm": the project asks to confirm the address first (an e-mail with a link left);
+ * "exists": an account already has this address (Supabase hides it when confirmation is on: no identity returned).
+ */
+export async function signUpWithPassword(email: string, password: string): Promise<"signed_in" | "confirm" | "exists"> {
+  if (!supabase) throw new Error("not configured");
+  const redirect = window.location.origin + window.location.pathname;
+  // the account's language goes with it: the e-mails are written in it (supabase/email-templates.md)
+  const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { lang: getLang() }, emailRedirectTo: redirect } });
+  if (error) throw error;
+  if (data.session) return "signed_in";
+  if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) return "exists";
+  return "confirm";
+}
+
+/** Sends the confirmation e-mail of a new account again (when the project asks to confirm addresses) */
+export async function resendSignupEmail(email: string) {
+  if (!supabase) throw new Error("not configured");
+  const { error } = await supabase.auth.resend({ type: "signup", email, options: { emailRedirectTo: window.location.origin + window.location.pathname } });
+  if (error) throw error;
+}
+
+/** "Mot de passe oublié": an e-mail with a link back to this page (?reset=1), where a new password is chosen */
+export async function sendPasswordReset(email: string) {
+  if (!supabase) throw new Error("not configured");
+  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + window.location.pathname + "?reset=1" });
+  if (error) throw error;
+}
+
+/** Sets the signed-in account's password (after a reset link, or a first password for an account made with a link) */
+export async function updatePassword(password: string) {
+  if (!supabase) throw new Error("not configured");
+  const { error } = await supabase.auth.updateUser({ password });
   if (error) throw error;
 }
 
