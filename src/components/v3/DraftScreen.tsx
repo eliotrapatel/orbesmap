@@ -123,7 +123,7 @@ function Review({ onClose }: { onClose: () => void }) {
       </div>
       <div className="v3-glass v3-daycard">
         <div className="v3-dayhead">
-          <span className="v3-grow"><b className="v3-d">{dd?.theme || dd?.title}</b><small>{dd?.title}</small></span>
+          <span className="v3-grow"><b className="v3-d">{dd?.theme || dd?.title}</b>{dd?.theme && <small>{dd.title}</small>}</span>
           <button className="v3-chip" disabled={run.busy} onClick={() => { const date = dd?.dates?.[0]; if (date) void regenerateDay(trip.id, date); }}>{run.busy ? "Préparation…" : "↻ Régénérer le jour"}</button>
         </div>
         {!slots.length && <p className="v3-note">Aucun lieu ce jour-là.</p>}
@@ -142,7 +142,7 @@ function Review({ onClose }: { onClose: () => void }) {
         </div>
       </div>
       <div className="v3-spacer" />
-      <button className="v3-btn" disabled={run.busy} onClick={() => { confirmTrip(trip.id); onClose(); }}>Valider le voyage ✓</button>
+      <button className="v3-btn" disabled={run.busy} onClick={() => confirmTrip(trip.id)}>Valider le voyage ✓</button>
     </Shell>
   );
 }
