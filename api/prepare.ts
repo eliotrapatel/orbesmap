@@ -10,10 +10,10 @@
 // When everything is ready: a notification to the person who started it (Web Push, else a short e-mail).
 // Needs on Vercel: SUPABASE_SERVICE_ROLE_KEY, DEEPSEEK_API_KEY (or ANTHROPIC_API_KEY); VAPID_PRIVATE_KEY and
 // RESEND_API_KEY for the notice at the end (MAIL_FROM optional). Nothing new: the same keys as api/ai.ts and api/cron.ts.
-import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import webpush from "web-push";
 import { waitUntil } from "@vercel/functions";
-import { reserve, runTask, TaskFailure, type TaskRun } from "./ai";
+import { reserve, runTask, TaskFailure, type TaskRun } from "./ai.js";
 
 type Json = Record<string, unknown>;
 const SUPA_URL = process.env.SUPABASE_URL || "https://ifugaqjneprbtigvegeb.supabase.co";
@@ -29,8 +29,11 @@ export const LEASE_STALE = 6 * 60_000;
 const DEVICE_LEASE = 3 * 60_000;
 /** Time for one AI request (the call must answer before Vercel cuts it at 300 s) */
 const AI_DEADLINE = 250_000;
-/** Placing a day's places: beyond this, the rest goes to the next call */
-const PLACE_BUDGET = 230_000;
+/** Placing a day's places: once a call is this old, the rest goes to the next call (one place can take ~30 s: four
+ *  OpenStreetMap queries with their spacing and timeout, and the writes; Vercel cuts a call at 300 s) */
+const CALL_BUDGET = 255_000;
+/** A step that fails this many times in a row (the database refusing a write…) stops the preparation */
+const UNIT_TRIES = 3;
 /** Where the scratch of a preparation lives (place_states, trip "_prep", place = the trip's id) */
 const SCRATCH_TRIP = "_prep";
 
@@ -91,11 +94,16 @@ export type Scratch = {
   only: string | null;
   /** the daily cap was reached while booking: the run stops with this message when the bookings run out */
   capHit: string | null;
-  /** a day's answer between its research and its placing */
-  pending: { date: string; result: DayResult; next: number; written: string[]; cleaned: boolean } | null;
+  /** a day's answer between its research and its placing; `ids` are the places' ids, fixed with the answer (a step
+   *  replayed after a cut writes the same rows again, which the database ignores) */
+  pending: { date: string; result: DayResult; next: number; ids: string[]; cleaned: boolean } | null;
+  /** the booking of the AI request in progress (a « stop » during it leaves it to the call that settles it) */
+  inflight: number | null;
   notified: string | null;
   done: boolean;
   at: number;
+  /** version: each write expects the one it read (a call whose run was stopped or replaced meanwhile writes nothing) */
+  v: number;
 };
 
 export type Row = { data: Json; updatedAt: string };
@@ -107,10 +115,13 @@ export type Db = {
   patchTrip(id: string, data: Json, updatedAt: string): Promise<boolean>;
   role(tripId: string, userId: string): Promise<string | null>;
   listPlaces(tripId: string): Promise<PlaceRow[]>;
+  /** adds a place; a place already there with this id is left as it is */
   insertPlace(tripId: string, id: string, data: Json, by: string): Promise<void>;
   patchPlace(tripId: string, id: string, data: Json, updatedAt: string): Promise<boolean>;
   getScratch(tripId: string): Promise<Scratch | null>;
-  putScratch(tripId: string, s: Scratch): Promise<void>;
+  /** writes the scratch only if the stored one is still `expect` (same run, same version); null = whatever is there
+   *  (a new run). false = changed meanwhile */
+  writeScratch(tripId: string, s: Scratch, expect: { run: string; v: number } | null): Promise<boolean>;
   updateUsage(id: number, detail: Json): Promise<void>;
   deleteUsage(ids: number[]): Promise<void>;
   profile(userId: string): Promise<Json>;
@@ -351,21 +362,49 @@ async function settle(deps: Deps, s: Scratch, b: Booking, tripId: string, r: { u
 }
 const failMsg = (k: string) => (k === "busy" ? MSG.busy : k === "refusal" ? MSG.refusal : k === "bad_output" ? MSG.badOutput : MSG.upstream);
 
-/** Takes the trip for one step: null when the preparation is over or another call is working on it */
-async function claim(deps: Deps, tripId: string, s: Scratch): Promise<{ hold: string; data: Json; step: Step } | null> {
+/** A call whose run was stopped or replaced meanwhile (someone else wrote its scratch): it stops there */
+class Lost extends Error {
+  constructor() {
+    super("run taken over");
+  }
+}
+/** Writes the scratch over the version this call read; false when it changed meanwhile (stopped, replaced) */
+async function save(deps: Deps, tripId: string, s: Scratch): Promise<boolean> {
+  const v = Number(s.v) || 0;
+  const next: Scratch = { ...s, v: v + 1, at: deps.now() };
+  if (!(await deps.db.writeScratch(tripId, next, { run: s.run, v }))) return false;
+  s.v = next.v;
+  s.at = next.at;
+  return true;
+}
+const mustSave = async (deps: Deps, tripId: string, s: Scratch) => {
+  if (!(await save(deps, tripId, s))) throw new Lost();
+};
+
+type Claim = { hold: string; data: Json; step: Step };
+/** Takes the trip for one step: "over" when the preparation no longer runs, "busy" when another call works on it */
+async function claim(deps: Deps, tripId: string, s: Scratch): Promise<Claim | "over" | "busy"> {
   const hold = randomUUID();
   let step: Step = { kind: "finish" };
+  let why: "over" | "busy" = "busy";
   const res = await commit(deps, tripId, (data) => {
     const d = draftOf(data);
-    if (!d || d.status !== "preparing") return null;
+    if (!d || d.status !== "preparing") {
+      why = "over";
+      return null;
+    }
     const l = d.lease;
     const now = deps.now();
     // a phone preparing it itself, or another call of the server at work
-    if (l && fresh(l, now, l.by === "server" ? LEASE_STALE : DEVICE_LEASE) && (l.by !== "server" || l.hold)) return null;
+    if (l && fresh(l, now, l.by === "server" ? LEASE_STALE : DEVICE_LEASE) && (l.by !== "server" || l.hold)) {
+      why = "busy";
+      return null;
+    }
     step = nextStep(data, s);
     return draftWith(data, { lease: { by: "server", at: now, hold, step: stepCode(step) } });
   });
-  if (!res || !res.changed) return null;
+  if (!res) return "over";
+  if (!res.changed) return why;
   return { hold, data: res.data, step };
 }
 /** Still ours: preparing, and the lease is this call's */
@@ -381,16 +420,36 @@ async function stopRun(deps: Deps, tripId: string, s: Scratch, hold: string | nu
   await commit(deps, tripId, (data) => (hold && !holds(data, hold) ? null : draftWith(data, { error, lease: undefined })));
   await giveBack(deps, tripId, s);
 }
-/** The unused bookings are deleted (they no longer count in the daily cap), the scratch is closed */
-async function giveBack(deps: Deps, tripId: string, s: Scratch) {
-  const ids = s.bookings.map((b) => b.id);
-  if (ids.length) await deps.db.deleteUsage(ids).catch(() => undefined);
-  s.bookings = [];
-  s.spent = {};
-  s.pending = null;
-  s.done = true;
-  s.at = deps.now();
-  await deps.db.putScratch(tripId, s);
+/**
+ * Closes the scratch and deletes the bookings left unused (they no longer count in the daily cap). `spare`: from the
+ * app's « stop » or a new start, the request in progress stays booked (the call that sent it settles it). `retry`: the
+ * scratch changed meanwhile (a call noting its request) → read again and close that; else whoever changed it is in
+ * charge and nothing is done.
+ */
+async function giveBack(deps: Deps, tripId: string, s: Scratch, opts: { spare?: boolean; retry?: boolean } = {}): Promise<boolean> {
+  let cur: Scratch | null = s;
+  for (let i = 0; i < 5 && cur && !cur.done; i++) {
+    const keep = opts.spare ? cur.inflight : null;
+    const ids = cur.bookings.map((b) => b.id).filter((id) => id !== keep);
+    const closed: Scratch = { ...cur, bookings: [], spent: {}, pending: null, inflight: null, done: true };
+    if (await save(deps, tripId, closed)) {
+      Object.assign(s, closed);
+      if (ids.length) await deps.db.deleteUsage(ids).catch(() => undefined);
+      return true;
+    }
+    if (!opts.retry) return false;
+    const again = await deps.db.getScratch(tripId);
+    cur = again && again.run === s.run ? again : null;
+  }
+  return false;
+}
+/** A scratch still open while the preparation no longer runs (validated, or stopped from a phone): its unused bookings
+ *  are given back, unless a start is at work (it holds a fresh lease while it books) */
+async function orphan(deps: Deps, tripId: string, s: Scratch, data?: Json) {
+  const cur = data || (await deps.db.getTrip(tripId))?.data;
+  const d = cur ? draftOf(cur) : null;
+  if (d?.status === "preparing" || (d?.lease?.hold && fresh(d.lease, deps.now()))) return;
+  await giveBack(deps, tripId, s, { spare: true }).catch(() => false);
 }
 
 type UnitResult = "next" | "again" | "stop";
@@ -400,8 +459,8 @@ export async function runUnit(tripId: string, deps: Deps): Promise<string> {
   const t0 = deps.now();
   let ran = 0;
   for (;;) {
-    const s = await deps.db.getScratch(tripId);
-    if (!s || s.done) {
+    const s0 = await deps.db.getScratch(tripId);
+    if (!s0 || s0.done) {
       // nothing to run with (no session booked the requests): the app starts it again when it is opened
       if (ran === 0) {
         await commit(deps, tripId, (data) => {
@@ -414,15 +473,43 @@ export async function runUnit(tripId: string, deps: Deps): Promise<string> {
       }
       return ran ? "done" : "no-scratch";
     }
-    const c = await claim(deps, tripId, s);
-    if (!c) return ran ? "done" : "busy";
+    const c = await claim(deps, tripId, s0);
+    if (c === "over") {
+      await orphan(deps, tripId, s0);
+      return ran ? "done" : "over";
+    }
+    if (c === "busy") return ran ? "done" : "busy";
     ran++;
+    // read again now that the trip is ours: the call before may have written its scratch after the read above
+    const s = await deps.db.getScratch(tripId);
+    if (!s || s.done) {
+      await commit(deps, tripId, (data) => (holds(data, c.hold) ? draftWith(data, { error: draftOf(data)!.error || MSG.stopped, lease: undefined }) : null)).catch(() => null);
+      return "done";
+    }
+    const step = nextStep(c.data, s);
+    if (stepCode(step) !== stepCode(c.step)) {
+      const ok = await commit(deps, tripId, (data) => (holds(data, c.hold) ? draftWith(data, { lease: { by: "server", at: deps.now(), hold: c.hold, step: stepCode(step) } }) : null)).catch(() => null);
+      if (!ok?.changed) return "done";
+    }
     let r: UnitResult;
     try {
-      r = await unit(deps, tripId, s, c);
+      r = await unit(deps, tripId, s, { ...c, step }, t0);
     } catch (e) {
-      // an unexpected failure (database): the lease is let go, the cron or the app tries again later
+      if (e instanceof Lost) {
+        // stopped or replaced meanwhile: whoever did it has the bookings; the lease goes if it is still this call's
+        await commit(deps, tripId, (data) => (holds(data, c.hold) ? draftWith(data, { lease: released(deps, data) }) : null)).catch(() => null);
+        return "lost";
+      }
+      // an unexpected failure (database): the lease is let go, the cron or the app tries again later; the same step
+      // failing again and again stops the preparation (it never blocks the cron's restarts)
       deps.log?.(`prepare ${tripId}: ${String((e as Error)?.message || e).slice(0, 200)}`);
+      const key = `unit:${stepCode(step)}`;
+      s.attempts[key] = (s.attempts[key] || 0) + 1;
+      if (s.attempts[key] >= UNIT_TRIES) {
+        await stopRun(deps, tripId, s, c.hold, MSG.stopped).catch(() => undefined);
+        return "error";
+      }
+      await save(deps, tripId, s).catch(() => false);
       await commit(deps, tripId, (data) => (holds(data, c.hold) ? draftWith(data, { lease: { ...released(deps, data), at: deps.now() - LEASE_STALE + 60_000 } }) : null)).catch(() => null);
       return "error";
     }
@@ -430,7 +517,11 @@ export async function runUnit(tripId: string, deps: Deps): Promise<string> {
     // the next step: right here when it needs no AI request and the call is young, else in a new call
     const peek = await deps.db.getTrip(tripId);
     const s2 = await deps.db.getScratch(tripId);
-    if (!peek || !s2 || s2.done || draftOf(peek.data)?.status !== "preparing") return "done";
+    if (!peek || !s2 || s2.done) return "done";
+    if (draftOf(peek.data)?.status !== "preparing") {
+      await orphan(deps, tripId, s2, peek.data);
+      return "done";
+    }
     const nx = nextStep(peek.data, s2);
     const quick = (nx.kind === "place" || nx.kind === "finish") && deps.now() - t0 < 60_000;
     if (quick && r === "next") continue;
@@ -440,7 +531,7 @@ export async function runUnit(tripId: string, deps: Deps): Promise<string> {
   }
 }
 
-async function unit(deps: Deps, tripId: string, s: Scratch, c: { hold: string; data: Json; step: Step }): Promise<UnitResult> {
+async function unit(deps: Deps, tripId: string, s: Scratch, c: Claim, t0: number): Promise<UnitResult> {
   const { hold, step } = c;
   const data = c.data;
   const d = draftOf(data)!;
@@ -462,8 +553,7 @@ async function unit(deps: Deps, tripId: string, s: Scratch, c: { hold: string; d
     if (res?.changed && notify && s.notified !== s.run) {
       // said once per run (written first: two calls never send it twice)
       s.notified = s.run;
-      await deps.db.putScratch(tripId, s);
-      await sendReady(deps, tripId, res.data, s.user).catch((e) => deps.log?.(`prepare notify: ${String(e)}`));
+      if (await save(deps, tripId, s)) await sendReady(deps, tripId, res.data, s.user).catch((e) => deps.log?.(`prepare notify: ${String(e)}`));
     }
     await giveBack(deps, tripId, s);
     return "stop";
@@ -512,17 +602,22 @@ async function unit(deps: Deps, tripId: string, s: Scratch, c: { hold: string; d
         .join(", ");
       payload = body("day", { plan: planOf(data, d), day: lines, used });
     }
+    // the request in progress is noted first: a « stop » meanwhile leaves its booking to this call, which settles it
+    // (and a run stopped or replaced before this point sends nothing)
+    s.inflight = b.id;
+    await mustSave(deps, tripId, s);
     try {
       out = await deps.ai(task as "outline", payload);
     } catch (e) {
       const f = e instanceof TaskFailure ? e : new TaskFailure("upstream", { hit: 0, miss: 0, out: 0, search: 0, fetch: 0, usd: 0 }, "", "", 0);
+      s.inflight = null;
       s.attempts[key] = (s.attempts[key] || 0) + 1;
       const again = s.attempts[key] < 2 && f.kind !== "refusal" && f.kind !== "bad" && f.kind !== "config";
       await settle(deps, s, b, tripId, f, false, f.kind);
       if (again) {
         // tried once more in the next call, on the same booking
         s.spent[String(b.id)] = (s.spent[String(b.id)] || 0) + f.usage.usd;
-        await deps.db.putScratch(tripId, s);
+        await mustSave(deps, tripId, s);
         await commit(deps, tripId, (cur) => (holds(cur, hold) ? draftWith(cur, { lease: released(deps, cur) }) : null));
         return "again";
       }
@@ -534,22 +629,23 @@ async function unit(deps: Deps, tripId: string, s: Scratch, c: { hold: string; d
       if (step.kind === "essentials") {
         // not blocking (the programme matters more): the language comes from the country; tried again at the next start
         s.essTried = true;
-        await deps.db.putScratch(tripId, s);
+        await mustSave(deps, tripId, s);
         const fb = langForCountry(data.country);
         await commit(deps, tripId, (cur) => (holds(cur, hold) ? { ...(fb && !cur.lang ? { lang: fb } : {}), ...draftWith(cur, { lease: released(deps, cur) }) } : null));
         return "next";
       }
       s.errored.push(step.date);
-      await deps.db.putScratch(tripId, s);
+      await mustSave(deps, tripId, s);
       await commit(deps, tripId, (cur) => (holds(cur, hold) ? draftWith(cur, { days: { ...(draftOf(cur)!.days || {}), [step.date]: "error" }, lease: released(deps, cur) }) : null));
       return "next";
     }
     await settle(deps, s, b, tripId, out, true);
     dropBooking(s, b);
+    s.inflight = null;
     const r = out.out;
     if (step.kind === "outline") {
       const outline = arr<NonNullable<Draft["outline"]>[number]>(r.days);
-      await deps.db.putScratch(tripId, s);
+      await mustSave(deps, tripId, s);
       const themes = new Map(outline.map((x) => [x.date, x.theme]));
       await commit(deps, tripId, (cur) => {
         if (!holds(cur, hold)) return null;
@@ -561,7 +657,7 @@ async function unit(deps: Deps, tripId: string, s: Scratch, c: { hold: string; d
       return "next";
     }
     if (step.kind === "essentials") {
-      await deps.db.putScratch(tripId, s);
+      await mustSave(deps, tripId, s);
       const e = r as {
         lang?: { code: string; name: string; speech: string }; checklist?: { text: string; due: string; group: string }[]; phrases?: { title: string; items: { local: string; romanized: string; fr: string }[] }[];
         practical?: { title: string; text: string }[]; emergency?: { label: string; number: string; note: string }[]; consulate?: { name: string; address: string; phone: string; emergency: string; website: string };
@@ -581,9 +677,10 @@ async function unit(deps: Deps, tripId: string, s: Scratch, c: { hold: string; d
       await commit(deps, tripId, (cur) => (holds(cur, hold) ? { ...patch, ...draftWith(cur, { essentials: true, lease: released(deps, cur) }) } : null));
       return "next";
     }
-    // the day's answer waits in the scratch for its placing (never in the trip's record)
-    s.pending = { date: step.date, result: { theme: String(r.theme || ""), places: arr<DayPlace>(r.places) }, next: 0, written: [], cleaned: false };
-    await deps.db.putScratch(tripId, s);
+    // the day's answer waits in the scratch for its placing (never in the trip's record), with its places' ids fixed now
+    const found = arr<DayPlace>(r.places);
+    s.pending = { date: step.date, result: { theme: String(r.theme || ""), places: found }, next: 0, ids: found.map(() => randomUUID()), cleaned: false };
+    await mustSave(deps, tripId, s);
     await commit(deps, tripId, (cur) => (holds(cur, hold) ? draftWith(cur, { lease: released(deps, cur, `place:${step.date}`) }) : null));
     return "next";
   }
@@ -592,10 +689,11 @@ async function unit(deps: Deps, tripId: string, s: Scratch, c: { hold: string; d
   const p = s.pending!;
   const date = step.date;
   const day = days.find((x) => x.dates![0] === date)!;
-  const started = deps.now();
+  const list = p.result.places || [];
+  const ids = list.map((_, i) => p.ids?.[i] || "");
   if (!p.cleaned) {
     for (const row of await deps.db.listPlaces(tripId)) {
-      if (row.data.fromDraft !== date || row.data.deleted === true || p.written.includes(row.id)) continue;
+      if (row.data.fromDraft !== date || row.data.deleted === true || ids.includes(row.id)) continue;
       const now = deps.now();
       const fa = { ...((row.data.fieldsAt as Record<string, number>) || {}) };
       fa.deleted = Math.max(now, (Number(fa.deleted) || 0) + 1);
@@ -611,28 +709,33 @@ async function unit(deps: Deps, tripId: string, s: Scratch, c: { hold: string; d
       }
     }
     p.cleaned = true;
-    await deps.db.putScratch(tripId, s);
+    await mustSave(deps, tripId, s);
   }
   const o = d.outline?.find((x) => x.date === date);
   const city = cityFor(d, o?.area);
   const country = String(arr<{ name: string; country?: string }>(d.cities).find((c) => c.name === city.name)?.country || data.country || "").toLowerCase();
-  const list = p.result.places || [];
+  /** stopped meanwhile (« Arrêter et voir les jours prêts », validated): the places written so far stay */
+  const stillOurs = async () => {
+    const cur = await deps.db.getTrip(tripId);
+    if (cur && holds(cur.data, hold)) return true;
+    if (cur) await orphan(deps, tripId, s, cur.data);
+    return false;
+  };
   for (let i = p.next; i < list.length; i++) {
-    if (deps.now() - started > PLACE_BUDGET) {
-      // the rest in the next call
+    if (deps.now() - t0 > CALL_BUDGET) {
+      // the rest in the next call (measured from the call's start: Vercel cuts it at 300 s)
       await commit(deps, tripId, (cur) => (holds(cur, hold) ? draftWith(cur, { lease: released(deps, cur) }) : null));
       return "again";
     }
-    // stopped meanwhile (« Arrêter et voir les jours prêts »): the places written so far stay
-    const cur = await deps.db.getTrip(tripId);
-    if (!cur || !holds(cur.data, hold)) return "stop";
+    if (!(await stillOurs())) return "stop";
     const x = list[i];
-    p.next = i + 1;
     if (!x?.name) {
-      await deps.db.putScratch(tripId, s);
+      p.next = i + 1;
+      await mustSave(deps, tripId, s);
       continue;
     }
     const ll = await position(x, city, country, deps);
+    if (!(await stillOurs())) return "stop";
     const st = hm(x.start);
     const en = hm(x.end);
     const slot = st != null && en != null && en > st ? slotText(st, en) : st != null ? slotText(st, st + 60) : "";
@@ -650,10 +753,10 @@ async function unit(deps: Deps, tripId: string, s: Scratch, c: { hold: string; d
       origin: "added", order: 1e12 + now + i,
     });
     const fieldsAt = Object.fromEntries(Object.keys(fields).map((k) => [k, now]));
-    const id = randomUUID();
-    await deps.db.insertPlace(tripId, id, { ...fields, fieldsAt, updatedAt: now }, s.user);
-    p.written.push(id);
-    await deps.db.putScratch(tripId, s);
+    // its id was fixed with the day's answer: written again after a cut, the row already there is kept as it is
+    await deps.db.insertPlace(tripId, ids[i] || randomUUID(), { ...fields, fieldsAt, updatedAt: now }, s.user);
+    p.next = i + 1;
+    await mustSave(deps, tripId, s);
   }
   const theme = p.result.theme;
   await commit(deps, tripId, (cur) => {
@@ -668,7 +771,7 @@ async function unit(deps: Deps, tripId: string, s: Scratch, c: { hold: string; d
     };
   });
   s.pending = null;
-  await deps.db.putScratch(tripId, s);
+  await mustSave(deps, tripId, s);
   return "next";
 }
 
@@ -720,7 +823,8 @@ const CORS = (origin: string | null): Record<string, string> => {
   const ok = origin && ORIGINS.some((r) => r.test(origin));
   return { "Access-Control-Allow-Origin": ok ? origin! : "https://theorbes.com", "Access-Control-Allow-Methods": "POST, OPTIONS", "Access-Control-Allow-Headers": "authorization, content-type", "Access-Control-Max-Age": "86400", Vary: "Origin" };
 };
-const reply = (body: unknown, status: number, origin: string | null) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", ...CORS(origin) } });
+/** Every answer carries the server's clock (the app compares the lease's time with it, not with its own clock) */
+const reply = (body: Json, status: number, origin: string | null) => new Response(JSON.stringify({ ...body, now: Date.now() }), { status, headers: { "content-type": "application/json", ...CORS(origin) } });
 /** Who the AI helps and for which trip (src/lib/ai.ts aiContext), kept small */
 function ctxOf(v: unknown): Json {
   const c = v && typeof v === "object" ? (v as Json) : {};
@@ -728,7 +832,7 @@ function ctxOf(v: unknown): Json {
   return JSON.stringify(out).length > 8000 ? { who: {}, trip: out.trip, lang: out.lang } : out;
 }
 const refusalOf = (r: Exclude<BookResult, { id: number }>["refused"]) => (r === "pro" ? { error: "pro", message: MSG.pro, status: 403 } : r === "prep" ? { error: "pro", message: MSG.prep, status: 403 } : r === "cap" ? { error: "busy", message: MSG.cap, status: 429 } : { error: "unavailable", message: MSG.error, status: 503 });
-const newScratch = (deps: Deps, user: string, ctx: Json): Scratch => ({ run: randomUUID(), user, ctx, bookings: [], spent: {}, attempts: {}, errored: [], only: null, capHit: null, pending: null, notified: null, done: false, at: deps.now() });
+const newScratch = (deps: Deps, user: string, ctx: Json): Scratch => ({ run: randomUUID(), user, ctx, bookings: [], spent: {}, attempts: {}, errored: [], only: null, capHit: null, pending: null, inflight: null, notified: null, done: false, at: deps.now(), v: 0 });
 
 /**
  * "start": prepares (or goes on preparing) the trip's missing steps; "day": one day again; "review": stop and show
@@ -797,8 +901,10 @@ export async function handle(req: Request, depsIn?: Deps): Promise<Response> {
       const dd = draftOf(data);
       return dd && dd.status !== "done" ? draftWith(data, { status: "review", error: undefined, lease: undefined }) : null;
     });
+    // the unused bookings go back; the request a call is sending right now stays booked (that call settles it, then
+    // finds its run closed and stops)
     const s = await deps.db.getScratch(tripId);
-    if (s && !s.done) await giveBack(deps, tripId, s);
+    if (s && !s.done) await giveBack(deps, tripId, s, { spare: true, retry: true });
     return reply({ ok: true, at: res?.at || 0 }, 200, origin);
   }
 
@@ -830,11 +936,27 @@ export async function handle(req: Request, depsIn?: Deps): Promise<Response> {
   const old = await deps.db.getScratch(tripId);
   // a run stopped halfway by the same person goes on with its bookings; anything else starts a new scratch
   const keep = old && !old.done && old.user === user && !only ? old : null;
-  if (old && !old.done && !keep) await giveBack(deps, tripId, old);
-  const s: Scratch = keep ? { ...keep, ctx, attempts: {}, errored: [], essTried: false, only: null, capHit: null } : newScratch(deps, user, ctx);
+  if (old && !old.done && !keep) await giveBack(deps, tripId, old, { spare: true, retry: true });
+  const s: Scratch = keep
+    ? {
+        ...keep,
+        // a restart sent without the traveller's context (another trip open in the app) keeps the one it had
+        ctx: Object.keys((ctx.who as Json) || {}).length ? ctx : keep.ctx,
+        // the request a call was sending when it was cut may have been made: its booking is not used again
+        bookings: keep.bookings.filter((b) => b.id !== keep.inflight),
+        inflight: null, attempts: {}, errored: [], essTried: false, only: null, capHit: null,
+      }
+    : newScratch(deps, user, ctx);
   if (!keep) s.only = only || null;
   // a day's answer kept for a day that is now ready (or asked again) is dropped
   if (s.pending && (d.days?.[s.pending.date] === "done" || only)) s.pending = null;
+  /** the bookings given back before the scratch is written (a kept run's are in its stored scratch) */
+  const dropAll = async (list: Booking[]) => {
+    if (keep) {
+      s.bookings = list;
+      await giveBack(deps, tripId, s, { retry: true });
+    } else if (list.length) await deps.db.deleteUsage(list.map((b) => b.id)).catch(() => undefined);
+  };
 
   // the requests this run needs, booked now with the traveller's session (the free trip of the month on the outline)
   const missing = days.filter((x) => (only ? x.dates![0] === only : d.days?.[x.dates![0]] !== "done"));
@@ -842,11 +964,12 @@ export async function handle(req: Request, depsIn?: Deps): Promise<Response> {
   if (!needs.length && !s.pending) {
     // nothing left to prepare: the review
     const res = await unlock({ status: "review", error: undefined });
-    await giveBack(deps, tripId, s);
+    await dropAll(s.bookings);
     return reply({ ok: true, at: res?.at || 0 }, 200, origin);
   }
   const have = [...s.bookings];
   const booked: Booking[] = [];
+  const newly: Booking[] = [];
   for (const task of needs) {
     const i = have.findIndex((b) => b.task === task);
     if (i >= 0) {
@@ -856,14 +979,13 @@ export async function handle(req: Request, depsIn?: Deps): Promise<Response> {
     const b = await deps.reserve(token, task, tripId).catch(() => ({ refused: "error" as const }));
     if ("id" in b) {
       booked.push({ id: b.id, task });
+      newly.push({ id: b.id, task });
       continue;
     }
     const why = refusalOf(b.refused);
     // the outline refused (the trip of the month, the cap) or nothing booked at all: the run does not start
     if (task === "outline" || !booked.length) {
-      s.bookings = [...booked, ...have];
-      if (!keep) s.only = null;
-      await giveBack(deps, tripId, s);
+      await dropAll([...booked, ...have]);
       // the preparation says why it stopped (a day asked again from the review only answers the app)
       await unlock(action === "start" && d.status === "preparing" ? { error: why.message } : {});
       return reply({ error: why.error, message: why.message }, why.status, origin);
@@ -876,7 +998,15 @@ export async function handle(req: Request, depsIn?: Deps): Promise<Response> {
   s.bookings = booked;
   s.done = false;
   s.at = now;
-  await deps.db.putScratch(tripId, s);
+  // a kept run is written over the version read above (a new run replaces whatever was there: the calls of the old
+  // one find another run and stop)
+  const next: Scratch = { ...s, v: (Number(s.v) || 0) + 1 };
+  if (!(await deps.db.writeScratch(tripId, next, keep ? { run: keep.run, v: Number(keep.v) || 0 } : null))) {
+    if (newly.length) await deps.db.deleteUsage(newly.map((b) => b.id)).catch(() => undefined);
+    await unlock();
+    return reply({ error: "busy" }, 409, origin);
+  }
+  s.v = next.v;
   const res = await commit(deps, tripId, (data) => {
     const dd = draftOf(data);
     if (!dd || dd.status === "done" || dd.lease?.hold !== lock) return null;
@@ -886,7 +1016,7 @@ export async function handle(req: Request, depsIn?: Deps): Promise<Response> {
   });
   if (!res?.changed) {
     // stopped or validated meanwhile: the requests are given back
-    await giveBack(deps, tripId, s);
+    await giveBack(deps, tripId, s, { retry: true });
     return reply({ error: "busy" }, 409, origin);
   }
   deps.schedule(runUnit(tripId, deps).catch((e) => deps.log?.(`prepare run: ${String(e)}`)));
@@ -901,6 +1031,8 @@ export function staleRuns(trips: { id: string; data: Json }[], now: number, max 
       const d = draftOf(t.data || {});
       return !!d && d.status === "preparing" && d.lease?.by === "server" && now - Number(d.lease.at || 0) > LEASE_STALE;
     })
+    // the oldest first (a trip that keeps failing never takes every slot)
+    .sort((a, b) => Number(draftOf(a.data)!.lease!.at || 0) - Number(draftOf(b.data)!.lease!.at || 0))
     .slice(0, max)
     .map((t) => t.id);
 }
@@ -926,7 +1058,39 @@ async function kickOnce(tripId: string, secret: string, f: typeof fetch): Promis
 }
 
 // ---------- the real services ----------
-function restDb(key: string, f: typeof fetch): Db {
+/**
+ * The scratch is stored sealed (AES-256-GCM, key derived from the service key): it holds the traveller's profile and
+ * the AI's raw answers, and no account other than the server's may read them. Its run and version stay in clear (the
+ * conditional writes filter on them).
+ */
+export function scratchBox(serviceKey: string) {
+  const k = createHmac("sha256", serviceKey).update("orbes-prep-scratch").digest();
+  return {
+    seal(s: Scratch): Json {
+      const iv = randomBytes(12);
+      const c = createCipheriv("aes-256-gcm", k, iv);
+      const body = Buffer.concat([c.update(JSON.stringify(s), "utf8"), c.final()]);
+      return { run: s.run, v: s.v, enc: Buffer.concat([iv, c.getAuthTag(), body]).toString("base64") };
+    },
+    open(d: unknown): Scratch | null {
+      if (!d || typeof d !== "object") return null;
+      const o = d as Json;
+      if (typeof o.enc !== "string") return o.run ? (o as unknown as Scratch) : null;
+      try {
+        const buf = Buffer.from(o.enc, "base64");
+        const dc = createDecipheriv("aes-256-gcm", k, buf.subarray(0, 12));
+        dc.setAuthTag(buf.subarray(12, 28));
+        const s = JSON.parse(Buffer.concat([dc.update(buf.subarray(28)), dc.final()]).toString("utf8")) as Scratch;
+        return s && s.run === o.run ? { ...s, v: Number(o.v) || 0 } : null;
+      } catch {
+        return null;
+      }
+    },
+  };
+}
+
+export function restDb(key: string, f: typeof fetch): Db {
+  const box = scratchBox(key);
   const enc = encodeURIComponent;
   const call = async (path: string, init: RequestInit = {}): Promise<unknown> => {
     const r = await f(`${SUPA_URL}${path}`, { ...init, headers: { apikey: key, authorization: `Bearer ${key}`, "content-type": "application/json", ...((init.headers as Record<string, string>) || {}) } });
@@ -952,19 +1116,26 @@ function restDb(key: string, f: typeof fetch): Db {
       return (rows || []).map((r) => ({ id: r.place_id, data: r.data || {}, updatedAt: r.updated_at }));
     },
     async insertPlace(tripId, id, data, by) {
-      await call("/rest/v1/places", { method: "POST", headers: { prefer: "return=minimal" }, body: JSON.stringify({ trip_id: tripId, place_id: id, data, updated_at: new Date().toISOString(), updated_by: by || null }) });
+      // the same id written twice (a step replayed after a cut): the row already there is kept
+      await call("/rest/v1/places?on_conflict=trip_id,place_id", { method: "POST", headers: { prefer: "resolution=ignore-duplicates,return=minimal" }, body: JSON.stringify({ trip_id: tripId, place_id: id, data, updated_at: new Date().toISOString(), updated_by: by || null }) });
     },
     async patchPlace(tripId, id, data, updatedAt) {
       const rows = (await call(`/rest/v1/places?trip_id=eq.${enc(tripId)}&place_id=eq.${enc(id)}&updated_at=eq.${enc(updatedAt)}&select=place_id`, { method: "PATCH", headers: { prefer: "return=representation" }, body: JSON.stringify({ data, updated_at: new Date().toISOString() }) })) as unknown[];
       return Array.isArray(rows) && rows.length > 0;
     },
     async getScratch(tripId) {
-      const rows = (await call(`/rest/v1/place_states?trip_id=eq.${SCRATCH_TRIP}&place_id=eq.${enc(tripId)}&select=data`)) as { data: Scratch }[];
-      const s = rows?.[0]?.data;
-      return s && typeof s === "object" && s.run ? s : null;
+      const rows = (await call(`/rest/v1/place_states?trip_id=eq.${SCRATCH_TRIP}&place_id=eq.${enc(tripId)}&select=data`)) as { data: unknown }[];
+      return box.open(rows?.[0]?.data);
     },
-    async putScratch(tripId, s) {
-      await call("/rest/v1/place_states?on_conflict=trip_id,place_id", { method: "POST", headers: { prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ trip_id: SCRATCH_TRIP, place_id: tripId, data: s, updated_at: new Date().toISOString() }) });
+    async writeScratch(tripId, s, expect) {
+      const row = { data: box.seal(s), updated_at: new Date().toISOString() };
+      if (!expect) {
+        await call("/rest/v1/place_states?on_conflict=trip_id,place_id", { method: "POST", headers: { prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ trip_id: SCRATCH_TRIP, place_id: tripId, ...row }) });
+        return true;
+      }
+      // only over the run and the version this call read
+      const rows = (await call(`/rest/v1/place_states?trip_id=eq.${SCRATCH_TRIP}&place_id=eq.${enc(tripId)}&data->>run=eq.${enc(expect.run)}&data->>v=eq.${Number(expect.v) || 0}&select=place_id`, { method: "PATCH", headers: { prefer: "return=representation" }, body: JSON.stringify(row) })) as unknown[];
+      return Array.isArray(rows) && rows.length > 0;
     },
     async updateUsage(id, detail) {
       try {

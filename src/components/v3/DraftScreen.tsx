@@ -6,7 +6,7 @@ import { useStore, useTrip } from "../../lib/store";
 import { TYPE_LABEL } from "../../data/trip";
 import Shell from "./Shell";
 import InviteTravellers from "./InviteTravellers";
-import { locale, t, tk } from "../../lib/i18n";
+import { locale, t } from "../../lib/i18n";
 import { CcBell, CcCheck, CcClose, CcRefresh, CcSpark } from "./ConciergeIcons";
 import "../../styles/creation.css";
 import "../../styles/prep.css";
@@ -19,10 +19,17 @@ function errText(s?: string | null): string {
   return t(s);
 }
 
-/** "43.77° N · 11.26° E" */
-function coords(lat?: number, lng?: number): string {
-  if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) return "";
-  return `${Math.abs(lat).toFixed(2)}° ${lat >= 0 ? "N" : "S"} · ${Math.abs(lng).toFixed(2)}° ${lng >= 0 ? "E" : tk("coord.west", "O")}`;
+/** "22–28 nov." (English "Nov 22 – 28"): the dates of the trip, short */
+function shortRange(from?: string, to?: string): string {
+  if (!from) return "";
+  try {
+    const f = new Intl.DateTimeFormat(locale(), { day: "numeric", month: "short", timeZone: "UTC" });
+    const a = new Date(`${from}T12:00:00Z`);
+    const b = new Date(`${to || from}T12:00:00Z`);
+    return !to || to === from ? f.format(a) : f.formatRange(a, b);
+  } catch {
+    return "";
+  }
 }
 
 /** Re-renders every few seconds (a server's sign of life gets old without any change in the store) */
@@ -144,6 +151,7 @@ function Preparing({ onClose }: { onClose: () => void }) {
   const busy = run.busy || serverOn;
   const elsewhere = !busy && preparedElsewhere(trip.id) && d.lease?.by !== "server";
   const [stopping, setStopping] = useState(false);
+  const [stopErr, setStopErr] = useState<string | null>(null);
   const days = trip.days.filter((x) => x.scheduled && x.dates?.length);
   const stateOf = (x: (typeof days)[number]) => d.days?.[x.dates![0]];
   const done = days.filter((x) => stateOf(x) === "done").length;
@@ -163,14 +171,16 @@ function Preparing({ onClose }: { onClose: () => void }) {
   const toPlace = trip.places.filter((p) => p.day === "ideas" && (defs[p.id] as { fromDraft?: string } | undefined)?.fromDraft).length;
   const found = Math.max(run.found, placed + toPlace);
   const shown = Math.max(run.placed, placed);
-  // the step in progress: the app's own run says it; the server writes a code in its lease
+  const themeOf = (x: (typeof days)[number]) => d.outline?.find((o) => o.date === x.dates![0])?.theme || x.theme || x.title;
+  // the step in progress: the app's own run says it; the server writes a code in its lease. On the days, the theme
+  // only (the counter and the list already say which day)
   const serverStep = (() => {
     const code = d.lease?.by === "server" ? d.lease.step || "" : "";
     if (code === "outline") return t("Trame du voyage");
     if (code === "essentials") return t("L'essentiel pratique");
     const m = /^(?:day|place):(.+)$/.exec(code);
     const x = m ? days.find((y) => y.dates?.[0] === m[1]) : undefined;
-    return x ? `${x.short} · ${d.outline?.find((o) => o.date === m![1])?.theme || x.theme || x.title}` : "";
+    return x ? themeOf(x) : "";
   })();
   const step = run.busy ? run.step : serverOn ? serverStep : "";
   const phase = (k: 0 | 1 | 2) => {
@@ -190,15 +200,18 @@ function Preparing({ onClose }: { onClose: () => void }) {
     d.places.length ? (d.places.length > 1 ? t("{n} lieux de votre liste", { n: d.places.length }) : t("1 lieu de votre liste")) : "",
     d.fixed.length ? (d.fixed.length > 1 ? t("{n} réservations", { n: d.fixed.length }) : t("1 réservation")) : "",
   ].filter(Boolean).join(" · ");
-  const where = d.cities[0] ? coords(d.cities[0].lat, d.cities[0].lng) : "";
+  // where and when, set like a ticket: FLORENCE · 22–28 NOV.
+  const where = [cities[0], shortRange(days[0]?.dates?.[0], days[days.length - 1]?.dates?.[0])].filter(Boolean).join(" · ");
   const state = busy ? "live" : elsewhere ? "away" : stopped ? "stop" : "pause";
   const stateLabel = busy ? t("En cours") : elsewhere ? t("Sur un autre appareil") : stopped ? t("Arrêtée") : t("En pause");
   const counter = onDays && days.length ? t("Jour {n} sur {of}", { n: Math.min(days.length, done + (done < days.length ? 1 : 0)), of: days.length }) : d.outline ? t("L'essentiel") : t("La trame");
   const stopNow = async () => {
     if (stopping) return;
     setStopping(true);
+    setStopErr(null);
     try {
-      await reviewNow(trip.id);
+      const why = await reviewNow(trip.id);
+      if (why) setStopErr(why);
     } finally {
       setStopping(false);
     }
@@ -212,113 +225,132 @@ function Preparing({ onClose }: { onClose: () => void }) {
   );
   return (
     <Shell ring={false} top={top} className="dr-screen pp-screen">
-      <div className="pp-head">
-        <span className={"pp-state " + state}><i aria-hidden="true" />{stateLabel}</span>
-        {where && <span className="pp-geo">{where}</span>}
-      </div>
-      <p className="pp-pct" aria-hidden="true"><span key={pct} className="pp-num">{pct}</span><span className="pp-sign">%</span></p>
-      <p className="sr" aria-live="polite">{t("{pct} %", { pct })}. {step}</p>
-      <div className="pp-step">
-        <b>{counter}</b>
-        <span key={step}>{step || (stopped ? t("La préparation s'est arrêtée.") : " ")}</span>
-      </div>
-      <div className={"pp-rule" + (busy ? "" : " off")} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label={t("Préparation")}>
-        <i style={{ transform: `scaleX(${Math.max(0.02, pct / 100)})` }} />
-      </div>
-      <ol className="pp-phases">
-        {[t("La trame"), t("L'essentiel"), t("Les jours")].map((label, k) => (
-          <li key={k} className={phase(k as 0 | 1 | 2)}>
-            <span className="pp-n">{String(k + 1).padStart(2, "0")}</span>
-            <span className="pp-l">{label}</span>
-            <span className="pp-mk" aria-hidden="true">{phase(k as 0 | 1 | 2) === "done" && <CcCheck />}</span>
-          </li>
-        ))}
-      </ol>
-
-      <h1 className="v3-d pp-title">{t("Nous préparons {title}.", { title: trip.title })}</h1>
-      {facts && <p className="pp-facts">{facts}</p>}
-
-      <dl className="pp-stats">
-        <div><dt>{t("Lieux trouvés")}</dt><dd>{found || "—"}</dd></div>
-        <div><dt>{t("Sur la carte")}</dt><dd>{shown || "—"}</dd></div>
-        <div><dt>{t("Jours prêts")}</dt><dd>{done}<small>/{days.length}</small></dd></div>
-      </dl>
-
-      {stopped && !elsewhere && (
-        <div className="pp-alert" role="alert">
-          <p>{errText(run.err || d.error)}</p>
-          <button type="button" onClick={() => void prepare(trip.id)}>{t("Reprendre la préparation")}</button>
+      <div className="pp-grid">
+        <div className="pp-aside-l">
+          <div className="pp-head">
+            <span className={"pp-state " + state}><i aria-hidden="true" />{stateLabel}</span>
+            {where && <span className="pp-where">{where}</span>}
+          </div>
+          <p className="pp-pct" aria-hidden="true"><span key={pct} className="pp-num">{pct}</span><span className="pp-sign">%</span></p>
+          <p className="sr" aria-live="polite">{t("{pct} %", { pct })}. {step}</p>
+          <div className="pp-step">
+            <b>{counter}</b>
+            <span key={step}>{step || (stopped ? t("La préparation s'est arrêtée.") : " ")}</span>
+          </div>
+          <div className={"pp-rule" + (busy ? "" : " off")} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label={t("Préparation")}>
+            <i style={{ transform: `scaleX(${Math.max(0.02, pct / 100)})` }} />
+          </div>
+          <ol className="pp-phases">
+            {[t("La trame"), t("L'essentiel"), t("Les jours")].map((label, k) => (
+              <li key={k} className={phase(k as 0 | 1 | 2)}>
+                <span className="pp-n">{String(k + 1).padStart(2, "0")}</span>
+                <span className="pp-l">{label}</span>
+                <span className="pp-mk" aria-hidden="true">{phase(k as 0 | 1 | 2) === "done" && <CcCheck />}</span>
+              </li>
+            ))}
+          </ol>
+          {/* the one promise of this screen, said where it is seen: only while the server is actually working */}
+          {onServer && busy && !stopped && <p className="pp-promise">{t("La préparation continue sans vous : vous pouvez quitter cet écran ou fermer l'application. Nous vous prévenons dès que le programme est prêt.")}</p>}
+          {stopped && !elsewhere && (
+            <div className="pp-alert" role="alert">
+              <p>{errText(run.err || d.error)}</p>
+              <button type="button" onClick={() => void prepare(trip.id)}>{t("Reprendre la préparation")}</button>
+            </div>
+          )}
+          {elsewhere && <p className="pp-aside">{t("Ce voyage est en cours de préparation sur un autre appareil.")}</p>}
         </div>
-      )}
-      {elsewhere && <p className="pp-aside">{t("Ce voyage est en cours de préparation sur un autre appareil.")}</p>}
 
-      <ol className="pp-days">
-        {days.map((x, i) => {
-          const s = stateOf(x);
-          const st = s === "done" ? "done" : s === "error" ? "err" : i === liveIdx && busy && onDays ? "live" : "wait";
-          const names = placedByDay.get(x.key) || [];
-          return (
-            <li key={x.key} className={st}>
-              <span className="pp-mk" aria-hidden="true">{st === "done" ? <CcCheck /> : st === "err" ? "!" : null}</span>
-              <span className="pp-when">{x.short}</span>
-              <span className="pp-what">
-                <b>{d.outline?.find((o) => o.date === x.dates![0])?.theme || x.theme || x.title}</b>
-                {st === "done" && names.length > 0 && <small>{names.slice(0, 3).join(" · ")}</small>}
-                {st === "err" && <small className="warn">{t("À reprendre")}</small>}
-                {st === "live" && <small>{t("En cours")}</small>}
-              </span>
-              <span className="pp-cnt">{st === "done" ? names.length : ""}</span>
-            </li>
-          );
-        })}
-      </ol>
-      {/* while it runs, looking now stops the day in progress: the link says so */}
-      {done > 0 && done < days.length && (
-        <button className="v3-link pp-review" disabled={stopping} onClick={() => void stopNow()}>
-          {!busy ? t("Voir le programme avec ce qui est prêt") : done > 1 ? t("Arrêter et voir les {n} jours prêts", { n: done }) : t("Arrêter et voir le jour prêt")}
-        </button>
-      )}
+        <div className="pp-main">
+          <h1 className="v3-d pp-title">{t("Nous préparons {title}.", { title: trip.title })}</h1>
+          {facts && <p className="pp-facts">{facts}</p>}
 
-      {/* the waiting time: invite who travels with you, add what comes to mind */}
-      <section className="dr-meanwhile">
-        <span className="v3-lbl">{t("Pendant ce temps")}</span>
-        <InviteTravellers />
-        {done < days.length && <AddWish />}
-      </section>
-      {run.mode === "server" ? (
-        <p className="dr-note"><CcBell /><span>{t("La préparation continue sans vous : vous pouvez quitter cet écran ou fermer l'application. Nous vous prévenons dès que le programme est prêt.")}</span></p>
-      ) : run.mode === "local" ? (
-        <p className="dr-note"><CcBell /><span>{t("La préparation avance tant que cet écran reste ouvert. Si vous le quittez, elle reprendra là où elle s'est arrêtée à votre retour sur ce voyage.")}{awake && <> {t("L'écran reste allumé pendant la préparation.")}</>}</span></p>
-      ) : null}
+          <dl className="pp-stats">
+            <div><dt>{t("Lieux trouvés")}</dt><dd>{found || "—"}</dd></div>
+            <div><dt>{t("Sur la carte")}</dt><dd>{shown || "—"}</dd></div>
+            <div><dt>{t("À placer")}</dt><dd>{toPlace || "—"}</dd></div>
+          </dl>
+
+          <ol className="pp-days">
+            {days.map((x, i) => {
+              const s = stateOf(x);
+              const st = s === "done" ? "done" : s === "error" ? "err" : i === liveIdx && busy && onDays ? "live" : "wait";
+              const names = placedByDay.get(x.key) || [];
+              return (
+                <li key={x.key} className={st}>
+                  <span className="pp-mk" aria-hidden="true">{st === "done" ? <CcCheck /> : st === "err" ? "!" : null}</span>
+                  <span className="pp-when">{x.short}</span>
+                  <span className="pp-what">
+                    <b>{themeOf(x)}</b>
+                    {st === "done" && names.length > 0 && <small>{names.slice(0, 3).join(" · ")}</small>}
+                    {st === "err" && <small className="warn">{t("À reprendre")}</small>}
+                  </span>
+                  <span className="pp-cnt">{st === "done" && names.length ? names.length : ""}</span>
+                </li>
+              );
+            })}
+          </ol>
+          {/* while it runs, looking now stops the day in progress: the link says so */}
+          {done > 0 && done < days.length && (
+            <button className="v3-link pp-review" disabled={stopping} onClick={() => void stopNow()}>
+              {!busy ? t("Voir le programme avec ce qui est prêt") : done > 1 ? t("Arrêter et voir les {n} jours prêts", { n: done }) : t("Arrêter et voir le jour prêt")}
+            </button>
+          )}
+          {stopErr && <p className="pp-err" role="alert">{stopErr}</p>}
+
+          {/* the waiting time: invite who travels with you, add what comes to mind */}
+          <section className="dr-meanwhile">
+            <span className="v3-lbl">{t("Pendant ce temps")}</span>
+            <InviteTravellers />
+            {done < days.length && <AddWish />}
+          </section>
+          {run.mode === "local" && (
+            <p className="dr-note"><CcBell /><span>{t("La préparation avance tant que cet écran reste ouvert. Si vous le quittez, elle reprendra là où elle s'est arrêtée à votre retour sur ce voyage.")}{awake && <> {t("L'écran reste allumé pendant la préparation.")}</>}</span></p>
+          )}
+        </div>
+      </div>
       <div className="dr-end" />
     </Shell>
   );
 }
 
-/** "Une envie à ajouter ?": read by each day not prepared yet (the run reads the trip's draft before every day) */
+/** "Une envie à ajouter ?": read by each day not prepared yet (the run reads the trip's draft before every day) */
 function AddWish() {
   const trip = useTrip();
   const [v, setV] = useState("");
+  const [sending, setSending] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
   const [added, setAdded] = useState<string[]>([]);
-  const add = () => {
+  const add = async () => {
     const s = v.trim().slice(0, 300);
-    if (!s || !draftOf(trip.id)) return;
-    void addWish(trip.id, s);
-    setAdded((a) => [...a, s]);
-    setV("");
+    if (!s || sending || !draftOf(trip.id)) return;
+    setSending(true);
+    setErr(null);
+    try {
+      // not taken (the server did not answer): the wish stays in the field, to be sent again
+      const why = await addWish(trip.id, s);
+      if (why) {
+        setErr(why);
+        return;
+      }
+      setAdded((a) => [...a, s]);
+      setV("");
+    } finally {
+      setSending(false);
+    }
   };
   return (
-    <div className="v3-glass dr-add">
-      <b>{t("Une envie à ajouter ?")}</b>
+    <div className="pp-wish">
+      <b>{t("Une envie à ajouter ?")}</b>
       <small>{t("Elle sera prise en compte pour les jours suivants.")}</small>
-      <form onSubmit={(e) => { e.preventDefault(); add(); }}>
-        <label className="v3-field">
-          <span className="sr">{t("Une envie à ajouter ?")}</span>
+      <form onSubmit={(e) => { e.preventDefault(); void add(); }}>
+        <label className="pp-wish-field">
+          <span className="sr">{t("Une envie à ajouter ?")}</span>
           <input value={v} onChange={(e) => setV(e.target.value)} placeholder={t("ex. un rooftop un soir")} autoComplete="off" maxLength={300} enterKeyHint="done" />
         </label>
-        <button className="v3-chip on" disabled={!v.trim()}>{t("Ajouter")}</button>
+        <button className="pp-wish-add" disabled={!v.trim() || sending}>{t("Ajouter")}</button>
       </form>
-      {added.length > 0 && <div className="dr-added">{added.map((a, i) => <span key={i}><CcCheck />{a}</span>)}</div>}
+      {err && <p className="pp-err" role="alert">{err}</p>}
+      {added.length > 0 && <ul className="pp-wish-added">{added.map((a, i) => <li key={i}><CcCheck />{a}</li>)}</ul>}
     </div>
   );
 }

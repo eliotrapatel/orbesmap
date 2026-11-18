@@ -1212,8 +1212,14 @@ export function updateTrip(id: string, patch: Record<string, unknown>) {
   const now = Date.now();
   const cur = state.trips[id] || {};
   const fieldsAt = { ...(cur.fieldsAt || {}) };
-  for (const k of Object.keys(patch)) fieldsAt[k] = now;
-  setTrips({ ...state.trips, [id]: { ...cur, ...patch, fieldsAt, updatedAt: now } });
+  // a change always beats the version it was made on, even when that version came from a clock ahead of this phone's
+  // (the server's preparation, another phone): else the field merge would keep the older value
+  let at = now;
+  for (const k of Object.keys(patch)) {
+    fieldsAt[k] = Math.max(now, (Number(fieldsAt[k]) || 0) + 1);
+    at = Math.max(at, fieldsAt[k]);
+  }
+  setTrips({ ...state.trips, [id]: { ...cur, ...patch, fieldsAt, updatedAt: Math.max(at, (Number(cur.updatedAt) || 0) + 1) } });
   enqueue({ t: "trip", trip: id, id });
 }
 

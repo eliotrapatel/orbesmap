@@ -263,8 +263,8 @@
 .dr-add b { display: block; font-weight: 600; font-size: 14.5px; }
 .dr-add > small { display: block; margin-top: 3px; font-size: 12.5px; color: var(--mute); line-height: 1.4; }
 .dr-add form { display: flex; gap: 8px; margin-top: 10px; }
-.dr-add .v3-field { flex: 1; min-height: 44px; }
-.dr-add .v3-field input { height: 42px; }
+.dr-add .v3-field { flex: 1; min-width: 0; min-height: 44px; }
+.dr-add .v3-field input { width: 100%; min-width: 0; height: 42px; }
 .dr-add form .v3-chip { height: 44px; flex: none; }
 .dr-added { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .dr-added span { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 999px; background: rgba(246, 242, 234, 0.06); font-size: 12.5px; color: var(--soft); animation: crRise 0.3s var(--ease) both; }
@@ -330,7 +330,7 @@
 .dr-final-mark .cc-ic { width: 20px; height: 20px; stroke-width: 1.5; }
 .dr-final h2 { font-size: clamp(32px, 10vw, 44px); margin: 22px 0 0; animation: crRise 0.6s 0.18s var(--ease) both; max-width: 12ch; overflow-wrap: anywhere; }
 .dr-final p { margin-top: 12px; color: var(--soft); font-size: 15px; animation: crRise 0.6s 0.32s var(--ease) both; }
-.dr-final p b { color: var(--gold); font-weight: 500; }
+.dr-final p b { color: var(--ink); font-weight: 500; }
 .dr-final small { margin-top: 6px; color: var(--mute); font-size: 13px; animation: crRise 0.6s 0.4s var(--ease) both; }
 
 /* the four step names in full on every phone */

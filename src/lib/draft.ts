@@ -162,11 +162,15 @@ const setMode = (tripId: string, m: "server" | "local") => {
 };
 /** A server lease older than this: its call is gone (the server restarts it, the app can too) */
 const SERVER_STALE = 6 * 60_000;
+/** The server's clock minus this phone's (each answer of api/prepare.ts says its time): a lease's age is measured on
+ *  the server's clock, so a phone set a few minutes ahead never takes a running preparation for a stopped one */
+let skew = 0;
+const serverNow = (now = Date.now()) => now + skew;
 /** The server is working on this trip right now */
 export const serverBusy = (tripId: string, now = Date.now()) => {
   const d = draftOf(tripId);
   const l = d?.lease;
-  return d?.status === "preparing" && !!l && l.by === "server" && now - l.at < SERVER_STALE;
+  return d?.status === "preparing" && !!l && l.by === "server" && serverNow(now) - l.at < SERVER_STALE;
 };
 const starting = new Set<string>();
 
@@ -190,6 +194,7 @@ async function askServer(action: string, tripId: string, extra: Record<string, u
       signal: ctl.signal,
     });
     const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (typeof body.now === "number" && Number.isFinite(body.now)) skew = body.now - Date.now();
     if (res.ok) return { kind: "ok", body };
     if (res.status === 409) return { kind: body.error === "notready" ? "notready" : body.error === "elsewhere" ? "elsewhere" : "busy" };
     if (res.status === 401 || res.status === 403 || res.status === 429) {
@@ -274,7 +279,7 @@ export function watchServer(tripId: string): () => void {
     if (document.visibilityState !== "visible" || modes.get(tripId) !== "server") return;
     const d = draftOf(tripId);
     if (!d) return;
-    const now = Date.now();
+    const now = serverNow();
     if (d.status === "preparing") void pull();
     if (d.status !== "preparing" || d.error || run.busy || starting.has(tripId)) return;
     const l = d.lease;
@@ -285,14 +290,16 @@ export function watchServer(tripId: string): () => void {
     }
     if (now - lastKick < 60_000) return;
     lastKick = now;
+    // the server could not be reached twice: the app prepares the trip itself
     if (kicks >= 2) {
       setMode(tripId, "local");
       void prepareHere(tripId);
       return;
     }
-    kicks++;
+    // only an unreachable server counts as a failed restart (an answer, even « already running », is a sign of life)
     void askServer("start", tripId).then((a) => {
-      if (a.kind === "down") kicks = Math.max(kicks, 2);
+      if (a.kind === "down") kicks++;
+      else if (a.kind === "ok") kicks = 0;
     });
   };
   const timer = window.setInterval(step, 7000);
@@ -382,7 +389,8 @@ async function prepareHere(tripId: string): Promise<void> {
       const date = day.dates![0];
       if (d.days?.[date] === "done") continue;
       const o = d.outline?.find((x) => x.date === date);
-      setRun({ step: `${day.short} · ${o?.theme || day.title}` });
+      // the day itself is shown by the counter and the list: the step says its theme only
+      setRun({ step: o?.theme || day.theme || day.title });
       beat();
       const fixedToday = d.fixed.filter((f) => f.date === date);
       const lines = [
@@ -448,15 +456,15 @@ async function prepareHere(tripId: string): Promise<void> {
   }
 }
 
-/** Stops waiting: the review opens with the days that are ready (the others can be prepared from there) */
-export async function reviewNow(tripId: string): Promise<void> {
+/** Stops waiting: the review opens with the days that are ready (the others can be prepared from there). Returns why
+ *  it could not, when the server did not take it (the app never writes the draft while the server prepares) */
+export async function reviewNow(tripId: string): Promise<string | void> {
   if (modes.get(tripId) === "server") {
     const a = await askServer("review", tripId);
     if (a.kind === "ok") return refreshUntil(tripId, Number(a.body.at) || 0);
-    if (a.kind === "refused") {
-      setRun({ tripId, err: a.message });
-      return;
-    }
+    if (a.kind === "refused") return a.message;
+    if (a.kind === "elsewhere") return t("Ce voyage est en cours de préparation sur un autre appareil.");
+    return t("Le service ne répond pas, réessayez.");
   }
   stopPrepare();
   saveDraft(tripId, { status: "review", error: undefined, lease: undefined });
@@ -474,17 +482,19 @@ export async function prepareAgain(tripId: string): Promise<void> {
   if (cur) updateTrip(tripId, { draft: { ...cur, status: "preparing", error: undefined } });
 }
 
-/** "Une envie à ajouter ?": read by each day not prepared yet */
-export async function addWish(tripId: string, text: string): Promise<void> {
+/** "Une envie à ajouter ?": read by each day not prepared yet. Returns why it was not added (the server did not
+ *  answer): the app never writes the draft while the server prepares, the wish stays to be sent again */
+export async function addWish(tripId: string, text: string): Promise<string | void> {
   const s = text.trim().slice(0, 300);
   if (!s) return;
   if (modes.get(tripId) === "server") {
-    // the server merges it into its run (the app never writes the draft while the server prepares)
+    // the server merges it into its run
     const a = await askServer("wish", tripId, { text: s });
     if (a.kind === "ok") {
       void pull();
       return;
     }
+    return a.kind === "refused" ? a.message : t("Le service ne répond pas, réessayez.");
   }
   const d = draftOf(tripId);
   if (d) updateTrip(tripId, { draft: { ...d, wishes: [...d.wishes, s] } });
@@ -508,7 +518,9 @@ export async function regenerateDay(tripId: string, date: string): Promise<strin
       if (a.pro) requestPro("edit");
       return a.message;
     }
-    if (a.kind === "busy" || a.kind === "elsewhere") return t("Ce voyage est en cours de préparation sur un autre appareil.");
+    // busy: the server is already preparing this trip (the missing days, another day): nothing is queued
+    if (a.kind === "busy") return t("Une préparation est déjà en cours : réessayez dans un instant.");
+    if (a.kind === "elsewhere") return t("Ce voyage est en cours de préparation sur un autre appareil.");
     setMode(tripId, "local");
   }
   const days = { ...(d.days || {}) };

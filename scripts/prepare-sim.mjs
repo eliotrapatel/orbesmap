@@ -3,13 +3,15 @@
 // Nothing leaves this computer: every service is replaced in memory. Exits with code 1 when a check fails.
 import { register } from "node:module";
 
-// the functions import "./ai" without an extension (Vercel's bundler finds the .ts): the same here
+// Vercel runs the functions as ES modules, which need the full name: "./ai.js" (compiled from api/ai.ts). Here, the
+// sources are read directly, so a ".js" under api/ is read from its ".ts". A name without its extension still fails,
+// as it would on Vercel.
 register(
   "data:text/javascript," +
     encodeURIComponent(`
 export async function resolve(spec, ctx, next) {
-  if ((spec.startsWith("./") || spec.startsWith("../")) && !/\\.[a-z]+$/i.test(spec) && ctx.parentURL && ctx.parentURL.includes("/api/")) {
-    try { return await next(spec + ".ts", ctx); } catch {}
+  if ((spec.startsWith("./") || spec.startsWith("../")) && spec.endsWith(".js") && ctx.parentURL && ctx.parentURL.includes("/api/")) {
+    return next(spec.replace(/\\.js$/, ".ts"), ctx);
   }
   return next(spec, ctx);
 }`),
@@ -41,7 +43,7 @@ function world(opts = {}) {
   const usage = new Map();
   const members = new Map();
   const subs = new Map();
-  const calls = { ai: [], geocode: 0, push: [], mail: [], kicks: [], reserve: [] };
+  const calls = { ai: [], geocode: 0, push: [], mail: [], kicks: [], reserve: [], inserts: 0 };
   let usageId = 100;
   const db = {
     async getTrip(id) {
@@ -65,8 +67,20 @@ function world(opts = {}) {
     },
     async insertPlace(tripId, id, data) {
       await tick();
+      calls.inserts++;
       if (!places.has(tripId)) places.set(tripId, new Map());
+      // on conflict do nothing (the primary key is trip_id, place_id)
+      if (places.get(tripId).has(id)) return;
+      if (opts.insertFails && opts.insertFails.times > 0 && !opts.insertFails.after) {
+        opts.insertFails.times--;
+        throw new Error("db 500 /rest/v1/places");
+      }
       places.get(tripId).set(id, { data: clone(data), updatedAt: stamp() });
+      // written, then the call is cut before it notes it
+      if (opts.insertFails && opts.insertFails.times > 0 && opts.insertFails.after) {
+        opts.insertFails.times--;
+        throw new Error("call cut after the insert");
+      }
     },
     async patchPlace(tripId, id, data, updatedAt) {
       await tick();
@@ -79,9 +93,13 @@ function world(opts = {}) {
       await tick();
       return clone(scratch.get(tripId) || null);
     },
-    async putScratch(tripId, s) {
+    async writeScratch(tripId, s, expect) {
       await tick();
+      const cur = scratch.get(tripId);
+      if (expect && (!cur || cur.run !== expect.run || (cur.v || 0) !== expect.v)) return false;
       scratch.set(tripId, clone(s));
+      if (opts.afterWrite) await opts.afterWrite(s);
+      return true;
     },
     async updateUsage(id, detail) {
       const r = usage.get(id);
@@ -110,6 +128,7 @@ function world(opts = {}) {
     log: () => {},
     async ai(task, body) {
       calls.ai.push({ task, body });
+      if (opts.duringAi) await opts.duringAi(task, body);
       clock.t += task === "outline" ? 20_000 : 60_000;
       if (opts.slowAi) await new Promise((r) => setTimeout(r, 15));
       const f = opts.fail?.[task];
@@ -415,6 +434,141 @@ console.log("8. Access");
   await P.handle(user({ action: "start", trip: "trip-1", ctx }), w.deps);
   await drain(w);
   check(w.calls.push[0]?.title === "Your trip is ready" && w.calls.push[0].body === "Florence: your itinerary is waiting.", "the notice follows the account's language");
+}
+
+// ---------- 9. « stop » while a day's AI request is running ----------
+console.log("9. Stop during a day's research, then start again at once");
+{
+  let w;
+  let fired = false;
+  let runB = null;
+  w = world({
+    async duringAi(task) {
+      if (task !== "day" || fired) return;
+      fired = true;
+      // the traveller taps « Arrêter et voir les jours prêts », then « Préparer les jours manquants », while this
+      // request is still on its way
+      const r1 = await P.handle(user({ action: "review", trip: "trip-1" }), w.deps);
+      check(r1.status === 200, "review accepted during the request");
+      const r2 = await P.handle(user({ action: "start", trip: "trip-1", ctx }), w.deps);
+      check(r2.status === 200, "start accepted right after");
+      runB = w.scratch.get("trip-1").run;
+    },
+  });
+  seedTrip(w);
+  await P.handle(user({ action: "start", trip: "trip-1", ctx }), w.deps);
+  const runA = w.scratch.get("trip-1").run;
+  await drain(w);
+  const sc = w.scratch.get("trip-1");
+  check(runB && runB !== runA && sc.run === runB, "the first run never wrote over the new one's scratch");
+  check(sc.done === true && sc.bookings.length === 0 && !sc.inflight, "the new run closed its scratch at the end");
+  check(draft(w).status === "review" && Object.values(draft(w).days).every((x) => x === "done"), "the new run prepared every day");
+  const rows = [...w.usage.values()];
+  check(rows.length === w.calls.ai.length, `one booking row per AI request sent (${rows.length} rows, ${w.calls.ai.length} requests)`);
+  check(rows.every((u) => u.settled === 1 && u.usd > 0), "every request sent is settled once, with its cost (none unbooked, none lost)");
+  const firstDay = rows.find((u) => u.task === "day" && u.id === Math.min(...rows.filter((x) => x.task === "day").map((x) => x.id)));
+  check(!!firstDay && firstDay.ok === true, "the request running during the stop kept its booking and its cost");
+  check(w.calls.ai.filter((c) => c.task === "outline").length === 1, "the outline is not asked again");
+  const ids = new Set(rows.map((u) => u.id));
+  check(ids.size === rows.length, "no booking used twice");
+}
+
+// ---------- 10. cut between a place's write and its note ----------
+console.log("10. A call cut right after writing a place: no duplicate");
+{
+  const w = world({ insertFails: { times: 1, after: true } });
+  seedTrip(w, "trip-1", 2);
+  await P.handle(user({ action: "start", trip: "trip-1", ctx }), w.deps);
+  await drain(w, { soft: true });
+  check(draft(w).status === "preparing" && draft(w).lease?.hold == null, "the failing call let the lease go");
+  w.clock.t += 7 * 60_000;
+  const fakeFetch = async (url, init) => P.handle(new Request(url, init), w.deps);
+  await P.kickStale([...w.trips].map(([id, r]) => ({ id, data: r.data })), "test-service-key", fakeFetch, w.clock.t);
+  await drain(w);
+  const pl = livePlaces(w);
+  const names = pl.map(([, p]) => p.data.name);
+  check(draft(w).status === "review", "the preparation finishes after the restart");
+  check(pl.length === 6 && new Set(names).size === names.length, `6 places, no duplicate (${pl.length})`);
+  check(w.calls.inserts === 7, `the replayed write was ignored by the database (${w.calls.inserts} writes for 6 rows)`);
+}
+
+// ---------- 11. a step failing again and again ----------
+console.log("11. A step that keeps failing stops the preparation");
+{
+  const w = world({ insertFails: { times: 99 } });
+  seedTrip(w, "trip-1", 2);
+  await P.handle(user({ action: "start", trip: "trip-1", ctx }), w.deps);
+  await drain(w, { soft: true });
+  for (let i = 0; i < 5 && draft(w).lease; i++) {
+    w.clock.t += 2 * 60_000;
+    await P.runUnit("trip-1", w.deps);
+  }
+  const d = draft(w);
+  check(d.error === "La préparation s'est arrêtée. Elle reprendra à la prochaine ouverture." && !d.lease, `stopped with a message after ${3} failures (${d.error})`);
+  check(w.scratch.get("trip-1").done === true && [...w.usage.values()].every((u) => u.settled), "scratch closed, unused bookings deleted");
+  check(P.staleRuns([...w.trips].map(([id, r]) => ({ id, data: r.data })), w.clock.t + 3600_000).length === 0, "the cron no longer picks it");
+}
+
+// ---------- 12. a restart without the traveller's context ----------
+console.log("12. A restart sent while another trip is open keeps the traveller's context");
+{
+  const w = world();
+  seedTrip(w);
+  await P.handle(user({ action: "start", trip: "trip-1", ctx }), w.deps);
+  await drain(w, { dropKicks: 1 });
+  w.clock.t += 7 * 60_000;
+  const r = await P.handle(user({ action: "start", trip: "trip-1", ctx: { who: {}, trip: {}, lang: null } }), w.deps);
+  check(r.status === 200, "restart accepted");
+  check(typeof (await r.clone().json()).now === "number", "every answer carries the server's clock");
+  await drain(w);
+  check(w.calls.ai.filter((c) => c.task === "day").every((c) => c.body.who?.name === "Eliot"), "the days are asked with the traveller's profile");
+  check(w.calls.reserve.length === 5, `the bookings of the first start are used, none booked again (${w.calls.reserve.length})`);
+}
+
+// ---------- 13. the cron's order ----------
+console.log("13. The cron restarts the oldest first");
+{
+  const mk = (id, at) => ({ id, data: { draft: { status: "preparing", lease: { by: "server", at, hold: null } } } });
+  const now = Date.parse("2026-11-18T12:00:00Z");
+  const got = P.staleRuns([mk("c", now - 20 * 60_000), mk("a", now - 90 * 60_000), mk("d", now - 60_000), mk("b", now - 50 * 60_000), mk("e", now - 10 * 60_000)], now);
+  check(got.join(",") === "a,b,c", `oldest three first (${got.join(",")})`);
+}
+
+// ---------- 14. the real database adapter (PostgREST requests, sealed scratch) ----------
+console.log("14. The database adapter: sealed scratch, conditional writes, idempotent places");
+{
+  const sent = [];
+  let stored = null;
+  const fakeFetch = async (url, init = {}) => {
+    const u = decodeURIComponent(String(url));
+    sent.push({ url: u, method: init.method || "GET", prefer: init.headers?.prefer || "", body: init.body ? JSON.parse(init.body) : null });
+    if (u.includes("/place_states") && (init.method || "GET") === "GET") return new Response(JSON.stringify(stored ? [{ data: stored }] : []), { status: 200 });
+    if (u.includes("/place_states") && init.method === "POST") {
+      stored = JSON.parse(init.body).data;
+      return new Response("", { status: 201 });
+    }
+    if (u.includes("/place_states") && init.method === "PATCH") {
+      const run = /data->>run=eq\.([^&]+)/.exec(u)?.[1];
+      const v = /data->>v=eq\.(\d+)/.exec(u)?.[1];
+      if (!stored || stored.run !== run || String(stored.v) !== v) return new Response("[]", { status: 200 });
+      stored = JSON.parse(init.body).data;
+      return new Response(JSON.stringify([{ place_id: "trip-1" }]), { status: 200 });
+    }
+    return new Response("", { status: 201 });
+  };
+  const db = P.restDb("test-service-key", fakeFetch);
+  const sc = { run: "run-1", user: "user-1", ctx: { who: { name: "Eliot", budget: "élevé" } }, bookings: [{ id: 7, task: "day" }], spent: {}, attempts: {}, errored: [], only: null, capHit: null, pending: null, inflight: null, notified: null, done: false, at: 1, v: 1 };
+  check((await db.writeScratch("trip-1", sc, null)) === true, "a new run's scratch is written");
+  check(!JSON.stringify(stored).includes("Eliot") && stored.run === "run-1" && stored.v === 1 && typeof stored.enc === "string", "stored sealed: only its run and version in clear");
+  const back = await db.getScratch("trip-1");
+  check(back?.ctx?.who?.name === "Eliot" && back.v === 1 && back.bookings[0].id === 7, "read back whole");
+  check((await db.writeScratch("trip-1", { ...sc, v: 2 }, { run: "run-1", v: 1 })) === true, "a write over the version read is accepted");
+  check((await db.writeScratch("trip-1", { ...sc, v: 2 }, { run: "run-1", v: 1 })) === false, "a write over an older version is refused");
+  check((await db.writeScratch("trip-1", { ...sc, v: 3 }, { run: "run-0", v: 2 })) === false, "a write from another run is refused");
+  check(P.restDb("another-key", fakeFetch) && (await P.restDb("another-key", fakeFetch).getScratch("trip-1")) === null, "unreadable with another key");
+  await db.insertPlace("trip-1", "p-1", { name: "x" }, "user-1");
+  const ins = sent.find((x) => x.url.includes("/rest/v1/places") && x.method === "POST");
+  check(!!ins && ins.url.includes("on_conflict=trip_id,place_id") && /resolution=ignore-duplicates/.test(ins.prefer), "a place is added with « on conflict do nothing »");
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);
