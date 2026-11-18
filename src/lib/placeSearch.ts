@@ -68,7 +68,7 @@ export function usePlaceSearch(): State {
 type LL = [number, number];
 let lastGeo = 0;
 /** OpenStreetMap geocoder, one request per second max (its usage policy). rank: 28+ = number/building, 26–27 = street. */
-async function geocode(q: string, box: [number, number, number, number], signal: AbortSignal): Promise<{ ll: LL; rank: number } | null> {
+export async function geocode(q: string, box: [number, number, number, number], signal: AbortSignal, country = "cn"): Promise<{ ll: LL; rank: number } | null> {
   if (q.trim().length < 2 || signal.aborted) return null;
   const wait = lastGeo + 1100 - Date.now();
   if (wait > 0) await new Promise((r) => setTimeout(r, wait));
@@ -80,7 +80,7 @@ async function geocode(q: string, box: [number, number, number, number], signal:
   signal.addEventListener("abort", onAbort, { once: true });
   try {
     const [w, s, e, n] = box;
-    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&accept-language=zh,en&countrycodes=cn&viewbox=${w},${n},${e},${s}&bounded=1&q=${encodeURIComponent(q)}`, { signal: ctl.signal });
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&accept-language=zh,en${country ? `&countrycodes=${country}` : ""}&viewbox=${w},${n},${e},${s}&bounded=1&q=${encodeURIComponent(q)}`, { signal: ctl.signal });
     const hit = (await r.json())[0];
     if (!hit) return null;
     const rank = Number(hit.place_rank) || 0;
@@ -114,14 +114,15 @@ async function locate(p: PlaceItem, trip: Trip, signal: AbortSignal, near?: { la
     const w = toWgs(p.lat, p.lng, p.coordSystem);
     if (inBox([w.lng, w.lat])) model = [w.lng, w.lat];
   }
-  const addr = p.addressCn ? await geocode(p.addressCn, box, signal) : null;
+  const cc = trip.country ?? "cn";
+  const addr = p.addressCn ? await geocode(p.addressCn, box, signal, cc) : null;
   // an exact address (number / building) wins over doubtful coordinates (often mislabelled as WGS-84)
   if (addr && addr.rank >= 28 && (!model || km({ lat: model[1], lng: model[0] }, { lat: addr.ll[1], lng: addr.ll[0] }) > 0.25)) return { ll: addr.ll };
   if (model) return { ll: model };
   if (addr) return { ll: null, hint: addr.ll }; // street only
   // by name only: chains have many branches, so this is just a hint, the user places the pin
   if (p.nameCn) {
-    const byName = await geocode(p.nameCn, near ? boxFor(trip, near) : box, signal);
+    const byName = await geocode(p.nameCn, near ? boxFor(trip, near) : box, signal, cc);
     if (byName) return { ll: null, hint: byName.ll };
   }
   return { ll: null };

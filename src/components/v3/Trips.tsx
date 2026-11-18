@@ -5,6 +5,7 @@ import { dayCount, newTripRecord, searchCities, type Destination } from "../../l
 import { phase } from "../../lib/time";
 import OrbitMark from "../OrbitMark";
 import Shell, { Steps } from "./Shell";
+import CreateWizard from "./CreateWizard";
 
 const greeting = () => {
   const h = new Date().getHours();
@@ -26,7 +27,7 @@ export default function Trips({ onOpen, onClose }: { onOpen: (id: string) => voi
   }, [trips]);
   const [hero, ...rest] = sorted;
 
-  if (creating) return <CreateTrip onCancel={() => setCreating(false)} onCreated={(id) => { setCreating(false); onOpen(id); }} />;
+  if (creating) return <CreateWizard onCancel={() => setCreating(false)} onCreated={(id) => { setCreating(false); onOpen(id); }} />;
 
   const top = (
     <div className="v3-bar">
@@ -68,12 +69,17 @@ function TripCard({ t, big, onOpen }: { t: Trip; big?: boolean; onOpen: (id: str
   const ph = phase(t);
   const d = daysTo(t);
   const n = t.days.filter((x) => x.scheduled).reduce((k, x) => k + (x.dates?.length || 0), 0);
+  const draft = (useStore((s) => s.trips[t.id])?.draft as { status?: string } | undefined)?.status;
   return (
     <button className={"v3-trip" + (big ? " big" : "")} onClick={() => onOpen(t.id)}>
       <span className="v3-trip-art" aria-hidden="true" />
       <span className="v3-trip-over">
         <span className="v3-tags">
-          <span className={"v3-tag " + (ph === "during" ? "ok" : ph === "before" ? "gold" : "dim")}>{ph === "during" ? "En cours" : ph === "before" ? "À venir" : "Passé"}</span>
+          {draft && draft !== "done" ? (
+            <span className="v3-tag dim">{draft === "preparing" ? "En préparation" : "À valider"}</span>
+          ) : (
+            <span className={"v3-tag " + (ph === "during" ? "ok" : ph === "before" ? "gold" : "dim")}>{ph === "during" ? "En cours" : ph === "before" ? "À venir" : "Passé"}</span>
+          )}
         </span>
         <span className="v3-grow" />
         <span className="v3-trip-name">

@@ -998,3 +998,67 @@ button.pl-day:hover { border-color: var(--hair-strong); background: rgba(246, 24
 .v3-h2 + .v3-opts { margin-top: 20px; }
 .v3-grid .v3-trip-name b { font-size: 19px; overflow-wrap: anywhere; }
 .v3-grid .v3-trip-name small { font-size: 12px; }
+
+/* v3: creation wizard, preparation, review */
+.v3-stepper { flex: 1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.v3-stepper span { font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--mute); padding-top: 9px; border-top: 2px solid var(--hair); transition: color 0.3s, border-color 0.3s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v3-stepper span.done { color: var(--soft); border-color: rgba(246, 242, 234, 0.5); }
+.v3-stepper span.on { color: var(--ink); border-color: var(--ink); }
+.v3-paste { border-radius: 16px; border: 1px dashed var(--hair-strong); background: rgba(246, 242, 234, 0.03); padding: 10px 12px; margin-top: 8px; }
+.v3-paste:focus-within { border-style: solid; border-color: rgba(246, 242, 234, 0.5); }
+.v3-paste textarea { width: 100%; background: none; border: 0; outline: 0; resize: vertical; color: var(--ink); font: inherit; font-size: 16px; line-height: 1.45; min-height: 60px; }
+.v3-paste textarea::placeholder { color: var(--mute); }
+.v3-paste-bar { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.v3-paste-bar .v3-chip { height: 36px; padding: 0 14px; font-size: 13px; }
+.v3-chip:disabled { opacity: 0.45; }
+.v3-xchip { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; background: rgba(246, 242, 234, 0.06); border: 1px solid rgba(246, 242, 234, 0.08); font-size: 13.5px; margin-top: 8px; }
+.v3-xchip button { color: var(--mute); width: 28px; height: 28px; }
+.v3-card { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 11px 14px; border-radius: 14px; border: 1px solid var(--hair); margin-top: 6px; font-size: 14px; opacity: 0.55; transition: opacity 0.2s, border-color 0.2s, background 0.2s; }
+.v3-card.on { opacity: 1; border-color: rgba(246, 242, 234, 0.35); background: rgba(246, 242, 234, 0.04); }
+.v3-card b { font-weight: 500; display: block; }
+.v3-card small { display: block; color: var(--mute); font-size: 12.5px; margin-top: 2px; }
+.v3-card.on .v3-ck { background: var(--ink); border-color: var(--ink); color: #0a0a0a; }
+.v3-wish { border-top: 1px solid var(--hair); margin-top: 6px; }
+.v3-wishrow { display: flex; align-items: center; gap: 12px; padding: 6px 0; border-bottom: 1px solid rgba(246, 242, 234, 0.08); }
+.v3-wishrow > span { width: 84px; flex: none; font: 500 12px/1.2 var(--display); text-transform: uppercase; }
+.v3-wishrow > span small { display: block; font: 400 10.5px var(--font); color: var(--mute); letter-spacing: 0.08em; text-transform: none; }
+.v3-wishrow input { flex: 1; min-width: 0; height: 40px; background: none; border: 0; outline: 0; color: var(--ink); font: inherit; font-size: 16px; }
+.v3-wishrow input::placeholder { color: var(--mute); }
+.v3-orb { position: relative; width: 160px; height: 160px; margin: 8px auto 10px; color: var(--ink); }
+.v3-orb svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.v3-spin { transform-origin: 100px 100px; transform-box: view-box; animation: v3spin 14s linear infinite; }
+.v3-spin.rev { animation-duration: 22s; animation-direction: reverse; }
+@keyframes v3spin { to { transform: rotate(360deg); } }
+.v3-pct { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+.v3-pct b { font: 500 36px/1 var(--display); }
+.v3-pct small { display: block; font-size: 11px; color: var(--mute); margin-top: 6px; max-width: 120px; letter-spacing: 0.06em; }
+.v3-days { padding: 6px 16px; margin-top: 16px; }
+.v3-day { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(246, 242, 234, 0.08); font-size: 14px; transition: opacity 0.4s; }
+.v3-day:last-child { border-bottom: 0; }
+.v3-day.wait { opacity: 0.42; }
+.v3-st { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--hair); font-size: 12px; flex: none; }
+.v3-day.done .v3-st { background: rgba(127, 209, 185, 0.14); border-color: transparent; color: var(--ok); }
+.v3-day.err .v3-st { color: var(--warn); border-color: rgba(232, 176, 122, 0.5); }
+.v3-day.live .v3-st { border-color: var(--ink); animation: v3breathe 1.6s ease-in-out infinite; }
+@keyframes v3breathe { 50% { box-shadow: 0 0 0 6px rgba(246, 242, 234, 0.06); } }
+.v3-when { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--mute); min-width: 58px; }
+.v3-day.live .v3-when { color: var(--ink); }
+.v3-count { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+.v3-count div { padding: 12px 14px; border: 1px solid var(--hair); border-radius: 16px; }
+.v3-count b { font: 500 26px/1 var(--display); display: block; margin-top: 6px; }
+.v3-dsel { display: flex; gap: 6px; margin-top: 14px; overflow-x: auto; scrollbar-width: none; }
+.v3-dsel::-webkit-scrollbar { display: none; }
+.v3-dsel button { flex: none; width: 54px; height: 60px; border-radius: 15px; border: 1px solid var(--hair); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mute); transition: background 0.25s var(--ease), color 0.2s; }
+.v3-dsel button b { font: 500 19px/1 var(--display); color: var(--ink); }
+.v3-dsel button.on { background: var(--ink); border-color: var(--ink); color: #55524d; }
+.v3-dsel button.on b { color: #0a0a0a; }
+.v3-daycard { margin-top: 12px; padding: 14px 16px 6px; }
+.v3-dayhead { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
+.v3-dayhead b { display: block; font-size: 19px; }
+.v3-dayhead small { color: var(--mute); font-size: 12.5px; }
+.v3-dayhead .v3-chip { height: 34px; font-size: 12.5px; padding: 0 12px; flex: none; }
+.v3-slot { display: flex; gap: 12px; padding: 10px 0; border-top: 1px solid rgba(246, 242, 234, 0.08); align-items: flex-start; }
+.v3-tm { width: 46px; flex: none; font-size: 12.5px; color: var(--soft); font-variant-numeric: tabular-nums; padding-top: 1px; }
+.v3-slot b { font-weight: 500; font-size: 14px; display: block; }
+.v3-slot small { display: block; color: var(--mute); font-size: 12px; margin-top: 2px; line-height: 1.35; }
+@media (prefers-reduced-motion: reduce) { .v3-spin, .v3-day.live .v3-st { animation: none; } }

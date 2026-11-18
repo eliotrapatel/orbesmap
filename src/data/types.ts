@@ -108,6 +108,10 @@ export interface Trip {
   start: string;
   end: string;
   timezone: string;
+  /** country code of the destination (OpenStreetMap, e.g. "jp"); the first trips are in China */
+  country?: string;
+  /** main local language (interpreter, phrases) */
+  lang?: { code: string; name: string; speech: string };
   hotel: { name: string; lat: number; lng: number; placeId?: string };
   center: [number, number];
   days: Day[];

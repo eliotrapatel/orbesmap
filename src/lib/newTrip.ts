@@ -75,6 +75,7 @@ export function newTripRecord(o: { dest: Destination; start: string; end: string
     start: o.start,
     end: o.end,
     timezone: timezoneFor(o.dest.country, o.dest.lng),
+    country: (o.dest.country || "").toLowerCase(),
     hotel: { name: o.hotel?.trim() || "Hôtel à préciser", lat: o.dest.lat, lng: o.dest.lng },
     center,
     days: [

@@ -5,6 +5,7 @@ import { defaultTripId, hasLocalData, switchTrip, useStore, useTrips } from "../
 import Onboarding from "./Onboarding";
 import Trips from "./Trips";
 import Welcome from "./Welcome";
+import DraftScreen from "./DraftScreen";
 import { openHome, useHome } from "./nav";
 
 
@@ -19,6 +20,7 @@ export default function Root() {
   const member = useStore((s) => s.member);
   const profile = useStore((s) => s.profile);
   const tripId = useStore((s) => s.tripId);
+  const allTrips = useStore((s) => s.trips);
   const trips = useTrips();
   const home = useHome();
   const current = trips.some((t) => t.id === tripId);
@@ -55,5 +57,8 @@ export default function Root() {
         onClose={trips.length && current ? () => openHome(false) : undefined}
       />
     );
+  // a new trip being prepared by the AI, or waiting to be confirmed
+  const draft = (allTrips[tripId]?.draft as { status?: string } | undefined)?.status;
+  if (draft === "preparing" || draft === "review") return <DraftScreen onClose={() => openHome(true)} />;
   return <App />;
 }
