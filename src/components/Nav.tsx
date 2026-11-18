@@ -5,11 +5,12 @@ import { DENIED_HELP, ensureCompass, setFollow, startLocate, useLoc } from "../l
 import { estimate, fetchRoute, fmtDistance, fmtDuration, progress, secondsLeft, type LL, type Mode, type Route } from "../lib/route";
 import { IClose, ILocate, INav, IPinPlus } from "./Icons";
 import { useEscape } from "./ui";
+import { locale, t } from "../lib/i18n";
 
 export type NavTarget = LL & { name: string };
 export type NavState = { target: NavTarget; mode: Mode } | null;
 
-const clockIn = (s: number) => new Date(Date.now() + s * 1000).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+const clockIn = (s: number) => new Date(Date.now() + s * 1000).toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" });
 
 export const IWalk = (p: React.SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...p}>
@@ -118,17 +119,17 @@ export function NavCard({ nav, info, onMode, onClose }: { nav: NonNullable<NavSt
   const status = useLoc((s) => s.status);
   const follow = useLoc((s) => s.follow);
   return (
-    <div className="navcard glass" role="region" aria-label={`Itinéraire vers ${nav.target.name}`}>
+    <div className="navcard glass" role="region" aria-label={t("Itinéraire vers {name}", { name: nav.target.name })}>
       <div className="nav-top">
-        <div className="seg nav-modes" role="group" aria-label="Mode de déplacement">
-          <button className={nav.mode === "walk" ? "on" : ""} aria-pressed={nav.mode === "walk"} onClick={() => onMode("walk")}><IWalk /> À pied</button>
-          <button className={nav.mode === "car" ? "on" : ""} aria-pressed={nav.mode === "car"} onClick={() => onMode("car")}><ICar /> Voiture</button>
+        <div className="seg nav-modes" role="group" aria-label={t("Mode de déplacement")}>
+          <button className={nav.mode === "walk" ? "on" : ""} aria-pressed={nav.mode === "walk"} onClick={() => onMode("walk")}><IWalk /> {t("À pied")}</button>
+          <button className={nav.mode === "car" ? "on" : ""} aria-pressed={nav.mode === "car"} onClick={() => onMode("car")}><ICar /> {t("Voiture")}</button>
         </div>
-        <button className="icon-btn" onClick={onClose} aria-label="Arrêter l'itinéraire"><IClose /></button>
+        <button className="icon-btn" onClick={onClose} aria-label={t("Arrêter l'itinéraire")}><IClose /></button>
       </div>
       {info?.left != null && info.secs != null ? (
         info.arrived ? (
-          <div className="nav-main"><b>Vous êtes arrivé</b><span>{nav.target.name}</span></div>
+          <div className="nav-main"><b>{t("Vous êtes arrivé")}</b><span>{nav.target.name}</span></div>
         ) : (
           <div className="nav-main">
             <b>
@@ -137,15 +138,15 @@ export function NavCard({ nav, info, onMode, onClose }: { nav: NonNullable<NavSt
             </b>
             <span>
               {info.stale
-                ? `${nav.target.name} · position perdue (métro, tunnel ?), dernière position connue`
-                : `${nav.target.name} · arrivée ${clockIn(info.secs)}${info.loading ? " · calcul…" : info.estimate ? " · estimation" : nav.mode === "car" ? " · avec trafic moyen" : ""}`}
+                ? `${nav.target.name} · ${t("position perdue (métro, tunnel ?), dernière position connue")}`
+                : `${nav.target.name} · ${t("arrivée {time}", { time: clockIn(info.secs) })}${info.loading ? ` · ${t("calcul…")}` : info.estimate ? ` · ${t("estimation")}` : nav.mode === "car" ? ` · ${t("avec trafic moyen")}` : ""}`}
             </span>
           </div>
         )
       ) : (
         <div className="nav-main">
-          <b>{status === "denied" ? "Position refusée" : "Recherche de votre position…"}</b>
-          <span style={status === "denied" ? { whiteSpace: "normal" } : undefined}>{status === "denied" ? DENIED_HELP : `Vers ${nav.target.name}`}</span>
+          <b>{status === "denied" ? t("Position refusée") : t("Recherche de votre position…")}</b>
+          <span style={status === "denied" ? { whiteSpace: "normal" } : undefined}>{status === "denied" ? t(DENIED_HELP) : t("Vers {name}", { name: nav.target.name })}</span>
         </div>
       )}
       <div className="nav-btns">
@@ -154,9 +155,9 @@ export function NavCard({ nav, info, onMode, onClose }: { nav: NonNullable<NavSt
             if (status === "on") setFollow(!follow);
             else startLocate(true);
           }}>
-          <ILocate /> {follow ? "Je suis suivi" : "Me suivre"}
+          <ILocate /> {follow ? t("Je suis suivi") : t("Me suivre")}
         </button>
-        <a className="btn-sm" href={amapDirections(nav.target, nav.mode)} target="_blank" rel="noopener"><INav /> Guidage Amap</a>
+        <a className="btn-sm" href={amapDirections(nav.target, nav.mode)} target="_blank" rel="noopener"><INav /> {t("Guidage Amap")}</a>
       </div>
     </div>
   );
@@ -169,9 +170,9 @@ export function GoBlock({ target, onGo }: { target: NavTarget; onGo: (m: Mode) =
   if (!fix) {
     return (
       <div className="sec go">
-        <span className="label">Y aller</span>
+        <span className="label">{t("Y aller")}</span>
         <button className="btn-sm" onClick={() => startLocate(false)}>
-          <ILocate /> {status === "searching" ? "Recherche de votre position…" : "Voir la distance depuis ma position"}
+          <ILocate /> {status === "searching" ? t("Recherche de votre position…") : t("Voir la distance depuis ma position")}
         </button>
       </div>
     );
@@ -181,16 +182,16 @@ export function GoBlock({ target, onGo }: { target: NavTarget; onGo: (m: Mode) =
   if (w.distance / 1.25 > 80_000) {
     return (
       <div className="sec go">
-        <span className="label">Y aller · à {fmtDistance(w.distance / 1.25)} de vous</span>
+        <span className="label">{t("Y aller · à {dist} de vous", { dist: fmtDistance(w.distance / 1.25) })}</span>
       </div>
     );
   }
   return (
     <div className="sec go">
-      <span className="label">Y aller · à {fmtDistance(w.distance / 1.25)} à vol d'oiseau</span>
+      <span className="label">{t("Y aller · à {dist} à vol d'oiseau", { dist: fmtDistance(w.distance / 1.25) })}</span>
       <div className="go-row">
-        <button className="go-btn" onClick={() => onGo("walk")}><IWalk /><b>~{fmtDuration(w.duration)}</b><small>à pied · {fmtDistance(w.distance)}</small></button>
-        <button className="go-btn" onClick={() => onGo("car")}><ICar /><b>~{fmtDuration(c.duration)}</b><small>en voiture · {fmtDistance(c.distance)}</small></button>
+        <button className="go-btn" onClick={() => onGo("walk")}><IWalk /><b>~{fmtDuration(w.duration)}</b><small>{t("à pied · {dist}", { dist: fmtDistance(w.distance) })}</small></button>
+        <button className="go-btn" onClick={() => onGo("car")}><ICar /><b>~{fmtDuration(c.duration)}</b><small>{t("en voiture · {dist}", { dist: fmtDistance(c.distance) })}</small></button>
       </div>
     </div>
   );
@@ -203,24 +204,24 @@ export function PointCard({ point, onGo, onPin, onClose }: { point: LL; onGo: (m
   const w = fix ? estimate(fix, point, "walk") : null;
   const c = fix ? estimate(fix, point, "car") : null;
   return (
-    <div className="navcard glass" role="region" aria-label="Point choisi sur la carte">
+    <div className="navcard glass" role="region" aria-label={t("Point choisi sur la carte")}>
       <div className="nav-top">
         <div className="nav-main" style={{ padding: 0 }}>
-          <b style={{ fontSize: 16 }}>Point choisi</b>
-          <span>{fix && w ? `À ${fmtDistance(w.distance / 1.25)} à vol d'oiseau` : `${point.lat.toFixed(5)}, ${point.lng.toFixed(5)}`}</span>
+          <b style={{ fontSize: 16 }}>{t("Point choisi")}</b>
+          <span>{fix && w ? t("À {dist} à vol d'oiseau", { dist: fmtDistance(w.distance / 1.25) }) : `${point.lat.toFixed(5)}, ${point.lng.toFixed(5)}`}</span>
         </div>
-        <button className="icon-btn" onClick={onClose} aria-label="Fermer"><IClose /></button>
+        <button className="icon-btn" onClick={onClose} aria-label={t("Fermer")}><IClose /></button>
       </div>
       {fix && w && c && w.distance / 1.25 <= 80_000 ? (
         <div className="go-row">
-          <button className="go-btn" onClick={() => onGo("walk")}><IWalk /><b>~{fmtDuration(w.duration)}</b><small>à pied</small></button>
-          <button className="go-btn" onClick={() => onGo("car")}><ICar /><b>~{fmtDuration(c.duration)}</b><small>en voiture</small></button>
+          <button className="go-btn" onClick={() => onGo("walk")}><IWalk /><b>~{fmtDuration(w.duration)}</b><small>{t("à pied")}</small></button>
+          <button className="go-btn" onClick={() => onGo("car")}><ICar /><b>~{fmtDuration(c.duration)}</b><small>{t("en voiture")}</small></button>
         </div>
       ) : (
-        !fix && <button className="btn-sm" onClick={() => startLocate(false)}><ILocate /> Voir la distance depuis ma position</button>
+        !fix && <button className="btn-sm" onClick={() => startLocate(false)}><ILocate /> {t("Voir la distance depuis ma position")}</button>
       )}
       <div className="nav-btns">
-        <button className="btn-sm" onClick={onPin}><IPinPlus /> Ajouter à mes lieux</button>
+        <button className="btn-sm" onClick={onPin}><IPinPlus /> {t("Ajouter à mes lieux")}</button>
       </div>
     </div>
   );

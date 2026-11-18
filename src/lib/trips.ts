@@ -5,6 +5,7 @@
 // Their places come from the places table (defs.ts).
 import type { Trip } from "../data/types";
 import type { PlaceDef } from "./model";
+import { t as tr } from "./i18n";
 
 export type TripRec = PlaceDef;
 
@@ -15,6 +16,15 @@ export const TRIP_FIELDS = [
 ] as const;
 
 const SEED_AT = 1;
+
+/** A label in the language shown (the store reads the trips at start, before the language can be known: French then) */
+const t = (fr: string) => {
+  try {
+    return tr(fr);
+  } catch {
+    return fr;
+  }
+};
 
 /** Seed patch for a trip of the code: every field its record does not have yet, stamped at 1 ms */
 export function tripSeedPatch(code: Trip, rec: TripRec | undefined): TripRec | null {
@@ -34,10 +44,10 @@ export function tripSeedPatch(code: Trip, rec: TripRec | undefined): TripRec | n
 const str = (v: unknown, d = "") => (typeof v === "string" && v ? v : d);
 const arr = <T,>(v: unknown, d: T[]): T[] => (Array.isArray(v) ? (v as T[]) : d);
 
-/** Days every trip has, so a new trip always has somewhere to put places */
-const BASE_DAYS: Trip["days"] = [
-  { key: "base", short: "Hôtel", title: "Hôtel", theme: "Base du séjour", color: "#f6f2ea", glyph: "H", scheduled: false },
-  { key: "ideas", short: "Pistes", title: "Pistes", theme: "À voir si le temps le permet", color: "#9A958D", glyph: "+", scheduled: false },
+/** Days every trip has, so a new trip always has somewhere to put places (labels in the language shown) */
+const baseDays = (): Trip["days"] => [
+  { key: "base", short: t("Hôtel"), title: t("Hôtel"), theme: t("Base du séjour"), color: "#f6f2ea", glyph: "H", scheduled: false },
+  { key: "ideas", short: t("Pistes"), title: t("Pistes"), theme: t("À voir si le temps le permet"), color: "#9A958D", glyph: "+", scheduled: false },
 ];
 
 /**
@@ -49,23 +59,23 @@ export function tripFromRecord(id: string, rec: TripRec | undefined, code: Trip 
   const c = code;
   const pick = <T,>(k: (typeof TRIP_FIELDS)[number], d: T): T => (r[k] !== undefined && r[k] !== null ? (r[k] as T) : c ? ((c as unknown as Record<string, unknown>)[k] as T) ?? d : d);
   const start = str(pick("start", ""), new Date().toISOString().slice(0, 10));
-  const days = arr<Trip["days"][number]>(pick("days", BASE_DAYS), BASE_DAYS);
+  const days = arr<Trip["days"][number]>(pick<unknown>("days", null), []);
   const hotel = pick<Trip["hotel"] | null>("hotel", null);
   const center = pick<[number, number] | null>("center", null);
   return {
     id,
-    code: str(pick("code", ""), "VOYAGE"),
-    title: str(pick("title", ""), "Nouveau voyage"),
-    subtitle: str(pick("subtitle", ""), "Voyage"),
+    code: str(pick("code", "")) || t("VOYAGE"),
+    title: str(pick("title", "")) || t("Nouveau voyage"),
+    subtitle: str(pick("subtitle", "")) || t("Voyage"),
     dateLabel: str(pick("dateLabel", "")),
     start,
     end: str(pick("end", ""), start),
     timezone: str(pick("timezone", ""), "Europe/Paris"),
     country: str(pick("country", "")) || (c ? "cn" : undefined),
     lang: pick<Trip["lang"] | undefined>("lang", undefined),
-    hotel: hotel && typeof hotel.lat === "number" ? hotel : { name: "Hôtel à préciser", lat: center?.[1] ?? 48.8566, lng: center?.[0] ?? 2.3522 },
+    hotel: hotel && typeof hotel.lat === "number" ? hotel : { name: t("Hôtel à préciser"), lat: center?.[1] ?? 48.8566, lng: center?.[0] ?? 2.3522 },
     center: Array.isArray(center) && center.length === 2 ? center : hotel ? [hotel.lng, hotel.lat] : [2.3522, 48.8566],
-    days: days.length ? days : BASE_DAYS,
+    days: days.length ? days : baseDays(),
     places: c?.places || [],
     flights: arr(pick("flights", []), []),
     phrases: arr(pick("phrases", []), []),

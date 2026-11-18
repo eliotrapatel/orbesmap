@@ -11,6 +11,7 @@ import { fmtDistance } from "../lib/route";
 import { useLoc } from "../lib/locate";
 import { IStar, IStarFill } from "./Icons";
 import RemovedList from "./RemovedList";
+import { t } from "../lib/i18n";
 
 export type Filter = { types: Set<PlaceType>; fav: boolean; todo: boolean; near?: boolean; added?: boolean };
 
@@ -40,7 +41,7 @@ export default function PlaceList({ trip, places, states, pins, selectedId, quer
   const near = !!(filter.near && fix);
   const dayOf = (k: string) => trip.days.find((d) => d.key === k)!;
   const groups = near
-    ? [{ day: { key: "near", title: "Autour de moi", theme: "Du plus proche au plus loin", color: "#5aa7ff", glyph: "•" } as Trip["days"][number], items: places.filter((p) => !isHotel(trip, p)).sort((a, b) => dist(a)! - dist(b)!) }]
+    ? [{ day: { key: "near", title: t("Autour de moi"), theme: t("Du plus proche au plus loin"), color: "#5aa7ff", glyph: "•" } as Trip["days"][number], items: places.filter((p) => !isHotel(trip, p)).sort((a, b) => dist(a)! - dist(b)!) }]
     : trip.days
         .map((d) => {
           const items = places.filter((p) => p.day === d.key);
@@ -67,40 +68,40 @@ export default function PlaceList({ trip, places, states, pins, selectedId, quer
     <div>
       {nx && (
         <button className="next" onClick={() => onOpen(nx.place)}>
-          <span className="label">{ph === "during" ? "Prochain arrêt" : "Premier arrêt"}</span>
+          <span className="label">{ph === "during" ? t("Prochain arrêt") : t("Premier arrêt")}</span>
           <b>{nx.place.name}</b>
           <small>
             {nx.day.title}
-            {nx.when != null ? `, ${fmtMin(nx.when)}` : ""} · {TYPE_LABEL[nx.place.type] || ""}
+            {nx.when != null ? `, ${fmtMin(nx.when)}` : ""} · {t(TYPE_LABEL[nx.place.type] || "")}
           </small>
         </button>
       )}
-      <div className="filters" role="group" aria-label="Filtres">
+      <div className="filters" role="group" aria-label={t("Filtres")}>
         {fix && (
           <button className={"fchip" + (filter.near ? " on" : "")} aria-pressed={!!filter.near} onClick={() => onFilter({ ...filter, near: !filter.near })}>
-            Autour de moi
+            {t("Autour de moi")}
           </button>
         )}
         <button className={"fchip" + (filter.fav ? " on" : "")} aria-pressed={filter.fav} onClick={() => onFilter({ ...filter, fav: !filter.fav })}>
-          <IStar /> Favoris
+          <IStar /> {t("Favoris")}
         </button>
         <button className={"fchip" + (filter.todo ? " on" : "")} aria-pressed={filter.todo} onClick={() => onFilter({ ...filter, todo: !filter.todo })}>
-          Pas encore vus
+          {t("Pas encore vus")}
         </button>
         {hasAdded && (
           <button className={"fchip" + (filter.added ? " on" : "")} aria-pressed={!!filter.added} onClick={() => onFilter({ ...filter, added: !filter.added })}>
-            Mes ajouts
+            {t("Mes ajouts")}
           </button>
         )}
-        {types.map((t) => (
-          <button key={t} className={"fchip" + (filter.types.has(t) ? " on" : "")} aria-pressed={filter.types.has(t)} onClick={() => toggleType(t)}>
-            {TYPE_LABEL[t] || t}
+        {types.map((ty) => (
+          <button key={ty} className={"fchip" + (filter.types.has(ty) ? " on" : "")} aria-pressed={filter.types.has(ty)} onClick={() => toggleType(ty)}>
+            {t(TYPE_LABEL[ty] || ty)}
           </button>
         ))}
       </div>
-      <div className="progress" style={{ padding: "0 18px 6px" }} aria-label={`${visited} lieux visités sur ${all.length}`}>
+      <div className="progress" style={{ padding: "0 18px 6px" }} aria-label={t("{n} lieux visités sur {total}", { n: visited, total: all.length })}>
         <span className="num">
-          {visited} / {all.length} visités
+          {t("{n} / {total} visités", { n: visited, total: all.length })}
         </span>
         <div className="bar">
           <span style={{ width: `${all.length ? (visited / all.length) * 100 : 0}%` }} />
@@ -109,8 +110,8 @@ export default function PlaceList({ trip, places, states, pins, selectedId, quer
 
       {!groups.length && !pinItems.length && (
         <div className="empty">
-          <b>Aucun lieu</b>
-          Changez la recherche ou les filtres.
+          <b>{t("Aucun lieu")}</b>
+          {t("Changez la recherche ou les filtres.")}
         </div>
       )}
 
@@ -136,14 +137,14 @@ export default function PlaceList({ trip, places, states, pins, selectedId, quer
                 <span className="row-main">
                   <span className="row-name">{p.name}</span>
                   <span className="row-meta">
-                    {s?.appt ? `RDV ${s.appt}` : [p.time, TYPE_LABEL[p.type] || p.type, !p.time && p.added ? p.why || p.desc || p.added.note : ""].filter(Boolean).join(" · ")}
+                    {s?.appt ? t("RDV {appt}", { appt: s.appt }) : [p.time, t(TYPE_LABEL[p.type] || p.type), !p.time && p.added ? p.why || p.desc || p.added.note : ""].filter(Boolean).join(" · ")}
                   </span>
                 </span>
                 <span className="row-tags">
-                  {p.added && <span className="row-new" title="Ajouté dans l'app">Ajout</span>}
-                  {s?.favorite && <IStarFill aria-label="Favori" />}
-                  {st && <span className="sdot" title={st.label} style={{ ["--c" as string]: st.color }} />}
-                  {ls && ls.tone === "bad" && <span className="row-closed">Fermé</span>}
+                  {p.added && <span className="row-new" title={t("Ajouté dans l'app")}>{t("Ajout")}</span>}
+                  {s?.favorite && <IStarFill aria-label={t("Favori")} />}
+                  {st && <span className="sdot" title={t(st.label)} style={{ ["--c" as string]: st.color }} />}
+                  {ls && ls.tone === "bad" && <span className="row-closed">{t("Fermé")}</span>}
                   {d != null && <span className="row-dist">{fmtDistance(d)}</span>}
                 </span>
               </button>
@@ -155,8 +156,8 @@ export default function PlaceList({ trip, places, states, pins, selectedId, quer
       {pinItems.length > 0 && (
         <section>
           <div className="group-h">
-            <span className="label">Mes lieux</span>
-            <span>Ajoutés sur la carte</span>
+            <span className="label">{t("Mes lieux")}</span>
+            <span>{t("Ajoutés sur la carte")}</span>
             <em>{pinItems.length}</em>
           </div>
           {pinItems.map((pin) => (

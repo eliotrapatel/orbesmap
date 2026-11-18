@@ -7,10 +7,11 @@ import OrbitMark from "../OrbitMark";
 import Shell, { Steps } from "./Shell";
 import CreateWizard from "./CreateWizard";
 import AccountActions from "./AccountActions";
+import { t } from "../../lib/i18n";
 
 const greeting = () => {
   const h = new Date().getHours();
-  return h < 5 ? "Bonsoir" : h < 18 ? "Bonjour" : "Bonsoir";
+  return h < 5 ? t("Bonsoir") : h < 18 ? t("Bonjour") : t("Bonsoir");
 };
 const daysTo = (t: Trip) => Math.ceil((Date.parse(t.start + "T00:00:00") - Date.now()) / 864e5);
 
@@ -41,15 +42,15 @@ export default function Trips({ onOpen, onClose }: { onOpen: (id: string) => voi
     <div className="v3-bar">
       <OrbitMark size={20} title="ORBES Trips" />
       <span className="v3-grow" />
-      {onClose && <button className="v3-tool" onClick={onClose} aria-label="Revenir à la carte">✕</button>}
-      <button type="button" className="v3-av" aria-label="Mon compte" aria-expanded={menu} onClick={() => setMenu((v) => !v)}>{initial}</button>
+      {onClose && <button className="v3-tool" onClick={onClose} aria-label={t("Revenir à la carte")}>✕</button>}
+      <button type="button" className="v3-av" aria-label={t("Mon compte")} aria-expanded={menu} onClick={() => setMenu((v) => !v)}>{initial}</button>
       {menu && (
         <div className="v3-acct-wrap" onClick={() => setMenu(false)}>
-          <div className="v3-glass v3-acct" role="dialog" aria-label="Mon compte" onClick={(e) => e.stopPropagation()}>
+          <div className="v3-glass v3-acct" role="dialog" aria-label={t("Mon compte")} onClick={(e) => e.stopPropagation()}>
             <b>{name || email.split("@")[0]}</b>
             <small>{email}</small>
             <AccountActions />
-            <button type="button" className="v3-link" onClick={() => { setMenu(false); void signOut(); }}>Se déconnecter</button>
+            <button type="button" className="v3-link" onClick={() => { setMenu(false); void signOut(); }}>{t("Se déconnecter")}</button>
           </div>
         </div>
       )}
@@ -61,9 +62,9 @@ export default function Trips({ onOpen, onClose }: { onOpen: (id: string) => voi
       <Shell top={top} className="v3-empty">
         <div className="v3-bigmark"><OrbitMark size={88} /></div>
         <p className="v3-lbl" style={{ textAlign: "center", marginTop: 30 }}>{greeting()}{name ? ` ${name}` : ""}</p>
-        <h1 className="v3-d v3-h2" style={{ textAlign: "center" }}>Votre premier voyage commence ici.</h1>
-        <p className="v3-lead" style={{ textAlign: "center", margin: "14px auto 0" }}>Une destination et des dates suffisent. Le reste se construit avec vous.</p>
-        <button className="v3-btn" style={{ marginTop: 26 }} onClick={() => setCreating(true)}>＋ Créer un voyage</button>
+        <h1 className="v3-d v3-h2" style={{ textAlign: "center" }}>{t("Votre premier voyage commence ici.")}</h1>
+        <p className="v3-lead" style={{ textAlign: "center", margin: "14px auto 0" }}>{t("Une destination et des dates suffisent. Le reste se construit avec vous.")}</p>
+        <button className="v3-btn" style={{ marginTop: 26 }} onClick={() => setCreating(true)}>{t("＋ Créer un voyage")}</button>
         <div className="v3-spacer" />
       </Shell>
     );
@@ -72,10 +73,10 @@ export default function Trips({ onOpen, onClose }: { onOpen: (id: string) => voi
     <Shell ring={false} top={top}>
       <p className="v3-lbl" style={{ marginTop: 14 }}>{greeting()}{name ? ` ${name}` : ""}</p>
       <div className="v3-titlerow">
-        <h1 className="v3-d v3-h2" style={{ margin: 0 }}>Mes voyages</h1>
+        <h1 className="v3-d v3-h2" style={{ margin: 0 }}>{t("Mes voyages")}</h1>
         <span>{trips.length}</span>
       </div>
-      <button className="v3-btn" style={{ marginTop: 16 }} onClick={() => setCreating(true)}>＋ Créer un voyage</button>
+      <button className="v3-btn" style={{ marginTop: 16 }} onClick={() => setCreating(true)}>{t("＋ Créer un voyage")}</button>
       {hero && <TripCard t={hero} big onOpen={onOpen} />}
       {rest.length > 0 && <div className="v3-grid">{rest.map((t) => <TripCard key={t.id} t={t} onOpen={onOpen} />)}</div>}
       <div style={{ height: 24 }} />
@@ -83,28 +84,28 @@ export default function Trips({ onOpen, onClose }: { onOpen: (id: string) => voi
   );
 }
 
-function TripCard({ t, big, onOpen }: { t: Trip; big?: boolean; onOpen: (id: string) => void }) {
-  const ph = phase(t);
-  const d = daysTo(t);
-  const n = t.days.filter((x) => x.scheduled).reduce((k, x) => k + (x.dates?.length || 0), 0);
-  const draft = (useStore((s) => s.trips[t.id])?.draft as { status?: string } | undefined)?.status;
+function TripCard({ t: trip, big, onOpen }: { t: Trip; big?: boolean; onOpen: (id: string) => void }) {
+  const ph = phase(trip);
+  const d = daysTo(trip);
+  const n = trip.days.filter((x) => x.scheduled).reduce((k, x) => k + (x.dates?.length || 0), 0);
+  const draft = (useStore((s) => s.trips[trip.id])?.draft as { status?: string } | undefined)?.status;
   return (
-    <button className={"v3-trip" + (big ? " big" : "")} onClick={() => onOpen(t.id)}>
+    <button className={"v3-trip" + (big ? " big" : "")} onClick={() => onOpen(trip.id)}>
       <span className="v3-trip-art" aria-hidden="true" />
       <span className="v3-trip-over">
         <span className="v3-tags">
           {draft && draft !== "done" ? (
-            <span className="v3-tag dim">{draft === "preparing" ? "En préparation" : "À valider"}</span>
+            <span className="v3-tag dim">{draft === "preparing" ? t("En préparation") : t("À valider")}</span>
           ) : (
-            <span className={"v3-tag " + (ph === "during" ? "ok" : ph === "before" ? "gold" : "dim")}>{ph === "during" ? "En cours" : ph === "before" ? "À venir" : "Passé"}</span>
+            <span className={"v3-tag " + (ph === "during" ? "ok" : ph === "before" ? "gold" : "dim")}>{ph === "during" ? t("En cours") : ph === "before" ? t("À venir") : t("Passé")}</span>
           )}
         </span>
         <span className="v3-grow" />
         <span className="v3-trip-name">
-          {big && ph === "before" && d > 0 && <span className="v3-cd">J–{d}</span>}
+          {big && ph === "before" && d > 0 && <span className="v3-cd">{t("J–{d}", { d })}</span>}
           <span>
-            <b className="v3-d">{t.title}</b>
-            <small>{t.dateLabel}{n ? ` · ${n} jour${n > 1 ? "s" : ""}` : ""}</small>
+            <b className="v3-d">{trip.title}</b>
+            <small>{trip.dateLabel}{n ? ` · ${n > 1 ? t("{n} jours", { n }) : t("{n} jour", { n })}` : ""}</small>
           </span>
         </span>
       </span>
@@ -150,7 +151,7 @@ export function CreateTrip({ onCancel, onCreated }: { onCancel: () => void; onCr
   const n = start && end && end >= start ? dayCount(start, end) : 0;
   const top = (
     <div className="v3-bar">
-      <button className="v3-tool" onClick={step === 1 ? onCancel : () => setStep(1)} aria-label={step === 1 ? "Fermer" : "Retour"}>{step === 1 ? "✕" : "‹"}</button>
+      <button className="v3-tool" onClick={step === 1 ? onCancel : () => setStep(1)} aria-label={step === 1 ? t("Fermer") : t("Retour")}>{step === 1 ? "✕" : "‹"}</button>
       <Steps n={step} of={2} />
     </div>
   );
@@ -158,14 +159,14 @@ export function CreateTrip({ onCancel, onCreated }: { onCancel: () => void; onCr
   if (step === 1)
     return (
       <Shell ring={false} top={top}>
-        <p className="v3-lbl" style={{ marginTop: 22 }}>Nouveau voyage</p>
-        <h1 className="v3-d v3-h2">Où allez-vous ?</h1>
+        <p className="v3-lbl" style={{ marginTop: 22 }}>{t("Nouveau voyage")}</p>
+        <h1 className="v3-d v3-h2">{t("Où allez-vous ?")}</h1>
         <label className="v3-field" style={{ marginTop: 16 }}>
-          <span className="sr">Ville</span>
-          <input autoFocus value={q} onChange={(e) => { setQ(e.target.value); setDest(null); }} placeholder="Une ville : Tokyo, Rome, Lisbonne…" autoComplete="off" />
+          <span className="sr">{t("Ville")}</span>
+          <input autoFocus value={q} onChange={(e) => { setQ(e.target.value); setDest(null); }} placeholder={t("Une ville : Tokyo, Rome, Lisbonne…")} autoComplete="off" />
         </label>
         <ul className="v3-results" aria-live="polite">
-          {searching && !results.length && <li className="v3-note">Recherche…</li>}
+          {searching && !results.length && <li className="v3-note">{t("Recherche…")}</li>}
           {results.map((r) => (
             <li key={`${r.name}-${r.lat}`}>
               <button className={"v3-res" + (dest === r ? " on" : "")} onClick={() => { setDest(r); setQ(r.name); setResults([r]); }}>
@@ -177,23 +178,23 @@ export function CreateTrip({ onCancel, onCreated }: { onCancel: () => void; onCr
           ))}
         </ul>
         <div className="v3-spacer" />
-        <button className="v3-btn" disabled={!dest} onClick={() => setStep(2)}>Continuer</button>
+        <button className="v3-btn" disabled={!dest} onClick={() => setStep(2)}>{t("Continuer")}</button>
       </Shell>
     );
 
   return (
     <Shell ring={false} top={top}>
       <p className="v3-lbl" style={{ marginTop: 22 }}>{dest?.name}</p>
-      <h1 className="v3-d v3-h2">Quand partez-vous ?</h1>
+      <h1 className="v3-d v3-h2">{t("Quand partez-vous ?")}</h1>
       <div className="v3-dates">
-        <label className="v3-field col"><span>Arrivée</span><input type="date" value={start} onChange={(e) => { setStart(e.target.value); if (!end || end < e.target.value) setEnd(e.target.value); }} /></label>
-        <label className="v3-field col"><span>Départ</span><input type="date" value={end} min={start || undefined} onChange={(e) => setEnd(e.target.value)} /></label>
+        <label className="v3-field col"><span>{t("Arrivée")}</span><input type="date" value={start} onChange={(e) => { setStart(e.target.value); if (!end || end < e.target.value) setEnd(e.target.value); }} /></label>
+        <label className="v3-field col"><span>{t("Départ")}</span><input type="date" value={end} min={start || undefined} onChange={(e) => setEnd(e.target.value)} /></label>
       </div>
-      {n > 0 && <p className="v3-note">{n} jour{n > 1 ? "s" : ""} sur place{n > 60 ? " (60 au maximum)" : ""}</p>}
-      <p className="v3-lbl" style={{ marginTop: 22 }}>Hôtel (si vous le connaissez)</p>
+      {n > 0 && <p className="v3-note">{n > 1 ? t("{n} jours sur place", { n }) : t("{n} jour sur place", { n })}{n > 60 ? t(" (60 au maximum)") : ""}</p>}
+      <p className="v3-lbl" style={{ marginTop: 22 }}>{t("Hôtel (si vous le connaissez)")}</p>
       <label className="v3-field" style={{ marginTop: 8 }}>
-        <span className="sr">Hôtel</span>
-        <input value={hotel} onChange={(e) => setHotel(e.target.value)} placeholder="Nom de l'hôtel" />
+        <span className="sr">{t("Hôtel")}</span>
+        <input value={hotel} onChange={(e) => setHotel(e.target.value)} placeholder={t("Nom de l'hôtel")} />
       </label>
       <div className="v3-spacer" />
       <button
@@ -206,7 +207,7 @@ export function CreateTrip({ onCancel, onCreated }: { onCancel: () => void; onCr
           onCreated(id);
         }}
       >
-        Créer le voyage
+        {t("Créer le voyage")}
       </button>
     </Shell>
   );

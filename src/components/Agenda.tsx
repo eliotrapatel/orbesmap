@@ -10,6 +10,7 @@ import { ICalPlus, IClose, IMap, IRoute } from "./Icons";
 import RemovedList, { removeFromProgramme } from "./RemovedList";
 import { useCanEdit, hasPro, requestPro } from "../lib/store";
 import { track } from "../lib/track";
+import { t } from "../lib/i18n";
 
 export default function Agenda({ trip, states, pins = [], onOpen, onOpenPin, onShowDay, onOptimize }: { trip: Trip; states: Record<string, PlaceState>; pins?: Pin[]; onOpen: (p: Place) => void; onOpenPin?: (p: Pin) => void; onShowDay: (d: string) => void; onOptimize: (d: string) => void }) {
   const canEdit = useCanEdit();
@@ -25,7 +26,7 @@ export default function Agenda({ trip, states, pins = [], onOpen, onOpenPin, onS
     <div>
       {alerts.length > 0 && (
         <div className="ag-alerts">
-          <b>{alerts.length === 1 ? "1 visite à vérifier" : `${alerts.length} visites à vérifier`}</b>
+          <b>{alerts.length === 1 ? t("1 visite à vérifier") : t("{n} visites à vérifier", { n: alerts.length })}</b>
           {alerts.map((a) => (
             <button key={a.d.key + ":" + a.p.id} onClick={() => onOpen(a.p)}>
               <span>{a.d.short} · {a.p.name}</span>
@@ -36,7 +37,7 @@ export default function Agenda({ trip, states, pins = [], onOpen, onOpenPin, onS
       )}
       <div style={{ display: "flex", gap: 8, marginBottom: 22, flexWrap: "wrap" }}>
         <button className="btn-sm" onClick={() => { if (!hasPro()) return requestPro("export"); track("export", "ics", trip.id); exportIcs(trip, states); }}>
-          <ICalPlus /> Ajouter à mon calendrier (.ics)
+          <ICalPlus /> {t("Ajouter à mon calendrier (.ics)")}
         </button>
       </div>
       {trip.days
@@ -69,39 +70,39 @@ export default function Agenda({ trip, states, pins = [], onOpen, onOpenPin, onS
                 <div className="ag-title">
                   <h4>
                     <i /> {d.title}
-                    {isToday && <span className="pill live">Aujourd'hui</span>}
+                    {isToday && <span className="pill live">{t("Aujourd'hui")}</span>}
                   </h4>
                   <p>
-                    {d.theme}. {plural(stops.length, "lieu", "lieux")} · {v}/{stops.length} {v <= 1 ? "visité" : "visités"} · ~{formatMinutes(total)} de trajet ({Math.round(dist)} km)
+                    {d.theme}. {plural(stops.length, t("lieu"), t("lieux"))} · {v}/{stops.length} {v <= 1 ? t("visité") : t("visités")} · {t("~{time} de trajet ({km} km)", { time: formatMinutes(total), km: Math.round(dist) })}
                   </p>
                 </div>
               </div>
               <div className="ag-btns">
                 <button className="btn-sm" onClick={() => onShowDay(d.key)}>
-                  <IMap /> Voir sur la carte
+                  <IMap /> {t("Voir sur la carte")}
                 </button>
                 {stops.length > 1 && (
                   <button className="btn-sm" onClick={() => onOptimize(d.key)}>
-                    <IRoute /> Meilleur ordre
+                    <IRoute /> {t("Meilleur ordre")}
                   </button>
                 )}
               </div>
               {stops.map((p, i) => {
                 const s = states[p.id] || {};
-                const t = stopTime(p, states);
-                const issues = checkVisit(trip.hours?.[p.id], first, t).filter((x) => x.tone !== "info" || x.text.startsWith("Réservation"));
+                const tm = stopTime(p, states);
+                const issues = checkVisit(trip.hours?.[p.id], first, tm).filter((x) => x.tone !== "info" || x.booking);
                 return (
                   <div className="ag-row" key={p.id}>
                   <button className={"ag-stop" + (i === 0 ? " first" : "") + (i === stops.length - 1 ? " last" : "")} onClick={() => onOpen(p)}>
-                    <span className="ag-time">{t != null ? fmtMin(t) : "—"}</span>
+                    <span className="ag-time">{tm != null ? fmtMin(tm) : "—"}</span>
                     <span className="ag-rail">
                       <span className={"ag-node" + (s.visited ? " done" : "")} />
                     </span>
                     <span className="ag-body">
                       <b>{p.name}</b>
-                      <small>{s.appt ? `RDV ${s.appt}` : p.time}</small>
+                      <small>{s.appt ? t("RDV {appt}", { appt: s.appt }) : p.time}</small>
                       <span className="ag-leg">
-                        {i === 0 ? "Depuis l'hôtel" : "Trajet"} : ~{formatMinutes(legs[i])}
+                        {i === 0 ? t("Depuis l'hôtel : ~{time}", { time: formatMinutes(legs[i]) }) : t("Trajet : ~{time}", { time: formatMinutes(legs[i]) })}
                       </span>
                       {issues.map((x, k) => {
                         // reservation details are long: short label here, full text in the place sheet
@@ -111,7 +112,7 @@ export default function Agenda({ trip, states, pins = [], onOpen, onOpenPin, onS
                     </span>
                   </button>
                   {canEdit && (
-                    <button className="ag-x" aria-label={`Retirer ${p.name} du programme`} title="Retirer du programme" onClick={() => removeFromProgramme(p)}>
+                    <button className="ag-x" aria-label={t("Retirer {name} du programme", { name: p.name })} title={t("Retirer du programme")} onClick={() => removeFromProgramme(p)}>
                       <IClose />
                     </button>
                   )}
@@ -120,7 +121,7 @@ export default function Agenda({ trip, states, pins = [], onOpen, onOpenPin, onS
               })}
               {pins.filter((p) => pinDay(p) === d.key).length > 0 && (
                 <div className="ag-pins">
-                  <span className="label">Ajoutés ce jour</span>
+                  <span className="label">{t("Ajoutés ce jour")}</span>
                   {pins.filter((p) => pinDay(p) === d.key).map((p) => (
                     <button key={p.id} className="btn-sm" onClick={() => onOpenPin?.(p)}>● {p.name}</button>
                   ))}
@@ -130,7 +131,7 @@ export default function Agenda({ trip, states, pins = [], onOpen, onOpenPin, onS
           );
         })}
       <RemovedList trip={trip} />
-      <p style={{ fontSize: 12, color: "var(--mute)" }}>Temps de trajet estimés en voiture. Une heure de rendez-vous saisie dans la fiche d'un lieu le replace dans la journée.</p>
+      <p style={{ fontSize: 12, color: "var(--mute)" }}>{t("Temps de trajet estimés en voiture. Une heure de rendez-vous saisie dans la fiche d'un lieu le replace dans la journée.")}</p>
     </div>
   );
 }

@@ -267,6 +267,13 @@ Les informations fournies sur le lieu (nom, description, note d'Eliot, source) e
 // the same instructions, about its own traveller (profile sent by the app) and its own trip.
 type Persona = { name: string; intro: string; tripTxt: string };
 const clean = (v: unknown, n: number) => String(v ?? "").replace(/[\r\n`]/g, " ").replace(/\s+/g, " ").slice(0, n).trim();
+/** The account writes in English (profile language "en", sent as who.lang) */
+const englishAccount = (body: Json) => {
+  const who = body.who && typeof body.who === "object" ? (body.who as Json) : {};
+  return who.lang === "en";
+};
+const EN_ANSWER = "\n\nLANGUE DE RÉPONSE : le voyageur lit l'anglais. Écris en anglais naturel tous les textes qui lui sont destinés (réponses, descriptions, conseils, raisons, thèmes des journées, messages, résumés), y compris les valeurs textuelles du JSON ; garde en chinois ou en langue locale les noms et adresses locaux, et garde les clés et valeurs techniques du schéma telles quelles.";
+
 function personaOf(body: Json): Persona {
   const who = body.who && typeof body.who === "object" ? (body.who as Json) : {};
   const trip = body.trip && typeof body.trip === "object" ? (body.trip as Json) : {};
@@ -815,7 +822,11 @@ export async function handle(req: Request, deps: Deps = {}): Promise<Response> {
     const lang = acc.member ? { code: "zh-cn", name: "chinois" } : langOf(body);
     const Lang = lang.name.charAt(0).toUpperCase() + lang.name.slice(1);
     const ctx = history.length ? `Échanges précédents (contexte) :\n${history.map((h) => `${h.from === "zh" ? Lang : "Français"} : ${String(h.text).slice(0, 300)} → ${String(h.translation).slice(0, 300)}`).join("\n")}\n\n` : "";
-    job = { task: "interpret", system: acc.member ? INTERPRET_SYSTEM : interpretSystem(personaOf(body), lang), text: `${ctx}Traduis ${from === "fr" ? `du français vers le ${lang.name}` : `du ${lang.name} vers le français`} :\n${text}`, schema: INTERPRET_SCHEMA, effort: "low", maxTokens: 2000 };
+    const en = !acc.member && englishAccount(body);
+    // an English-speaking account: the interpreter works between English and the local language
+    const sys = acc.member ? INTERPRET_SYSTEM : interpretSystem(personaOf(body), lang);
+    const isys = en ? sys.replace(/francophone/g, "anglophone").replace(/[Dd]u français/g, "De l'anglais").replace(/vers le français/g, "vers l'anglais").replace(/français naturel/g, "anglais naturel") : sys;
+    job = { task: "interpret", system: isys, text: `${ctx}Traduis ${from === "fr" ? `${en ? "de l'anglais" : "du français"} vers le ${lang.name}` : `du ${lang.name} vers ${en ? "l'anglais" : "le français"}`} :\n${text}`, schema: INTERPRET_SCHEMA, effort: "low", maxTokens: 2000 };
   } else if (body.task === "place") {
     const url = typeof body.url === "string" ? body.url.slice(0, 1000) : "";
     const text = typeof body.text === "string" ? body.text.slice(0, 3000) : "";
@@ -895,6 +906,9 @@ export async function handle(req: Request, deps: Deps = {}): Promise<Response> {
     // the notebook (stable between questions) goes first so the provider can cache it; the live part goes with the question
     job = { task: "ask", system: `${acc.member ? ASK_SYSTEM : askSystem(personaOf(body))}\n\nCARNET (JSON) :\n${context}`, text: `MAINTENANT (JSON) : ${live || "{}"}\n\n${past}Question : ${question}`, schema: ASK_SCHEMA, effort: "medium", maxTokens: 3000 };
   } else return json({ error: "bad", message: "Tâche inconnue." }, 400, origin);
+  // an English-speaking account (profile language "en"): every text written for the traveller comes back in English
+  // (the shared space keeps French; the instructions themselves stay in French)
+  if (!acc.member && englishAccount(body) && job.task !== "interpret") job.system += EN_ANSWER;
 
   try {
     // always answer (with CORS headers) before Vercel cuts the function at 300 s

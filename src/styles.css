@@ -1262,3 +1262,4 @@ button.v3-brand { color: var(--ink); background: none; border: 0; padding: 0; cu
 .pt-sheet-wrap { background: rgba(0, 0, 0, 0.55); display: flex; align-items: flex-end; justify-content: center; }
 .pt-sheet { position: relative; width: min(480px, 100%); padding: 20px 20px calc(20px + var(--safe-b)); border-radius: 24px 24px 0 0; background: rgba(14, 13, 12, 0.96); display: flex; flex-direction: column; animation: pop 0.2s var(--ease); }
 @media (min-width: 900px) { .pt-sheet-wrap { align-items: center; } .pt-sheet { border-radius: 24px; } }
+.acct-lang { margin-top: 4px; }

@@ -3,6 +3,7 @@ import { sendLoginEmail, signInWithPassword, signOut, useStore, verifyLoginCode,
 import { supabaseConfigured } from "../lib/supabase";
 import AiCredit from "./AiCredit";
 import AccountActions from "./v3/AccountActions";
+import { t } from "../lib/i18n";
 
 const SYNC_TEXT: Record<SyncState, string> = {
   local: "Enregistré sur cet appareil",
@@ -24,8 +25,8 @@ export function SyncBadge() {
   const pending = useStore((s) => s.pending);
   return (
     <span className={"sync " + state}>
-      <i /> {SYNC_TEXT[state]}
-      {pending > 0 && state !== "idle" ? ` · ${pending} en attente` : ""}
+      <i /> {t(SYNC_TEXT[state])}
+      {pending > 0 && state !== "idle" ? ` · ${t("{n} en attente", { n: pending })}` : ""}
     </span>
   );
 }
@@ -45,9 +46,9 @@ export default function Account() {
     return (
       <div>
         <div className="card">
-          <h4>Sauvegarde</h4>
-          <p style={{ marginTop: 6 }}>Vos notes, statuts, contacts et photos sont enregistrés sur cet appareil, même hors connexion.</p>
-          <p style={{ marginTop: 10 }}>La sauvegarde en ligne et le partage avec votre père s'activeront dès que le projet Supabase sera relié à l'app.</p>
+          <h4>{t("Sauvegarde")}</h4>
+          <p style={{ marginTop: 6 }}>{t("Vos notes, statuts, contacts et photos sont enregistrés sur cet appareil, même hors connexion.")}</p>
+          <p style={{ marginTop: 10 }}>{t("La sauvegarde en ligne et le partage avec votre père s'activeront dès que le projet Supabase sera relié à l'app.")}</p>
           <div style={{ marginTop: 14 }}><SyncBadge /></div>
         </div>
       </div>
@@ -58,13 +59,13 @@ export default function Account() {
     return (
       <div>
         <div className="card">
-          <h4>{member === false ? "Votre compte" : "Espace partagé"}</h4>
-          <p style={{ marginTop: 6 }}>Connecté avec {session.user.email}</p>
+          <h4>{member === false ? t("Votre compte") : t("Espace partagé")}</h4>
+          <p style={{ marginTop: 6 }}>{t("Connecté avec {email}", { email: session.user.email })}</p>
           <div style={{ marginTop: 14 }}><SyncBadge /></div>
           {member === false ? (
-            <p style={{ marginTop: 14 }}>Vos voyages sont sauvegardés en ligne et partagés avec les personnes que vous invitez. Ils restent aussi sur cet appareil pour fonctionner sans réseau.</p>
+            <p style={{ marginTop: 14 }}>{t("Vos voyages sont sauvegardés en ligne et partagés avec les personnes que vous invitez. Ils restent aussi sur cet appareil pour fonctionner sans réseau.")}</p>
           ) : (
-            <p style={{ marginTop: 14 }}>Vos données sont sauvegardées en ligne et partagées en direct avec les autres membres. Elles restent aussi sur cet appareil pour fonctionner sans réseau.</p>
+            <p style={{ marginTop: 14 }}>{t("Vos données sont sauvegardées en ligne et partagées en direct avec les autres membres. Elles restent aussi sur cet appareil pour fonctionner sans réseau.")}</p>
           )}
           {member !== false && <AiCredit />}
           <AccountActions variant="app" />
@@ -72,11 +73,11 @@ export default function Account() {
             className="btn danger block"
             style={{ marginTop: 16 }}
             onClick={() => {
-              if (pending > 0 && !confirm(`${pending} modification(s) ne sont pas encore envoyées. Elles resteront sur cet appareil et partiront à la prochaine connexion. Se déconnecter ?`)) return;
+              if (pending > 0 && !confirm(t("{n} modification(s) ne sont pas encore envoyées. Elles resteront sur cet appareil et partiront à la prochaine connexion. Se déconnecter ?", { n: pending }))) return;
               void signOut();
             }}
           >
-            Se déconnecter
+            {t("Se déconnecter")}
           </button>
         </div>
       </div>
@@ -86,8 +87,8 @@ export default function Account() {
   return (
     <div>
       <div className="card">
-        <h4>Sauvegarder et partager</h4>
-        <p style={{ marginTop: 6 }}>Connectez-vous pour retrouver vos notes, contacts et photos sur tous vos appareils et les partager avec votre père. Sans connexion, tout reste sur cet appareil.</p>
+        <h4>{t("Sauvegarder et partager")}</h4>
+        <p style={{ marginTop: 6 }}>{t("Connectez-vous pour retrouver vos notes, contacts et photos sur tous vos appareils et les partager avec votre père. Sans connexion, tout reste sur cet appareil.")}</p>
         <div style={{ marginTop: 12 }}><SyncBadge /></div>
         {step === "password" ? (
           <form
@@ -99,25 +100,25 @@ export default function Account() {
                 await signInWithPassword(email.trim(), password);
               } catch (x) {
                 const m = x instanceof Error ? x.message : "";
-                setErr(/invalid login credentials/i.test(m) ? "E-mail ou mot de passe incorrect." : /fetch|network/i.test(m) ? "Pas de connexion au serveur. Vérifiez le réseau (en Chine : eSIM, itinérance ou VPN)." : m || "La connexion a échoué. Réessayez.");
+                setErr(/invalid login credentials/i.test(m) ? t("E-mail ou mot de passe incorrect.") : /fetch|network/i.test(m) ? t("Pas de connexion au serveur. Vérifiez le réseau (en Chine : eSIM, itinérance ou VPN).") : m || t("La connexion a échoué. Réessayez."));
               } finally {
                 setBusy(false);
               }
             }}
           >
             <label className="field">
-              <span>E-mail</span>
-              <input className="input" type="email" required autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="vous@exemple.com" />
+              <span>{t("E-mail")}</span>
+              <input className="input" type="email" required autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("vous@exemple.com")} />
             </label>
             <label className="field">
-              <span>Mot de passe</span>
+              <span>{t("Mot de passe")}</span>
               <input className="input" type="password" required autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
             </label>
             <button className="btn primary block" style={{ marginTop: 12 }} disabled={busy || !email.includes("@") || !password}>
-              {busy ? "Connexion…" : "Se connecter"}
+              {busy ? t("Connexion…") : t("Se connecter")}
             </button>
             <button type="button" className="btn block" style={{ marginTop: 8 }} onClick={() => { setErr(null); setStep("email"); }}>
-              Recevoir plutôt un lien par e-mail
+              {t("Recevoir plutôt un lien par e-mail")}
             </button>
           </form>
         ) : step === "email" ? (
@@ -130,21 +131,21 @@ export default function Account() {
                 await sendLoginEmail(email.trim());
                 setStep("code");
               } catch (x) {
-                setErr(x instanceof Error ? x.message : "L'e-mail n'a pas pu être envoyé. Vérifiez l'adresse et réessayez.");
+                setErr(x instanceof Error ? x.message : t("L'e-mail n'a pas pu être envoyé. Vérifiez l'adresse et réessayez."));
               } finally {
                 setBusy(false);
               }
             }}
           >
             <label className="field">
-              <span>E-mail</span>
-              <input className="input" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="vous@exemple.com" />
+              <span>{t("E-mail")}</span>
+              <input className="input" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("vous@exemple.com")} />
             </label>
             <button className="btn primary block" style={{ marginTop: 12 }} disabled={busy || !email.includes("@")}>
-              {busy ? "Envoi…" : "Recevoir le lien de connexion"}
+              {busy ? t("Envoi…") : t("Recevoir le lien de connexion")}
             </button>
             <button type="button" className="btn block" style={{ marginTop: 8 }} onClick={() => { setErr(null); setStep("password"); }}>
-              Se connecter avec un mot de passe
+              {t("Se connecter avec un mot de passe")}
             </button>
           </form>
         ) : (
@@ -156,22 +157,22 @@ export default function Account() {
               try {
                 await verifyLoginCode(email.trim(), code.trim());
               } catch {
-                setErr("Ce code n'est pas valide ou a expiré. Demandez un nouvel e-mail.");
+                setErr(t("Ce code n'est pas valide ou a expiré. Demandez un nouvel e-mail."));
               } finally {
                 setBusy(false);
               }
             }}
           >
             <p style={{ marginTop: 14, color: "var(--soft)", fontSize: 13.5 }}>
-              E-mail envoyé à <b style={{ color: "var(--ink)" }}>{email}</b>. Ouvrez le lien sur cet appareil, ou saisissez le code reçu.
+              {t("E-mail envoyé à")} <b style={{ color: "var(--ink)" }}>{email}</b>. {t("Ouvrez le lien sur cet appareil, ou saisissez le code reçu.")}
             </p>
             <label className="field">
-              <span>Code</span>
+              <span>{t("Code")}</span>
               <input className="input" inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} placeholder="123456" maxLength={10} />
             </label>
             <div className="btn-row">
-              <button type="button" className="btn" onClick={() => setStep("email")}>Changer d'e-mail</button>
-              <button className="btn primary" disabled={busy || code.length < 6}>Se connecter</button>
+              <button type="button" className="btn" onClick={() => setStep("email")}>{t("Changer d'e-mail")}</button>
+              <button className="btn primary" disabled={busy || code.length < 6}>{t("Se connecter")}</button>
             </div>
           </form>
         )}

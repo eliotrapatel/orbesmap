@@ -14,6 +14,7 @@ import { TYPE_LABEL } from "../data/trip";
 import type { Hours } from "./hours";
 import type { Data, PlaceDef } from "./model";
 import { normHours } from "./live";
+import { t } from "./i18n";
 
 /** Record saying the trip's places are data (written last by the migration) */
 export const META = "__meta";
@@ -153,7 +154,7 @@ export function tripFromDefs(base: Trip, data: Pick<Data, "places" | "pins" | "d
       order: Number(d.order) || 0,
       p: {
         id,
-        name: str(d.name) || nameCn || "Lieu",
+        name: str(d.name) || nameCn || t("Lieu"),
         day,
         type,
         lat,

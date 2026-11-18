@@ -16,6 +16,7 @@ import { migrationPatches } from "./defs";
 import { emptyData, mergePlaceState, uid, type Contact, type Data, type Photo, type Pin, type PlaceDef, type PlaceState, type Settings } from "./model";
 import { PHOTO_BUCKET, supabase } from "./supabase";
 import { linkVisitor, track } from "./track";
+import { t as tr, getLang } from "./i18n";
 
 const dataKey = (tripId: string) => "orbes.v2." + tripId;
 const SETTINGS_KEY = "orbes.settings";
@@ -142,7 +143,7 @@ function saveTrip(tripId: string, d: Data): boolean {
   if (freeLegacyPhotoKeys() && writeJSON(dataKey(tripId), d)) return true;
   if (!warnedFull) {
     warnedFull = true;
-    toast("Mémoire du navigateur pleine : les dernières modifications ne sont pas enregistrées sur cet appareil");
+    toast(tr("Mémoire du navigateur pleine : les dernières modifications ne sont pas enregistrées sur cet appareil"));
   }
   return false;
 }
@@ -992,7 +993,8 @@ if (typeof window !== "undefined") {
 export async function sendLoginEmail(email: string) {
   if (!supabase) throw new Error("not configured");
   const redirect = window.location.origin + window.location.pathname;
-  const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: redirect, shouldCreateUser: true } });
+  // the account's language goes with it: the sign-in e-mails are written in it (supabase/email-templates.md)
+  const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: redirect, shouldCreateUser: true, data: { lang: getLang() } } });
   if (error) throw error;
 }
 
@@ -1089,7 +1091,7 @@ async function joinInvitations() {
       set({ roles });
     }
     if (Number(n) > 0) {
-      toast(Number(n) > 1 ? `${n} voyages partagés avec vous ont été ajoutés` : "Un voyage partagé avec vous a été ajouté");
+      toast(Number(n) > 1 ? tr("{n} voyages partagés avec vous ont été ajoutés", { n }) : tr("Un voyage partagé avec vous a été ajouté"));
       void pullTripsOnly();
     }
   } catch {
@@ -1249,7 +1251,7 @@ export async function addPhoto(placeId: string, blob: Blob): Promise<boolean> {
   try {
     await putPhoto(photo.id, blob);
   } catch {
-    toast("Stockage plein : la photo n'a pas été enregistrée");
+    toast(tr("Stockage plein : la photo n'a pas été enregistrée"));
     return false;
   }
   const u = URL.createObjectURL(blob);

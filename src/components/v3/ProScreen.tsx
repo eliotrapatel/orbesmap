@@ -3,6 +3,7 @@ import { track } from "../../lib/track";
 import { closePro, useStore, type ProReason } from "../../lib/store";
 import { joinWaitlist, proDate, redeemCode } from "../../lib/pro";
 import Shell from "./Shell";
+import { t } from "../../lib/i18n";
 
 const WHY: Record<ProReason, string> = {
   edit: "Ce voyage est validé. Pour modifier son programme, ajouter ou déplacer des lieux, passez à Pro.",
@@ -26,7 +27,7 @@ export default function ProScreen() {
     try {
       await f();
     } catch (e) {
-      setErr((e as Error).message || "Une erreur est survenue. Réessayez.");
+      setErr((e as Error).message || t("Une erreur est survenue. Réessayez."));
     } finally {
       setBusy(false);
     }
@@ -35,31 +36,31 @@ export default function ProScreen() {
   useEffect(() => track("pro_screen", why), []); // eslint-disable-line react-hooks/exhaustive-deps
   const top = (
     <div className="v3-bar">
-      <button className="v3-tool" onClick={closePro} aria-label="Fermer">✕</button>
+      <button className="v3-tool" onClick={closePro} aria-label={t("Fermer")}>✕</button>
       <span className="v3-grow" />
     </div>
   );
   return (
     <Shell className="v3-pro" top={top}>
       <p className="v3-lbl" style={{ marginTop: 18 }}>ORBES Trips <span className="pro-tag">PRO</span></p>
-      <h1 className="v3-d v3-h1">{pro ? "Vous êtes Pro." : "Votre voyage, sans limite."}</h1>
-      {!pro && WHY[why] && <p className="v3-lead">{WHY[why]}</p>}
+      <h1 className="v3-d v3-h1">{pro ? t("Vous êtes Pro.") : t("Votre voyage, sans limite.")}</h1>
+      {!pro && WHY[why] && <p className="v3-lead">{t(WHY[why])}</p>}
       {pro && (
         <p className="v3-lead">
-          {plan?.granted && plan.until ? `Pro jusqu'au ${proDate(plan.until)}.` : plan?.granted ? "Pro à vie." : "Pro est inclus avec votre accès."}
+          {plan?.granted && plan.until ? t("Pro jusqu'au {date}.", { date: proDate(plan.until) }) : plan?.granted ? t("Pro à vie.") : t("Pro est inclus avec votre accès.")}
         </p>
       )}
       <ul className="v3-vp" style={{ marginTop: 26 }}>
-        <li><span>01</span>Modifier le programme à tout moment : ajouter, déplacer, retirer des lieux</li>
-        <li><span>02</span>Des voyages préparés par l'IA sans limite mensuelle, et bien plus de demandes</li>
-        <li><span>03</span>La carte hors ligne et les exports (PDF, calendrier)</li>
-        <li><span>04</span>Le mode affaires : fournisseurs, rendez-vous, comptes-rendus</li>
+        <li><span>01</span>{t("Modifier le programme à tout moment : ajouter, déplacer, retirer des lieux")}</li>
+        <li><span>02</span>{t("Des voyages préparés par l'IA sans limite mensuelle, et bien plus de demandes")}</li>
+        <li><span>03</span>{t("La carte hors ligne et les exports (PDF, calendrier)")}</li>
+        <li><span>04</span>{t("Le mode affaires : fournisseurs, rendez-vous, comptes-rendus")}</li>
       </ul>
       <div className="v3-spacer" />
       {!pro && (
         <div className="v3-glass v3-auth">
           {!session ? (
-            <p className="v3-msg">Connectez-vous pour activer un code ou être prévenu à l'ouverture des ventes.</p>
+            <p className="v3-msg">{t("Connectez-vous pour activer un code ou être prévenu à l'ouverture des ventes.")}</p>
           ) : (
             <>
               <form
@@ -68,23 +69,23 @@ export default function ProScreen() {
                   if (!code.trim()) return;
                   void run(async () => {
                     const until = await redeemCode(code);
-                    setDone(until ? `Pro activé jusqu'au ${proDate(until)}.` : "Pro activé à vie.");
+                    setDone(until ? t("Pro activé jusqu'au {date}.", { date: proDate(until) }) : t("Pro activé à vie."));
                     setCode("");
                   });
                 }}
               >
                 <label className="v3-field">
-                  <span className="sr">Code d'accès Pro</span>
-                  <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} autoCapitalize="characters" autoComplete="off" spellCheck={false} placeholder="Code d'accès (ORB-…)" maxLength={32} />
+                  <span className="sr">{t("Code d'accès Pro")}</span>
+                  <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} autoCapitalize="characters" autoComplete="off" spellCheck={false} placeholder={t("Code d'accès (ORB-…)")} maxLength={32} />
                 </label>
-                <button className="v3-btn" disabled={busy || !code.trim()}>{busy ? "Vérification…" : "Activer Pro"}</button>
+                <button className="v3-btn" disabled={busy || !code.trim()}>{busy ? t("Vérification…") : t("Activer Pro")}</button>
               </form>
               <div className="pro-wait">
-                <p className="v3-msg">Pro sera bientôt en vente.</p>
+                <p className="v3-msg">{t("Pro sera bientôt en vente.")}</p>
                 {plan?.waitlisted ? (
-                  <p className="v3-note" style={{ marginTop: 4 }}>✓ Vous serez prévenu à l'ouverture des ventes.</p>
+                  <p className="v3-note" style={{ marginTop: 4 }}>{t("✓ Vous serez prévenu à l'ouverture des ventes.")}</p>
                 ) : (
-                  <button type="button" className="v3-btn ghost" disabled={busy} onClick={() => void run(joinWaitlist)}>Prévenez-moi à l'ouverture</button>
+                  <button type="button" className="v3-btn ghost" disabled={busy} onClick={() => void run(joinWaitlist)}>{t("Prévenez-moi à l'ouverture")}</button>
                 )}
               </div>
             </>
@@ -95,7 +96,7 @@ export default function ProScreen() {
       {(pro || done) && (
         <>
           {done && <p className="sr" role="status">{done}</p>}
-          <button className="v3-btn" onClick={closePro}>Continuer</button>
+          <button className="v3-btn" onClick={closePro}>{t("Continuer")}</button>
         </>
       )}
     </Shell>

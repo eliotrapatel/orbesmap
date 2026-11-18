@@ -1,6 +1,7 @@
 import { ago, noteKey, notesOf } from "../lib/notes";
 import { currentAuthor, useStore } from "../lib/store";
 import { SavedInput } from "./ui";
+import { t } from "../lib/i18n";
 
 /**
  * One note per person. "Ma note" is mine (editable); the other traveller's note is shown read-only
@@ -16,16 +17,16 @@ export default function Notes({ rec, legacyText, placeholder, onSave }: { rec: R
   const legacy = all.find((n) => n.legacy);
   return (
     <div className="sec">
-      <span className="label">Notes</span>
+      <span className="label">{t("Notes")}</span>
       {mineKey && (
         <label className="field">
-          <span>Ma note{mine?.at ? ` · ${ago(mine.at)}` : ""}</span>
+          <span>{t("Ma note")}{mine?.at ? ` · ${ago(mine.at)}` : ""}</span>
           <SavedInput multiline value={mine?.text || ""} placeholder={placeholder} onSave={(v) => onSave(mineKey, v)} />
         </label>
       )}
       {others.map((n) => (
         <div key={n.key} className="note-other">
-          <span className="note-by">Note de {n.name}{n.at ? ` · ${ago(n.at)}` : ""}</span>
+          <span className="note-by">{t("Note de {name}", { name: n.name })}{n.at ? ` · ${ago(n.at)}` : ""}</span>
           <p>{n.text}</p>
         </div>
       ))}
@@ -33,7 +34,7 @@ export default function Notes({ rec, legacyText, placeholder, onSave }: { rec: R
       {(legacy || !mineKey) && (
         <label className="field">
           <span>
-            {legacy ? `Note commune${legacy.name ? ` (dernière modif. : ${legacy.name})` : ""}${legacy.at ? ` · ${ago(legacy.at)}` : ""}` : "Note (connectez-vous pour signer vos notes)"}
+            {legacy ? `${legacy.name ? t("Note commune (dernière modif. : {name})", { name: legacy.name }) : t("Note commune")}${legacy.at ? ` · ${ago(legacy.at)}` : ""}` : t("Note (connectez-vous pour signer vos notes)")}
           </span>
           <SavedInput multiline value={legacy?.text || ""} placeholder={placeholder} onSave={(v) => onSave("note", v)} />
         </label>

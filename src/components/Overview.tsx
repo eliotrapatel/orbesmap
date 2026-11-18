@@ -5,6 +5,7 @@ import { countable, dayStops } from "../lib/plan";
 import { countdownParts, fmtDay, phase, tripStartMs } from "../lib/time";
 import { useWeather, wxKind, WX_LABEL } from "../lib/weather";
 import { WxIcon } from "./WxIcon";
+import { locale, t } from "../lib/i18n";
 
 export default function Overview({ trip, states, onShowDay }: { trip: Trip; states: Record<string, PlaceState>; onShowDay: (key: string) => void }) {
   const all = countable(trip);
@@ -29,29 +30,29 @@ export default function Overview({ trip, states, onShowDay }: { trip: Trip; stat
     <div>
       <div className="stats">
         <div className="stat">
-          <span className="label">{ph === "before" ? "Départ" : ph === "during" ? "En cours" : "Terminé"}</span>
-          <b>{ph === "before" ? `J-${cd.d}` : ph === "during" ? "Live" : "✓"}</b>
+          <span className="label">{ph === "before" ? t("Départ") : ph === "during" ? t("En cours") : t("Terminé")}</span>
+          <b>{ph === "before" ? t("J-{n}", { n: cd.d }) : ph === "during" ? t("Live") : "✓"}</b>
           <small>{trip.dateLabel}</small>
         </div>
         <div className="stat">
-          <span className="label">Lieux</span>
+          <span className="label">{t("Lieux")}</span>
           <b>{all.length}</b>
-          <small>{(all.length / nights).toFixed(1).replace(".", ",")} par jour en moyenne</small>
+          <small>{t("{n} par jour en moyenne", { n: (all.length / nights).toLocaleString(locale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 }) })}</small>
         </div>
         <div className="stat">
-          <span className="label">Visités</span>
+          <span className="label">{t("Visités")}</span>
           <b>{visited}</b>
-          <small>{all.length ? Math.round((visited / all.length) * 100) : 0} % du programme</small>
+          <small>{t("{n} % du programme", { n: all.length ? Math.round((visited / all.length) * 100) : 0 })}</small>
         </div>
         <div className="stat">
-          <span className="label">Favoris</span>
+          <span className="label">{t("Favoris")}</span>
           <b>{favs}</b>
-          <small>{favs ? `${favs - all.filter((p) => states[p.id]?.favorite && states[p.id]?.visited).length} encore à voir` : "Touchez l'étoile d'une fiche"}</small>
+          <small>{favs ? t("{n} encore à voir", { n: favs - all.filter((p) => states[p.id]?.favorite && states[p.id]?.visited).length }) : t("Touchez l'étoile d'une fiche")}</small>
         </div>
       </div>
 
       <div className="block">
-        <span className="label">Avancement par jour</span>
+        <span className="label">{t("Avancement par jour")}</span>
         {trip.days.map((d) => {
           const stops = dayStops(trip, d.key, states).filter((p) => all.includes(p));
           if (!stops.length) return null;
@@ -75,10 +76,10 @@ export default function Overview({ trip, states, onShowDay }: { trip: Trip; stat
 
       {wx && wx.days.length > 0 && (
         <div className="block">
-          <span className="label">Météo à {trip.title}{wx.now ? ` · maintenant ${wx.now.temp}°, ${WX_LABEL[wxKind(wx.now.code)].toLowerCase()}` : ""}</span>
+          <span className="label">{t("Météo à {city}", { city: trip.title })}{wx.now ? ` · ${t("maintenant {temp}°, {sky}", { temp: wx.now.temp, sky: t(WX_LABEL[wxKind(wx.now.code)]).toLowerCase() })}` : ""}</span>
           <div className="wx-row">
             {wx.days.map((d) => (
-              <div key={d.date} className={"wx-day" + (tripDates.has(d.date) ? " trip" : "")} title={WX_LABEL[wxKind(d.code)]}>
+              <div key={d.date} className={"wx-day" + (tripDates.has(d.date) ? " trip" : "")} title={t(WX_LABEL[wxKind(d.code)])}>
                 {fmtDay(d.date, trip.timezone, { weekday: "short", day: "numeric" })}
                 <WxIcon code={d.code} />
                 <b>
@@ -88,16 +89,16 @@ export default function Overview({ trip, states, onShowDay }: { trip: Trip; stat
               </div>
             ))}
           </div>
-          <p style={{ fontSize: 12, color: "var(--mute)", marginTop: 8 }}>Prévisions Open-Meteo sur 16 jours. Les jours du voyage sont encadrés.</p>
+          <p style={{ fontSize: 12, color: "var(--mute)", marginTop: 8 }}>{t("Prévisions Open-Meteo sur 16 jours. Les jours du voyage sont encadrés.")}</p>
         </div>
       )}
 
       <div className="block">
-        <span className="label">Répartition</span>
+        <span className="label">{t("Répartition")}</span>
         <div className="catbars">
-          {cats.map(([t, n]) => (
-            <div key={t} className="catbar">
-              <span>{TYPE_LABEL[t as keyof typeof TYPE_LABEL] || t}</span>
+          {cats.map(([ty, n]) => (
+            <div key={ty} className="catbar">
+              <span>{t(TYPE_LABEL[ty as keyof typeof TYPE_LABEL] || ty)}</span>
               <span className="bar">
                 <span style={{ width: `${(n / maxCat) * 100}%` }} />
               </span>

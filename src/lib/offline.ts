@@ -3,6 +3,7 @@
 // pre-downloads the trip's neighbourhoods so the map works in the metro or without data.
 import * as maplibregl from "maplibre-gl";
 import { useSyncExternalStore } from "react";
+import { t } from "./i18n";
 
 const HOST = "https://tiles.openfreemap.org";
 const CACHE = "orbes-map-v1";
@@ -231,7 +232,7 @@ let running: AbortController | null = null;
 
 export async function prepareOffline(points: LL[]): Promise<void> {
   if (!hasCache) {
-    setStatus({ state: "error", error: "Ce navigateur ne permet pas de garder la carte hors ligne." });
+    setStatus({ state: "error", error: t("Ce navigateur ne permet pas de garder la carte hors ligne.") });
     return;
   }
   if (running) return;
@@ -242,7 +243,7 @@ export async function prepareOffline(points: LL[]): Promise<void> {
   try {
     const est = await navigator.storage?.estimate?.().catch(() => undefined);
     if (est?.quota && est.quota - (est.usage || 0) < 80e6) {
-      setStatus({ state: "error", error: "Plus assez de place sur le téléphone (il faut environ 80 Mo libres)." });
+      setStatus({ state: "error", error: t("Plus assez de place sur le téléphone (il faut environ 80 Mo libres).") });
       return;
     }
     await navigator.storage?.persist?.().catch(() => false);
@@ -297,14 +298,14 @@ export async function prepareOffline(points: LL[]): Promise<void> {
       failed = await pass(failed);
     }
     if (signal.aborted) setStatus(prev || { state: "none", done: 0, total: 0, bytes: 0 });
-    else if (quota) setStatus(prev ? { ...prev, error: "Plus assez de place : la carte précédente reste disponible." } : { state: "error", error: "Plus assez de place sur le téléphone." });
+    else if (quota) setStatus(prev ? { ...prev, error: t("Plus assez de place : la carte précédente reste disponible.") } : { state: "error", error: t("Plus assez de place sur le téléphone.") });
     else if (failed.length) {
-      const msg = `${failed.length} morceaux de carte manquent (réseau). Touchez « Mettre à jour » en Wi-Fi pour les récupérer.`;
+      const msg = t("{n} morceaux de carte manquent (réseau). Touchez « Mettre à jour » en Wi-Fi pour les récupérer.", { n: failed.length });
       setStatus({ state: "ready", done, total: all.length, bytes, at: Date.now(), points: points.length, error: msg });
     } else setStatus({ state: "ready", done, total: all.length, bytes, at: Date.now(), points: points.length, error: undefined });
   } catch (e) {
-    const msg = (e as Error)?.name === "QuotaExceededError" ? "Plus assez de place sur le téléphone." : "Téléchargement interrompu. Réessayez en Wi-Fi.";
-    setStatus(prev ? { ...prev, error: `${msg} La carte précédente reste disponible.` } : { state: "error", error: msg });
+    const msg = (e as Error)?.name === "QuotaExceededError" ? t("Plus assez de place sur le téléphone.") : t("Téléchargement interrompu. Réessayez en Wi-Fi.");
+    setStatus(prev ? { ...prev, error: t("{msg} La carte précédente reste disponible.", { msg }) } : { state: "error", error: msg });
   } finally {
     running = null;
     lock?.release().catch(() => {});

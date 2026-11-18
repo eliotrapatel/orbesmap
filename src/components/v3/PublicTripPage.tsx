@@ -8,6 +8,7 @@ import { useStore } from "../../lib/store";
 import { track } from "../../lib/track";
 import OrbitMark from "../OrbitMark";
 import Shell from "./Shell";
+import { t } from "../../lib/i18n";
 
 const leave = (hash = "") => location.assign(location.pathname + hash);
 const today = () => new Date().toISOString().slice(0, 10);
@@ -40,19 +41,19 @@ export default function PublicTripPage({ slug, copyNow }: { slug: string; copyNo
 
   const top = (
     <div className="v3-bar">
-      <button type="button" className="v3-brand" onClick={() => leave()} aria-label="ORBES Trips, accueil"><OrbitMark size={20} /><span>ORBES Trips</span></button>
+      <button type="button" className="v3-brand" onClick={() => leave()} aria-label={t("ORBES Trips, accueil")}><OrbitMark size={20} /><span>ORBES Trips</span></button>
       <span className="v3-grow" />
-      <button type="button" className="v3-toplink" onClick={() => leave()}>{signedIn ? "Mes voyages" : "Se connecter"}</button>
+      <button type="button" className="v3-toplink" onClick={() => leave()}>{signedIn ? t("Mes voyages") : t("Se connecter")}</button>
     </div>
   );
-  if (pub === undefined) return <Shell ring={false} top={top}><p className="v3-note" style={{ marginTop: 40 }}>Chargement du programme…</p></Shell>;
+  if (pub === undefined) return <Shell ring={false} top={top}><p className="v3-note" style={{ marginTop: 40 }}>{t("Chargement du programme…")}</p></Shell>;
   if (!pub)
     return (
       <Shell ring={false} top={top}>
-        <h1 className="v3-d v3-h2" style={{ marginTop: 40 }}>Ce lien n'est plus actif.</h1>
-        <p className="v3-lead" style={{ marginTop: 12 }}>{err || "Son propriétaire l'a désactivé, ou l'adresse est incomplète."}</p>
+        <h1 className="v3-d v3-h2" style={{ marginTop: 40 }}>{t("Ce lien n'est plus actif.")}</h1>
+        <p className="v3-lead" style={{ marginTop: 12 }}>{err || t("Son propriétaire l'a désactivé, ou l'adresse est incomplète.")}</p>
         <div className="v3-spacer" />
-        <button className="v3-btn" onClick={() => leave()}>Découvrir ORBES Trips</button>
+        <button className="v3-btn" onClick={() => leave()}>{t("Découvrir ORBES Trips")}</button>
       </Shell>
     );
   const trip = pub.trip;
@@ -69,9 +70,9 @@ export default function PublicTripPage({ slug, copyNow }: { slug: string; copyNo
   };
   return (
     <Shell ring={false} top={top} className="v3-public-trip">
-      <p className="v3-lbl" style={{ marginTop: 18 }}>Programme partagé</p>
+      <p className="v3-lbl" style={{ marginTop: 18 }}>{t("Programme partagé")}</p>
       <h1 className="v3-d v3-h1" style={{ marginBottom: 8 }}>{trip.title}</h1>
-      <p className="v3-lead">{days.length} jour{days.length > 1 ? "s" : ""} · {count} lieu{count > 1 ? "x" : ""}{trip.dateLabel ? ` · ${trip.dateLabel}` : ""}</p>
+      <p className="v3-lead">{days.length > 1 ? t("{n} jours", { n: days.length }) : t("{n} jour", { n: days.length })} · {count > 1 ? t("{n} lieux", { n: count }) : t("{n} lieu", { n: count })}{trip.dateLabel ? ` · ${trip.dateLabel}` : ""}</p>
 
       {days.map((d) => {
         const stops = dayStops(trip, d.key, {});
@@ -88,14 +89,14 @@ export default function PublicTripPage({ slug, copyNow }: { slug: string; copyNo
       })}
       {ideas.length > 0 && (
         <section className="pt-day">
-          <div className="pt-dayhead"><i /><span className="v3-grow"><b className="v3-d">Pistes</b><small>À voir si le temps le permet</small></span></div>
+          <div className="pt-dayhead"><i /><span className="v3-grow"><b className="v3-d">{t("Pistes")}</b><small>{t("À voir si le temps le permet")}</small></span></div>
           {ideas.map((p) => <Stop key={p.id} p={p} open={open === p.id} onToggle={() => setOpen(open === p.id ? null : p.id)} />)}
         </section>
       )}
 
       <div className="pt-cta">
-        <button className="v3-btn" disabled={!authReady} onClick={copy}>Copier ce voyage</button>
-        <p className="v3-fine">Dans vos voyages, avec vos dates · {signedIn ? "gratuit" : "un compte gratuit suffit"}</p>
+        <button className="v3-btn" disabled={!authReady} onClick={copy}>{t("Copier ce voyage")}</button>
+        <p className="v3-fine">{t("Dans vos voyages, avec vos dates")} · {signedIn ? t("gratuit") : t("un compte gratuit suffit")}</p>
       </div>
       {copying && <CopySheet pub={pub} onClose={() => setCopying(false)} />}
     </Shell>
@@ -110,7 +111,7 @@ function Stop({ p, open, onToggle }: { p: Place; open: boolean; onToggle: () => 
         <span className="v3-tm">{p.time ? p.time.split("–")[0] : "—"}</span>
         <span className="v3-grow">
           <b>{p.name}</b>
-          <small>{[p.type !== "ajout" ? TYPE_LABEL[p.type] : "", p.time].filter(Boolean).join(" · ")}</small>
+          <small>{[p.type !== "ajout" ? t(TYPE_LABEL[p.type]) : "", p.time].filter(Boolean).join(" · ")}</small>
         </span>
         <span className="pt-chev" aria-hidden="true">{open ? "−" : "+"}</span>
       </button>
@@ -119,11 +120,11 @@ function Stop({ p, open, onToggle }: { p: Place; open: boolean; onToggle: () => 
           {p.desc && <p>{p.desc}</p>}
           {p.why && <p className="pt-why">{p.why}</p>}
           {p.highlights && p.highlights.length > 0 && <ul>{p.highlights.map((h, i) => <li key={i}>{h}</li>)}</ul>}
-          {p.tip && <p className="pt-why">Conseil : {p.tip}</p>}
-          {p.hoursText && <p className="pt-meta">Horaires : {p.hoursText}</p>}
-          {p.price && <p className="pt-meta">Prix : {p.price}</p>}
+          {p.tip && <p className="pt-why">{t("Conseil : {tip}", { tip: p.tip })}</p>}
+          {p.hoursText && <p className="pt-meta">{t("Horaires : {hours}", { hours: p.hoursText })}</p>}
+          {p.price && <p className="pt-meta">{t("Prix : {price}", { price: p.price })}</p>}
           {(p.address || p.cn) && <p className="pt-meta">{p.address}{p.cn ? ` · ${p.cn}` : ""}</p>}
-          <a className="v3-link" href={maps} target="_blank" rel="noopener">Voir sur la carte</a>
+          <a className="v3-link" href={maps} target="_blank" rel="noopener">{t("Voir sur la carte")}</a>
         </div>
       )}
     </div>
@@ -139,12 +140,12 @@ function CopySheet({ pub, onClose }: { pub: PublicTrip; onClose: () => void }) {
   const end = valid ? addDays(start, n - 1) : "";
   return (
     <div className="v3-acct-wrap pt-sheet-wrap" onClick={onClose}>
-      <div className="v3-glass pt-sheet" role="dialog" aria-label="Copier ce voyage" onClick={(e) => e.stopPropagation()}>
-        <span className="v3-lbl">Copier ce voyage</span>
+      <div className="v3-glass pt-sheet" role="dialog" aria-label={t("Copier ce voyage")} onClick={(e) => e.stopPropagation()}>
+        <span className="v3-lbl">{t("Copier ce voyage")}</span>
         <h2 className="v3-d" style={{ fontSize: 26, marginTop: 8 }}>{pub.trip.title}</h2>
-        <p className="v3-note">{n} jour{n > 1 ? "s" : ""} · le programme, les lieux et leurs fiches arrivent dans vos voyages.</p>
+        <p className="v3-note">{n > 1 ? t("{n} jours", { n }) : t("{n} jour", { n })} · {t("le programme, les lieux et leurs fiches arrivent dans vos voyages.")}</p>
         <label className="v3-field col" style={{ marginTop: 14 }}>
-          <span>Premier jour</span>
+          <span>{t("Premier jour")}</span>
           <input type="date" value={start} min={today()} onChange={(e) => setStart(e.target.value)} />
         </label>
         {valid && <p className="v3-note">{dateLabel(start, end)}</p>}
@@ -157,9 +158,9 @@ function CopySheet({ pub, onClose }: { pub: PublicTrip; onClose: () => void }) {
             location.assign(`${location.pathname}#${id}`);
           }}
         >
-          Copier dans mes voyages
+          {t("Copier dans mes voyages")}
         </button>
-        <button type="button" className="v3-link" onClick={onClose}>Annuler</button>
+        <button type="button" className="v3-link" onClick={onClose}>{t("Annuler")}</button>
       </div>
     </div>
   );

@@ -7,6 +7,7 @@ import { fmtH, windowFor } from "./hours";
 import type { PlaceState } from "./model";
 import { dayStops, isHotel, stopTime } from "./plan";
 import { localDate, parseTime } from "./time";
+import { t } from "./i18n";
 
 type LL = { lat: number; lng: number };
 
@@ -135,7 +136,7 @@ export function fitDay(trip: Trip, day: Day, place: Place, states: Record<string
   const date = day.dates?.[0];
   if (!date || !day.scheduled) return null;
   const today = localDate(trip.timezone, now);
-  if ((day.dates?.[day.dates.length - 1] ?? date) < today) return { day, ok: false, reason: "Jour passé" };
+  if ((day.dates?.[day.dates.length - 1] ?? date) < today) return { day, ok: false, reason: t("Jour passé") };
   const dow = new Date(`${date}T12:00:00Z`).getUTCDay();
   const h = trip.hours?.[place.id];
   let known = !!h && (h.always || h.byDay.length > 0 || (parseTime(h.open) != null && parseTime(h.close) != null));
@@ -143,7 +144,7 @@ export function fitDay(trip: Trip, day: Day, place: Place, states: Record<string
   let close = 0;
   let lastEntry: number | null = null;
   // a weekly closing day is certain even when the opening times are not
-  if (h?.closed.includes(dow)) return { day, ok: false, reason: `Fermé le ${WEEKDAYS[dow]}` };
+  if (h?.closed.includes(dow)) return { day, ok: false, reason: t("Fermé le {days}", { days: t(WEEKDAYS[dow]) }) };
   const w = known ? windowFor(h!, dow) : null;
   // no time known for this weekday (e.g. hours given for some days only): guessed, not "closed"
   if (known && w === null) known = false;
@@ -201,7 +202,7 @@ export function fitDay(trip: Trip, day: Day, place: Place, states: Record<string
   }
   if (cands.length) return cands.sort((x, y) => x.extra - y.extra || x.start - y.start)[0];
   if (tight.length) return tight.sort((x, y) => x.tight - y.tight || x.extra - y.extra)[0];
-  return { day, ok: false, reason: bounds.note === "jour du départ" ? "Plus de créneau avant le départ" : busy.length ? "Journée pleine" : "Aucun créneau compatible avec les horaires" };
+  return { day, ok: false, reason: bounds.note === "jour du départ" ? t("Plus de créneau avant le départ") : busy.length ? t("Journée pleine") : t("Aucun créneau compatible avec les horaires") };
 }
 
 /** Every planned day, plus the recommended one (least detour; the place's own day first when tied) */

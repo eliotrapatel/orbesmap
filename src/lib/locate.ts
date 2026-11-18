@@ -1,6 +1,7 @@
 // Live position (GPS) + compass. The GPS itself uses no mobile data: only the map tiles and the
 // occasional route request (a few KB) go over the network.
 import { useSyncExternalStore } from "react";
+import { t } from "./i18n";
 
 export type Fix = { lat: number; lng: number; acc: number; heading: number | null; speed: number | null; t: number };
 export type LocStatus = "off" | "searching" | "on" | "denied" | "unavailable";
@@ -44,7 +45,7 @@ export function startLocate(follow = true, fromGesture = true) {
   if (fromGesture) ensureCompass(true);
   if (!("geolocation" in navigator)) {
     set({ status: "unavailable" });
-    onError?.("La localisation n'est pas disponible sur cet appareil");
+    onError?.(t("La localisation n'est pas disponible sur cet appareil"));
     return;
   }
   setFollow(follow);
@@ -68,10 +69,10 @@ export function startLocate(follow = true, fromGesture = true) {
       if (err.code === 1) {
         stopLocate();
         set({ status: "denied" });
-        onError?.(DENIED_HELP);
+        onError?.(t(DENIED_HELP));
       } else if (!state.fix) {
         // no fix yet (indoors, tunnel): keep trying, the watch stays active
-        onError?.("Position pas encore trouvée, ça peut prendre quelques secondes dehors");
+        onError?.(t("Position pas encore trouvée, ça peut prendre quelques secondes dehors"));
       }
     },
     { enableHighAccuracy: true, maximumAge: 5_000, timeout: 30_000 },

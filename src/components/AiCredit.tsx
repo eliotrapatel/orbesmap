@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ai, AiError } from "../lib/ai";
+import { locale, t } from "../lib/i18n";
 
 type Row = { at: number; task: string; by: string; hit: number; miss: number; out: number; search: number; fetch: number; usd: number; ok: boolean };
 type Bal = { is_available: boolean; balance_infos: { currency: string; total_balance: string; granted_balance: string; topped_up_balance: string }[] };
@@ -26,7 +27,7 @@ export default function AiCredit() {
     try {
       setRes(await ai<Res>("balance", {}, 20_000));
     } catch (e) {
-      setErr(e instanceof AiError ? e.message : "Solde indisponible.");
+      setErr(e instanceof AiError ? e.message : t("Solde indisponible."));
     } finally {
       setBusy(false);
     }
@@ -48,9 +49,9 @@ export default function AiCredit() {
   const dayRows = h.filter((r) => new Date(r.at).toDateString() === today);
   const weekRows = h.filter((r) => now - r.at < 7 * 864e5);
   // totals over every call come from the relay; the list below shows the 300 latest
-  const t = res?.totals;
+  const tot = res?.totals;
   const byPerson = Object.entries(
-    Object.entries(t?.byPerson || {}).reduce<Record<string, number>>((m, [p, v]) => ((m[who(p)] = (m[who(p)] || 0) + v), m), {}),
+    Object.entries(tot?.byPerson || {}).reduce<Record<string, number>>((m, [p, v]) => ((m[who(p)] = (m[who(p)] || 0) + v), m), {}),
   );
   const days = [...new Set(h.map((r) => new Date(r.at).toDateString()))];
 
@@ -58,38 +59,38 @@ export default function AiCredit() {
     <div className="card ai-credit">
       <button className="ai-head" onClick={() => (res ? setOpen((o) => !o) : load())} aria-expanded={open}>
         <span>
-          <span className="label">Crédit IA (DeepSeek)</span>
+          <span className="label">{t("Crédit IA (DeepSeek)")}</span>
           <b>{b ? money(Number(b.total_balance), b.currency) : busy ? "…" : "—"}</b>
-          {b && <small>{res?.balance?.is_available ? "Solde disponible" : "Solde épuisé : rechargez sur platform.deepseek.com"}</small>}
-          {!b && res && <small>Solde indisponible pour le moment</small>}
+          {b && <small>{res?.balance?.is_available ? t("Solde disponible") : t("Solde épuisé : rechargez sur platform.deepseek.com")}</small>}
+          {!b && res && <small>{t("Solde indisponible pour le moment")}</small>}
         </span>
-        <span className="ai-chev">{!res ? (busy ? "…" : "Réessayer") : open ? "Masquer" : "Historique"}</span>
+        <span className="ai-chev">{!res ? (busy ? "…" : t("Réessayer")) : open ? t("Masquer") : t("Historique")}</span>
       </button>
       {err && <p className="tr-err">{err}</p>}
       {open && res && (
         <div className="ai-hist">
-          {t ? (
+          {tot ? (
             <div className="ai-totals">
-              <span>Aujourd'hui<b>{money(sum(dayRows))}</b></span>
-              <span>7 jours<b>{money(t.week ?? sum(weekRows))}</b></span>
-              <span>Total ({t.calls} appels)<b>{money(t.total)}</b></span>
+              <span>{t("Aujourd'hui")}<b>{money(sum(dayRows))}</b></span>
+              <span>{t("7 jours")}<b>{money(tot.week ?? sum(weekRows))}</b></span>
+              <span>{t("Total ({n} appels)", { n: tot.calls })}<b>{money(tot.total)}</b></span>
             </div>
           ) : (
-            <p className="tr-err">Totaux indisponibles pour le moment : touchez Actualiser.</p>
+            <p className="tr-err">{t("Totaux indisponibles pour le moment : touchez Actualiser.")}</p>
           )}
-          {byPerson.length > 0 && <p className="em-small">Par personne : {byPerson.map(([p, v]) => `${p} ${money(v)}`).join(" · ")}</p>}
-          {!histOk && <p className="tr-err">Historique indisponible pour le moment : touchez Actualiser.</p>}
-          {histOk && !h.length && <p className="em-small">Aucune dépense enregistrée pour l'instant.</p>}
-          {histOk && h.length >= 300 && <p className="em-small">Détail : les 300 derniers appels.</p>}
+          {byPerson.length > 0 && <p className="em-small">{t("Par personne : {list}", { list: byPerson.map(([p, v]) => `${t(p)} ${money(v)}`).join(" · ") })}</p>}
+          {!histOk && <p className="tr-err">{t("Historique indisponible pour le moment : touchez Actualiser.")}</p>}
+          {histOk && !h.length && <p className="em-small">{t("Aucune dépense enregistrée pour l'instant.")}</p>}
+          {histOk && h.length >= 300 && <p className="em-small">{t("Détail : les 300 derniers appels.")}</p>}
           {days.map((d) => (
             <section key={d} className="ai-day">
-              <span className="label">{new Date(d).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })} · {money(sum(h.filter((r) => new Date(r.at).toDateString() === d)))}</span>
+              <span className="label">{new Date(d).toLocaleDateString(locale(), { weekday: "long", day: "numeric", month: "long" })} · {money(sum(h.filter((r) => new Date(r.at).toDateString() === d)))}</span>
               {h.filter((r) => new Date(r.at).toDateString() === d).map((r) => (
                 <div key={r.at + r.task} className="ai-row">
-                  <span className="ai-time">{new Date(r.at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</span>
+                  <span className="ai-time">{new Date(r.at).toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" })}</span>
                   <span className="ai-main">
-                    <b>{TASK[r.task] || r.task}{r.ok ? "" : " (échec)"}</b>
-                    <small>{who(r.by)} · {tokens(r.hit + r.miss)} lus{r.hit ? ` (dont ${tokens(r.hit)} en cache)` : ""} · {tokens(r.out)} écrits{r.search + r.fetch ? ` · ${r.search + r.fetch} recherche${r.search + r.fetch > 1 ? "s" : ""} web` : ""}</small>
+                    <b>{TASK[r.task] ? t(TASK[r.task]) : r.task}{r.ok ? "" : " " + t("(échec)")}</b>
+                    <small>{t(who(r.by))} · {t("{n} lus", { n: tokens(r.hit + r.miss) })}{r.hit ? ` (${t("dont {n} en cache", { n: tokens(r.hit) })})` : ""} · {t("{n} écrits", { n: tokens(r.out) })}{r.search + r.fetch ? ` · ${r.search + r.fetch > 1 ? t("{n} recherches web", { n: r.search + r.fetch }) : t("{n} recherche web", { n: r.search + r.fetch })}` : ""}</small>
                   </span>
                   <span className="ai-cost">{money(r.usd || 0)}</span>
                 </div>
@@ -97,9 +98,9 @@ export default function AiCredit() {
             </section>
           ))}
           <div className="em-actions">
-            <button className="btn-sm" onClick={load} disabled={busy}>{busy ? "Mise à jour…" : "Actualiser"}</button>
+            <button className="btn-sm" onClick={load} disabled={busy}>{busy ? t("Mise à jour…") : t("Actualiser")}</button>
           </div>
-          <p className="em-small">Solde : donné par DeepSeek. Dépenses : estimées par l'app pour chaque appel, au tarif officiel (heures pleines et creuses), à partir des jetons réellement consommés. Le détail exact reste sur platform.deepseek.com.</p>
+          <p className="em-small">{t("Solde : donné par DeepSeek. Dépenses : estimées par l'app pour chaque appel, au tarif officiel (heures pleines et creuses), à partir des jetons réellement consommés. Le détail exact reste sur platform.deepseek.com.")}</p>
         </div>
       )}
     </div>

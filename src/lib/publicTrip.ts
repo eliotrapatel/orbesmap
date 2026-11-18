@@ -7,9 +7,10 @@ import { createPlace, createTrip, switchTrip, updateTrip } from "./store";
 import { supabase } from "./supabase";
 import { tripFromRecord, type TripRec } from "./trips";
 import { track } from "./track";
+import { t } from "./i18n";
 
 const sb = () => {
-  if (!supabase) throw new Error("Indisponible hors connexion.");
+  if (!supabase) throw new Error(t("Indisponible hors connexion."));
   return supabase;
 };
 const missing = (e: { code?: string } | null) => !!e && ["PGRST202", "PGRST205", "42883", "42P01"].includes(e.code || "");
@@ -21,27 +22,27 @@ export const linkUrl = (slug: string) => `https://theorbes.com/maps?t=${slug}`;
 export async function linkOf(tripId: string): Promise<{ slug: string; active: boolean } | null> {
   const { data, error } = await sb().from("trip_links").select("slug,active").eq("trip_id", tripId).maybeSingle();
   if (error) {
-    if (missing(error)) throw new Error("Le lien public n'est pas encore activé sur le serveur.");
+    if (missing(error)) throw new Error(t("Le lien public n'est pas encore activé sur le serveur."));
     return null;
   }
   return (data as { slug: string; active: boolean } | null) || null;
 }
 export async function openLink(tripId: string): Promise<string> {
   const { data, error } = await sb().rpc("open_trip_link", { p_trip: tripId });
-  if (error) throw new Error(missing(error) ? "Le lien public n'est pas encore activé sur le serveur." : error.code === "42501" ? "Seul le propriétaire du voyage peut créer son lien." : "Le lien n'a pas pu être créé. Réessayez.");
+  if (error) throw new Error(missing(error) ? t("Le lien public n'est pas encore activé sur le serveur.") : error.code === "42501" ? t("Seul le propriétaire du voyage peut créer son lien.") : t("Le lien n'a pas pu être créé. Réessayez."));
   track("link_opened", null, tripId);
   return String(data);
 }
 export async function closeLink(tripId: string) {
   const { error } = await sb().rpc("close_trip_link", { p_trip: tripId });
-  if (error) throw new Error("Le lien n'a pas pu être désactivé. Réessayez.");
+  if (error) throw new Error(t("Le lien n'a pas pu être désactivé. Réessayez."));
 }
 
 export type PublicTrip = { slug: string; trip: Trip; rec: TripRec; defs: Record<string, Record<string, unknown>> };
 /** The programme behind a public link, as a trip the app can show; null = no such link, or closed */
 export async function fetchPublic(slug: string): Promise<PublicTrip | null> {
   const { data, error } = await sb().rpc("public_trip", { p_slug: slug });
-  if (error) throw new Error(missing(error) ? "Les liens publics ne sont pas encore activés." : "Le programme n'a pas pu être chargé. Vérifiez le réseau.");
+  if (error) throw new Error(missing(error) ? t("Les liens publics ne sont pas encore activés.") : t("Le programme n'a pas pu être chargé. Vérifiez le réseau."));
   if (!data) return null;
   const d = data as { trip: TripRec; places: Record<string, unknown>[] };
   const defs: Record<string, Record<string, unknown>> = { [META]: { seeded: true } };
@@ -66,7 +67,7 @@ export function copyTrip(pub: PublicTrip, start: string): string {
     return from ? { ...d, title: from.title || d.title, theme: from.theme || d.theme } : d;
   });
   const dayKey = new Map<string, string>(days.map((d, i) => [d.key, `d${i + 1}`]));
-  const id = createTrip({ ...rec, days: newDays, subtitle: src.subtitle || "Voyage", timezone: src.timezone || rec.timezone, lang: src.lang, dateLabel: dateLabel(start, end) });
+  const id = createTrip({ ...rec, days: newDays, subtitle: src.subtitle || t("Voyage"), timezone: src.timezone || rec.timezone, lang: src.lang, dateLabel: dateLabel(start, end) });
   switchTrip(id);
   for (const [pid, d] of Object.entries(pub.defs)) {
     if (pid === META) continue;

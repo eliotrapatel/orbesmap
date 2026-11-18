@@ -3,6 +3,7 @@ import { notesText } from "./notes";
 import type { Trip } from "../data/types";
 import type { PlaceState } from "./model";
 import { dayStops, stopTime } from "./plan";
+import { t as tr } from "./i18n";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/[,;]/g, (c) => "\\" + c);
@@ -17,7 +18,7 @@ export function exportIcs(trip: Trip, states: Record<string, PlaceState>) {
     for (const p of dayStops(trip, day.key, states)) {
       const t = stopTime(p, states);
       const s = states[p.id] || {};
-      const desc = [p.cn, p.address, p.metro, s.appt ? `RDV : ${s.appt}` : "", p.tip || "", notesText(s as Record<string, unknown>, p.added?.note, "\n")].filter(Boolean).join("\n");
+      const desc = [p.cn, p.address, p.metro, s.appt ? tr("RDV : {appt}", { appt: s.appt }) : "", p.tip || "", notesText(s as Record<string, unknown>, p.added?.note, "\n")].filter(Boolean).join("\n");
       lines.push("BEGIN:VEVENT", `UID:${trip.id}-${p.id}@orbes`, `DTSTAMP:${stamp}`);
       if (t != null) {
         const end = t + 90;

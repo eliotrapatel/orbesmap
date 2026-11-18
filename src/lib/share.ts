@@ -2,19 +2,20 @@
 // to sign in with that address (supabase/saas-3.sql). Online only: these lists are read from the server.
 import { supabase } from "./supabase";
 import { track } from "./track";
+import { t } from "./i18n";
 
 export type Person = { user_id: string; email: string; name: string; role: "owner" | "editor" | "viewer" };
 export type Invite = { email: string; role: "editor" | "viewer"; created_at: string };
 
 const sb = () => {
-  if (!supabase) throw new Error("Partage indisponible hors connexion.");
+  if (!supabase) throw new Error(t("Partage indisponible hors connexion."));
   return supabase;
 };
 const fail = (e: { message?: string; code?: string } | null, what: string) => {
   if (!e) return;
-  if (e.code === "42501" || /row-level security|permission/i.test(e.message || "")) throw new Error("Seul le propriétaire du voyage peut faire cela.");
-  if (/trip_invites|trip_people|accept_invites/.test(e.message || "") && /exist|find/i.test(e.message || "")) throw new Error("Le partage n'est pas encore activé sur le serveur.");
-  throw new Error(`${what} n'a pas pu être fait. Vérifiez le réseau et réessayez.`);
+  if (e.code === "42501" || /row-level security|permission/i.test(e.message || "")) throw new Error(t("Seul le propriétaire du voyage peut faire cela."));
+  if (/trip_invites|trip_people|accept_invites/.test(e.message || "") && /exist|find/i.test(e.message || "")) throw new Error(t("Le partage n'est pas encore activé sur le serveur."));
+  throw new Error(t("{what} n'a pas pu être fait. Vérifiez le réseau et réessayez.", { what: t(what) }));
 };
 
 export async function people(tripId: string): Promise<Person[]> {
@@ -29,8 +30,8 @@ export async function invites(tripId: string): Promise<Invite[]> {
 }
 export async function invite(tripId: string, email: string, role: Invite["role"]) {
   const e = email.trim().toLowerCase();
-  if (!/^\S+@\S+\.\S+$/.test(e)) throw new Error("Adresse e-mail invalide.");
-  if (["sha-2026", "gz-2026"].includes(tripId)) throw new Error("Ces deux voyages sont partagés entre vous deux ; inviter d'autres personnes sera possible plus tard.");
+  if (!/^\S+@\S+\.\S+$/.test(e)) throw new Error(t("Adresse e-mail invalide."));
+  if (["sha-2026", "gz-2026"].includes(tripId)) throw new Error(t("Ces deux voyages sont partagés entre vous deux ; inviter d'autres personnes sera possible plus tard."));
   const uid = (await sb().auth.getSession()).data.session?.user.id;
   const { error } = await sb().from("trip_invites").upsert({ trip_id: tripId, email: e, role, invited_by: uid });
   fail(error, "L'invitation");
@@ -57,4 +58,6 @@ export async function acceptInvites(): Promise<number> {
 }
 /** The message to send to someone invited (by any messaging app) */
 export const inviteMessage = (tripTitle: string, inviter: string) =>
-  `${inviter ? `${inviter} vous invite` : "Vous êtes invité"} à rejoindre le voyage « ${tripTitle} » sur ORBES Trips. Ouvrez https://orbesmap.vercel.app et connectez-vous avec cette adresse e-mail : le voyage apparaîtra dans « Mes voyages ».`;
+  inviter
+    ? t("{inviter} vous invite à rejoindre le voyage « {title} » sur ORBES Trips. Ouvrez https://orbesmap.vercel.app et connectez-vous avec cette adresse e-mail : le voyage apparaîtra dans « Mes voyages ».", { inviter, title: tripTitle })
+    : t("Vous êtes invité à rejoindre le voyage « {title} » sur ORBES Trips. Ouvrez https://orbesmap.vercel.app et connectez-vous avec cette adresse e-mail : le voyage apparaîtra dans « Mes voyages ».", { title: tripTitle });

@@ -1,6 +1,7 @@
 // Calls the ORBES AI relay (api/ai.ts on Vercel). Only members of the shared space can use it.
 import { supabase } from "./supabase";
 import { currentTrip, getState, pullPlan, requestPro } from "./store";
+import { t as tr } from "./i18n";
 
 /** Who the AI helps and for which trip (profile + current trip), sent with every request */
 function aiContext() {
@@ -91,9 +92,9 @@ export type EssentialsResult = {
 };
 
 export async function ai<T>(task: AiTask, payload: Record<string, unknown>, timeoutMs = 60_000, signal?: AbortSignal): Promise<T> {
-  if (!navigator.onLine) throw new AiError("Pas de réseau : cette fonction a besoin d'Internet.");
+  if (!navigator.onLine) throw new AiError(tr("Pas de réseau : cette fonction a besoin d'Internet."));
   const token = supabase ? (await supabase.auth.getSession()).data.session?.access_token : null;
-  if (!token) throw new AiError("Connectez-vous dans l'onglet Compte pour utiliser cette fonction.");
+  if (!token) throw new AiError(tr("Connectez-vous dans l'onglet Compte pour utiliser cette fonction."));
   const ctl = new AbortController();
   let timedOut = false;
   const t = window.setTimeout(() => {
@@ -105,7 +106,7 @@ export async function ai<T>(task: AiTask, payload: Record<string, unknown>, time
   // stopped while the session / image was being prepared: do not send the request
   if (signal?.aborted) {
     window.clearTimeout(t);
-    throw new AiError("Recherche arrêtée.");
+    throw new AiError(tr("Recherche arrêtée."));
   }
   try {
     const res = await fetch(ENDPOINT, {
@@ -118,15 +119,15 @@ export async function ai<T>(task: AiTask, payload: Record<string, unknown>, time
     if (!res.ok) {
       // a validated trip's programme, or the free trip of the month already used: the Pro screen opens
       if (body.error === "pro") requestPro(task === "outline" ? "prep" : "edit");
-      throw new AiError(body.message || "Le service ne répond pas, réessayez.");
+      throw new AiError(body.message ? tr(String(body.message)) : tr("Le service ne répond pas, réessayez."));
     }
     // the free trip of the month is now used: the account's plan says so
     if (task === "outline") void pullPlan();
     return body as T;
   } catch (e) {
     if (e instanceof AiError) throw e;
-    if ((e as Error)?.name === "AbortError") throw new AiError(timedOut ? "Trop long : le réseau est peut-être lent. Réessayez." : "Recherche arrêtée.");
-    throw new AiError("Le service est injoignable (réseau ou VPN ?). Réessayez.");
+    if ((e as Error)?.name === "AbortError") throw new AiError(timedOut ? tr("Trop long : le réseau est peut-être lent. Réessayez.") : tr("Recherche arrêtée."));
+    throw new AiError(tr("Le service est injoignable (réseau ou VPN ?). Réessayez."));
   } finally {
     window.clearTimeout(t);
     signal?.removeEventListener("abort", onAbort);
@@ -140,7 +141,7 @@ export function imageToBase64(file: Blob, max = 1400, quality = 0.75): Promise<s
     const img = new Image();
     img.onerror = () => {
       URL.revokeObjectURL(url);
-      reject(new AiError("Cette image ne peut pas être lue."));
+      reject(new AiError(tr("Cette image ne peut pas être lue.")));
     };
     img.onload = () => {
       URL.revokeObjectURL(url);

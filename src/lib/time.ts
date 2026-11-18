@@ -1,6 +1,7 @@
 import type { Trip } from "../data/types";
+import { locale } from "./i18n";
 
-const tz = (d: Date, timeZone: string, opts: Intl.DateTimeFormatOptions) => d.toLocaleString("fr-FR", { timeZone, ...opts });
+const tz = (d: Date, timeZone: string, opts: Intl.DateTimeFormatOptions) => d.toLocaleString(locale(), { timeZone, ...opts });
 
 export const clock = (timeZone: string, d = new Date()) => tz(d, timeZone, { hour: "2-digit", minute: "2-digit" });
 
@@ -31,7 +32,7 @@ export function countdownParts(target: number, now = Date.now()) {
   return { d: Math.floor(s / 86400), h: Math.floor((s % 86400) / 3600), m: Math.floor((s % 3600) / 60), s: s % 60 };
 }
 
-export const fmtDay = (iso: string, timeZone: string, opts: Intl.DateTimeFormatOptions) => new Date(iso + "T12:00:00+08:00").toLocaleDateString("fr-FR", { timeZone, ...opts });
+export const fmtDay = (iso: string, timeZone: string, opts: Intl.DateTimeFormatOptions) => new Date(iso + "T12:00:00+08:00").toLocaleDateString(locale(), { timeZone, ...opts });
 
 /** "10h30", "10:30", "9h" → minutes since midnight */
 export function parseTime(s?: string): number | null {

@@ -6,6 +6,7 @@ import { fmtDistance } from "../lib/route";
 import { updateRecord, useStore, useCanEdit } from "../lib/store";
 import { IExpand, INav } from "./Icons";
 import { SavedInput, ShowScreen } from "./ui";
+import { t } from "../lib/i18n";
 
 const tel = (n: string) => `tel:${n.replace(/[^\d+]/g, "")}`;
 
@@ -25,13 +26,14 @@ export default function Emergency({ trip }: { trip: Trip }) {
   return (
     <div className="em">
       <p className="em-intro">
-        Touchez un numéro pour appeler. Cette fiche reste lisible sans réseau tant que l'app est ouverte
-        {shell ? " (et depuis l'icône d'écran d'accueil)" : " ; pour l'ouvrir sans réseau, utilisez orbesmap.vercel.app sur l'écran d'accueil, ou faites une capture d'écran"}.
+        {shell
+          ? t("Touchez un numéro pour appeler. Cette fiche reste lisible sans réseau tant que l'app est ouverte (et depuis l'icône d'écran d'accueil).")
+          : t("Touchez un numéro pour appeler. Cette fiche reste lisible sans réseau tant que l'app est ouverte ; pour l'ouvrir sans réseau, utilisez orbesmap.vercel.app sur l'écran d'accueil, ou faites une capture d'écran.")}
       </p>
       {em && (<>
 
       <section className="em-sec">
-        <span className="label">Numéros d'urgence en Chine</span>
+        <span className="label">{t("Numéros d'urgence en Chine")}</span>
         <div className="em-nums">
           {em.numbers.map((n) => (
             <a key={n.number + n.label} className="em-num" href={tel(n.number)}>
@@ -45,16 +47,16 @@ export default function Emergency({ trip }: { trip: Trip }) {
 
       {em.consulate.name && (
       <section className="em-sec">
-        <span className="label">Consulat général de France</span>
+        <span className="label">{t("Consulat général de France")}</span>
         <div className="card em-card">
           <h4>{em.consulate.name}</h4>
           <p>{em.consulate.address}</p>
           {em.consulate.cn && <p className="zh" lang="zh-CN">{em.consulate.cn}</p>}
           {em.consulate.hours && <p className="em-small">{em.consulate.hours}</p>}
           <div className="em-actions">
-            {em.consulate.phone && <a className="btn-sm" href={tel(em.consulate.phone)}>Standard {em.consulate.phone}</a>}
-            {em.consulate.emergency && <a className="btn-sm em-red" href={tel(em.consulate.emergency)}>Urgence {em.consulate.emergency}</a>}
-            {em.consulate.cn && <button className="btn-sm" onClick={() => setShow({ zh: em.consulate.cn, sub: em.consulate.address })}><IExpand /> Montrer au chauffeur</button>}
+            {em.consulate.phone && <a className="btn-sm" href={tel(em.consulate.phone)}>{t("Standard {phone}", { phone: em.consulate.phone })}</a>}
+            {em.consulate.emergency && <a className="btn-sm em-red" href={tel(em.consulate.emergency)}>{t("Urgence {phone}", { phone: em.consulate.emergency })}</a>}
+            {em.consulate.cn && <button className="btn-sm" onClick={() => setShow({ zh: em.consulate.cn, sub: em.consulate.address })}><IExpand /> {t("Montrer au chauffeur")}</button>}
             {em.consulate.cn && Number.isFinite(em.consulate.lat) && <a className="btn-sm" href={amapDirections({ lat: em.consulate.lat, lng: em.consulate.lng, name: "法国驻上海总领事馆" })} target="_blank" rel="noopener"><INav /> Amap</a>}
           </div>
         </div>
@@ -62,21 +64,21 @@ export default function Emergency({ trip }: { trip: Trip }) {
       )}
 
       <section className="em-sec">
-        <span className="label">Hôpitaux internationaux · du plus proche {fix ? "de vous" : "de l'hôtel"}</span>
+        <span className="label">{fix ? t("Hôpitaux internationaux · du plus proche de vous") : t("Hôpitaux internationaux · du plus proche de l'hôtel")}</span>
         {hospitals.map((h) => (
           <div key={h.name} className="card em-card">
             <h4>{h.name}</h4>
             <p className="em-small">
-              À {fmtDistance(km(from, h) * 1000)} · {h.er24 ? "urgences 24h/24" : "pas d'urgences la nuit"}
-              {h.english ? " · personnel anglophone" : ""}
+              {t("À {distance}", { distance: fmtDistance(km(from, h) * 1000) })} · {h.er24 ? t("urgences 24h/24") : t("pas d'urgences la nuit")}
+              {h.english ? " · " + t("personnel anglophone") : ""}
             </p>
             <p>{h.address}</p>
             <p className="zh" lang="zh-CN">{h.cn} · {h.addressCn}</p>
-            {h.directBilling && <p className="em-small">Assurances : {h.directBilling}</p>}
+            {h.directBilling && <p className="em-small">{t("Assurances : {list}", { list: h.directBilling })}</p>}
             {h.note && <p className="em-small">{h.note}</p>}
             <div className="em-actions">
-              <a className="btn-sm em-red" href={tel(h.phone)}>Appeler {h.phone}</a>
-              <button className="btn-sm" onClick={() => setShow({ zh: `${h.cn}\n${h.addressCn}`, sub: h.address })}><IExpand /> Montrer au chauffeur</button>
+              <a className="btn-sm em-red" href={tel(h.phone)}>{t("Appeler {phone}", { phone: h.phone })}</a>
+              <button className="btn-sm" onClick={() => setShow({ zh: `${h.cn}\n${h.addressCn}`, sub: h.address })}><IExpand /> {t("Montrer au chauffeur")}</button>
               <a className="btn-sm" href={amapDirections({ lat: h.lat, lng: h.lng, name: h.cn })} target="_blank" rel="noopener"><INav /> Amap</a>
             </div>
           </div>
@@ -85,13 +87,13 @@ export default function Emergency({ trip }: { trip: Trip }) {
 
       </>)}
       <section className="em-sec">
-        <span className="label">{member === true ? "Assurance voyage · partagée avec votre père" : "Assurance voyage"}</span>
+        <span className="label">{member === true ? t("Assurance voyage · partagée avec votre père") : t("Assurance voyage")}</span>
         <fieldset className="card em-card" disabled={!canEdit} style={{ margin: 0, minWidth: 0 }}>
-          <label className="field"><span>Assureur</span><SavedInput value={ins.insurer || ""} placeholder="ex. AXA Assistance, carte Visa Premier…" onSave={setIns("insurer")} /></label>
-          <label className="field"><span>N° de contrat</span><SavedInput value={ins.policy || ""} onSave={setIns("policy")} /></label>
-          <label className="field"><span>Assistance 24h/24 (depuis l'étranger)</span><SavedInput value={ins.phone || ""} placeholder="+33 1 …" onSave={setIns("phone")} /></label>
-          <label className="field"><span>À savoir</span><SavedInput multiline value={ins.note || ""} placeholder="Appeler avant toute dépense, franchise, garde le dossier…" onSave={setIns("note")} /></label>
-          {ins.phone && <a className="btn primary block" style={{ marginTop: 12 }} href={tel(ins.phone)}>Appeler l'assistance</a>}
+          <label className="field"><span>{t("Assureur")}</span><SavedInput value={ins.insurer || ""} placeholder={t("ex. AXA Assistance, carte Visa Premier…")} onSave={setIns("insurer")} /></label>
+          <label className="field"><span>{t("N° de contrat")}</span><SavedInput value={ins.policy || ""} onSave={setIns("policy")} /></label>
+          <label className="field"><span>{t("Assistance 24h/24 (depuis l'étranger)")}</span><SavedInput value={ins.phone || ""} placeholder="+33 1 …" onSave={setIns("phone")} /></label>
+          <label className="field"><span>{t("À savoir")}</span><SavedInput multiline value={ins.note || ""} placeholder={t("Appeler avant toute dépense, franchise, garde le dossier…")} onSave={setIns("note")} /></label>
+          {ins.phone && <a className="btn primary block" style={{ marginTop: 12 }} href={tel(ins.phone)}>{t("Appeler l'assistance")}</a>}
         </fieldset>
       </section>
       {show && <ShowScreen zh={show.zh} sub={show.sub} onClose={() => setShow(null)} />}

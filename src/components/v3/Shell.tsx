@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import OrbitMark from "../OrbitMark";
+import { t } from "../../lib/i18n";
 
 /** Full-screen "Vault" page: black ground, a faint gold light, a slow orbit ring, content in one column */
 export default function Shell({ children, ring = true, top, className }: { children: ReactNode; ring?: boolean; top?: ReactNode; className?: string }) {
@@ -26,7 +27,7 @@ export default function Shell({ children, ring = true, top, className }: { child
 /** Progress of a multi-step screen: "01 / 03" and bars */
 export function Steps({ n, of }: { n: number; of: number }) {
   return (
-    <div className="v3-steps" aria-label={`Étape ${n} sur ${of}`}>
+    <div className="v3-steps" aria-label={t("Étape {n} sur {of}", { n, of })}>
       <span className="v3-bars">
         {Array.from({ length: of }, (_, i) => <i key={i} className={i < n ? "on" : ""} />)}
       </span>

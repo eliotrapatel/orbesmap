@@ -5,6 +5,7 @@
 import { useSyncExternalStore } from "react";
 import { ai, AiError, type EnrichResult } from "./ai";
 import { currentTrip, getState, toast, updateDef, programmeLocked, needPro } from "./store";
+import { t } from "./i18n";
 
 type One = { busy: boolean; startedAt: number; err: string | null };
 const jobs = new Map<string, One>();
@@ -110,11 +111,11 @@ async function run(id: string): Promise<void> {
     if (Object.keys(prev).length > 1) patch.prevSheet = prev;
     const saved = updateDef(id, patch);
     set(id, IDLE);
-    if (saved) toast(`Fiche de « ${place.name} » mise à jour`);
+    if (saved) toast(t("Fiche de « {name} » mise à jour", { name: place.name }));
   } catch (e) {
-    const msg = e instanceof AiError ? e.message : "La fiche n'a pas pu être mise à jour. Réessayez.";
+    const msg = e instanceof AiError ? e.message : t("La fiche n'a pas pu être mise à jour. Réessayez.");
     set(id, { busy: false, startedAt: 0, err: msg });
-    toast(`Fiche de « ${place.name} » : ${msg}`);
+    toast(t("Fiche de « {name} » : {msg}", { name: place.name, msg }));
   }
 }
 
@@ -124,5 +125,5 @@ export function restorePrevSheet(id: string) {
   if (!prev) return;
   const patch: Record<string, unknown> = { prevSheet: null };
   for (const k of SHEET) if (k in prev) patch[k] = prev[k];
-  if (updateDef(id, patch)) toast("Fiche précédente remise");
+  if (updateDef(id, patch)) toast(t("Fiche précédente remise"));
 }

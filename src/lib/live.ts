@@ -9,6 +9,7 @@ import type { Place, PlaceType, Trip } from "../data/types";
 import type { Hours } from "./hours";
 import type { Data } from "./model";
 import { tripFromDefs } from "./defs";
+import { t } from "./i18n";
 
 /** Place id of an added place */
 export const pinPlaceId = (pinId: string) => `_pin:${pinId}`;
@@ -54,7 +55,7 @@ export function normHours(v: unknown): Hours | undefined {
   // closing days without any opening time would read as "closed" every day: kept as text instead
   if (!h.always && !h.byDay.length && !(h.open && h.close) && h.closed.length) {
     const names = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
-    h.note = [`Fermé le ${h.closed.map((d) => names[d]).join(", ")}`, h.note].filter(Boolean).join(" · ");
+    h.note = [t("Fermé le {days}", { days: h.closed.map((d) => t(names[d])).join(", ") }), h.note].filter(Boolean).join(" · ");
     h.closed = [];
   }
   return h;

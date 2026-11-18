@@ -6,13 +6,14 @@ import { ICube, ILocate, IPin, IPinPlus, ISearch, ISpeaker } from "./Icons";
 import { TOOLS, type ToolKey } from "./TopBar";
 import { getState, listTrips } from "../lib/store";
 import { notesText } from "../lib/notes";
+import { t } from "../lib/i18n";
 
 const TOOL_WORDS: Partial<Record<ToolKey, string>> = {
-  emergency: "urgence sos hopital consulat police ambulance assurance 110 120 medecin",
-  translate: "traduire traduction photo menu interprete conversation parler chinois",
-  checklist: "check-list liste depart taches reservations valise",
-  practical: "infos hors ligne offline carte telecharger",
-  ask: "demander question assistant carnet ia chat discuter",
+  emergency: "urgence sos hopital consulat police ambulance assurance 110 120 medecin emergency hospital consulate insurance doctor",
+  translate: "traduire traduction photo menu interprete conversation parler chinois translate translation interpreter speak chinese",
+  checklist: "check-list liste depart taches reservations valise checklist list departure tasks bookings luggage suitcase",
+  practical: "infos hors ligne offline carte telecharger info map download",
+  ask: "demander question assistant carnet ia chat discuter ask ai notebook talk",
 };
 import { Portal, speak, useEscape } from "./ui";
 
@@ -47,7 +48,7 @@ export default function CommandPalette(p: {
       const d = day(pl.day);
       // added places were found by their notes in the former "Mes lieux" list: still the case
       const nt = pl.added ? notesText(st0[pl.id], pl.added.note) : "";
-      out.push({ id: "p:" + pl.id, section: "Lieux", title: pl.name, sub: `${d?.title || ""} · ${TYPE_LABEL[pl.type] || pl.type} · ${pl.address}`, icon: <span className="ic dot" style={{ ["--c" as string]: d?.color }}>{pl.type === "hotel" ? "H" : d?.glyph}</span>, run: () => p.onPlace(pl), text: norm([pl.name, pl.cn, pl.address, pl.desc, TYPE_LABEL[pl.type], ...pl.highlights, nt].join(" ")) });
+      out.push({ id: "p:" + pl.id, section: "Lieux", title: pl.name, sub: `${d?.title || ""} · ${t(TYPE_LABEL[pl.type] || pl.type)} · ${pl.address}`, icon: <span className="ic dot" style={{ ["--c" as string]: d?.color }}>{pl.type === "hotel" ? "H" : d?.glyph}</span>, run: () => p.onPlace(pl), text: norm([pl.name, pl.cn, pl.address, pl.desc, TYPE_LABEL[pl.type], t(TYPE_LABEL[pl.type] || pl.type), ...pl.highlights, nt].join(" ")) });
     }
     const states = getState().data.places as Record<string, Record<string, unknown>>;
     for (const pin of p.pins) {
@@ -55,13 +56,13 @@ export default function CommandPalette(p: {
       out.push({ id: "pin:" + pin.id, section: "Mes lieux", title: pin.name, sub: nt || undefined, icon: <span className="ic"><IPin /></span>, run: () => p.onPin(pin), text: norm(pin.name + " " + nt) });
     }
     for (const d of p.trip.days) out.push({ id: "d:" + d.key, section: "Jours", title: d.title, sub: d.theme, icon: <span className="ic dot" style={{ ["--c" as string]: d.color }}>{d.glyph}</span>, run: () => p.onDay(d.key), text: norm(d.title + " " + d.short + " " + (d.theme || "")) });
-    for (const z of p.trip.zones) out.push({ id: "z:" + z.label, section: "Zones", title: z.label, sub: "Centrer la carte", icon: <span className="ic"><ILocate /></span>, run: () => p.onZone(z.center, z.zoom), text: norm("zone quartier ville " + z.label) });
-    for (const t of TOOLS) out.push({ id: "t:" + t.key, section: "Outils", title: t.label, icon: <span className="ic">{t.icon}</span>, run: () => p.onTool(t.key), text: norm(t.label + " " + t.key + " " + (TOOL_WORDS[t.key] || "")) });
-    out.push({ id: "a:3d", section: "Actions", title: "Bâtiments en 3D", sub: "Activer ou couper la vue 3D", icon: <span className="ic"><ICube /></span>, run: p.onToggle3D, text: norm("3d batiments relief vue") });
-    out.push({ id: "a:loc", section: "Actions", title: "Ma position", icon: <span className="ic"><ILocate /></span>, run: p.onLocate, text: norm("ma position localisation gps ou suis je") });
-    out.push({ id: "a:pin", section: "Actions", title: "Ajouter un lieu sur la carte", icon: <span className="ic"><IPinPlus /></span>, run: p.onAddPin, text: norm("ajouter lieu epingle pin") });
-    out.push({ id: "a:link", section: "Actions", title: "Ajouter un lieu : lien, nom ou description", icon: <span className="ic"><IPinPlus /></span>, run: p.onAddLink, text: norm("ajouter lien xiaohongshu dianping instagram capture adresse chercher proposer suggestion bar restaurant boutique") });
-    for (const t of listTrips()) if (t.id !== p.trip.id) out.push({ id: "trip:" + t.id, section: "Voyages", title: `Ouvrir ${t.title}`, sub: t.dateLabel, icon: <span className="ic"><ISearch /></span>, run: () => p.onTrip(t.id), text: norm(`voyage ${t.title} ${t.code}`) });
+    for (const z of p.trip.zones) out.push({ id: "z:" + z.label, section: "Zones", title: z.label, sub: t("Centrer la carte"), icon: <span className="ic"><ILocate /></span>, run: () => p.onZone(z.center, z.zoom), text: norm("zone quartier ville district city area " + z.label) });
+    for (const tl of TOOLS) out.push({ id: "t:" + tl.key, section: "Outils", title: t(tl.label), icon: <span className="ic">{tl.icon}</span>, run: () => p.onTool(tl.key), text: norm(tl.label + " " + t(tl.label) + " " + tl.key + " " + (TOOL_WORDS[tl.key] || "")) });
+    out.push({ id: "a:3d", section: "Actions", title: t("Bâtiments en 3D"), sub: t("Activer ou couper la vue 3D"), icon: <span className="ic"><ICube /></span>, run: p.onToggle3D, text: norm("3d batiments relief vue buildings view") });
+    out.push({ id: "a:loc", section: "Actions", title: t("Ma position"), icon: <span className="ic"><ILocate /></span>, run: p.onLocate, text: norm("ma position localisation gps ou suis je my location where am i") });
+    out.push({ id: "a:pin", section: "Actions", title: t("Ajouter un lieu sur la carte"), icon: <span className="ic"><IPinPlus /></span>, run: p.onAddPin, text: norm("ajouter lieu epingle pin add place map") });
+    out.push({ id: "a:link", section: "Actions", title: t("Ajouter un lieu : lien, nom ou description"), icon: <span className="ic"><IPinPlus /></span>, run: p.onAddLink, text: norm("ajouter lien xiaohongshu dianping instagram capture adresse chercher proposer suggestion bar restaurant boutique add link screenshot address search suggest shop store") });
+    for (const tr of listTrips()) if (tr.id !== p.trip.id) out.push({ id: "trip:" + tr.id, section: "Voyages", title: t("Ouvrir {name}", { name: tr.title }), sub: tr.dateLabel, icon: <span className="ic"><ISearch /></span>, run: () => p.onTrip(tr.id), text: norm(`voyage trip ${tr.title} ${tr.code}`) });
     for (const g of p.trip.phrases) for (const ph of g.items) out.push({ id: "ph:" + g.title + ph.zh, section: "Phrases", title: ph.fr, sub: `${ph.zh} · ${ph.pinyin}`, icon: <span className="ic"><ISpeaker /></span>, run: () => speak(ph.zh), text: norm(ph.fr + " " + ph.pinyin) + " " + ph.zh });
     return out;
   }, [p]);
@@ -93,12 +94,12 @@ export default function CommandPalette(p: {
   return (
     <Portal>
       <div className="cmdk-bg" onMouseDown={(e) => e.target === e.currentTarget && p.onClose()}>
-        <div className="cmdk glass" role="dialog" aria-modal="true" aria-label="Recherche">
+        <div className="cmdk glass" role="dialog" aria-modal="true" aria-label={t("Recherche")}>
           <div className="cmdk-input">
             <ISearch />
             <input
               autoFocus
-              placeholder="Lieu, quartier, phrase, outil…"
+              placeholder={t("Lieu, quartier, phrase, outil…")}
               value={q}
               onChange={(e) => setQ(e.target.value)}
               onKeyDown={(e) => {
@@ -111,7 +112,7 @@ export default function CommandPalette(p: {
           </div>
           <div className="cmdk-list scroll" ref={list} role="listbox">
             {shown.map((it, n) => {
-              const head = it.section !== lastSection ? <span className="cmdk-sec label">{it.section}</span> : null;
+              const head = it.section !== lastSection ? <span className="cmdk-sec label">{t(it.section)}</span> : null;
               lastSection = it.section;
               return (
                 <div key={it.id}>
@@ -126,12 +127,12 @@ export default function CommandPalette(p: {
                 </div>
               );
             })}
-            {!shown.length && <div className="empty"><b>Rien trouvé</b>Essayez un autre mot.</div>}
+            {!shown.length && <div className="empty"><b>{t("Rien trouvé")}</b>{t("Essayez un autre mot.")}</div>}
           </div>
           <div className="cmdk-foot">
-            <span>↑↓ naviguer</span>
-            <span>↵ ouvrir</span>
-            <span>Échap fermer</span>
+            <span>{t("↑↓ naviguer")}</span>
+            <span>{t("↵ ouvrir")}</span>
+            <span>{t("Échap fermer")}</span>
           </div>
         </div>
       </div>

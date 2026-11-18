@@ -1,15 +1,16 @@
 import type { Trip } from "../data/types";
 import { plural } from "../lib/fmt";
 import { fmtDay, localDate } from "../lib/time";
+import { t } from "../lib/i18n";
 
 export default function DayBar({ trip, day, onDay }: { trip: Trip; day: string; onDay: (d: string) => void }) {
   const today = localDate(trip.timezone);
   const count = (key: string) => trip.places.filter((p) => p.day === key).length;
   return (
-    <div className="daybar" role="group" aria-label="Filtrer par jour">
+    <div className="daybar" role="group" aria-label={t("Filtrer par jour")}>
       <button className={"day" + (day === "all" ? " on" : "")} aria-pressed={day === "all"} onClick={() => onDay("all")}>
-        <span className="d-top">Tout</span>
-        <span className="d-sub">{plural(trip.places.length, "lieu", "lieux")}</span>
+        <span className="d-top">{t("Tout")}</span>
+        <span className="d-sub">{plural(trip.places.length, t("lieu"), t("lieux"))}</span>
       </button>
       {trip.days
         .filter((d) => count(d.key) > 0)
@@ -25,7 +26,7 @@ export default function DayBar({ trip, day, onDay }: { trip: Trip; day: string; 
               <i />
               {d.short}
             </span>
-            <span className="d-sub">{d.dates?.[0] ? fmtDay(d.dates[0], trip.timezone, { weekday: "short", day: "numeric", month: "short" }) : plural(count(d.key), "lieu", "lieux")}</span>
+            <span className="d-sub">{d.dates?.[0] ? fmtDay(d.dates[0], trip.timezone, { weekday: "short", day: "numeric", month: "short" }) : plural(count(d.key), t("lieu"), t("lieux"))}</span>
           </button>
         ))}
     </div>

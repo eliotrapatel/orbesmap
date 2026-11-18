@@ -2,6 +2,7 @@
 // One request is ~3 KB. Results are cached on the device, so the same trip is never downloaded twice.
 // Without network, a straight-line estimate is shown instead.
 import { km } from "./geo";
+import { getLang } from "./i18n";
 
 export type Mode = "walk" | "car";
 export type LL = { lat: number; lng: number };
@@ -144,7 +145,8 @@ export function secondsLeft(route: Route, left: number, mode: Mode): number {
 
 export function fmtDistance(m: number): string {
   if (m < 950) return `${Math.max(10, Math.round(m / 10) * 10)} m`;
-  return `${(m / 1000).toFixed(m < 9950 ? 1 : 0).replace(".", ",")} km`;
+  const v = (m / 1000).toFixed(m < 9950 ? 1 : 0);
+  return `${getLang() === "en" ? v : v.replace(".", ",")} km`;
 }
 export function fmtDuration(s: number): string {
   const m = Math.max(1, Math.round(s / 60));

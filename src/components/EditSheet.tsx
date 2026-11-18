@@ -5,6 +5,7 @@ import type { Hours } from "../lib/hours";
 import { hhmm } from "../lib/live";
 import { getState, toast, updateDef } from "../lib/store";
 import { Modal } from "./ui";
+import { t } from "../lib/i18n";
 
 const WEEK = [1, 2, 3, 4, 5, 6, 0];
 const SHORT = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
@@ -101,7 +102,7 @@ export default function EditSheet({ trip, place, onClose, onMovePoint }: { trip:
     const patch = patchOf();
     if (Object.keys(patch).length) {
       if (!updateDef(place.id, patch)) return false;
-      toast("Fiche enregistrée");
+      toast(t("Fiche enregistrée"));
     }
     if (close) onClose();
     return true;
@@ -125,58 +126,58 @@ export default function EditSheet({ trip, place, onClose, onMovePoint }: { trip:
   );
 
   return (
-    <Modal title="Modifier la fiche" intro={place.name} onClose={onClose} className="modal-edit">
+    <Modal title={t("Modifier la fiche")} intro={place.name} onClose={onClose} className="modal-edit">
       <form onSubmit={(e) => { e.preventDefault(); save(); }}>
-        {field("Nom", "name")}
-        {field("Nom chinois", "nameCn", { zh: true })}
+        {field(t("Nom"), "name")}
+        {field(t("Nom chinois"), "nameCn", { zh: true })}
         <label className="field">
-          <span>Genre</span>
+          <span>{t("Genre")}</span>
           <select className="input" value={f.type} onChange={(e) => set("type", e.target.value as PlaceType)} disabled={hotel}>
-            {types.map((t) => <option key={t} value={t}>{TYPE_LABEL[t]}</option>)}
+            {types.map((ty) => <option key={ty} value={ty}>{t(TYPE_LABEL[ty])}</option>)}
           </select>
         </label>
-        {field("Adresse", "address")}
-        {field("Adresse chinoise (pour le chauffeur)", "addressCn", { zh: true })}
+        {field(t("Adresse"), "address")}
+        {field(t("Adresse chinoise (pour le chauffeur)"), "addressCn", { zh: true })}
         {onMovePoint && !hotel && (
           // what was typed is saved first, then the point is placed on the map
-          <button type="button" className="btn-sm" onClick={() => save(false) && onMovePoint()}>Déplacer le point sur la carte</button>
+          <button type="button" className="btn-sm" onClick={() => save(false) && onMovePoint()}>{t("Déplacer le point sur la carte")}</button>
         )}
-        {field("Métro", "metro", { ph: "Ligne 2 – Station (中文), sortie 3" })}
-        {field("Site", "website", { mode: "url", ph: "https://" })}
-        {field("Description", "desc", { area: true })}
-        {field("Points forts (un par ligne)", "highlights", { area: true })}
-        {field("Conseil", "tip", { area: true })}
-        {field("Prix", "price")}
-        {field("Durée de visite (minutes)", "duration", { mode: "numeric", ph: "ex. 45" })}
-        {!durOk && <p className="hb-issue warn">Entre 10 et 600 minutes.</p>}
+        {field(t("Métro"), "metro", { ph: t("Ligne 2 – Station (中文), sortie 3") })}
+        {field(t("Site"), "website", { mode: "url", ph: "https://" })}
+        {field(t("Description"), "desc", { area: true })}
+        {field(t("Points forts (un par ligne)"), "highlights", { area: true })}
+        {field(t("Conseil"), "tip", { area: true })}
+        {field(t("Prix"), "price")}
+        {field(t("Durée de visite (minutes)"), "duration", { mode: "numeric", ph: t("ex. 45") })}
+        {!durOk && <p className="hb-issue warn">{t("Entre 10 et 600 minutes.")}</p>}
 
         <div className="ed-hours">
-          <span className="label">Horaires</span>
+          <span className="label">{t("Horaires")}</span>
           <div className="ed-times">
-            {time("Ouvre", "open")}
-            {time("Ferme", "close")}
-            {time("Dernière entrée", "lastEntry")}
+            {time(t("Ouvre"), "open")}
+            {time(t("Ferme"), "close")}
+            {time(t("Dernière entrée"), "lastEntry")}
           </div>
-          <p className="em-small">Heures sur 24 h ; après minuit : 25:30 pour 1h30.{start.h0?.byDay.length ? " Des horaires différents selon les jours sont notés : changer l'ouverture ou la fermeture les remplace." : ""}</p>
-          {!timesOk && <p className="hb-issue warn">Heure illisible : écrivez par exemple 10:00 ou 22:30.</p>}
-          <div className="ed-closed" role="group" aria-label="Jours de fermeture">
-            <span>Fermé le</span>
+          <p className="em-small">{t("Heures sur 24 h ; après minuit : 25:30 pour 1h30.")}{start.h0?.byDay.length ? ` ${t("Des horaires différents selon les jours sont notés : changer l'ouverture ou la fermeture les remplace.")}` : ""}</p>
+          {!timesOk && <p className="hb-issue warn">{t("Heure illisible : écrivez par exemple 10:00 ou 22:30.")}</p>}
+          <div className="ed-closed" role="group" aria-label={t("Jours de fermeture")}>
+            <span>{t("Fermé le")}</span>
             {WEEK.map((d) => {
               const on = f.closed.includes(d);
               return (
                 <button key={d} type="button" className={"fchip" + (on ? " on" : "")} aria-pressed={on} onClick={() => set("closed", on ? f.closed.filter((x) => x !== d) : [...f.closed, d])}>
-                  {SHORT[d]}
+                  {t(SHORT[d])}
                 </button>
               );
             })}
           </div>
-          {field("Réservation", "reservation", { ph: "ex. obligatoire sur WeChat, 7 jours avant" })}
-          {field("Précision sur les horaires", "hoursNote")}
+          {field(t("Réservation"), "reservation", { ph: t("ex. obligatoire sur WeChat, 7 jours avant") })}
+          {field(t("Précision sur les horaires"), "hoursNote")}
         </div>
 
         <div className="btn-row">
-          <button type="button" className="btn" onClick={onClose}>Annuler</button>
-          <button type="submit" className="btn primary" disabled={!f.name.trim() || !timesOk || !durOk}>Enregistrer</button>
+          <button type="button" className="btn" onClick={onClose}>{t("Annuler")}</button>
+          <button type="submit" className="btn primary" disabled={!f.name.trim() || !timesOk || !durOk}>{t("Enregistrer")}</button>
         </div>
       </form>
     </Modal>

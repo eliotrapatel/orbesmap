@@ -11,6 +11,7 @@ import { useStore, useTrips } from "../lib/store";
 import { openHome, openShare } from "./v3/nav";
 import { supabaseConfigured } from "../lib/supabase";
 import { useEscape } from "./ui";
+import { t } from "../lib/i18n";
 
 export type ToolKey = "overview" | "agenda" | "ask" | "translate" | "phrases" | "converter" | "checklist" | "flights" | "practical" | "emergency" | "export" | "account";
 
@@ -50,30 +51,30 @@ export function TripMenu({ trip, onPick, onClose, anchor }: { trip: Trip; onPick
   }, [onClose]);
   return (
     <div ref={ref} className="menu glass" role="menu" style={{ top: (anchor?.bottom ?? 60) + 8, left: Math.max(8, Math.min(anchor?.left ?? 12, window.innerWidth - 316)) }}>
-      {trips.map((t) => {
-        const ph = phase(t);
+      {trips.map((tp) => {
+        const ph = phase(tp);
         return (
-          <button key={t.id} role="menuitemradio" aria-checked={t.id === trip.id} className={"menu-item" + (t.id === trip.id ? " on" : "")} onClick={() => onPick(t.id)}>
+          <button key={tp.id} role="menuitemradio" aria-checked={tp.id === trip.id} className={"menu-item" + (tp.id === trip.id ? " on" : "")} onClick={() => onPick(tp.id)}>
             <span>
-              <span className="label">{t.code}</span>
+              <span className="label">{tp.code}</span>
               <small>
-                {t.title} · {t.dateLabel} · {ph === "before" ? "à venir" : ph === "during" ? "en cours" : "terminé"}
+                {tp.title} · {tp.dateLabel} · {ph === "before" ? t("à venir") : ph === "during" ? t("en cours") : t("terminé")}
               </small>
             </span>
-            {t.id === trip.id && <ICheck className="chk" />}
+            {tp.id === trip.id && <ICheck className="chk" />}
           </button>
         );
       })}
       {signedIn && <button role="menuitem" className="menu-item menu-home" onClick={() => { onClose(); openShare(); }}>
         <span>
-          <span className="label">Partager ce voyage</span>
-          <small>Inviter par e-mail · modifier ou lecture seule</small>
+          <span className="label">{t("Partager ce voyage")}</span>
+          <small>{t("Inviter par e-mail · modifier ou lecture seule")}</small>
         </span>
       </button>}
       <button role="menuitem" className="menu-item" onClick={() => { onClose(); openHome(); }}>
         <span>
-          <span className="label">Mes voyages</span>
-          <small>Tous vos voyages · créer un voyage</small>
+          <span className="label">{t("Mes voyages")}</span>
+          <small>{t("Tous vos voyages · créer un voyage")}</small>
         </span>
       </button>
     </div>
@@ -88,19 +89,19 @@ function SyncPill({ onOpen }: { onOpen: () => void }) {
   const now = useNow(30_000).getTime();
   if (!supabaseConfigured) return null;
   const ago = syncedAt ? Math.max(0, Math.round((now - syncedAt) / 60000)) : null;
-  const agoTxt = ago == null ? "" : ago < 1 ? "à l'instant" : ago < 60 ? `il y a ${ago} min` : `il y a ${Math.round(ago / 60)} h`;
+  const agoTxt = ago == null ? "" : ago < 1 ? t("à l'instant") : ago < 60 ? t("il y a {n} min", { n: ago }) : t("il y a {n} h", { n: Math.round(ago / 60) });
   const s =
     sync === "local"
-      ? { tone: "off", short: "Local", long: "Sur ce téléphone seulement (pas connecté)" }
+      ? { tone: "off", short: t("Local"), long: t("Sur ce téléphone seulement (pas connecté)") }
       : sync === "denied"
-        ? { tone: "bad", short: "Accès refusé", long: "Ce compte n'a pas accès à l'espace partagé" }
+        ? { tone: "bad", short: t("Accès refusé"), long: t("Ce compte n'a pas accès à l'espace partagé") }
         : sync === "syncing"
-          ? { tone: "busy", short: pending ? `Envoi (${pending})…` : "Synchro…", long: pending ? `${pending} modification${pending > 1 ? "s" : ""} en cours d'envoi` : "Synchronisation en cours…" }
+          ? { tone: "busy", short: pending ? t("Envoi ({n})…", { n: pending }) : t("Synchro…"), long: pending ? (pending > 1 ? t("{n} modifications en cours d'envoi", { n: pending }) : t("{n} modification en cours d'envoi", { n: pending })) : t("Synchronisation en cours…") }
           : sync === "pending" || sync === "error" || pending > 0
-            ? { tone: "warn", short: pending ? `En attente (${pending})` : "Nouvel essai…", long: pending ? `${pending} modification${pending > 1 ? "s" : ""} en attente d'envoi (réseau)` : "Envoi en attente, nouvel essai automatique" }
-            : { tone: "ok", short: "À jour", long: `Synchronisé${agoTxt ? ` ${agoTxt}` : ""}` };
+            ? { tone: "warn", short: pending ? t("En attente ({n})", { n: pending }) : t("Nouvel essai…"), long: pending ? (pending > 1 ? t("{n} modifications en attente d'envoi (réseau)", { n: pending }) : t("{n} modification en attente d'envoi (réseau)", { n: pending })) : t("Envoi en attente, nouvel essai automatique") }
+            : { tone: "ok", short: t("À jour"), long: agoTxt ? t("Synchronisé {ago}", { ago: agoTxt }) : t("Synchronisé") };
   return (
-    <button className={"sync-pill " + s.tone} onClick={onOpen} title={s.long} aria-label={`${s.long}. Ouvrir Compte`}>
+    <button className={"sync-pill " + s.tone} onClick={onOpen} title={s.long} aria-label={t("{state}. Ouvrir Compte", { state: s.long })}>
       <i />
       <span className="sp-short">{s.short}</span>
       <span className="sp-long">{s.long}</span>
@@ -116,19 +117,19 @@ export default function TopBar({ trip, tool, onTool, onSearch, onTrip, onHome }:
   const todo = useChecklist(trip).filter((i) => !i.done).length;
   const ph = phase(trip);
   const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
-  const toolBtn = (t: (typeof TOOLS)[number], mobile = false) => (
-    <button key={t.key} className={"tool" + (tool === t.key ? " on" : "")} onClick={() => onTool(t.key)} aria-pressed={tool === t.key} title={t.label}>
-      {t.icon}
-      <span className={mobile ? "tool-txt" : "tool-txt"}>{t.label}</span>
-      {t.key === "account" && (sync === "error" || sync === "pending" || sync === "denied") && <span className="badge-dot" />}
-      {t.key === "checklist" && todo > 0 && ph === "before" && <span className="badge-num">{todo}</span>}
+  const toolBtn = (tl: (typeof TOOLS)[number], mobile = false) => (
+    <button key={tl.key} className={"tool" + (tool === tl.key ? " on" : "")} onClick={() => onTool(tl.key)} aria-pressed={tool === tl.key} title={t(tl.label)}>
+      {tl.icon}
+      <span className={mobile ? "tool-txt" : "tool-txt"}>{t(tl.label)}</span>
+      {tl.key === "account" && (sync === "error" || sync === "pending" || sync === "denied") && <span className="badge-dot" />}
+      {tl.key === "checklist" && todo > 0 && ph === "before" && <span className="badge-num">{todo}</span>}
     </button>
   );
   return (
     <>
       <header className="topbar glass">
         <div className="tb-brand">
-          <button className="brand-mark" onClick={onHome} aria-label="ORBES Trips, retour à l'accueil">
+          <button className="brand-mark" onClick={onHome} aria-label={t("ORBES Trips, retour à l'accueil")}>
             <OrbitMark size={22} />
           </button>
           <span className="tb-sep" aria-hidden="true" />
@@ -138,13 +139,13 @@ export default function TopBar({ trip, tool, onTool, onSearch, onTrip, onHome }:
           </button>
           <SyncPill onOpen={() => onTool("account")} />
         </div>
-        <button className="tb-search" onClick={onSearch} aria-label="Rechercher">
+        <button className="tb-search" onClick={onSearch} aria-label={t("Rechercher")}>
           <ISearch />
-          <span>Rechercher un lieu, une phrase, une action…</span>
+          <span>{t("Rechercher un lieu, une phrase, une action…")}</span>
           <span className="kbd">{isMac ? "⌘K" : "Ctrl K"}</span>
         </button>
-        <nav className="tb-tools" aria-label="Outils">{TOOLS.map((t) => toolBtn(t))}</nav>
-        <div className="tb-meta" aria-label={`Heure à ${trip.title} et à Paris`}>
+        <nav className="tb-tools" aria-label={t("Outils")}>{TOOLS.map((tl) => toolBtn(tl))}</nav>
+        <div className="tb-meta" aria-label={t("Heure à {city} et à Paris", { city: trip.title })}>
           <span>
             {trip.title} <b>{clock(trip.timezone, now)}</b>
           </span>
@@ -159,7 +160,7 @@ export default function TopBar({ trip, tool, onTool, onSearch, onTrip, onHome }:
           )}
         </div>
       </header>
-      <nav className="m-tools glass" aria-label="Outils">{TOOLS.map((t) => toolBtn(t, true))}</nav>
+      <nav className="m-tools glass" aria-label={t("Outils")}>{TOOLS.map((tl) => toolBtn(tl, true))}</nav>
       {menu && (
         <TripMenu
           trip={trip}

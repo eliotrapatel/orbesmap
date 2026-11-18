@@ -6,6 +6,7 @@ import { ai, AiError, imageToBase64, type PlaceItem, type PlacesResult } from ".
 import { km, toWgs } from "./geo";
 import type { Pin, PlaceState } from "./model";
 import { getState, toast } from "./store";
+import { t } from "./i18n";
 
 export type Found = PlaceItem & {
   ll: [number, number] | null;
@@ -173,18 +174,18 @@ export async function runPlaceSearch(opts: { trip: Trip; pins: Pin[]; text: stri
     const url = opts.text.match(/https?:\/\/\S+/)?.[0] || "";
     const rest = url ? opts.text.replace(url, "").trim() : opts.text.trim();
     const image = opts.shot ? await imageToBase64(opts.shot, 1600, 0.8) : undefined;
-    if (signal.aborted) throw new AiError("Recherche arrêtée.");
+    if (signal.aborted) throw new AiError(t("Recherche arrêtée."));
     const known = [...new Set([...opts.trip.places.filter((p) => p.type !== "transport" && p.type !== "hotel").map((p) => p.name), ...opts.pins.map((p) => p.name)])];
     const near = opts.near ? { lat: opts.near.lat, lng: opts.near.lng, label: "ma position actuelle" } : undefined;
     const r = await ai<PlacesResult>("place", { url, text: rest, image, near, known }, 290_000, signal);
     const places = (r.places || []).filter((p) => p.name || p.nameCn).slice(0, 6);
-    if (!places.length) throw new AiError(r.message || "Rien trouvé. Ajoutez des détails, un nom précis ou une capture d'écran.");
+    if (!places.length) throw new AiError(r.message || t("Rien trouvé. Ajoutez des détails, un nom précis ou une capture d'écran."));
     const items: Found[] = [];
     for (const p of places) {
-      if (signal.aborted) throw new AiError("Recherche arrêtée.");
+      if (signal.aborted) throw new AiError(t("Recherche arrêtée."));
       items.push({ ...p, ...(await locate(p, opts.trip, signal, opts.near)), day: state.day });
     }
-    if (signal.aborted) throw new AiError("Recherche arrêtée.");
+    if (signal.aborted) throw new AiError(t("Recherche arrêtée."));
     // the user switched trip meanwhile: these places belong to another trip
     if (getState().tripId !== opts.trip.id) {
       set({ busy: false, res: null });
@@ -195,13 +196,13 @@ export async function runPlaceSearch(opts: { trip: Trip; pins: Pin[]; text: stri
     for (const f of items) f.existing = findExisting(f, opts.trip, pins, states);
     const kind = r.kind === "precise" && items.length === 1 ? "precise" : "suggestions";
     set({ busy: false, res: { kind, message: r.message, items }, picked: kind === "precise" && !items[0].existing ? [0] : [] });
-    if (!state.open) toast(kind === "precise" ? `« ${items[0].name} » trouvé : touchez le bouton lien pour l'ajouter` : `${items.length} propositions prêtes : touchez le bouton lien`);
+    if (!state.open) toast(kind === "precise" ? t("« {name} » trouvé : touchez le bouton lien pour l'ajouter", { name: items[0].name }) : t("{n} propositions prêtes : touchez le bouton lien", { n: items.length }));
   } catch (e) {
-    let msg = e instanceof AiError ? e.message : "La recherche a échoué. Réessayez.";
-    if (wentHidden && !signal.aborted && !(e instanceof AiError && /introuvable|Rien trouvé|Connectez/.test(msg)))
-      msg = "La recherche a été coupée quand l'écran s'est verrouillé ou que vous avez changé d'app. Relancez-la et gardez l'app ouverte (vous pouvez fermer cette fenêtre).";
+    let msg = e instanceof AiError ? e.message : t("La recherche a échoué. Réessayez.");
+    if (wentHidden && !signal.aborted && !(e instanceof AiError && /introuvable|Rien trouvé|Connectez|not found|Nothing found|Sign in/.test(msg)))
+      msg = t("La recherche a été coupée quand l'écran s'est verrouillé ou que vous avez changé d'app. Relancez-la et gardez l'app ouverte (vous pouvez fermer cette fenêtre).");
     set({ busy: false, err: signal.aborted ? null : msg });
-    if (!state.open && !signal.aborted) toast(`Ajout de lieu : ${msg}`);
+    if (!state.open && !signal.aborted) toast(t("Ajout de lieu : {msg}", { msg }));
   } finally {
     document.removeEventListener("visibilitychange", onVis);
     ctl = null;

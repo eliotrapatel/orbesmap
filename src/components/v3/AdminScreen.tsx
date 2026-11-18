@@ -5,22 +5,23 @@ import {
   type AccountRow, type CodeRow, type Overview, type WaitRow,
 } from "../../lib/pro";
 import Shell from "./Shell";
+import { locale, t, tk } from "../../lib/i18n";
 
 type Tab = "figures" | "accounts" | "codes" | "waitlist";
 const TABS: [Tab, string][] = [["figures", "Chiffres"], ["accounts", "Comptes"], ["codes", "Codes"], ["waitlist", "Attente"]];
 const DURATIONS: [string, number | null][] = [["30 jours", 30], ["90 jours", 90], ["1 an", 365], ["À vie", null]];
-const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "2-digit", timeZone: "Europe/Paris" }) : "—");
-const usd = (n: number) => `${(Number(n) || 0).toFixed(2)} $`;
+const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(locale(), { day: "numeric", month: "short", year: "2-digit", timeZone: "Europe/Paris" }) : "—");
+const usd = (n: number) => t("{n} $", { n: (Number(n) || 0).toFixed(2) });
 const copy = (text: string, what: string) =>
-  navigator.clipboard?.writeText(text).then(() => toast(`${what} copié`), () => toast("Copie impossible sur cet appareil"));
+  navigator.clipboard?.writeText(text).then(() => toast(t("{what} copié", { what: t(what) })), () => toast(t("Copie impossible sur cet appareil")));
 
 /** The admin's screen: figures (accounts, trips, AI cost), accounts (Pro by hand), Pro codes, waiting list */
 export default function AdminScreen({ onClose }: { onClose: () => void }) {
   const [tab, setTab] = useState<Tab>("figures");
   const top = (
     <div className="v3-bar">
-      <button className="v3-tool" onClick={onClose} aria-label="Fermer">✕</button>
-      <span className="v3-grow" style={{ textAlign: "center", color: "var(--soft)", fontSize: 13 }}>Administration</span>
+      <button className="v3-tool" onClick={onClose} aria-label={t("Fermer")}>✕</button>
+      <span className="v3-grow" style={{ textAlign: "center", color: "var(--soft)", fontSize: 13 }}>{t("Administration")}</span>
       <span className="v3-tool ghost" />
     </div>
   );
@@ -28,7 +29,7 @@ export default function AdminScreen({ onClose }: { onClose: () => void }) {
     <Shell className="v3-admin" ring={false} top={top}>
       <div className="v3-seg" role="tablist">
         {TABS.map(([k, label]) => (
-          <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{label}</button>
+          <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{t(label)}</button>
         ))}
       </div>
       {tab === "figures" && <Figures />}
@@ -58,15 +59,15 @@ function useLoad<T>(load: () => Promise<T>, deps: unknown[] = []) {
 function Figures() {
   const { data: o, err } = useLoad<Overview>(adminOverview);
   if (err) return <p className="v3-err">{err}</p>;
-  if (!o) return <p className="v3-note">Chargement…</p>;
+  if (!o) return <p className="v3-note">{t("Chargement…")}</p>;
   const max = Math.max(0.0001, ...o.days.map((d) => Number(d.usd) || 0));
   const stats: [string, string, string?][] = [
-    ["Comptes", String(o.accounts), `+${o.accounts7} en 7 jours`],
-    ["Voyages", String(o.trips), `+${o.trips7} en 7 jours`],
-    ["Préparés par l'IA", String(o.prepared30), "30 derniers jours"],
-    ["Pro actifs", String(o.pro), "codes et accès donnés"],
-    ["Liste d'attente", String(o.waitlist)],
-    ["IA aujourd'hui", String(o.aiToday), usd(o.usdToday)],
+    [t("Comptes"), String(o.accounts), t("+{n} en 7 jours", { n: o.accounts7 })],
+    [t("Voyages"), String(o.trips), t("+{n} en 7 jours", { n: o.trips7 })],
+    [t("Préparés par l'IA"), String(o.prepared30), t("30 derniers jours")],
+    [t("Pro actifs"), String(o.pro), t("codes et accès donnés")],
+    [t("Liste d'attente"), String(o.waitlist)],
+    [t("IA aujourd'hui"), String(o.aiToday), usd(o.usdToday)],
   ];
   return (
     <>
@@ -80,14 +81,14 @@ function Figures() {
         ))}
       </div>
       <div className="v3-glass adm-card">
-        <div className="adm-head"><span className="v3-lbl">Coût IA, 30 jours</span><b>{usd(o.usd30)}</b></div>
-        {o.days.length === 0 && <p className="v3-note">Aucune demande à l'IA sur 30 jours.</p>}
-        <div className="adm-bars" role="img" aria-label={`Coût IA par jour sur 30 jours, total ${usd(o.usd30)}`}>
+        <div className="adm-head"><span className="v3-lbl">{t("Coût IA, 30 jours")}</span><b>{usd(o.usd30)}</b></div>
+        {o.days.length === 0 && <p className="v3-note">{t("Aucune demande à l'IA sur 30 jours.")}</p>}
+        <div className="adm-bars" role="img" aria-label={t("Coût IA par jour sur 30 jours, total {total}", { total: usd(o.usd30) })}>
           {o.days.map((d) => (
-            <i key={d.day} style={{ height: `${Math.max(3, ((Number(d.usd) || 0) / max) * 100)}%` }} title={`${day(d.day)} : ${d.calls} demandes, ${usd(d.usd)}`} />
+            <i key={d.day} style={{ height: `${Math.max(3, ((Number(d.usd) || 0) / max) * 100)}%` }} title={t("{day} : {n} demandes, {usd}", { day: day(d.day), n: d.calls, usd: usd(d.usd) })} />
           ))}
         </div>
-        <p className="v3-note">Hors espace partagé, dont les demandes sont suivies à part.</p>
+        <p className="v3-note">{t("Hors espace partagé, dont les demandes sont suivies à part.")}</p>
       </div>
       <Path />
     </>
@@ -124,7 +125,7 @@ const AI_TASK: Record<string, string> = {
   outline: "trames", day: "jours préparés", essentials: "essentiels", enrich: "fiches", adjust: "ajustements", intake: "collages",
   extract: "réservations lues", place: "lieux cherchés", ask: "questions", photo: "photos", interpret: "interprète",
 };
-const when = (iso: string) => new Date(iso).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" });
+const when = (iso: string) => new Date(iso).toLocaleString(locale(), { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" });
 const PRO_WHY: Record<string, string> = { edit: "modifier un voyage validé", prep: "voyage du mois utilisé", export: "exports et hors ligne", info: "depuis le compte" };
 
 /** The visitor's path over 30 days (anonymous steps, supabase/saas-5.sql) */
@@ -135,26 +136,26 @@ function Path() {
   const pro = Object.entries(f.pro).sort((a, b) => b[1] - a[1]);
   return (
     <div className="v3-glass adm-card">
-      <div className="adm-head"><span className="v3-lbl">Parcours, 30 jours</span><small className="v3-note" style={{ margin: 0 }}>personnes · 30 j avant</small></div>
-      <p className="v3-note">Comptes actifs : {f.active} sur 30 jours, {f.active7} sur 7 jours.</p>
+      <div className="adm-head"><span className="v3-lbl">{t("Parcours, 30 jours")}</span><small className="v3-note" style={{ margin: 0 }}>{t("personnes · 30 j avant")}</small></div>
+      <p className="v3-note">{t("Comptes actifs : {n} sur 30 jours, {n7} sur 7 jours.", { n: f.active, n7: f.active7 })}</p>
       <div className="adm-path">
         {STEPS.map(([k, label]) => {
           const s = f.steps[k] || { now: 0, before: 0, people: 0 };
           return (
             <div key={k} className="adm-step">
               <span className="adm-step-bar" style={{ width: `${Math.max(2, (s.now / top) * 100)}%` }} />
-              <span className="v3-grow">{label}</span>
+              <span className="v3-grow">{t(label)}</span>
               <b>{s.now}</b>
-              <small title="personnes">{s.people || 0}</small>
+              <small title={t("personnes")}>{s.people || 0}</small>
               <small>{s.before}</small>
             </div>
           );
         })}
       </div>
-      <p className="v3-note">Visites : {f.phones} sur téléphone, {f.computers} sur ordinateur.</p>
-      {f.refs.length > 0 && <p className="v3-note">Venus de : {f.refs.map((r) => `${r.ref} (${r.n})`).join(", ")}.</p>}
-      {pro.length > 0 && <p className="v3-note">Écran Pro : {pro.map(([k, n]) => `${PRO_WHY[k] || k} (${n})`).join(", ")}.</p>}
-      <p className="v3-note">Le détail de chaque personne est dans Comptes : touchez un compte.</p>
+      <p className="v3-note">{t("Visites : {phones} sur téléphone, {computers} sur ordinateur.", { phones: f.phones, computers: f.computers })}</p>
+      {f.refs.length > 0 && <p className="v3-note">{t("Venus de : {list}.", { list: f.refs.map((r) => `${r.ref} (${r.n})`).join(", ") })}</p>}
+      {pro.length > 0 && <p className="v3-note">{t("Écran Pro : {list}.", { list: pro.map(([k, n]) => `${t(PRO_WHY[k] || k)} (${n})`).join(", ") })}</p>}
+      <p className="v3-note">{t("Le détail de chaque personne est dans Comptes : touchez un compte.")}</p>
     </div>
   );
 }
@@ -169,7 +170,7 @@ function Accounts() {
     setBusy(a.user_id);
     try {
       await adminSetPro(a.user_id, days);
-      toast(days === 0 ? "Pro retiré" : "Pro donné");
+      toast(days === 0 ? t("Pro retiré") : t("Pro donné"));
       again();
     } catch (e) {
       toast((e as Error).message);
@@ -180,24 +181,24 @@ function Accounts() {
   return (
     <>
       <form className="v3-field" style={{ marginTop: 14 }} onSubmit={(e) => { e.preventDefault(); setSearch(q.trim()); }}>
-        <span className="sr">Chercher un compte</span>
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Chercher (e-mail, prénom)" inputMode="search" />
+        <span className="sr">{t("Chercher un compte")}</span>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Chercher (e-mail, prénom)")} inputMode="search" />
       </form>
       {err && <p className="v3-err">{err}</p>}
-      {!data && !err && <p className="v3-note">Chargement…</p>}
-      {data && <p className="v3-note">{data.length} compte{data.length > 1 ? "s" : ""}{data.length === 300 ? " (les 300 plus récents)" : ""}</p>}
+      {!data && !err && <p className="v3-note">{t("Chargement…")}</p>}
+      {data && <p className="v3-note">{data.length > 1 ? t("{n} comptes", { n: data.length }) : t("{n} compte", { n: data.length })}{data.length === 300 ? t(" (les 300 plus récents)") : ""}</p>}
       <div className="adm-list">
         {data?.map((a) => (
           <div key={a.user_id} className="adm-row">
-            <button type="button" className="v3-grow adm-main" onClick={() => setOpen(a)} aria-label={`Voir le compte ${a.email}`}>
+            <button type="button" className="v3-grow adm-main" onClick={() => setOpen(a)} aria-label={t("Voir le compte {email}", { email: a.email })}>
               <b>{a.name || a.email.split("@")[0]}{a.admin && <span className="v3-tag dim" style={{ marginLeft: 6 }}>admin</span>}</b>
               <small>{a.email}</small>
-              <small>Inscrit {day(a.created_at)} · actif {day(a.last_active ?? a.last_seen)} · {a.trips} voyage{a.trips > 1 ? "s" : ""} · {a.ai30} IA/30 j{a.steps30 != null ? ` · ${a.steps30} actions/30 j` : ""}{a.waitlisted ? " · en attente" : ""}</small>
+              <small>{t("Inscrit {date}", { date: day(a.created_at) })} · {t("actif {date}", { date: day(a.last_active ?? a.last_seen) })} · {a.trips > 1 ? t("{n} voyages", { n: a.trips }) : t("{n} voyage", { n: a.trips })} · {t("{n} IA/30 j", { n: a.ai30 })}{a.steps30 != null ? ` · ${t("{n} actions/30 j", { n: a.steps30 })}` : ""}{a.waitlisted ? ` · ${t("en attente")}` : ""}</small>
             </button>
             <div className="adm-side">
-              {a.pro ? <span className="v3-tag gold">{a.granted ? (a.until ? `Pro → ${day(a.until)}` : "Pro à vie") : "Pro inclus"}</span> : <span className="v3-tag dim">Gratuit</span>}
+              {a.pro ? <span className="v3-tag gold">{a.granted ? (a.until ? `Pro → ${day(a.until)}` : t("Pro à vie")) : t("Pro inclus")}</span> : <span className="v3-tag dim">{t("Gratuit")}</span>}
               <select
-                aria-label={`Pro pour ${a.email}`}
+                aria-label={t("Pro pour {email}", { email: a.email })}
                 disabled={busy === a.user_id}
                 value=""
                 onChange={(e) => {
@@ -207,10 +208,10 @@ function Accounts() {
                 }}
               >
                 <option value="">Pro…</option>
-                <option value="30">30 jours</option>
-                <option value="365">1 an</option>
-                <option value="life">À vie</option>
-                {a.granted && <option value="0">Retirer</option>}
+                <option value="30">{t("30 jours")}</option>
+                <option value="365">{t("1 an")}</option>
+                <option value="life">{t("À vie")}</option>
+                {a.granted && <option value="0">{t("Retirer")}</option>}
               </select>
             </div>
           </div>
@@ -229,32 +230,32 @@ function AccountSheet({ row, onClose }: { row: AccountRow; onClose: () => void }
   const titleOf = (id: string | null) => (id ? u?.trips.find((t) => t.id === id)?.title || "" : "");
   const facts: [string, string][] = u
     ? ([
-        ["Prénom", String(p.name || "")],
-        ["Voyage", list(p.travel)],
-        ["Goûts", list(p.interests)],
-        ["Rythme", list(p.pace)],
-        ["Budget", list(p.budget)],
-        ["Langue", list(p.lang)],
-        ["Inscrit", when(u.created_at)],
-        ["Dernière connexion", u.last_seen ? when(u.last_seen) : "—"],
-        ["Première visite", u.firstSeen ? when(u.firstSeen) : "—"],
-        ["Venu de", u.firstRef || "accès direct ou inconnu"],
-        ["Visites avant inscription", String(u.visitsBefore)],
-        ["Pro", u.pro ? (u.grant ? (u.grant.until ? `jusqu'au ${day(u.grant.until)} (${u.grant.source || ""})` : `à vie (${u.grant.source || ""})`) : "inclus") : "non"],
-        ["IA", `${u.ai.calls30} demandes · ${usd(u.ai.usd30)} sur 30 j — ${u.ai.calls} · ${usd(u.ai.usd)} au total`],
+        [t("Prénom"), String(p.name || "")],
+        [tk("travel-style", "Voyage"), list(p.travel)],
+        [t("Goûts"), list(p.interests)],
+        [t("Rythme"), list(p.pace)],
+        [t("Budget"), list(p.budget)],
+        [t("Langue"), list(p.lang)],
+        [t("Inscrit"), when(u.created_at)],
+        [t("Dernière connexion"), u.last_seen ? when(u.last_seen) : "—"],
+        [t("Première visite"), u.firstSeen ? when(u.firstSeen) : "—"],
+        [t("Venu de"), u.firstRef || t("accès direct ou inconnu")],
+        [t("Visites avant inscription"), String(u.visitsBefore)],
+        ["Pro", u.pro ? (u.grant ? (u.grant.until ? t("jusqu'au {date} ({source})", { date: day(u.grant.until), source: u.grant.source || "" }) : t("à vie ({source})", { source: u.grant.source || "" })) : t("inclus")) : t("non")],
+        [t("IA"), t("{calls30} demandes · {usd30} sur 30 j — {calls} · {usd} au total", { calls30: u.ai.calls30, usd30: usd(u.ai.usd30), calls: u.ai.calls, usd: usd(u.ai.usd) })],
       ] as [string, string][]).filter(([, v]) => v)
     : [];
   return (
-    <div className="adm-sheet" role="dialog" aria-label={`Compte ${row.email}`}>
+    <div className="adm-sheet" role="dialog" aria-label={t("Compte {email}", { email: row.email })}>
       <div className="adm-sheet-in">
         <div className="v3-bar">
-          <button className="v3-tool" onClick={onClose} aria-label="Fermer">✕</button>
+          <button className="v3-tool" onClick={onClose} aria-label={t("Fermer")}>✕</button>
           <span className="v3-grow" />
         </div>
         <h2 className="v3-d v3-h2" style={{ fontSize: 28 }}>{row.name || row.email.split("@")[0]}</h2>
-        <p className="v3-note" style={{ overflowWrap: "anywhere" }}>{row.email}{u && !u.confirmed ? " · e-mail non confirmé" : ""}</p>
+        <p className="v3-note" style={{ overflowWrap: "anywhere" }}>{row.email}{u && !u.confirmed ? ` · ${t("e-mail non confirmé")}` : ""}</p>
         {err && <p className="v3-err">{err}</p>}
-        {!u && !err && <p className="v3-note">Chargement…</p>}
+        {!u && !err && <p className="v3-note">{t("Chargement…")}</p>}
         {u && (
           <>
             <dl className="adm-facts">
@@ -262,46 +263,46 @@ function AccountSheet({ row, onClose }: { row: AccountRow; onClose: () => void }
                 <div key={k}><dt>{k}</dt><dd>{v}</dd></div>
               ))}
             </dl>
-            <span className="v3-lbl adm-sub">Voyages ({u.trips.length})</span>
+            <span className="v3-lbl adm-sub">{t("Voyages ({n})", { n: u.trips.length })}</span>
             <div className="adm-list">
-              {u.trips.map((t) => (
-                <div key={t.id} className="adm-row">
+              {u.trips.map((tr) => (
+                <div key={tr.id} className="adm-row">
                   <div className="v3-grow adm-main">
-                    <b>{t.title || "Sans titre"}</b>
-                    <small>{t.dates || ""} · {t.role === "owner" ? "créé" : t.role === "editor" ? "invité (modifie)" : "invité (lecture)"} {day(t.created_at)} · {t.places} lieux · {t.status === "done" ? "validé" : t.status === "review" ? "en revue" : t.status === "preparing" ? "en préparation" : "sans préparation"}</small>
+                    <b>{tr.title || t("Sans titre")}</b>
+                    <small>{tr.dates || ""} · {tr.role === "owner" ? t("créé") : tr.role === "editor" ? t("invité (modifie)") : t("invité (lecture)")} {day(tr.created_at)} · {tr.places > 1 ? t("{n} lieux", { n: tr.places }) : t("{n} lieu", { n: tr.places })} · {tr.status === "done" ? t("validé") : tr.status === "review" ? t("en revue") : tr.status === "preparing" ? t("en préparation") : t("sans préparation")}</small>
                   </div>
                 </div>
               ))}
-              {!u.trips.length && <p className="v3-note">Aucun voyage.</p>}
+              {!u.trips.length && <p className="v3-note">{t("Aucun voyage.")}</p>}
             </div>
             {Object.keys(u.counts).length > 0 && (
               <>
-                <span className="v3-lbl adm-sub">Actions (13 derniers mois)</span>
+                <span className="v3-lbl adm-sub">{t("Actions (13 derniers mois)")}</span>
                 <div className="adm-counts">
                   {Object.entries(u.counts).sort((a, b) => b[1] - a[1]).map(([k, n]) => (
-                    <span key={k} className="v3-tag dim">{STEP_LABEL[k] || k} · {n}</span>
+                    <span key={k} className="v3-tag dim">{t(STEP_LABEL[k] || k)} · {n}</span>
                   ))}
                 </div>
               </>
             )}
             {Object.keys(u.ai.tasks).length > 0 && (
-              <p className="v3-note">IA par usage : {Object.entries(u.ai.tasks).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${AI_TASK[k] || k} ${n}`).join(", ")}.</p>
+              <p className="v3-note">{t("IA par usage : {list}.", { list: Object.entries(u.ai.tasks).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${t(AI_TASK[k] || k)} ${n}`).join(", ") })}</p>
             )}
-            <span className="v3-lbl adm-sub">Parcours (200 dernières actions)</span>
+            <span className="v3-lbl adm-sub">{t("Parcours (200 dernières actions)")}</span>
             <div className="adm-timeline">
               {u.events.map((e, i) => (
                 <div key={i} className="adm-ev">
                   <span className="adm-ev-at">{when(e.at)}</span>
                   <span className="v3-grow">
-                    {STEP_LABEL[e.name] || e.name}
-                    {e.detail ? ` · ${(e.name === "pro_screen" ? PRO_WHY[e.detail] : DETAIL[e.detail]) || e.detail}` : ""}
+                    {t(STEP_LABEL[e.name] || e.name)}
+                    {e.detail ? ` · ${t((e.name === "pro_screen" ? PRO_WHY[e.detail] : DETAIL[e.detail]) || e.detail)}` : ""}
                     {e.trip && titleOf(e.trip) ? ` · ${titleOf(e.trip)}` : ""}
-                    {e.ref ? ` · depuis ${e.ref}` : ""}
+                    {e.ref ? ` · ${t("depuis {ref}", { ref: e.ref })}` : ""}
                   </span>
-                  <small>{e.device === "computer" ? "ordi" : e.device === "phone" ? "tél." : ""}</small>
+                  <small>{e.device === "computer" ? t("ordi") : e.device === "phone" ? t("tél.") : ""}</small>
                 </div>
               ))}
-              {!u.events.length && <p className="v3-note">Aucune action enregistrée pour l'instant.</p>}
+              {!u.events.length && <p className="v3-note">{t("Aucune action enregistrée pour l'instant.")}</p>}
             </div>
           </>
         )}
@@ -343,26 +344,26 @@ function Codes() {
   return (
     <>
       <div className="v3-glass adm-card">
-        <span className="v3-lbl">Nouveau code</span>
+        <span className="v3-lbl">{t("Nouveau code")}</span>
         <div className="v3-chips" style={{ marginTop: 10 }}>
           {DURATIONS.map(([l], i) => (
-            <button key={l} type="button" className={"v3-chip" + (dur === i ? " on" : "")} aria-pressed={dur === i} onClick={() => setDur(i)}>{l}</button>
+            <button key={l} type="button" className={"v3-chip" + (dur === i ? " on" : "")} aria-pressed={dur === i} onClick={() => setDur(i)}>{t(l)}</button>
           ))}
         </div>
         <div className="v3-dates">
           <label className="v3-field col">
-            <span>Utilisations</span>
+            <span>{t("Utilisations")}</span>
             <input value={uses} onChange={(e) => setUses(e.target.value.replace(/\D/g, ""))} inputMode="numeric" maxLength={6} />
           </label>
           <label className="v3-field col">
-            <span>Note (pour qui)</span>
-            <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} placeholder="facultatif" />
+            <span>{t("Note (pour qui)")}</span>
+            <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} placeholder={t("facultatif")} />
           </label>
         </div>
-        <button className="v3-btn" style={{ marginTop: 12 }} disabled={busy} onClick={() => void create()}>{busy ? "Création…" : "Créer le code"}</button>
+        <button className="v3-btn" style={{ marginTop: 12 }} disabled={busy} onClick={() => void create()}>{busy ? t("Création…") : t("Créer le code")}</button>
         {fresh && (
           <button type="button" className="adm-fresh" onClick={() => copy(fresh, "Code")}>
-            <b>{fresh}</b><small>Toucher pour copier</small>
+            <b>{fresh}</b><small>{t("Toucher pour copier")}</small>
           </button>
         )}
         {msg && <p className="v3-err">{msg}</p>}
@@ -371,14 +372,14 @@ function Codes() {
       <div className="adm-list">
         {data?.map((c) => (
           <div key={c.code} className={"adm-row" + (c.active ? "" : " off")}>
-            <button type="button" className="v3-grow adm-main" onClick={() => copy(c.code, "Code")} aria-label={`Copier le code ${c.code}`}>
+            <button type="button" className="v3-grow adm-main" onClick={() => copy(c.code, "Code")} aria-label={t("Copier le code {code}", { code: c.code })}>
               <b className="adm-code">{c.code}</b>
-              <small>{c.days ? `${c.days} jours` : "À vie"} · {c.uses}/{c.max_uses} utilisé{c.uses > 1 ? "s" : ""} · {day(c.created_at)}{c.note ? ` · ${c.note}` : ""}</small>
+              <small>{c.days ? t("{n} jours", { n: c.days }) : t("À vie")} · {c.uses > 1 ? t("{uses}/{max} utilisés", { uses: c.uses, max: c.max_uses }) : t("{uses}/{max} utilisé", { uses: c.uses, max: c.max_uses })} · {day(c.created_at)}{c.note ? ` · ${c.note}` : ""}</small>
             </button>
-            <button type="button" className="v3-chip adm-toggle" onClick={() => void toggle(c)}>{c.active ? "Désactiver" : "Réactiver"}</button>
+            <button type="button" className="v3-chip adm-toggle" onClick={() => void toggle(c)}>{c.active ? t("Désactiver") : t("Réactiver")}</button>
           </div>
         ))}
-        {data && !data.length && <p className="v3-note">Aucun code pour l'instant.</p>}
+        {data && !data.length && <p className="v3-note">{t("Aucun code pour l'instant.")}</p>}
       </div>
     </>
   );
@@ -387,12 +388,12 @@ function Codes() {
 function Waitlist() {
   const { data, err } = useLoad<WaitRow[]>(adminWaitlist);
   if (err) return <p className="v3-err">{err}</p>;
-  if (!data) return <p className="v3-note">Chargement…</p>;
+  if (!data) return <p className="v3-note">{t("Chargement…")}</p>;
   return (
     <>
       <div className="v3-titlerow" style={{ marginTop: 16 }}>
-        <span className="v3-lbl">{data.length} personne{data.length > 1 ? "s" : ""} à prévenir</span>
-        {data.length > 0 && <button className="v3-chip" onClick={() => copy(data.map((w) => w.email).join(", "), "Adresses")}>Copier les adresses</button>}
+        <span className="v3-lbl">{data.length > 1 ? t("{n} personnes à prévenir", { n: data.length }) : t("{n} personne à prévenir", { n: data.length })}</span>
+        {data.length > 0 && <button className="v3-chip" onClick={() => copy(data.map((w) => w.email).join(", "), "Adresses")}>{t("Copier les adresses")}</button>}
       </div>
       <div className="adm-list">
         {data.map((w) => (

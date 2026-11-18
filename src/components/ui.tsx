@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { isMobileSheet, useSheetGesture } from "../lib/sheetDrag";
 import { onToast, currentTrip } from "../lib/store";
 import { IClose, ISpeaker } from "./Icons";
+import { t } from "../lib/i18n";
 
 /** Overlays are rendered in <body> so they are never trapped inside a transformed panel */
 export const Portal = ({ children }: { children: ReactNode }) => createPortal(children, document.body);
@@ -104,15 +105,15 @@ export function ShowScreen({ zh, sub, onClose }: { zh: string; sub?: string; onC
   return (
     <Portal>
       <div className="show" role="dialog" aria-modal="true" onClick={onClose}>
-        <button className="icon-btn close" aria-label="Fermer" onClick={onClose}>
+        <button className="icon-btn close" aria-label={t("Fermer")} onClick={onClose}>
           <IClose />
         </button>
         <div className="zh" lang="zh-CN">{zh}</div>
         {sub && <div className="sub">{sub}</div>}
         <button className="speak" onClick={(e) => { e.stopPropagation(); speak(zh); }}>
-          <ISpeaker /> Écouter
+          <ISpeaker /> {t("Écouter")}
         </button>
-        <div className="hint">Touchez l'écran pour fermer</div>
+        <div className="hint">{t("Touchez l'écran pour fermer")}</div>
       </div>
     </Portal>
   );
@@ -279,14 +280,14 @@ export function Drawer({ kicker, title, onClose, wide, children, sheetH, actions
       style={sheetH ? ({ ["--sheet-h" as string]: sheetH } as React.CSSProperties) : undefined}
       aria-label={title}
     >
-      <div className="sheet-grip" {...sheet.handlers} role="button" aria-label="Glisser vers le bas pour fermer, vers le haut pour agrandir" />
+      <div className="sheet-grip" {...sheet.handlers} role="button" aria-label={t("Glisser vers le bas pour fermer, vers le haut pour agrandir")} />
       <div className="drawer-head" {...sheet.handlers}>
         <div>
           {kicker && <span className="label">{kicker}</span>}
           <h3>{title}</h3>
         </div>
         {actions}
-        <button className="icon-btn" onClick={onClose} aria-label="Fermer">
+        <button className="icon-btn" onClick={onClose} aria-label={t("Fermer")}>
           <IClose />
         </button>
       </div>

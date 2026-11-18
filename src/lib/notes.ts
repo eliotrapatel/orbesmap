@@ -1,6 +1,8 @@
 // One note per person: each traveller writes in their own field (note_<author>), so the field-by-field
 // merge never lets one person's note overwrite the other's. The former shared "note" field is kept and
 // shown as "Note commune" so nothing written before is lost.
+import { locale, t } from "./i18n";
+
 export type NoteEntry = { key: string; author: string; name: string; text: string; at?: number; mine: boolean; legacy: boolean };
 
 /** Record key of an author's note */
@@ -10,7 +12,7 @@ export const noteKey = (author?: string | null) => (author ? "note_" + author.to
 export function authorName(author: string): string {
   if (/^eliot/i.test(author)) return "Eliot";
   if (/^bertrand/i.test(author)) return "Papa";
-  return author || "Sans nom";
+  return author || t("Sans nom");
 }
 
 /**
@@ -40,16 +42,16 @@ export function notesOf(rec: Record<string, unknown> | undefined, me?: string | 
 export function notesText(rec: Record<string, unknown> | undefined, legacyText?: string, sep = " / "): string {
   return notesOf(rec, null, legacyText)
     .filter((n) => n.text.trim())
-    .map((n) => `${n.legacy ? (n.name ? `${n.name} (commune)` : "Commune") : n.name} : ${n.text.trim()}`)
+    .map((n) => t("{name} : {text}", { name: n.legacy ? (n.name ? t("{name} (commune)", { name: n.name }) : t("Commune")) : n.name, text: n.text.trim() }))
     .join(sep);
 }
 
 export function ago(at?: number): string {
   if (!at) return "";
   const m = Math.round((Date.now() - at) / 60000);
-  if (m < 1) return "à l'instant";
-  if (m < 60) return `il y a ${m} min`;
+  if (m < 1) return t("à l'instant");
+  if (m < 60) return t("il y a {n} min", { n: m });
   const h = Math.round(m / 60);
-  if (h < 24) return `il y a ${h} h`;
-  return new Date(at).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+  if (h < 24) return t("il y a {n} h", { n: h });
+  return new Date(at).toLocaleDateString(locale(), { day: "numeric", month: "short" });
 }

@@ -1,6 +1,8 @@
 // A new trip's record from where and when: code, title, dates, time zone, days, map centre and zone.
 // The time zone comes from the country of the destination (OpenStreetMap), with the longitude for the
 // countries that have several; the phone's own time zone when it is unknown.
+// The labels written into a new trip (day names, "Jour 1", the hotel and ideas days) follow the language shown.
+import { getLang, t } from "./i18n";
 
 const TZ: Record<string, string> = {
   cn: "Asia/Shanghai", hk: "Asia/Hong_Kong", mo: "Asia/Macau", tw: "Asia/Taipei", jp: "Asia/Tokyo", kr: "Asia/Seoul",
@@ -29,6 +31,8 @@ export function timezoneFor(country: string | undefined, lng: number): string {
 const COLORS = ["#8CB4E8", "#B7A3E6", "#E8B07A", "#7FD1B9", "#EE8F8F", "#D8C47E", "#9FC6A4", "#E0A3C4"];
 const MONTHS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
 const WD = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
+const MONTHS_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const WD_EN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 const parts = (iso: string) => {
   const [y, m, d] = iso.split("-").map(Number);
@@ -39,10 +43,17 @@ export const addDays = (iso: string, n: number) => {
   return new Date(Date.UTC(y, m - 1, d + n, 12)).toISOString().slice(0, 10);
 };
 
-/** "24 – 29 novembre 2026", "30 mars – 2 avril 2027" */
+/** "24 – 29 novembre 2026", "30 mars – 2 avril 2027" (English: "Nov 24 – 29, 2026", "Mar 30 – Apr 2, 2027") */
 export function dateLabel(start: string, end: string): string {
   const a = parts(start);
   const b = parts(end);
+  if (getLang() === "en") {
+    const M = MONTHS_EN;
+    if (start === end) return `${M[a.m - 1]} ${a.d}, ${a.y}`;
+    if (a.y !== b.y) return `${M[a.m - 1]} ${a.d}, ${a.y} – ${M[b.m - 1]} ${b.d}, ${b.y}`;
+    if (a.m !== b.m) return `${M[a.m - 1]} ${a.d} – ${M[b.m - 1]} ${b.d}, ${b.y}`;
+    return `${M[a.m - 1]} ${a.d} – ${b.d}, ${b.y}`;
+  }
   if (start === end) return `${a.d} ${MONTHS[a.m - 1]} ${a.y}`;
   if (a.y !== b.y) return `${a.d} ${MONTHS[a.m - 1]} ${a.y} – ${b.d} ${MONTHS[b.m - 1]} ${b.y}`;
   if (a.m !== b.m) return `${a.d} ${MONTHS[a.m - 1]} – ${b.d} ${MONTHS[b.m - 1]} ${b.y}`;
@@ -57,31 +68,32 @@ export type Destination = { name: string; country?: string; countryName?: string
 /** The record of a new trip */
 export function newTripRecord(o: { dest: Destination; start: string; end: string; hotel?: string }): Record<string, unknown> {
   const n = Math.max(1, Math.min(60, dayCount(o.start, o.end)));
+  const wd = getLang() === "en" ? WD_EN : WD;
   const days = Array.from({ length: n }, (_, i) => {
     const iso = addDays(o.start, i);
     const p = parts(iso);
     return {
-      key: `d${i + 1}`, short: `${WD[p.dow]} ${p.d}`, title: `Jour ${i + 1}`, theme: i === 0 ? "Arrivée" : i === n - 1 ? "Départ" : "",
+      key: `d${i + 1}`, short: `${wd[p.dow]} ${p.d}`, title: t("Jour {n}", { n: i + 1 }), theme: i === 0 ? t("Arrivée") : i === n - 1 ? t("Départ") : "",
       dates: [iso], color: COLORS[i % COLORS.length], glyph: String(i + 1), scheduled: true,
     };
   });
   const center: [number, number] = [o.dest.lng, o.dest.lat];
   const city = o.dest.name.trim();
   return {
-    code: `${city.replace(/[^A-Za-zÀ-ÿ]/g, "").slice(0, 3).toUpperCase() || "VOY"} ${parts(o.start).y}`,
+    code: `${city.replace(/[^A-Za-zÀ-ÿ]/g, "").slice(0, 3).toUpperCase() || t("VOY")} ${parts(o.start).y}`,
     title: city,
-    subtitle: "Voyage",
+    subtitle: t("Voyage"),
     dateLabel: dateLabel(o.start, o.end),
     start: o.start,
     end: o.end,
     timezone: timezoneFor(o.dest.country, o.dest.lng),
     country: (o.dest.country || "").toLowerCase(),
-    hotel: { name: o.hotel?.trim() || "Hôtel à préciser", lat: o.dest.lat, lng: o.dest.lng },
+    hotel: { name: o.hotel?.trim() || t("Hôtel à préciser"), lat: o.dest.lat, lng: o.dest.lng },
     center,
     days: [
-      { key: "base", short: "Hôtel", title: "Hôtel", theme: "Base du séjour", color: "#f6f2ea", glyph: "H", scheduled: false },
+      { key: "base", short: t("Hôtel"), title: t("Hôtel"), theme: t("Base du séjour"), color: "#f6f2ea", glyph: "H", scheduled: false },
       ...days,
-      { key: "ideas", short: "Pistes", title: "Pistes", theme: "À voir si le temps le permet", color: "#9A958D", glyph: "+", scheduled: false },
+      { key: "ideas", short: t("Pistes"), title: t("Pistes"), theme: t("À voir si le temps le permet"), color: "#9A958D", glyph: "+", scheduled: false },
     ],
     zones: [{ label: city, center, zoom: 12 }],
     flights: [],
@@ -100,7 +112,7 @@ export async function searchCities(q: string, signal?: AbortSignal): Promise<Des
   if (signal?.aborted) return [];
   lastGeo = Date.now();
   try {
-    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&addressdetails=1&accept-language=fr&featureType=settlement&q=${encodeURIComponent(q.trim())}`, { signal });
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&addressdetails=1&accept-language=${getLang()}&featureType=settlement&q=${encodeURIComponent(q.trim())}`, { signal });
     const list = (await r.json()) as { name?: string; display_name: string; lat: string; lon: string; address?: Record<string, string> }[];
     const seen = new Set<string>();
     return list

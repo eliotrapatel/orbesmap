@@ -4,6 +4,7 @@ import { uid } from "../lib/model";
 import { toast, updateRecord, useCanEdit, useStore } from "../lib/store";
 import { localDate } from "../lib/time";
 import { ICheck, IPlus, ITrash } from "./Icons";
+import { locale, t } from "../lib/i18n";
 
 type Item = { id: string; text: string; due?: string; group?: string; owner?: string; done?: boolean; deleted?: boolean; custom?: boolean; order?: number };
 const OWNERS = [
@@ -11,7 +12,7 @@ const OWNERS = [
   { key: "papa", label: "Papa" },
   { key: "both", label: "Les deux" },
 ];
-const fmtDue = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+const fmtDue = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString(locale(), { day: "numeric", month: "short" });
 
 /** Shared departure checklist: who does what before when. Synced live between Eliot and his father. */
 export function useChecklist(trip: Trip) {
@@ -40,11 +41,11 @@ export default function Checklist({ trip }: { trip: Trip }) {
   const groups = [...new Set(shown.map((i) => i.group || "Ajouts"))];
 
   const add = () => {
-    const t = text.trim();
-    if (!t) return;
-    updateRecord(`_check:${uid()}`, { text: t, custom: true, order: 1000 + items.length, ...(who !== "all" ? { owner: who } : {}) });
+    const txt = text.trim();
+    if (!txt) return;
+    updateRecord(`_check:${uid()}`, { text: txt, custom: true, order: 1000 + items.length, ...(who !== "all" ? { owner: who } : {}) });
     setText("");
-    toast("Ajouté à la check-list");
+    toast(t("Ajouté à la check-list"));
   };
 
   return (
@@ -52,19 +53,19 @@ export default function Checklist({ trip }: { trip: Trip }) {
     <div>
       <div className="ck-head">
         <div>
-          <b>{left.length ? `${left.length} à faire` : "Tout est prêt"}</b>
-          <span>{items.length - left.length} / {items.length} faites · partagée avec votre père</span>
+          <b>{left.length ? t("{n} à faire", { n: left.length }) : t("Tout est prêt")}</b>
+          <span>{t("{done} / {total} faites · partagée avec votre père", { done: items.length - left.length, total: items.length })}</span>
         </div>
         <div className="bar"><span style={{ width: `${items.length ? ((items.length - left.length) / items.length) * 100 : 0}%` }} /></div>
       </div>
-      <div className="seg" role="group" aria-label="Filtrer par personne" style={{ margin: "14px 0 6px" }}>
+      <div className="seg" role="group" aria-label={t("Filtrer par personne")} style={{ margin: "14px 0 6px" }}>
         {[{ key: "all", label: "Tout" }, ...OWNERS.slice(0, 2)].map((o) => (
-          <button key={o.key} className={who === o.key ? "on" : ""} style={{ ["--c" as string]: "var(--ink)" }} aria-pressed={who === o.key} onClick={() => setWho(o.key)}>{o.label}</button>
+          <button key={o.key} className={who === o.key ? "on" : ""} style={{ ["--c" as string]: "var(--ink)" }} aria-pressed={who === o.key} onClick={() => setWho(o.key)}>{t(o.label)}</button>
         ))}
       </div>
       {groups.map((g) => (
         <section key={g} className="ck-group">
-          <span className="label">{g}</span>
+          <span className="label">{t(g)}</span>
           {shown
             .filter((i) => (i.group || "Ajouts") === g)
             .sort((a, b) => Number(!!a.done) - Number(!!b.done) || (a.due || "9").localeCompare(b.due || "9") || (a.order ?? 0) - (b.order ?? 0))
@@ -78,24 +79,24 @@ export default function Checklist({ trip }: { trip: Trip }) {
                   <div className="ck-main">
                     <span className="ck-text">{i.text}</span>
                     <span className="ck-meta">
-                      {i.due && <em className={late ? "late" : ""}>{late ? "En retard · " : "Avant le "}{fmtDue(i.due)}</em>}
+                      {i.due && <em className={late ? "late" : ""}>{late ? t("En retard · {date}", { date: fmtDue(i.due) }) : t("Avant le {date}", { date: fmtDue(i.due) })}</em>}
                       <select
-                        aria-label="Qui s'en occupe"
+                        aria-label={t("Qui s'en occupe")}
                         value={i.owner || ""}
                         onChange={(e) => updateRecord(`_check:${i.id}`, { owner: e.target.value || null })}
                       >
-                        <option value="">Personne</option>
-                        {OWNERS.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+                        <option value="">{t("Personne")}</option>
+                        {OWNERS.map((o) => <option key={o.key} value={o.key}>{t(o.label)}</option>)}
                       </select>
                     </span>
                   </div>
                   <button
                     className="icon-btn"
-                    aria-label="Retirer"
+                    aria-label={t("Retirer")}
                     onClick={() => {
-                      if (!i.custom && !confirm(`Retirer « ${i.text} » de la check-list (pour vous deux) ?`)) return;
+                      if (!i.custom && !confirm(t("Retirer « {text} » de la check-list (pour vous deux) ?", { text: i.text }))) return;
                       updateRecord(`_check:${i.id}`, { deleted: true });
-                      toast("Tâche retirée (restaurable en bas de la liste)");
+                      toast(t("Tâche retirée (restaurable en bas de la liste)"));
                     }}
                   >
                     <ITrash />
@@ -107,12 +108,12 @@ export default function Checklist({ trip }: { trip: Trip }) {
       ))}
       {removed.length > 0 && (
         <button className="btn-sm" style={{ marginTop: 14 }} onClick={() => removed.forEach(([k]) => updateRecord(k, { deleted: false }))}>
-          {removed.length === 1 ? "1 tâche retirée · restaurer" : `${removed.length} tâches retirées · tout restaurer`}
+          {removed.length === 1 ? t("1 tâche retirée · restaurer") : t("{n} tâches retirées · tout restaurer", { n: removed.length })}
         </button>
       )}
       <form className="ck-add" onSubmit={(e) => { e.preventDefault(); add(); }}>
-        <input className="input" value={text} onChange={(e) => setText(e.target.value)} placeholder="Ajouter une tâche…" aria-label="Nouvelle tâche" />
-        <button className="btn primary" disabled={!text.trim()}><IPlus /> Ajouter</button>
+        <input className="input" value={text} onChange={(e) => setText(e.target.value)} placeholder={t("Ajouter une tâche…")} aria-label={t("Nouvelle tâche")} />
+        <button className="btn primary" disabled={!text.trim()}><IPlus /> {t("Ajouter")}</button>
       </form>
     </div>
     </fieldset>

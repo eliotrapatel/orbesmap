@@ -3,17 +3,18 @@
 import { supabase } from "./supabase";
 import { track } from "./track";
 import { discardPending, getState, listTrips, pullPlan, signOut } from "./store";
+import { locale, t } from "./i18n";
 
 const sb = () => {
-  if (!supabase) throw new Error("Indisponible hors connexion.");
+  if (!supabase) throw new Error(t("Indisponible hors connexion."));
   return supabase;
 };
 const missing = (e: { code?: string } | null) => !!e && ["PGRST202", "PGRST205", "42883", "42P01"].includes(e.code || "");
 const fail = (e: { code?: string; message?: string } | null, what: string): void => {
   if (!e) return;
-  if (missing(e)) throw new Error("Pro n'est pas encore activé sur le serveur.");
-  if (e.code === "42501") throw new Error("Réservé à l'administrateur.");
-  throw new Error(`${what} n'a pas pu se faire. Vérifiez le réseau et réessayez.`);
+  if (missing(e)) throw new Error(t("Pro n'est pas encore activé sur le serveur."));
+  if (e.code === "42501") throw new Error(t("Réservé à l'administrateur."));
+  throw new Error(t("{what} n'a pas pu se faire. Vérifiez le réseau et réessayez.", { what: t(what) }));
 };
 
 const CODE_ERRORS: Record<string, string> = {
@@ -28,7 +29,7 @@ export async function redeemCode(code: string): Promise<string | null> {
   const { data, error } = await sb().rpc("redeem_code", { p_code: code });
   fail(error, "L'activation");
   const r = (data || {}) as { ok?: boolean; error?: string; until?: string | null };
-  if (!r.ok) throw new Error(CODE_ERRORS[r.error || ""] || "Ce code n'a pas pu être activé.");
+  if (!r.ok) throw new Error(CODE_ERRORS[r.error || ""] ? t(CODE_ERRORS[r.error || ""]) : t("Ce code n'a pas pu être activé."));
   track("code_redeemed");
   await pullPlan();
   return r.until ?? null;
@@ -37,7 +38,7 @@ export async function redeemCode(code: string): Promise<string | null> {
 /** "Prévenez-moi": this account is told when Pro goes on sale */
 export async function joinWaitlist() {
   const s = getState().session;
-  if (!s?.user.email) throw new Error("Connectez-vous d'abord.");
+  if (!s?.user.email) throw new Error(t("Connectez-vous d'abord."));
   const { error } = await sb().from("waitlist").upsert({ user_id: s.user.id, email: s.user.email.toLowerCase(), lang: (getState().profile.lang as string) || "fr" }, { onConflict: "user_id", ignoreDuplicates: true });
   fail(error, "L'inscription");
   track("waitlist_join");
@@ -45,7 +46,7 @@ export async function joinWaitlist() {
 }
 
 export const proDate = (until: string | null) =>
-  until ? new Date(until).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Paris" }) : "";
+  until ? new Date(until).toLocaleDateString(locale(), { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Paris" }) : "";
 
 // ---------- admin ----------
 export type Overview = {
@@ -153,12 +154,12 @@ export async function deleteMyAccount() {
   const paths = ((files.data || []) as string[]).filter(Boolean);
   for (let i = 0; i < paths.length; i += 100) {
     const { error } = await s.storage.from("photos").remove(paths.slice(i, i + 100));
-    if (error) throw new Error("Les photos n'ont pas pu être supprimées. Réessayez.");
+    if (error) throw new Error(t("Les photos n'ont pas pu être supprimées. Réessayez."));
   }
   const { error } = await s.rpc("delete_my_account");
   if (error) {
-    if (missing(error)) throw new Error("La suppression n'est pas encore activée sur le serveur.");
-    throw new Error("Le compte n'a pas pu être supprimé. Réessayez, ou écrivez-nous.");
+    if (missing(error)) throw new Error(t("La suppression n'est pas encore activée sur le serveur."));
+    throw new Error(t("Le compte n'a pas pu être supprimé. Réessayez, ou écrivez-nous."));
   }
   discardPending();
   try {

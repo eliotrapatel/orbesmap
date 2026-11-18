@@ -7,6 +7,7 @@ import { toast, updateDef } from "../lib/store";
 import { formatMinutes } from "../lib/geo";
 import { parseTime } from "../lib/time";
 import { Modal } from "./ui";
+import { t } from "../lib/i18n";
 
 const LENGTHS = [30, 45, 60, 90, 120];
 
@@ -21,13 +22,13 @@ export function placeAt(place: Place, day: string, slot: string, trip: Trip) {
   const ok = same && place.orig ? updateDef(place.id, { day: place.orig.day, slot: place.orig.time }) : updateDef(place.id, { day, slot });
   if (!ok) return;
   const d = trip.days.find((x) => x.key === day);
-  toast(`« ${place.name} » : ${d?.dates?.[0] ? d.short : d?.title || ""}${slot ? `, ${slot}` : ", sans heure"}`);
+  toast(t("« {name} » : {when}", { name: place.name, when: `${d?.dates?.[0] ? d.short : d?.title || ""}${slot ? `, ${slot}` : `, ${t("sans heure")}`}` }));
 }
 
 export function fitLine(f: Extract<DayFit, { ok: true }>): string {
-  if (f.tight) return `journée pleine : ${f.clash ? `empiète de ${f.tight} min sur ${f.clash}` : "trajets très serrés"}${f.guessed ? " · horaires à vérifier" : ""}`;
-  const where = f.after && f.before ? `entre ${f.after} et ${f.before}` : f.after ? `après ${f.after}` : f.before ? `avant ${f.before}` : "journée libre";
-  return `${where} · ${f.extra <= 0 ? "sur le chemin" : `+${formatMinutes(f.extra)} de trajet`}${f.guessed ? " · horaires à vérifier" : ""}`;
+  if (f.tight) return `${t("journée pleine : {why}", { why: f.clash ? t("empiète de {n} min sur {name}", { n: f.tight, name: f.clash }) : t("trajets très serrés") })}${f.guessed ? ` · ${t("horaires à vérifier")}` : ""}`;
+  const where = f.after && f.before ? t("entre {a} et {b}", { a: f.after, b: f.before }) : f.after ? t("après {a}", { a: f.after }) : f.before ? t("avant {b}", { b: f.before }) : t("journée libre");
+  return `${where} · ${f.extra <= 0 ? t("sur le chemin") : t("+{time} de trajet", { time: formatMinutes(f.extra) })}${f.guessed ? ` · ${t("horaires à vérifier")}` : ""}`;
 }
 
 export default function Planner({ trip, place, states, onClose }: { trip: Trip; place: Place; states: Record<string, PlaceState>; onClose: () => void }) {
@@ -54,9 +55,9 @@ export default function Planner({ trip, place, states, onClose }: { trip: Trip; 
   };
 
   return (
-    <Modal title={`Placer « ${place.name} »`} intro="Pour chaque jour, le meilleur créneau libre selon ce qui est déjà prévu, les trajets et les horaires du lieu." onClose={onClose} className="modal-plan">
-      <div className="pl-len" role="group" aria-label="Durée sur place">
-        <span className="label">Sur place</span>
+    <Modal title={t("Placer « {name} »", { name: place.name })} intro={t("Pour chaque jour, le meilleur créneau libre selon ce qui est déjà prévu, les trajets et les horaires du lieu.")} onClose={onClose} className="modal-plan">
+      <div className="pl-len" role="group" aria-label={t("Durée sur place")}>
+        <span className="label">{t("Sur place")}</span>
         {lengths.map((m) => (
           <button key={m} type="button" className={"fchip" + (dur === m ? " on" : "")} aria-pressed={dur === m} onClick={() => setDur(m)}>
             {formatMinutes(m)}
@@ -73,8 +74,8 @@ export default function Planner({ trip, place, states, onClose }: { trip: Trip; 
               <span className="pl-main">
                 <b>
                   {slotText(f.start, f.end)}
-                  {best && best.day.key === f.day.key && <em className="pl-tag">{f.tight ? "Le moins serré" : "Conseillé"}</em>}
-                  {current && <em className="pl-tag soft">Jour actuel</em>}
+                  {best && best.day.key === f.day.key && <em className="pl-tag">{f.tight ? t("Le moins serré") : t("Conseillé")}</em>}
+                  {current && <em className="pl-tag soft">{t("Jour actuel")}</em>}
                 </b>
                 <small>{fitLine(f)}</small>
               </span>
@@ -89,25 +90,25 @@ export default function Planner({ trip, place, states, onClose }: { trip: Trip; 
       </div>
 
       <div className="pl-sec">
-        <span className="label">Autre heure</span>
+        <span className="label">{t("Autre heure")}</span>
         <div className="pl-man">
-          <select className="input" value={manDay} onChange={(e) => setManDay(e.target.value)} aria-label="Jour">
+          <select className="input" value={manDay} onChange={(e) => setManDay(e.target.value)} aria-label={t("Jour")}>
             {scheduled.map((d) => <option key={d.key} value={d.key}>{dayLabel(d)}</option>)}
           </select>
-          <input className="input" type="time" step={300} value={manTime} onChange={(e) => setManTime(e.target.value)} aria-label="Heure d'arrivée" />
+          <input className="input" type="time" step={300} value={manTime} onChange={(e) => setManTime(e.target.value)} aria-label={t("Heure d'arrivée")} />
         </div>
-        {clash.map((b) => <p key={b.place.id} className="hb-issue warn">! Chevauche {b.place.name} ({slotText(b.start, b.end)})</p>)}
+        {clash.map((b) => <p key={b.place.id} className="hb-issue warn">! {t("Chevauche {name} ({slot})", { name: b.place.name, slot: slotText(b.start, b.end) })}</p>)}
         {issues.map((x, i) => <p key={i} className={"hb-issue " + x.tone}>{x.tone === "bad" ? "⚠ " : "! "}{x.text}</p>)}
         <button type="button" className="btn-sm on" disabled={manStart == null || !manDay} onClick={() => manStart != null && done(manDay, slotText(manStart, manStart + dur))}>
-          Placer à cette heure
+          {t("Placer à cette heure")}
         </button>
       </div>
 
       <div className="pl-sec">
-        <span className="label">Sans heure</span>
+        <span className="label">{t("Sans heure")}</span>
         <div className="pl-loose">
           {scheduled.some((d) => d.key === place.day) && (
-            <button type="button" className="btn-sm" onClick={() => done(place.day, "")}>Garder {trip.days.find((d) => d.key === place.day)?.short}, sans heure</button>
+            <button type="button" className="btn-sm" onClick={() => done(place.day, "")}>{t("Garder {day}, sans heure", { day: trip.days.find((d) => d.key === place.day)?.short })}</button>
           )}
           {loose.map((d) => (
             <button key={d.key} type="button" className={"btn-sm" + (place.day === d.key ? " on" : "")} onClick={() => done(d.key, "")}>{d.title}</button>
@@ -117,15 +118,15 @@ export default function Planner({ trip, place, states, onClose }: { trip: Trip; 
 
       {place.orig && (
         <div className="pl-sec">
-          <button type="button" className="link-btn" onClick={() => { updateDef(place.id, { day: place.orig!.day, slot: place.orig!.time }); toast(`« ${place.name} » revient au programme d'origine`); onClose(); }}>
-            Revenir au programme d'origine : {trip.days.find((d) => d.key === place.orig!.day)?.short}{place.orig.time ? `, ${place.orig.time}` : ""}
+          <button type="button" className="link-btn" onClick={() => { updateDef(place.id, { day: place.orig!.day, slot: place.orig!.time }); toast(t("« {name} » revient au programme d'origine", { name: place.name })); onClose(); }}>
+            {t("Revenir au programme d'origine : {day}", { day: `${trip.days.find((d) => d.key === place.orig!.day)?.short ?? ""}${place.orig.time ? `, ${place.orig.time}` : ""}` })}
           </button>
         </div>
       )}
-      {appt && <p className="em-small">Un rendez-vous est noté sur la fiche ({appt}) : c'est lui qui fixe l'heure dans l'agenda.</p>}
+      {appt && <p className="em-small">{t("Un rendez-vous est noté sur la fiche ({appt}) : c'est lui qui fixe l'heure dans l'agenda.", { appt })}</p>}
 
       <div className="btn-row" style={{ gridTemplateColumns: "1fr" }}>
-        <button type="button" className="btn" onClick={onClose}>Fermer</button>
+        <button type="button" className="btn" onClick={onClose}>{t("Fermer")}</button>
       </div>
     </Modal>
   );

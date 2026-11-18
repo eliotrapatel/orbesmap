@@ -7,6 +7,7 @@ import type { Pin } from "../lib/model";
 import { getState, useStore } from "../lib/store";
 import { useWeather, type Wx } from "../lib/weather";
 import { IPin } from "./Icons";
+import { t } from "../lib/i18n";
 
 type Ref = { kind: "place" | "pin"; id: string };
 type NewPlace = { name: string; query: string };
@@ -26,14 +27,14 @@ const subs = new Set<() => void>();
 const cache = new Map<string, Turn[]>();
 function read(tripId: string): Turn[] {
   if (!cache.has(tripId)) {
-    let t: Turn[] = [];
+    let saved: Turn[] = [];
     try {
-      t = JSON.parse(localStorage.getItem(`${KEY}.${tripId}`) || "[]");
+      saved = JSON.parse(localStorage.getItem(`${KEY}.${tripId}`) || "[]");
     } catch {
       /* ignore */
     }
     // an answer still "pending" from an earlier session never came back
-    cache.set(tripId, t.map((x) => (x.pending && Date.now() - x.at > 120_000 ? { ...x, pending: false, err: true, a: "Réponse perdue (app fermée pendant l'attente). Réessayez." } : x)));
+    cache.set(tripId, saved.map((x) => (x.pending && Date.now() - x.at > 120_000 ? { ...x, pending: false, err: true, a: t("Réponse perdue (app fermée pendant l'attente). Réessayez.") } : x)));
   }
   return cache.get(tripId)!;
 }
@@ -78,9 +79,9 @@ async function send(trip: Trip, question: string, wx: Wx | null) {
     const history = turns.filter((t) => !t.err && !t.pending && Date.now() - t.at < 6 * 3600e3).slice(-6).map((t) => ({ q: t.q, a: t.a, at: fmt(t.at) }));
     const r = await ai<{ answer: string; refs: Ref[]; newPlaces?: NewPlace[] }>("ask", { question: text, context, live, history }, 100_000);
     const newPlaces = (r.newPlaces || []).filter((p) => p && (p.name || p.query)).slice(0, 3);
-    replace({ q: text, a: r.answer || "Pas de réponse.", refs: r.refs || [], at, newPlaces });
+    replace({ q: text, a: r.answer || t("Pas de réponse."), refs: r.refs || [], at, newPlaces });
   } catch (e) {
-    replace({ q: text, a: e instanceof AiError ? e.message : "La question n'a pas pu être envoyée. Réessayez.", refs: [], at, err: true });
+    replace({ q: text, a: e instanceof AiError ? e.message : t("La question n'a pas pu être envoyée. Réessayez."), refs: [], at, err: true });
   }
 }
 
@@ -152,36 +153,36 @@ export default function Ask({ trip, onOpenPlace, onOpenPin, onAddPlace }: { trip
   return (
     <div className="ask">
       <p className="ask-intro">
-        Posez une question sur votre carnet : programme, horaires, réservations, vos notes, fournisseurs, check-list. L'assistant lit tout mais <b>ne modifie rien</b>.
+        {t("Posez une question sur votre carnet : programme, horaires, réservations, vos notes, fournisseurs, check-list. L'assistant lit tout mais")} <b>{t("ne modifie rien")}</b>.
       </p>
       {!turns.length && (
         <div className="ask-sugg">
           {SUGGESTIONS.map((s) => (
-            <button key={s} className="fchip" onClick={() => ask(s)} disabled={busy}>{s}</button>
+            <button key={s} className="fchip" onClick={() => ask(s)} disabled={busy}>{t(s)}</button>
           ))}
         </div>
       )}
       <div className="ask-thread">
-        {turns.map((t) => {
-          const refs = resolve(t.refs);
+        {turns.map((turn) => {
+          const refs = resolve(turn.refs);
           return (
-            <div key={t.at} className="ask-turn">
-              <div className="ask-q">{t.q}</div>
-              {t.pending ? (
-                <div className="tr-loading"><span className="spin" /> Lecture du carnet… (vous pouvez fermer ce panneau)</div>
+            <div key={turn.at} className="ask-turn">
+              <div className="ask-q">{t(turn.q)}</div>
+              {turn.pending ? (
+                <div className="tr-loading"><span className="spin" /> {t("Lecture du carnet… (vous pouvez fermer ce panneau)")}</div>
               ) : (
-                <div className={"ask-a" + (t.err ? " err" : "")}>
-                  <Answer text={t.a} />
+                <div className={"ask-a" + (turn.err ? " err" : "")}>
+                  <Answer text={turn.a} />
                   {refs.length > 0 && <div className="ask-refs">{refs}</div>}
-                  {onAddPlace && !!t.newPlaces?.length && (
+                  {onAddPlace && !!turn.newPlaces?.length && (
                     <div className="ask-refs ask-new">
-                      {t.newPlaces.map((n) => (
-                        <button key={n.name + n.query} className="btn-sm" onClick={() => onAddPlace(n.query || n.name)}>+ Ajouter {n.name || n.query}</button>
+                      {turn.newPlaces.map((n) => (
+                        <button key={n.name + n.query} className="btn-sm" onClick={() => onAddPlace(n.query || n.name)}>{t("+ Ajouter {name}", { name: n.name || n.query })}</button>
                       ))}
                     </div>
                   )}
-                  {t.err && (
-                    <button className="btn-sm" onClick={() => { write(trip.id, read(trip.id).filter((x) => x.at !== t.at)); ask(t.q); }}>Réessayer</button>
+                  {turn.err && (
+                    <button className="btn-sm" onClick={() => { write(trip.id, read(trip.id).filter((x) => x.at !== turn.at)); ask(turn.q); }}>{t("Réessayer")}</button>
                   )}
                 </div>
               )}
@@ -190,13 +191,13 @@ export default function Ask({ trip, onOpenPlace, onOpenPin, onAddPlace }: { trip
         })}
       </div>
       <form className="ask-form" onSubmit={(e) => { e.preventDefault(); ask(); }}>
-        <input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ex. « Qu'avons-nous noté sur le Bund ? »" enterKeyHint="send" aria-label="Votre question" />
-        <button className="btn primary" disabled={busy || !q.trim()}>Demander</button>
+        <input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Ex. « Qu'avons-nous noté sur le Bund ? »")} enterKeyHint="send" aria-label={t("Votre question")} />
+        <button className="btn primary" disabled={busy || !q.trim()}>{t("Demander")}</button>
       </form>
       {turns.length > 0 && !busy && (
-        <button className="btn-sm ask-clear" onClick={() => write(trip.id, [])}>Effacer la discussion</button>
+        <button className="btn-sm ask-clear" onClick={() => write(trip.id, [])}>{t("Effacer la discussion")}</button>
       )}
-      <p className="em-small">Chaque question envoie le carnet complet (notes, contacts et assurance compris) au service IA, en lecture seule. Environ 0,1 à 0,4 centime par question. Il faut du réseau (eSIM ou VPN en Chine).</p>
+      <p className="em-small">{t("Chaque question envoie le carnet complet (notes, contacts et assurance compris) au service IA, en lecture seule. Environ 0,1 à 0,4 centime par question. Il faut du réseau (eSIM ou VPN en Chine).")}</p>
     </div>
   );
 }

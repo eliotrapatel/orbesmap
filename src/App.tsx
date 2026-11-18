@@ -32,6 +32,7 @@ import { ensureCompass, getLoc, onLocateError, resumeLocate, setFollow, startLoc
 import type { Mode } from "./lib/route";
 import { NavCard, PointCard, useNavigation, type NavState, type NavTarget } from "./components/Nav";
 import { track } from "./lib/track";
+import { t } from "./lib/i18n";
 
 type Sel = { kind: "place" | "pin"; id: string } | null;
 type Snap = "peek" | "half" | "full";
@@ -258,7 +259,7 @@ export default function App() {
       setRoute({ day: d, order, best: true });
       fly({ bounds: boundsOf([...order, trip.hotel]) });
       if (!desktop) setSnap("peek");
-      toast(`Meilleur ordre : ${order.length} arrêts, ${Math.round(total)} km depuis l'hôtel (numéros sur la carte)`);
+      toast(t("Meilleur ordre : {n} arrêts, {km} km depuis l'hôtel (numéros sur la carte)", { n: order.length, km: Math.round(total) }));
     },
     [trip, fly, desktop],
   );
@@ -272,16 +273,16 @@ export default function App() {
     const st = getLoc();
     ensureCompass(true);
     if (st.status === "off" || st.status === "denied" || st.status === "unavailable") {
-      toast("Recherche de votre position…");
+      toast(t("Recherche de votre position…"));
       startLocate(true);
     } else if (st.status === "searching") {
       setFollow(true);
-      toast("Recherche de votre position…");
+      toast(t("Recherche de votre position…"));
     } else if (!st.follow || Date.now() - st.followSince < 1500) setFollow(true);
     else if (nav) setFollow(false);
     else {
       stopLocate();
-      toast("Localisation arrêtée");
+      toast(t("Localisation arrêtée"));
     }
   }, [nav]);
   // "Autour de moi" goes away with the location
@@ -319,7 +320,7 @@ export default function App() {
   const saveFound = useCallback(
     (f: Found, ll: LL, quiet = false) => {
       const id = createPlace({
-        name: f.name || f.nameCn || "Lieu", lng: ll[0], lat: ll[1], nameCn: f.nameCn, address: f.address, addressCn: f.addressCn, desc: f.desc,
+        name: f.name || f.nameCn || t("Lieu"), lng: ll[0], lat: ll[1], nameCn: f.nameCn, address: f.address, addressCn: f.addressCn, desc: f.desc,
         why: f.why, hoursText: f.hours, price: f.price, source: f.source, day: f.day, slot: "", type: f.type,
       });
       if (!id) return null;
@@ -331,7 +332,7 @@ export default function App() {
         setSel({ kind: "place", id });
         setTool(null);
         fly({ center: ll, zoom: 15.5 });
-        toast(`« ${f.name || f.nameCn} » ajouté sur la carte`);
+        toast(t("« {name} » ajouté sur la carte", { name: f.name || f.nameCn }));
       }
       return pin;
     },
@@ -361,7 +362,7 @@ export default function App() {
       }
       const pins = ok.map((f) => saveFound(f, f.ll!, true)).filter((x): x is NonNullable<typeof x> => !!x);
       if (pins.length) {
-        toast(`${pins.length} lieu${pins.length > 1 ? "x" : ""} ajouté${pins.length > 1 ? "s" : ""} sur la carte${manual.length ? ` · ${manual.length} à placer à la main` : ""}`);
+        toast(`${pins.length > 1 ? t("{n} lieux ajoutés sur la carte", { n: pins.length }) : t("{n} lieu ajouté sur la carte", { n: pins.length })}${manual.length ? ` · ${t("{n} à placer à la main", { n: manual.length })}` : ""}`);
         if (!manual.length) {
           setTool(null);
           setSel({ kind: "place", id: pins[pins.length - 1].id });
@@ -447,7 +448,7 @@ export default function App() {
           if (landing) return;
           if (moveFor) {
             updateDef(moveFor.id, { lng: ll[0], lat: ll[1] });
-            toast(`Point de « ${moveFor.name} » déplacé`);
+            toast(t("Point de « {name} » déplacé", { name: moveFor.name }));
             setSel({ kind: "place", id: moveFor.id });
             setMoveFor(null);
             return;
@@ -496,7 +497,7 @@ export default function App() {
           ) : point ? (
             <PointCard
               point={{ lng: point[0], lat: point[1] }}
-              onGo={(m) => startNav({ lng: point[0], lat: point[1], name: "Point choisi" }, m)}
+              onGo={(m) => startNav({ lng: point[0], lat: point[1], name: t("Point choisi") }, m)}
               onPin={() => { setPendingPin(point); setPoint(null); }}
               onClose={() => setPoint(null)}
             />
@@ -504,8 +505,8 @@ export default function App() {
             <DayBar trip={trip} day={day} onDay={showDay} />
           )}
 
-          <aside ref={sideRef} className="side glass" style={desktop ? undefined : ({ ["--sheet-h" as string]: `${snapPx[snap]}px` } as React.CSSProperties)} aria-label="Lieux du voyage">
-            <div className="sheet-grip" {...side.handlers} role="button" aria-label="Agrandir ou réduire la liste" />
+          <aside ref={sideRef} className="side glass" style={desktop ? undefined : ({ ["--sheet-h" as string]: `${snapPx[snap]}px` } as React.CSSProperties)} aria-label={t("Lieux du voyage")}>
+            <div className="sheet-grip" {...side.handlers} role="button" aria-label={t("Agrandir ou réduire la liste")} />
             <div className="side-head" {...side.handlers}>
               <span className="label">{trip.subtitle}</span>
               <div className="side-title">{trip.title}</div>
@@ -545,7 +546,7 @@ export default function App() {
           )}
 
           {toolDef && (
-            <Drawer key={toolDef.key} kicker={trip.code} title={toolDef.key === "converter" ? "Convertisseur" : toolDef.label} wide={toolDef.wide} onClose={() => setTool(null)} sheetH={toolSheet}>
+            <Drawer key={toolDef.key} kicker={trip.code} title={toolDef.key === "converter" ? t("Convertisseur") : t(toolDef.label)} wide={toolDef.wide} onClose={() => setTool(null)} sheetH={toolSheet}>
               {tool === "overview" && (
                 <Overview
                   trip={trip}
@@ -607,22 +608,22 @@ export default function App() {
                 className={"ctl" + (locStatus === "on" || locStatus === "searching" ? (follow ? " on" : " half") : "")}
                 onClick={toggleLocate}
                 aria-pressed={locStatus === "on"}
-                aria-label={locStatus === "off" ? "Afficher ma position" : follow ? (nav ? "Ne plus me suivre" : "Arrêter la localisation") : "Me suivre"}
-                title={locStatus === "off" ? "Ma position" : follow ? (nav ? "Ne plus me suivre" : "Arrêter la localisation") : "Me suivre"}
+                aria-label={locStatus === "off" ? t("Afficher ma position") : follow ? (nav ? t("Ne plus me suivre") : t("Arrêter la localisation")) : t("Me suivre")}
+                title={locStatus === "off" ? t("Ma position") : follow ? (nav ? t("Ne plus me suivre") : t("Arrêter la localisation")) : t("Me suivre")}
               >
                 <ILocate />
               </button>
               {canEdit && (
                 <>
-                  <button className={"ctl" + (pinMode ? " on" : "")} onClick={() => { if (!pinMode && needPro()) return; setPlaceQueue([]); setPinMode((v) => !v); }} aria-pressed={pinMode} aria-label="Ajouter un lieu sur la carte" title="Ajouter un lieu">
+                  <button className={"ctl" + (pinMode ? " on" : "")} onClick={() => { if (!pinMode && needPro()) return; setPlaceQueue([]); setPinMode((v) => !v); }} aria-pressed={pinMode} aria-label={t("Ajouter un lieu sur la carte")} title={t("Ajouter un lieu")}>
                     <IPinPlus />
                   </button>
-                  <button className="ctl" onClick={() => !needPro() && setAddLink(true)} aria-label="Ajouter un lieu : lien, nom ou description" title="Ajouter un lieu (lien, nom ou description)">
+                  <button className="ctl" onClick={() => !needPro() && setAddLink(true)} aria-label={t("Ajouter un lieu : lien, nom ou description")} title={t("Ajouter un lieu (lien, nom ou description)")}>
                     <ILink />
                   </button>
                 </>
               )}
-              <button className={"ctl" + (threeD ? " on" : "")} onClick={() => setThreeD((v) => !v)} aria-pressed={threeD} aria-label="Bâtiments en 3D" title="Vue 3D">
+              <button className={"ctl" + (threeD ? " on" : "")} onClick={() => setThreeD((v) => !v)} aria-pressed={threeD} aria-label={t("Bâtiments en 3D")} title={t("Vue 3D")}>
                 <ICube />
               </button>
             </div>
@@ -631,23 +632,23 @@ export default function App() {
           {moveFor && <EscGuard on={() => { setSel({ kind: "place", id: moveFor.id }); setMoveFor(null); }} />}
           {moveFor && (
             <div className="banner glass" role="status">
-              Touchez la carte au nouvel endroit de « {moveFor.name} »
-              <button onClick={() => { setSel({ kind: "place", id: moveFor.id }); setMoveFor(null); }}>Annuler</button>
+              {t("Touchez la carte au nouvel endroit de « {name} »", { name: moveFor.name })}
+              <button onClick={() => { setSel({ kind: "place", id: moveFor.id }); setMoveFor(null); }}>{t("Annuler")}</button>
             </div>
           )}
           {pinMode && <EscGuard on={() => { setPinMode(false); setPlaceQueue([]); }} />}
           {pinMode && (
             <div className="banner glass" role="status">
               {pendingFound
-                ? `Touchez la carte à l'endroit de « ${pendingFound.name || pendingFound.nameCn} »${queueTotal > 1 ? ` (${queueTotal - placeQueue.length + 1}/${queueTotal})` : ""}`
-                : "Touchez la carte pour placer le lieu"}
-              {placeQueue.length > 1 && <button onClick={() => { const rest = placeQueue.slice(1); setPlaceQueue(rest); if (rest[0]?.hint) fly({ center: rest[0].hint, zoom: 15 }); }}>Passer</button>}
-              <button onClick={() => { setPinMode(false); setPlaceQueue([]); }}>{placeQueue.length > 1 ? "Arrêter" : "Annuler"}</button>
+                ? `${t("Touchez la carte à l'endroit de « {name} »", { name: pendingFound.name || pendingFound.nameCn })}${queueTotal > 1 ? ` (${queueTotal - placeQueue.length + 1}/${queueTotal})` : ""}`
+                : t("Touchez la carte pour placer le lieu")}
+              {placeQueue.length > 1 && <button onClick={() => { const rest = placeQueue.slice(1); setPlaceQueue(rest); if (rest[0]?.hint) fly({ center: rest[0].hint, zoom: 15 }); }}>{t("Passer")}</button>}
+              <button onClick={() => { setPinMode(false); setPlaceQueue([]); }}>{placeQueue.length > 1 ? t("Arrêter") : t("Annuler")}</button>
             </div>
           )}
           {basemapFailed && !pinMode && (
             <div className="banner glass" role="status" style={{ pointerEvents: "none" }}>
-              Fond de carte lent ou indisponible. Les lieux restent affichés.
+              {t("Fond de carte lent ou indisponible. Les lieux restent affichés.")}
             </div>
           )}
         </>
@@ -701,7 +702,7 @@ export default function App() {
               // a place removed from the programme: put back, then opened
               const r = trip.removed?.find((x) => x.id === id);
               if (r && canEdit && updateDef(r.id, { removed: false })) {
-                toast(`« ${r.name} » remis au programme`);
+                toast(t("« {name} » remis au programme", { name: r.name }));
                 openPlace(r);
               }
             }
@@ -719,7 +720,7 @@ export default function App() {
             if (note) updatePlace(id, { [noteKey(currentAuthor()) || "note"]: note });
             setPendingPin(null);
             setSel({ kind: "place", id });
-            toast(`« ${name} » ajouté`);
+            toast(t("« {name} » ajouté", { name }));
           }}
         />
       )}

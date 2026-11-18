@@ -3,20 +3,22 @@ import { requestPro, useStore } from "../../lib/store";
 import { deleteMyAccount, exportMyData, proDate } from "../../lib/pro";
 import { openAdmin } from "./nav";
 import { legalHref } from "./Legal";
+import { t, setLang, useLang } from "../../lib/i18n";
 
 /** What the account's Pro status reads as, in one line */
 export function useProLine(): string | null {
   const plan = useStore((s) => s.plan);
   if (!plan) return null;
-  if (!plan.pro) return plan.prepLeft > 0 ? "Gratuit · 1 voyage offert ce mois-ci" : "Gratuit · voyage du mois utilisé";
-  return plan.granted ? (plan.until ? `Pro jusqu'au ${proDate(plan.until)}` : "Pro à vie") : "Pro inclus";
+  if (!plan.pro) return plan.prepLeft > 0 ? t("Gratuit · 1 voyage offert ce mois-ci") : t("Gratuit · voyage du mois utilisé");
+  return plan.granted ? (plan.until ? t("Pro jusqu'au {date}", { date: proDate(plan.until) }) : t("Pro à vie")) : t("Pro inclus");
 }
 
 /** Asks twice (typed word) before deleting the account; returns an error message, or nothing */
 export async function confirmAndDelete(): Promise<string | null> {
-  if (!confirm("Supprimer votre compte ?\nLes voyages que vous avez créés seront supprimés, y compris pour les personnes invitées. Les voyages partagés avec vous restent à leurs propriétaires.\nVous pouvez d'abord exporter vos données.")) return null;
-  const typed = prompt("Pour confirmer, écrivez SUPPRIMER");
-  if ((typed || "").trim().toUpperCase() !== "SUPPRIMER") return typed == null ? null : "Suppression annulée : le mot ne correspond pas.";
+  if (!confirm(t("Supprimer votre compte ?\nLes voyages que vous avez créés seront supprimés, y compris pour les personnes invitées. Les voyages partagés avec vous restent à leurs propriétaires.\nVous pouvez d'abord exporter vos données."))) return null;
+  const word = t("SUPPRIMER");
+  const typed = prompt(t("Pour confirmer, écrivez {word}", { word }));
+  if ((typed || "").trim().toUpperCase() !== word) return typed == null ? null : t("Suppression annulée : le mot ne correspond pas.");
   try {
     await deleteMyAccount();
     return null;
@@ -29,6 +31,7 @@ export async function confirmAndDelete(): Promise<string | null> {
 export default function AccountActions({ variant = "v3" }: { variant?: "v3" | "app" }) {
   const plan = useStore((s) => s.plan);
   const line = useProLine();
+  const lang = useLang();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const btn = variant === "app" ? "btn block" : "v3-btn ghost";
@@ -44,8 +47,8 @@ export default function AccountActions({ variant = "v3" }: { variant?: "v3" | "a
           <span aria-hidden="true">›</span>
         </button>
       )}
-      {plan?.admin && <button type="button" className={btn} onClick={() => openAdmin(true)}>Administration</button>}
-      <button type="button" className={btn} onClick={() => exportMyData()}>Exporter mes données</button>
+      {plan?.admin && <button type="button" className={btn} onClick={() => openAdmin(true)}>{t("Administration")}</button>}
+      <button type="button" className={btn} onClick={() => exportMyData()}>{t("Exporter mes données")}</button>
       <button
         type="button"
         className={variant === "app" ? "btn danger block" : "v3-link acct-delete"}
@@ -56,10 +59,15 @@ export default function AccountActions({ variant = "v3" }: { variant?: "v3" | "a
           setBusy(false);
         }}
       >
-        {busy ? "Suppression…" : "Supprimer mon compte"}
+        {busy ? t("Suppression…") : t("Supprimer mon compte")}
       </button>
       {err && <p className="v3-err" role="alert">{err}</p>}
-      <p className="v3-fine acct-legal"><a href={legalHref("cgu")}>Conditions</a> · <a href={legalHref("confidentialite")}>Confidentialité</a> · <a href="mailto:hello@joinentity.com">Contact</a></p>
+      <div className="v3-seg acct-lang" role="radiogroup" aria-label={t("Langue")}>
+        {(["fr", "en"] as const).map((l) => (
+          <button key={l} type="button" role="radio" aria-checked={lang === l} className={lang === l ? "on" : ""} onClick={() => setLang(l)}>{l === "fr" ? "Français" : "English"}</button>
+        ))}
+      </div>
+      <p className="v3-fine acct-legal"><a href={legalHref("cgu")}>{t("Conditions")}</a> · <a href={legalHref("confidentialite")}>{t("Confidentialité")}</a> · <a href="mailto:hello@joinentity.com">{t("Contact")}</a></p>
     </div>
   );
 }

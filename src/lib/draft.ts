@@ -12,6 +12,7 @@ import { km, toWgs } from "./geo";
 import { geocode } from "./placeSearch";
 import { slotText } from "./slots";
 import { createPlace, currentTrip, getState, updateDef, updateTrip } from "./store";
+import { t } from "./i18n";
 
 /** What the creation wizard collected, kept in the trip's record */
 export type Draft = {
@@ -139,7 +140,7 @@ async function position(p: { name: string; nameCn?: string; address?: string; ad
 }
 
 /** A day's limits that stop the whole run (the next steps would fail the same way and burn requests) */
-const stopsAll = (e: unknown) => e instanceof AiError && /Limite du jour|Trop de demandes|réseau|injoignable|Connectez|Session expirée|ne répond pas/i.test(e.message);
+const stopsAll = (e: unknown) => e instanceof AiError && /Limite du jour|Trop de demandes|réseau|injoignable|Connectez|Session expirée|ne répond pas|Daily limit|Too many requests|network|can't be reached|Sign in|Session expired|isn't responding/i.test(e.message);
 
 let ctl: AbortController | null = null;
 /** Stops the preparation (the screen closed, or another trip opened); it resumes where it stopped */
@@ -157,9 +158,9 @@ export async function prepare(tripId: string): Promise<void> {
   // everything written must go into this trip, which must stay the open one
   const mine = () => !signal.aborted && currentTrip().id === tripId && getState().tripId === tripId;
   const beat = () => saveDraft(tripId, { lease: { by: DEVICE, at: Date.now() } });
-  setRun({ tripId, busy: true, step: "Trame du voyage", err: null, found: 0, placed: 0 });
+  setRun({ tripId, busy: true, step: t("Trame du voyage"), err: null, found: 0, placed: 0 });
   try {
-    if (!mine()) throw new AiError("Ouvrez ce voyage pour continuer sa préparation.");
+    if (!mine()) throw new AiError(t("Ouvrez ce voyage pour continuer sa préparation."));
     beat();
     let trip = currentTrip();
     const days = trip.days.filter((x) => x.scheduled && x.dates?.length);
@@ -180,7 +181,7 @@ export async function prepare(tripId: string): Promise<void> {
     // 2. the essentials of the destination (language, checklist, phrases, emergency, practical)
     d = draftOf(tripId)!;
     if (!d.essentials) {
-      setRun({ step: "L'essentiel pratique" });
+      setRun({ step: t("L'essentiel pratique") });
       beat();
       const fallback = langForCountry(trip.country);
       try {
@@ -264,10 +265,10 @@ export async function prepare(tripId: string): Promise<void> {
       saveDraft(tripId, { days: { ...(draftOf(tripId)?.days || {}), [date]: "done" } });
     }
     const left = days.filter((x) => draftOf(tripId)?.days?.[x.dates![0]] !== "done");
-    saveDraft(tripId, { status: left.length ? "preparing" : "review", error: left.length ? `${left.length} jour${left.length > 1 ? "s" : ""} n'${left.length > 1 ? "ont" : "a"} pas pu être préparé${left.length > 1 ? "s" : ""}.` : undefined, lease: undefined });
+    saveDraft(tripId, { status: left.length ? "preparing" : "review", error: left.length ? (left.length > 1 ? t("{n} jours n'ont pas pu être préparés.", { n: left.length }) : t("{n} jour n'a pas pu être préparé.", { n: left.length })) : undefined, lease: undefined });
     setRun({ busy: false, step: "" });
   } catch (e) {
-    const msg = e instanceof AiError ? e.message : "La préparation s'est arrêtée. Elle reprendra à la prochaine ouverture.";
+    const msg = e instanceof AiError ? e.message : t("La préparation s'est arrêtée. Elle reprendra à la prochaine ouverture.");
     if (!signal.aborted) saveDraft(tripId, { error: msg, lease: undefined });
     setRun({ busy: false, step: "", err: signal.aborted ? null : msg });
   } finally {
@@ -314,7 +315,7 @@ export async function adjustProgramme(request: string): Promise<string> {
     .map((x) => `${x.dates![0]} (${x.short}${x.theme ? ` · ${x.theme}` : ""}) : ${trip.places.filter((p) => p.day === x.key).map((p) => `${p.time ? `${p.time} ` : ""}${p.name}`).join(" ; ") || "rien"}`)
     .join("\n");
   const r = await ai<AdjustResult>("adjust", { programme, request }, 100_000);
-  if (currentTrip().id !== trip.id) return "Le voyage a changé entre-temps : rien n'a été modifié.";
+  if (currentTrip().id !== trip.id) return t("Le voyage a changé entre-temps : rien n'a été modifié.");
   const keyOf = (date: string) => days.find((x) => x.dates![0] === date)?.key;
   // a place named exactly (else the only one that starts with that name) on the given day; never a guess
   const find = (date: string, name: string) => {
@@ -368,5 +369,5 @@ export async function adjustProgramme(request: string): Promise<string> {
     }
     applied++;
   }
-  return applied ? r.message || "Programme ajusté." : "Rien n'a changé : précisez la demande (jour, lieu, heure).";
+  return applied ? r.message || t("Programme ajusté.") : t("Rien n'a changé : précisez la demande (jour, lieu, heure).");
 }

@@ -2,6 +2,7 @@ import { track } from "../../lib/track";
 import { useState } from "react";
 import { updateProfile, useStore } from "../../lib/store";
 import Shell, { Steps } from "./Shell";
+import { t, getLang, setLang as setAppLang, type Lang } from "../../lib/i18n";
 
 export const TRAVEL = [
   { key: "solo", label: "Solo", dots: 1 },
@@ -34,7 +35,7 @@ export default function Onboarding() {
   const [interests, setInterests] = useState<string[]>(() => (profile.interests as string[]) || []);
   const [pace, setPace] = useState<string>(() => (profile.pace as string) || "balanced");
   const [budget, setBudget] = useState<number>(() => Number(profile.budget) || 3);
-  const [lang, setLang] = useState<string>(() => (profile.lang as string) || "fr");
+  const [lang, setLang] = useState<string>(() => (profile.lang as string) || getLang());
   const first = name.trim() || email.split("@")[0];
 
   const finish = () => {
@@ -44,7 +45,7 @@ export default function Onboarding() {
   const back = step > 1 ? () => setStep(step - 1) : undefined;
   const top = (
     <div className="v3-bar">
-      {back ? <button className="v3-tool" onClick={back} aria-label="Retour">‹</button> : <span className="v3-tool ghost" />}
+      {back ? <button className="v3-tool" onClick={back} aria-label={t("Retour")}>‹</button> : <span className="v3-tool ghost" />}
       <Steps n={step} of={3} />
     </div>
   );
@@ -52,79 +53,79 @@ export default function Onboarding() {
   if (step === 1)
     return (
       <Shell ring={false} top={top}>
-        <p className="v3-lbl" style={{ marginTop: 22 }}>Faisons connaissance</p>
-        <h1 className="v3-d v3-h2">Comment vous appelez-vous ?</h1>
-        <input className="v3-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Votre prénom" autoComplete="given-name" aria-label="Votre prénom" />
-        <p className="v3-lbl">Comment voyagez-vous ?</p>
-        <div className="v3-opts" role="radiogroup" aria-label="Comment voyagez-vous ?">
-          {TRAVEL.map((t) => (
-            <button key={t.key} role="radio" aria-checked={travel === t.key} className={"v3-opt" + (travel === t.key ? " on" : "")} onClick={() => setTravel(t.key)}>
-              <span className="v3-ppl">{t.dots ? Array.from({ length: t.dots }, (_, i) => <i key={i} className={t.key === "family" && i === 2 ? "sm" : ""} />) : <b>◇</b>}</span>
-              {t.label}
-              {"note" in t && <small> · {t.note}</small>}
+        <p className="v3-lbl" style={{ marginTop: 22 }}>{t("Faisons connaissance")}</p>
+        <h1 className="v3-d v3-h2">{t("Comment vous appelez-vous ?")}</h1>
+        <input className="v3-name" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("Votre prénom")} autoComplete="given-name" aria-label={t("Votre prénom")} />
+        <p className="v3-lbl">{t("Comment voyagez-vous ?")}</p>
+        <div className="v3-opts" role="radiogroup" aria-label={t("Comment voyagez-vous ?")}>
+          {TRAVEL.map((o) => (
+            <button key={o.key} role="radio" aria-checked={travel === o.key} className={"v3-opt" + (travel === o.key ? " on" : "")} onClick={() => setTravel(o.key)}>
+              <span className="v3-ppl">{o.dots ? Array.from({ length: o.dots }, (_, i) => <i key={i} className={o.key === "family" && i === 2 ? "sm" : ""} />) : <b>◇</b>}</span>
+              {t(o.label)}
+              {"note" in o && <small> · {t(o.note)}</small>}
               <span className="v3-ck">✓</span>
             </button>
           ))}
         </div>
         <div className="v3-spacer" />
-        <button className="v3-btn" disabled={!name.trim()} onClick={() => setStep(2)}>Continuer</button>
+        <button className="v3-btn" disabled={!name.trim()} onClick={() => setStep(2)}>{t("Continuer")}</button>
       </Shell>
     );
 
   if (step === 2)
     return (
       <Shell ring={false} top={top}>
-        <p className="v3-lbl" style={{ marginTop: 22 }}>Vos goûts</p>
-        <h1 className="v3-d v3-h2">Ce que vous aimez, {first}.</h1>
-        <p className="v3-lead" style={{ marginTop: 12 }}>Choisissez librement. Chaque voyage s'en sert, et vous pourrez tout changer.</p>
+        <p className="v3-lbl" style={{ marginTop: 22 }}>{t("Vos goûts")}</p>
+        <h1 className="v3-d v3-h2">{t("Ce que vous aimez, {first}.", { first })}</h1>
+        <p className="v3-lead" style={{ marginTop: 12 }}>{t("Choisissez librement. Chaque voyage s'en sert, et vous pourrez tout changer.")}</p>
         <div className="v3-chips" style={{ marginTop: 22 }}>
           {INTERESTS.map((x) => {
             const on = interests.includes(x);
             return (
               <button key={x} aria-pressed={on} className={"v3-chip" + (on ? " on" : "")} onClick={() => setInterests((cur) => (cur.includes(x) ? cur.filter((i) => i !== x) : [...cur, x]))}>
                 {on && "✓ "}
-                {x}
+                {t(x)}
               </button>
             );
           })}
         </div>
         <div className="v3-spacer" />
         <div className="v3-hintrow">
-          <span>{interests.length} centre{interests.length > 1 ? "s" : ""} d'intérêt</span>
-          <span className="v3-lbl">3 ou plus conseillés</span>
+          <span>{interests.length > 1 ? t("{n} centres d'intérêt", { n: interests.length }) : t("{n} centre d'intérêt", { n: interests.length })}</span>
+          <span className="v3-lbl">{t("3 ou plus conseillés")}</span>
         </div>
-        <button className="v3-btn" onClick={() => setStep(3)}>{interests.length ? "Continuer" : "Passer"}</button>
+        <button className="v3-btn" onClick={() => setStep(3)}>{interests.length ? t("Continuer") : t("Passer")}</button>
       </Shell>
     );
 
   return (
     <Shell ring={false} top={top}>
-      <p className="v3-lbl" style={{ marginTop: 22 }}>Votre façon</p>
-      <h1 className="v3-d v3-h2">Rythme, budget, langue.</h1>
-      <div className="v3-opts" role="radiogroup" aria-label="Rythme">
+      <p className="v3-lbl" style={{ marginTop: 22 }}>{t("Votre façon")}</p>
+      <h1 className="v3-d v3-h2">{t("Rythme, budget, langue.")}</h1>
+      <div className="v3-opts" role="radiogroup" aria-label={t("Rythme")}>
         {PACES.map((p) => (
           <button key={p.key} role="radio" aria-checked={pace === p.key} className={"v3-opt tall" + (pace === p.key ? " on" : "")} onClick={() => setPace(p.key)}>
             <span className="v3-dens">{Array.from({ length: 6 }, (_, i) => <i key={i} className={i < p.bars ? "f" : ""} />)}</span>
-            <span className="v3-t">{p.label}<small>{p.note}</small></span>
+            <span className="v3-t">{t(p.label)}<small>{t(p.note)}</small></span>
             <span className="v3-ck">✓</span>
           </button>
         ))}
       </div>
-      <p className="v3-lbl" style={{ marginTop: 22 }}>Budget par jour</p>
-      <div className="v3-seg" role="radiogroup" aria-label="Budget par jour">
+      <p className="v3-lbl" style={{ marginTop: 22 }}>{t("Budget par jour")}</p>
+      <div className="v3-seg" role="radiogroup" aria-label={t("Budget par jour")}>
         {BUDGETS.map((b) => (
           <button key={b.key} role="radio" aria-checked={budget === b.key} className={budget === b.key ? "on" : ""} onClick={() => setBudget(b.key)}>{b.label}</button>
         ))}
       </div>
-      <p className="v3-note">{BUDGETS.find((b) => b.key === budget)?.note}</p>
-      <p className="v3-lbl" style={{ marginTop: 18 }}>Langue des programmes</p>
-      <div className="v3-seg" role="radiogroup" aria-label="Langue">
+      <p className="v3-note">{t(BUDGETS.find((b) => b.key === budget)?.note || "")}</p>
+      <p className="v3-lbl" style={{ marginTop: 18 }}>{t("Langue")}</p>
+      <div className="v3-seg" role="radiogroup" aria-label={t("Langue")}>
         {[{ k: "fr", l: "Français" }, { k: "en", l: "English" }].map((x) => (
-          <button key={x.k} role="radio" aria-checked={lang === x.k} className={lang === x.k ? "on" : ""} onClick={() => setLang(x.k)}>{x.l}</button>
+          <button key={x.k} role="radio" aria-checked={lang === x.k} className={lang === x.k ? "on" : ""} onClick={() => { setLang(x.k); setAppLang(x.k as Lang); }}>{x.l}</button>
         ))}
       </div>
       <div className="v3-spacer" />
-      <button className="v3-btn" onClick={finish}>Terminer</button>
+      <button className="v3-btn" onClick={finish}>{t("Terminer")}</button>
     </Shell>
   );
 }

@@ -4,6 +4,7 @@ import { sendLoginEmail, signInWithGoogle, signInWithPassword, verifyLoginCode }
 import OrbitMark from "../OrbitMark";
 import Shell from "./Shell";
 import { legalHref } from "./Legal";
+import { t, tk, getLang, setLang } from "../../lib/i18n";
 
 type Mode = "email" | "sent" | "password";
 
@@ -28,7 +29,7 @@ export default function Welcome() {
       await f();
     } catch (e) {
       const m = String((e as Error)?.message || "");
-      setErr(/provider is not enabled|Unsupported provider/i.test(m) ? "La connexion avec Google n'est pas encore activée. Utilisez votre e-mail." : /rate limit|too many/i.test(m) ? "Trop de demandes : réessayez dans quelques minutes." : /Invalid login/i.test(m) ? "E-mail ou mot de passe incorrect." : fail);
+      setErr(/provider is not enabled|Unsupported provider/i.test(m) ? t("La connexion avec Google n'est pas encore activée. Utilisez votre e-mail.") : /rate limit|too many/i.test(m) ? t("Trop de demandes : réessayez dans quelques minutes.") : /Invalid login/i.test(m) ? t("E-mail ou mot de passe incorrect.") : fail);
     } finally {
       setBusy(false);
     }
@@ -40,146 +41,146 @@ export default function Welcome() {
   };
 
   return (
-    <Shell className="v3-public" top={<span className="v3-brand"><OrbitWord /><span className="v3-grow" /><button type="button" className="v3-toplink" onClick={toAccount}>Se connecter</button></span>}>
+    <Shell className="v3-public" top={<span className="v3-brand"><OrbitWord /><span className="v3-grow" /><button type="button" className="v3-toplink" onClick={() => setLang(getLang() === "fr" ? "en" : "fr")} lang={getLang() === "fr" ? "en" : "fr"}>{getLang() === "fr" ? "English" : "Français"}</button><button type="button" className="v3-toplink" onClick={toAccount}>{t("Se connecter")}</button></span>}>
       <section className="pub-hero">
         <div className="pub-hero-text">
-          <p className="v3-lbl" style={{ marginTop: 28 }}>Carnet de voyage · préparé par IA</p>
-          <h1 className="v3-d v3-h1">Vos voyages, préparés au détail près.</h1>
-          <p className="v3-lead">Dites où vous allez et ce que vous savez déjà. ORBES Trips construit votre programme jour par jour et vérifie chaque lieu.</p>
+          <p className="v3-lbl" style={{ marginTop: 28 }}>{t("Carnet de voyage · préparé par IA")}</p>
+          <h1 className="v3-d v3-h1">{t("Vos voyages, préparés au détail près.")}</h1>
+          <p className="v3-lead">{t("Dites où vous allez et ce que vous savez déjà. ORBES Trips construit votre programme jour par jour et vérifie chaque lieu.")}</p>
           <ul className="v3-vp">
-            <li><span>01</span>Un programme heure par heure, à votre rythme</li>
-            <li><span>02</span>Des lieux vérifiés : horaires, adresses, fermetures</li>
-            <li><span>03</span>Vols, hôtel et rendez-vous pris en compte</li>
+            <li><span>01</span>{t("Un programme heure par heure, à votre rythme")}</li>
+            <li><span>02</span>{t("Des lieux vérifiés : horaires, adresses, fermetures")}</li>
+            <li><span>03</span>{t("Vols, hôtel et rendez-vous pris en compte")}</li>
           </ul>
         </div>
         <div className="pub-hero-card">
           <div className="v3-glass v3-auth" id="compte">
             {mode === "sent" ? (
-              <form onSubmit={(e) => { e.preventDefault(); if (code.trim()) void run(() => verifyLoginCode(email.trim(), code.trim()), "Code incorrect ou expiré."); }}>
-                <p className="v3-msg">Un lien de connexion vient d'être envoyé à <b>{email.trim()}</b>. Ouvrez-le sur ce téléphone.</p>
+              <form onSubmit={(e) => { e.preventDefault(); if (code.trim()) void run(() => verifyLoginCode(email.trim(), code.trim()), t("Code incorrect ou expiré.")); }}>
+                <p className="v3-msg">{t("Un lien de connexion vient d'être envoyé à")} <b>{email.trim()}</b>. {t("Ouvrez-le sur ce téléphone.")}</p>
                 <label className="v3-field">
-                  <span className="sr">Code reçu par e-mail</span>
-                  <input value={code} onChange={(e) => setCode(e.target.value)} inputMode="numeric" autoComplete="one-time-code" placeholder="Ou saisissez le code reçu" />
+                  <span className="sr">{t("Code reçu par e-mail")}</span>
+                  <input value={code} onChange={(e) => setCode(e.target.value)} inputMode="numeric" autoComplete="one-time-code" placeholder={t("Ou saisissez le code reçu")} />
                 </label>
-                <button className="v3-btn" disabled={busy || !code.trim()}>{busy ? "Vérification…" : "Valider le code"}</button>
-                <button type="button" className="v3-link" onClick={() => { setMode("email"); setCode(""); }}>Changer d'adresse</button>
+                <button className="v3-btn" disabled={busy || !code.trim()}>{busy ? t("Vérification…") : t("Valider le code")}</button>
+                <button type="button" className="v3-link" onClick={() => { setMode("email"); setCode(""); }}>{t("Changer d'adresse")}</button>
               </form>
             ) : (
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
                   if (!valid) return;
-                  if (mode === "password") void run(() => signInWithPassword(email.trim(), password), "Connexion impossible. Réessayez.");
-                  else void run(async () => { await sendLoginEmail(email.trim()); setMode("sent"); track("signup_email"); }, "L'e-mail n'a pas pu partir. Réessayez dans un instant.");
+                  if (mode === "password") void run(() => signInWithPassword(email.trim(), password), t("Connexion impossible. Réessayez."));
+                  else void run(async () => { await sendLoginEmail(email.trim()); setMode("sent"); track("signup_email"); }, t("L'e-mail n'a pas pu partir. Réessayez dans un instant."));
                 }}
               >
                 <label className="v3-field">
-                  <span className="sr">Adresse e-mail</span>
-                  <input id="v3-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" inputMode="email" placeholder="Votre adresse e-mail" />
+                  <span className="sr">{t("Adresse e-mail")}</span>
+                  <input id="v3-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" inputMode="email" placeholder={t("Votre adresse e-mail")} />
                 </label>
                 {mode === "password" && (
                   <label className="v3-field">
-                    <span className="sr">Mot de passe</span>
-                    <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" placeholder="Mot de passe" />
+                    <span className="sr">{t("Mot de passe")}</span>
+                    <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" placeholder={t("Mot de passe")} />
                   </label>
                 )}
                 <button className="v3-btn" disabled={busy || !valid || (mode === "password" && !password)}>
-                  {busy ? "Un instant…" : mode === "password" ? "Se connecter" : "Recevoir le lien de connexion"}
+                  {busy ? t("Un instant…") : mode === "password" ? t("Se connecter") : t("Recevoir le lien de connexion")}
                 </button>
                 {GOOGLE && (
-                  <button type="button" className="v3-btn ghost" disabled={busy} onClick={() => void run(signInWithGoogle, "La connexion avec Google n'a pas pu démarrer.")}>
-                    <GoogleG /> Continuer avec Google
+                  <button type="button" className="v3-btn ghost" disabled={busy} onClick={() => void run(signInWithGoogle, t("La connexion avec Google n'a pas pu démarrer."))}>
+                    <GoogleG /> {t("Continuer avec Google")}
                   </button>
                 )}
                 <button type="button" className="v3-link" onClick={() => setMode(mode === "password" ? "email" : "password")}>
-                  {mode === "password" ? "Recevoir un lien à la place" : "J'ai un mot de passe"}
+                  {mode === "password" ? t("Recevoir un lien à la place") : t("J'ai un mot de passe")}
                 </button>
               </form>
             )}
             {err && <p className="v3-err" role="alert">{err}</p>}
-            <p className="v3-fine">Sans mot de passe · gratuit · en continuant, vous acceptez les <a href={legalHref("cgu")}>conditions</a> et la <a href={legalHref("confidentialite")}>politique de confidentialité</a></p>
+            <p className="v3-fine">{t("Sans mot de passe · gratuit · en continuant, vous acceptez les")} <a href={legalHref("cgu")}>{t("conditions")}</a> {t("et la")} <a href={legalHref("confidentialite")}>{t("politique de confidentialité")}</a></p>
           </div>
-          <a className="v3-link pub-more" href="#comment">Comment ça marche ↓</a>
+          <a className="v3-link pub-more" href="#comment">{t("Comment ça marche ↓")}</a>
         </div>
       </section>
 
       <section className="pub-sec" id="comment">
-        <p className="v3-lbl">Comment ça marche</p>
-        <h2 className="v3-d pub-h2">Trois minutes pour un voyage entier.</h2>
+        <p className="v3-lbl">{t("Comment ça marche")}</p>
+        <h2 className="v3-d pub-h2">{t("Trois minutes pour un voyage entier.")}</h2>
         <ol className="pub-steps">
           <li>
             <span className="pub-n">01</span>
-            <b>Où et quand</b>
-            <p>La destination, les dates, avec qui vous partez et le rythme que vous aimez.</p>
+            <b>{t("Où et quand")}</b>
+            <p>{t("La destination, les dates, avec qui vous partez et le rythme que vous aimez.")}</p>
           </li>
           <li>
             <span className="pub-n">02</span>
-            <b>Ce que vous savez déjà</b>
-            <p>Collez tout en vrac : vols, hôtel, réservations, envies, liens. L'IA trie et range chaque élément.</p>
+            <b>{t("Ce que vous savez déjà")}</b>
+            <p>{t("Collez tout en vrac : vols, hôtel, réservations, envies, liens. L'IA trie et range chaque élément.")}</p>
           </li>
           <li>
             <span className="pub-n">03</span>
-            <b>Votre programme, prêt</b>
-            <p>Jour par jour, heure par heure, sur la carte. Ajustez en une phrase : « samedi plus calme », « un rooftop un soir ».</p>
+            <b>{t("Votre programme, prêt")}</b>
+            <p>{t("Jour par jour, heure par heure, sur la carte. Ajustez en une phrase : « samedi plus calme », « un rooftop un soir ».")}</p>
           </li>
         </ol>
       </section>
 
       <section className="pub-sec pub-demo">
         <div className="pub-demo-text">
-          <p className="v3-lbl">Le programme</p>
-          <h2 className="v3-d pub-h2">Chaque journée tient debout.</h2>
-          <p className="v3-lead">Les horaires d'ouverture, les jours de fermeture et les temps de trajet sont vérifiés avant de placer un lieu. Ce qui ne rentre pas reste dans vos pistes, prêt à être placé quand un créneau se libère.</p>
+          <p className="v3-lbl">{t("Le programme")}</p>
+          <h2 className="v3-d pub-h2">{t("Chaque journée tient debout.")}</h2>
+          <p className="v3-lead">{t("Les horaires d'ouverture, les jours de fermeture et les temps de trajet sont vérifiés avant de placer un lieu. Ce qui ne rentre pas reste dans vos pistes, prêt à être placé quand un créneau se libère.")}</p>
         </div>
-        <div className="v3-glass v3-daycard pub-day" aria-label="Exemple de journée">
+        <div className="v3-glass v3-daycard pub-day" aria-label={t("Exemple de journée")}>
           <div className="v3-dayhead">
-            <span className="v3-grow"><b className="v3-d">Vieille ville et thé</b><small>Exemple · jour 2</small></span>
-            <span className="v3-chip on" aria-hidden="true">4 lieux</span>
+            <span className="v3-grow"><b className="v3-d">{t("Vieille ville et thé")}</b><small>{t("Exemple · jour 2")}</small></span>
+            <span className="v3-chip on" aria-hidden="true">{t("{n} lieux", { n: 4 })}</span>
           </div>
           {DEMO.map(([tm, name, why]) => (
             <div key={tm} className="v3-slot">
               <span className="v3-tm">{tm}</span>
-              <span className="v3-grow"><b>{name}</b><small>{why}</small></span>
+              <span className="v3-grow"><b>{t(name)}</b><small>{t(why)}</small></span>
             </div>
           ))}
         </div>
       </section>
 
       <section className="pub-sec">
-        <p className="v3-lbl">Sur place</p>
-        <h2 className="v3-d pub-h2">Tout ce qu'il faut, dans la poche.</h2>
+        <p className="v3-lbl">{tk("on-site", "Sur place")}</p>
+        <h2 className="v3-d pub-h2">{t("Tout ce qu'il faut, dans la poche.")}</h2>
         <div className="pub-grid">
-          {FEATURES.map(([t, d]) => (
-            <div key={t} className="pub-feat">
-              <b>{t}</b>
-              <p>{d}</p>
+          {FEATURES.map(([f, d]) => (
+            <div key={f} className="pub-feat">
+              <b>{t(f)}</b>
+              <p>{t(d)}</p>
             </div>
           ))}
         </div>
       </section>
 
       <section className="pub-sec pub-free">
-        <p className="v3-lbl">Prix</p>
-        <h2 className="v3-d pub-h2">Gratuit pour commencer.</h2>
-        <p className="v3-lead">Toutes les fonctions sont incluses pendant le lancement. Un compte suffit, sans carte bancaire et sans mot de passe.</p>
+        <p className="v3-lbl">{tk("pricing", "Prix")}</p>
+        <h2 className="v3-d pub-h2">{t("Gratuit pour commencer.")}</h2>
+        <p className="v3-lead">{t("Toutes les fonctions sont incluses pendant le lancement. Un compte suffit, sans carte bancaire et sans mot de passe.")}</p>
       </section>
 
       <section className="pub-sec">
-        <p className="v3-lbl">Questions</p>
+        <p className="v3-lbl">{t("Questions")}</p>
         <div className="pub-faq">
           {FAQ.map(([q, a]) => (
             <details key={q}>
-              <summary>{q}</summary>
-              <p>{a}</p>
+              <summary>{t(q)}</summary>
+              <p>{t(a)}</p>
             </details>
           ))}
         </div>
       </section>
 
       <section className="pub-sec pub-end">
-        <h2 className="v3-d pub-h2">Votre prochain voyage commence ici.</h2>
-        <button type="button" className="v3-btn" onClick={toAccount}>Créer mon premier voyage</button>
-        <p className="v3-fine">ORBES Trips · 2026 · <a href={legalHref("cgu")}>Conditions</a> · <a href={legalHref("confidentialite")}>Confidentialité</a> · <a href="mailto:hello@joinentity.com">Contact</a></p>
+        <h2 className="v3-d pub-h2">{t("Votre prochain voyage commence ici.")}</h2>
+        <button type="button" className="v3-btn" onClick={toAccount}>{t("Créer mon premier voyage")}</button>
+        <p className="v3-fine">ORBES Trips · 2026 · <a href={legalHref("cgu")}>{t("Conditions")}</a> · <a href={legalHref("confidentialite")}>{t("Confidentialité")}</a> · <a href="mailto:hello@joinentity.com">{t("Contact")}</a></p>
       </section>
     </Shell>
   );

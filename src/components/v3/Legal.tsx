@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Shell from "./Shell";
+import { getLang, t } from "../../lib/i18n";
 
 export type LegalKind = "cgu" | "confidentialite";
 export const legalKind = (v: string | null): LegalKind | null => (v === "cgu" || v === "confidentialite" ? v : null);
@@ -9,21 +10,24 @@ export const legalHref = (k: LegalKind) => `${location.pathname}?p=${k}`;
 const EDITOR = "CONGLOMERAT LLC, 30 N Gould St Ste N, Sheridan, WY 82801, États-Unis";
 const CONTACT = "hello@joinentity.com";
 const VERSION = "18 novembre 2026";
+const EDITOR_EN = "CONGLOMERAT LLC, 30 N Gould St Ste N, Sheridan, WY 82801, USA";
+const VERSION_EN = "November 18, 2026";
 
 /** Conditions d'utilisation and Politique de confidentialité, short and plain */
 export default function Legal({ kind, onClose }: { kind: LegalKind; onClose: () => void }) {
+  const en = getLang() === "en";
   const top = (
     <div className="v3-bar">
-      <button className="v3-tool" onClick={onClose} aria-label="Fermer">✕</button>
+      <button className="v3-tool" onClick={onClose} aria-label={t("Fermer")}>✕</button>
       <span className="v3-grow" />
-      <a className="v3-toplink" href={legalHref(kind === "cgu" ? "confidentialite" : "cgu")}>{kind === "cgu" ? "Confidentialité" : "Conditions"}</a>
+      <a className="v3-toplink" href={legalHref(kind === "cgu" ? "confidentialite" : "cgu")}>{kind === "cgu" ? t("Confidentialité") : t("Conditions")}</a>
     </div>
   );
   return (
     <Shell className="v3-legal" ring={false} top={top}>
-      <p className="v3-lbl" style={{ marginTop: 18 }}>ORBES Trips · version du {VERSION}</p>
-      {kind === "cgu" ? <Terms /> : <Privacy />}
-      <p className="v3-fine" style={{ marginTop: 40 }}>Une question : <a href={`mailto:${CONTACT}`}>{CONTACT}</a></p>
+      <p className="v3-lbl" style={{ marginTop: 18 }}>{t("ORBES Trips · version du {date}", { date: en ? VERSION_EN : VERSION })}</p>
+      {kind === "cgu" ? (en ? <TermsEn /> : <Terms />) : en ? <PrivacyEn /> : <Privacy />}
+      <p className="v3-fine" style={{ marginTop: 40 }}>{t("Une question :")} <a href={`mailto:${CONTACT}`}>{CONTACT}</a></p>
     </Shell>
   );
 }
@@ -110,6 +114,86 @@ function Privacy() {
       </Sec>
       <Sec t="Vos droits">
         <p>Vous pouvez accéder à vos données, les corriger, les exporter (menu du compte, « Exporter mes données ») et les supprimer (« Supprimer mon compte »), ou vous opposer à un traitement. Pour toute demande : <a href={`mailto:${CONTACT}`}>{CONTACT}</a>. Si vous résidez dans l'Union européenne, vous pouvez aussi vous adresser à l'autorité de protection des données de votre pays (en France, la CNIL).</p>
+      </Sec>
+    </>
+  );
+}
+
+// ---------- English version (same content and facts as the French pages above) ----------
+
+function TermsEn() {
+  return (
+    <>
+      <h1 className="v3-d v3-h2">Terms of use</h1>
+      <Sec t="Who we are">
+        <p>ORBES Trips is published by {EDITOR_EN}. Contact: <a href={`mailto:${CONTACT}`}>{CONTACT}</a>.</p>
+        <p>The app is hosted by Vercel Inc. (USA); accounts and data are managed with Supabase Inc. (USA).</p>
+      </Sec>
+      <Sec t="The service">
+        <p>ORBES Trips is a travel notebook: you enter your destination and what you already know, the app prepares a day-by-day itinerary with the help of artificial intelligence, then guides you on the ground (map, place details, schedule, tools).</p>
+        <p>An account is created with an email address. You are responsible for what you enter and for what you share with the people you invite.</p>
+      </Sec>
+      <Sec t="Free and Pro">
+        <p>The app is free, with limits: one trip prepared by the AI per month, and a confirmed trip's itinerary can no longer be changed without Pro. ORBES Trips Pro lifts these limits and adds features (offline map, exports, business mode).</p>
+        <p>For now, Pro is only available with an access code, for the length of time attached to the code. No payment is requested at this time; if Pro becomes paid, prices and terms will be shown before any purchase.</p>
+      </Sec>
+      <Sec t="Information from the AI">
+        <p>Itineraries, opening hours, addresses and tips are prepared automatically from searches on the internet. They may be incomplete or out of date: check important information (opening hours, bookings, entry requirements) with the places themselves before you go. ORBES Trips does not sell or book any travel service.</p>
+      </Sec>
+      <Sec t="Fair use">
+        <p>Do not use the service to break the law, to harm other people, or to disrupt it (automated requests, getting around the limits). We may suspend an account that does.</p>
+      </Sec>
+      <Sec t="Availability and liability">
+        <p>We do our best to keep the service running at all times, including without a connection for what is saved on your phone, but we cannot guarantee it. To the extent permitted by law, our liability does not cover the consequences of inaccurate information, an interruption of the service or a loss of data, and it is limited to the amounts you have paid us.</p>
+      </Sec>
+      <Sec t="Your account">
+        <p>You can export your data and delete your account at any time from the app (account menu). Deletion erases your account and the trips you created.</p>
+      </Sec>
+      <Sec t="Changes and governing law">
+        <p>These terms may change; the current version is always on this page, and any significant change will be announced in the app. They are governed by the laws of the State of Wyoming (USA), without depriving you of the mandatory protections of the country where you live if you are a consumer.</p>
+      </Sec>
+    </>
+  );
+}
+
+function PrivacyEn() {
+  return (
+    <>
+      <h1 className="v3-d v3-h2">Privacy</h1>
+      <Sec t="In short">
+        <p>We use your data to run your travel notebook and to improve it. No advertising, no reselling, no sharing with advertisers.</p>
+        <p>Data controller: {EDITOR_EN}. Contact: <a href={`mailto:${CONTACT}`}>{CONTACT}</a>.</p>
+      </Sec>
+      <Sec t="What we store">
+        <ul>
+          <li><b>Your account</b>: email address, first name, and what you tell us when you sign up (how you travel, tastes, pace, budget, language).</li>
+          <li><b>Your trips</b>: destinations, dates, flights and hotel, places, notes, photos, contacts and checklists you add, and the people you invite.</li>
+          <li><b>Your location</b>, only if you allow it: it is used to show distances on your phone, and is sent along with a question asked to the assistant so it can answer from where you are.</li>
+          <li><b>AI usage</b>: the number of requests and their cost, to apply the limits.</li>
+          <li><b>How you use the app</b>: the steps of your journey (home page viewed, sign-up, sign-ins, trips created, opened and confirmed, places added, invitations, exports, Pro screen), with the date, the type of device (phone or computer) and the site you came from. They are linked to your account; before sign-up, they are linked to a random identifier kept on your device, then attached to your account when you sign in.</li>
+        </ul>
+      </Sec>
+      <Sec t="Why">
+        <p>To provide the service you ask for (preparing and showing your trips, syncing them between your devices, sharing them), to apply the limits and Pro, to help you if you write to us, and to understand how the app is used in order to improve it.</p>
+      </Sec>
+      <Sec t="Who we share it with">
+        <p>Only with the providers needed for the service, who process the data on our behalf:</p>
+        <ul>
+          <li>Supabase (accounts, database, photos) and Vercel (app hosting);</li>
+          <li>Resend (sending sign-in emails);</li>
+          <li>DeepSeek, with Anthropic as a backup: the text of your requests to the AI and the trip information needed to answer them;</li>
+          <li>OpenStreetMap / Nominatim, OpenFreeMap, Open-Meteo and Frankfurter: place searches, base maps, weather and exchange rates, without your account data.</li>
+        </ul>
+        <p>These providers may be located outside the European Union, in particular in the United States and, for DeepSeek, in China.</p>
+      </Sec>
+      <Sec t="On your phone">
+        <p>The app keeps a copy of your trips and your session on your device, so it works without a connection, as well as the random identifier that links your use to your account. There are no advertising cookies and no tracking tools from other sites.</p>
+      </Sec>
+      <Sec t="How long">
+        <p>For as long as your account exists. When you delete it, your account, the trips you created and your usage history are erased. Usage history is kept for 13 months at most.</p>
+      </Sec>
+      <Sec t="Your rights">
+        <p>You can access your data, correct it, export it (account menu, “Export my data”) and delete it (“Delete my account”), or object to its processing. For any request: <a href={`mailto:${CONTACT}`}>{CONTACT}</a>. If you live in the European Union, you can also contact the data protection authority of your country (in France, the CNIL).</p>
       </Sec>
     </>
   );

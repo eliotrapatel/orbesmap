@@ -14,6 +14,7 @@ import Legal, { legalKind } from "./Legal";
 import PublicTripPage from "./PublicTripPage";
 import { takeRememberedCopy } from "../../lib/publicTrip";
 import { track } from "../../lib/track";
+import { getLang, useLang } from "../../lib/i18n";
 
 
 /**
@@ -23,6 +24,8 @@ import { track } from "../../lib/track";
  */
 export default function Root() {
   const proAsk = useStore((s) => s.proAsk);
+  // every screen reads its texts again when the language changes (the map app restarts in the new language)
+  useLang();
   const signedIn = useStore((s) => !!s.session);
   useEffect(() => {
     if (signedIn) track("app_open");
@@ -107,5 +110,5 @@ function Screen() {
   // a new trip being prepared by the AI, or waiting to be confirmed
   const draft = (allTrips[tripId]?.draft as { status?: string } | undefined)?.status;
   if (draft === "preparing" || draft === "review") return <DraftScreen onClose={() => openHome(true)} />;
-  return <App />;
+  return <App key={getLang()} />;
 }

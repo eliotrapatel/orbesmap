@@ -5,6 +5,7 @@ import { countable } from "../lib/plan";
 import { liveTrip } from "../lib/live";
 import { getState, useTrips } from "../lib/store";
 import { clock, countdownParts, phase, tripEndMs, tripStartMs } from "../lib/time";
+import { t } from "../lib/i18n";
 
 function visitedOf(t: Trip): number {
   try {
@@ -79,10 +80,10 @@ export default function Landing({ trip, onPick, onEnter }: { trip: Trip; onPick:
     return () => window.removeEventListener("resize", fit);
   }, [trip.id]);
   const days = trip.days.filter((d) => d.scheduled).reduce((n, d) => n + (d.dates?.length || 0), 0);
-  const ordered = trips.map((t) => liveOf(t, trip)).sort((a, b) => b.start.localeCompare(a.start));
+  const ordered = trips.map((tr) => liveOf(tr, trip)).sort((a, b) => b.start.localeCompare(a.start));
 
   return (
-    <div ref={root} className={"landing" + (out ? " out" : "")} role="dialog" aria-label="Accueil">
+    <div ref={root} className={"landing" + (out ? " out" : "")} role="dialog" aria-label={t("Accueil")}>
       <div className="l-top">
         <span className="brand-mark"><OrbitMark size={26} title="ORBES Trips" /></span>
         <div className="l-clocks">
@@ -94,37 +95,37 @@ export default function Landing({ trip, onPick, onEnter }: { trip: Trip; onPick:
         <span className="label l-kicker" data-fit>{trip.subtitle} · {trip.dateLabel}</span>
         <h1 className="l-title" key={trip.id} data-fit>{trip.title}</h1>
         <div className="l-sub">
-          <span><b>{trip.places.length}</b> lieux</span>
-          <span><b>{days}</b> {days <= 1 ? "jour" : "jours"} sur place</span>
-          <span>Hôtel <b>{trip.hotel.name}</b></span>
+          <span><b>{trip.places.length}</b> {t("lieux")}</span>
+          <span><b>{days}</b> {days <= 1 ? t("jour sur place") : t("jours sur place")}</span>
+          <span>{t("Hôtel")} <b>{trip.hotel.name}</b></span>
           {trip.flights.map((f) => <span key={f.code}><b>{f.code}</b> {f.from} → {f.to}</span>)}
         </div>
         {ph !== "after" && (
-          <div className="countdown" aria-label={ph === "before" ? "Compte à rebours avant l'arrivée" : "Temps restant sur place"}>
+          <div className="countdown" aria-label={ph === "before" ? t("Compte à rebours avant l'arrivée") : t("Temps restant sur place")}>
             {([["d", "Jours"], ["h", "Heures"], ["m", "Min"], ["s", "Sec"]] as const).map(([k, l]) => (
               <div key={k} className="cd-cell glass">
                 <b>{String(cd[k]).padStart(2, "0")}</b>
-                <span className="label">{l}</span>
+                <span className="label">{t(l)}</span>
               </div>
             ))}
-            <span className="label" style={{ alignSelf: "center", marginLeft: 6 }}>{ph === "before" ? "avant l'arrivée" : "avant le retour"}</span>
+            <span className="label" style={{ alignSelf: "center", marginLeft: 6 }}>{ph === "before" ? t("avant l'arrivée") : t("avant le retour")}</span>
           </div>
         )}
         <div className="l-trips">
-          {ordered.map((t) => {
-            const tp = phase(t, now);
-            const total = countable(t).length;
-            const v = visitedOf(t);
+          {ordered.map((tr) => {
+            const tp = phase(tr, now);
+            const total = countable(tr).length;
+            const v = visitedOf(tr);
             return (
-              <button key={t.id} className={"trip-card glass" + (t.id === trip.id ? " sel" : "")} onClick={() => onPick(t.id)} aria-pressed={t.id === trip.id}>
-                <span className="label" data-fit>{t.code} · {t.dateLabel}</span>
-                <span className={"pill tc-state" + (tp === "after" ? " done" : tp === "during" ? " live" : "")}>{tp === "before" ? `J-${countdownParts(tripStartMs(t), now).d}` : tp === "during" ? "En cours" : "Terminé"}</span>
-                <h3>{t.title}</h3>
-                <p>{t.subtitle}</p>
+              <button key={tr.id} className={"trip-card glass" + (tr.id === trip.id ? " sel" : "")} onClick={() => onPick(tr.id)} aria-pressed={tr.id === trip.id}>
+                <span className="label" data-fit>{tr.code} · {tr.dateLabel}</span>
+                <span className={"pill tc-state" + (tp === "after" ? " done" : tp === "during" ? " live" : "")}>{tp === "before" ? t("J-{n}", { n: countdownParts(tripStartMs(tr), now).d }) : tp === "during" ? t("En cours") : t("Terminé")}</span>
+                <h3>{tr.title}</h3>
+                <p>{tr.subtitle}</p>
                 <div className="tc-stats">
-                  <span><b>{t.places.length}</b>lieux</span>
-                  <span><b>{t.days.filter((d) => d.scheduled).length}</b>jours</span>
-                  <span><b>{v}/{total}</b>visités</span>
+                  <span><b>{tr.places.length}</b>{t("lieux")}</span>
+                  <span><b>{tr.days.filter((d) => d.scheduled).length}</b>{t("jours")}</span>
+                  <span><b>{v}/{total}</b>{t("visités")}</span>
                 </div>
                 <div className="bar tc-bar"><span style={{ width: `${total ? (v / total) * 100 : 0}%` }} /></div>
               </button>
@@ -132,8 +133,8 @@ export default function Landing({ trip, onPick, onEnter }: { trip: Trip; onPick:
           })}
         </div>
         <div className="l-enter">
-          <button ref={enterBtn} className="btn primary" onClick={enter}>Entrer</button>
-          <small data-fit>Carte, programme, phrases, vols, carnet partagé.</small>
+          <button ref={enterBtn} className="btn primary" onClick={enter}>{t("Entrer")}</button>
+          <small data-fit>{t("Carte, programme, phrases, vols, carnet partagé.")}</small>
         </div>
       </div>
     </div>

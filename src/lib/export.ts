@@ -2,18 +2,23 @@ import { notesText } from "./notes";
 import { STATUSES, TYPE_LABEL } from "../data/trip";
 import type { Trip } from "../data/types";
 import type { Data } from "./model";
+import { getLang, t } from "./i18n";
 
-const statusLabel = (k?: string | null) => STATUSES.find((s) => s.key === k)?.label || "";
+const statusLabel = (k?: string | null) => {
+  const l = STATUSES.find((s) => s.key === k)?.label;
+  return l ? t(l) : "";
+};
+const typeLabel = (k: string) => (TYPE_LABEL[k as keyof typeof TYPE_LABEL] ? t(TYPE_LABEL[k as keyof typeof TYPE_LABEL]) : k);
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 
 export function exportCsv(trip: Trip, d: Data) {
-  const head = ["Jour", "Lieu", "Type", "Statut", "Note /5", "MOQ", "Prix", "Délai", "Échantillon", "RDV", "Créneau", "Adresse", "Adresse (chinois)", "Métro", "Site", "Notes", "Contacts", "Visité", "Favori", "Latitude", "Longitude"];
+  const head = ["Jour", "Lieu", "Type", "Statut", "Note /5", "MOQ", "Prix", "Délai", "Échantillon", "RDV", "Créneau", "Adresse", "Adresse (chinois)", "Métro", "Site", "Notes", "Contacts", "Visité", "Favori", "Latitude", "Longitude"].map((x) => t(x));
   const rows: (string | number)[][] = [head];
   for (const day of trip.days) {
     for (const p of trip.places.filter((x) => x.day === day.key)) {
       const s = d.places[p.id] || {};
       const contacts = d.contacts.filter((c) => c.placeId === p.id).map((c) => `${c.name} (${c.kind === "wa" ? "WhatsApp" : "WeChat"} ${c.value})`).join(" | ");
-      rows.push([day.title, p.name, TYPE_LABEL[p.type] || p.type, statusLabel(s.status), s.rating || "", s.moq || "", s.price || "", s.lead || "", s.sample || "", s.appt || "", p.time, p.address, p.cn, p.metro || "", p.website || "", notesText(s as Record<string, unknown>, p.added?.note).replace(/\n/g, " "), contacts, s.visited ? "Oui" : "", s.favorite ? "Oui" : "", p.lat, p.lng]);
+      rows.push([day.title, p.name, typeLabel(p.type), statusLabel(s.status), s.rating || "", s.moq || "", s.price || "", s.lead || "", s.sample || "", s.appt || "", p.time, p.address, p.cn, p.metro || "", p.website || "", notesText(s as Record<string, unknown>, p.added?.note).replace(/\n/g, " "), contacts, s.visited ? t("Oui") : "", s.favorite ? t("Oui") : "", p.lat, p.lng]);
     }
   }
   const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
@@ -26,7 +31,7 @@ export function exportCsv(trip: Trip, d: Data) {
 }
 
 export function exportPdf(trip: Trip, d: Data): boolean {
-  let h = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>ORBES — ${esc(trip.title)}</title><style>
+  let h = `<!doctype html><html lang="${getLang()}"><head><meta charset="utf-8"><title>ORBES — ${esc(trip.title)}</title><style>
   body{font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;color:#0a0a0a;padding:36px;max-width:780px;margin:0 auto;font-size:12px;line-height:1.45}
   .wm{letter-spacing:.46em;font-size:12px;font-weight:500}
   h1{font-weight:500;font-size:30px;letter-spacing:-.02em;margin:14px 0 2px}
@@ -35,24 +40,24 @@ export function exportPdf(trip: Trip, d: Data): boolean {
   .p{padding:9px 0;border-bottom:1px solid #e5e2dc;page-break-inside:avoid}
   .n{font-weight:600;font-size:13px}.m{color:#666}.cn{font-family:"PingFang SC","Noto Sans SC",sans-serif}
   .b{display:inline-block;border:1px solid #0a0a0a;border-radius:3px;padding:0 5px;margin-right:4px;font-size:10.5px}
-  </style></head><body><div class="wm">ORBES</div><h1>${esc(trip.title)}</h1><div class="sub">${esc(trip.subtitle)}, ${esc(trip.dateLabel)}. Hôtel : ${esc(trip.hotel.name)}.</div>`;
+  </style></head><body><div class="wm">ORBES</div><h1>${esc(trip.title)}</h1><div class="sub">${esc(trip.subtitle)}, ${esc(trip.dateLabel)}. ${t("Hôtel : {name}.", { name: esc(trip.hotel.name) })}</div>`;
   for (const day of trip.days) {
     const items = trip.places.filter((x) => x.day === day.key);
     if (!items.length) continue;
     h += `<h2>${esc(day.title)}${day.theme ? ` — ${esc(day.theme)}` : ""}</h2>`;
     for (const p of items) {
       const s = d.places[p.id] || {};
-      h += `<div class="p"><div class="n">${esc(p.name)}${s.visited ? " ✓" : ""}${s.favorite ? " ★" : ""}</div><div class="m">${esc(TYPE_LABEL[p.type] || p.type)}${p.time ? `, ${esc(p.time)}` : ""}</div>`;
+      h += `<div class="p"><div class="n">${esc(p.name)}${s.visited ? " ✓" : ""}${s.favorite ? " ★" : ""}</div><div class="m">${esc(typeLabel(p.type))}${p.time ? `, ${esc(p.time)}` : ""}</div>`;
       const badges = [statusLabel(s.status), s.rating ? `${s.rating}/5` : ""].filter(Boolean);
       if (badges.length) h += `<div>${badges.map((b) => `<span class="b">${esc(b)}</span>`).join("")}</div>`;
-      if (s.moq || s.price || s.lead || s.sample) h += `<div>MOQ : ${esc(s.moq || "–")} · Prix : ${esc(s.price || "–")} · Délai : ${esc(s.lead || "–")} · Échantillon : ${esc(s.sample || "–")}</div>`;
-      if (s.appt) h += `<div>RDV : ${esc(s.appt)}</div>`;
+      if (s.moq || s.price || s.lead || s.sample) h += `<div>${t("MOQ : {moq} · Prix : {price} · Délai : {lead} · Échantillon : {sample}", { moq: esc(s.moq || "–"), price: esc(s.price || "–"), lead: esc(s.lead || "–"), sample: esc(s.sample || "–") })}</div>`;
+      if (s.appt) h += `<div>${t("RDV : {appt}", { appt: esc(s.appt) })}</div>`;
       if (p.address || p.cn) h += `<div class="m">${esc(p.address)}${p.address && p.cn ? " — " : ""}<span class="cn">${esc(p.cn)}</span></div>`;
       else if (p.added) h += `<div class="m">${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</div>`;
       const cs = d.contacts.filter((c) => c.placeId === p.id);
-      if (cs.length) h += `<div>Contacts : ${cs.map((c) => esc(`${c.name} (${c.kind === "wa" ? "WhatsApp" : "WeChat"} ${c.value})`)).join(", ")}</div>`;
+      if (cs.length) h += `<div>${t("Contacts : {list}", { list: cs.map((c) => esc(`${c.name} (${c.kind === "wa" ? "WhatsApp" : "WeChat"} ${c.value})`)).join(", ") })}</div>`;
       const nt = notesText(s as Record<string, unknown>, p.added?.note, "\n");
-      if (nt) h += `<div><b>Notes :</b> ${esc(nt).replace(/\n/g, "<br>")}</div>`;
+      if (nt) h += `<div><b>${t("Notes :")}</b> ${esc(nt).replace(/\n/g, "<br>")}</div>`;
       h += `</div>`;
     }
   }
