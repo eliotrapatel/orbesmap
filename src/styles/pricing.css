@@ -5,8 +5,8 @@
 
 .pm {
   --pm-pad: 16px;
-  /* the button's blue: var(--pro) taken 4 % deeper, so white text passes WCAG AA (4.95:1; the token itself is 4.50:1) */
-  --pm-btn: #2b64f5;
+  /* the button's blue: var(--pro-fill), var(--pro) taken 4 % deeper, so white text passes WCAG AA (4.95:1; the token itself is 4.50:1) */
+  --pm-btn: var(--pro-fill, #2b64f5);
   --pm-btn-down: #2156e0;
   --pm-edge: rgba(47, 107, 255, 0.5);
 }
@@ -15,7 +15,7 @@
 .pro-mark {
   display: inline-flex; align-items: center; justify-content: center; flex: none; box-sizing: border-box;
   font-family: var(--display); font-weight: 500; text-transform: uppercase; line-height: 1; color: #fff;
-  background: var(--pro, #2f6bff); vertical-align: middle; letter-spacing: 0;
+  background: var(--pro-fill, #2b64f5); vertical-align: middle; letter-spacing: 0;
 }
 /* optical centre: the trailing tracking is taken back (margin), and the capitals, which sit low in the font's line box
    (ascent 1.06, descent 0.14, caps 0.65), are lifted onto the chip's centre */
@@ -28,9 +28,9 @@
    The text node is the tag's only child, so the lift is a padding difference instead of a transform. */
 .pro-tag.pro-tag {
   height: 18px; padding: 0 calc(6px - 0.2em) 0.26em 6px; border-radius: 4px; box-sizing: border-box; border: 0;
-  font: 500 9.5px/1 var(--display); letter-spacing: 0.2em; color: #fff; background: var(--pro, #2f6bff); vertical-align: 1px;
+  font: 500 9.5px/1 var(--display); letter-spacing: 0.2em; color: #fff; background: var(--pro-fill, #2b64f5); vertical-align: 1px;
 }
-.v3-seg button.on .pro-tag.pro-tag { color: #fff; background: var(--pro, #2f6bff); border: 0; }
+.v3-seg button.on .pro-tag.pro-tag { color: #fff; background: var(--pro-fill, #2b64f5); border: 0; }
 /* the note "réservé à Pro" (place sheet): a fine blue edge on a faint blue field */
 .pro-note.pro-note { border-color: rgba(47, 107, 255, 0.4); background: rgba(47, 107, 255, 0.07); }
 .pro-note.pro-note:hover { border-color: rgba(47, 107, 255, 0.65); }
@@ -48,9 +48,8 @@
 .pm-rise { animation: pm-rise 0.7s var(--ease) both; animation-delay: var(--d, 0ms); }
 @keyframes pm-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 
-/* the eyebrow: the mark and the brand on one optical line */
-.pm-eyebrow { display: flex; align-items: center; gap: 10px; margin: 18px 0 0; font: 500 10.5px/1 var(--display); letter-spacing: 0.3em; text-transform: uppercase; color: var(--soft); }
-.pm .v3-h1 { font-size: clamp(36px, 10.6vw, 46px); margin: 16px 0 0; }
+/* the title opens the screen under the close button (the card below carries the only mark) */
+.pm .v3-h1 { font-size: clamp(36px, 10.6vw, 46px); margin: 22px 0 0; }
 .pm-lead.v3-lead { margin: 14px 0 0; font-size: 15px; }
 .pm-sec { margin: 34px 0 12px; }
 
@@ -68,7 +67,8 @@
 .pm-card .pm-card-name { margin-top: auto; padding: 0.06em 0 0.04em; font-size: clamp(24px, 7.6vw, 32px); line-height: 1.04; letter-spacing: 0.04em; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: color 0.6s var(--ease); }
 /* a preview (not yet a member): the name stays at reading grey, so becoming a member visibly brightens the card */
 .pm-card.is-preview .pm-card-name { color: var(--soft); }
-.pm-card-foot { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: end; gap: 14px; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(47, 107, 255, 0.28); }
+/* the left fact is short (a plan, an access): it takes its width, the right one (price, validity) takes the rest */
+.pm-card-foot { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: end; gap: 14px; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(47, 107, 255, 0.28); }
 .pm-fact { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .pm-fact.r { text-align: right; align-items: flex-end; }
 .pm-k { font-size: 9.5px; line-height: 1; letter-spacing: 0.16em; text-transform: uppercase; color: var(--mute); }
@@ -76,8 +76,9 @@
 .pm-fact.r .pm-v { color: var(--pro-ink, #8fb0ff); }
 @keyframes pm-swap { from { opacity: 0; } to { opacity: 1; } }
 
-/* =================== the plans: one radio group, three cards of one height, one x for dot / name / price / line =================== */
-.prc-list { display: grid; grid-auto-rows: 1fr; gap: 10px; }
+/* =================== the plans: one radio group, three cards built alike, one x for dot / name / price / line =================== */
+/* every card holds the same lines (name, price, two lines of what it is, two lines of why), so they share one height and one inner rhythm */
+.prc-list { display: grid; gap: 10px; }
 .prc-card {
   display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; grid-template-rows: 18px auto auto auto; column-gap: 14px;
   align-content: start; width: 100%; text-align: left; color: var(--ink); font: inherit;
@@ -99,8 +100,8 @@
 .prc-amount { grid-column: 2 / 4; grid-row: 2; display: flex; align-items: baseline; gap: 7px; margin-top: 14px; min-width: 0; }
 .prc-price { font: 500 26px/1 var(--display); letter-spacing: 0; color: var(--ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .prc-period { font-size: 12.5px; line-height: 1; color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.prc-line { grid-column: 2 / 4; grid-row: 3; margin-top: 10px; font-size: 13px; line-height: 1.45; color: var(--soft); text-wrap: pretty; }
-.prc-value { grid-column: 2 / 4; grid-row: 4; margin-top: 4px; font-size: 13px; line-height: 1.45; color: var(--mute); transition: color 0.25s var(--ease); text-wrap: pretty; }
+.prc-line { grid-column: 2 / 4; grid-row: 3; margin-top: 10px; min-height: calc(2 * 1.45em); font-size: 13px; line-height: 1.45; color: var(--soft); text-wrap: pretty; }
+.prc-value { grid-column: 2 / 4; grid-row: 4; margin-top: 4px; min-height: calc(2 * 1.45em); font-size: 13px; line-height: 1.45; color: var(--mute); transition: color 0.25s var(--ease); text-wrap: pretty; }
 .prc-card.on .prc-value { color: var(--pro-ink, #8fb0ff); }
 
 /* =================== the honest line, the docked action =================== */
@@ -137,20 +138,23 @@
 /* =================== the comparison: fixed columns, labels on the grid's x, checks centred, a clean sticky head =================== */
 .pm-cmp-wrap { border: 1px solid var(--hair); border-radius: 16px; background: #080808; }
 .pm-cmp { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
-.pm-c0 { width: 34%; }
+.pm-c0 { width: 42%; }
 .pm-cmp th, .pm-cmp td { padding: 0; font-weight: 400; text-align: center; vertical-align: middle; }
-.pm-cmp thead th, .pm-cmp thead td { position: sticky; top: 0; z-index: 1; background: #080808; border-bottom: 1px solid var(--hair); }
+.pm-cmp thead th, .pm-cmp thead td { position: sticky; top: var(--safe-t, 0px); z-index: 1; background: #080808; border-bottom: 1px solid var(--hair); }
 .pm-cmp thead .pm-corner { border-top-left-radius: 15px; }
 .pm-cmp thead th:last-child { border-top-right-radius: 15px; }
 .pm-colhead { display: flex; align-items: center; justify-content: center; width: 100%; height: 48px; padding: 0 2px; }
 /* a plan's column head is a button: it selects that plan, like its card */
 .pm-colbtn { font: inherit; color: inherit; background: none; border: 0; border-radius: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .pm-colbtn:focus-visible { outline: 2px solid var(--pro, #2f6bff); outline-offset: -2px; }
-.pm-cn { display: block; font: 600 9px/1 var(--font); letter-spacing: 0.06em; margin-right: -0.06em; text-transform: uppercase; color: var(--soft); white-space: nowrap; transition: color 0.25s var(--ease); }
+/* the column heads speak like the plan names: display capitals, tracked (the trailing tracking taken back, the capitals lifted onto the centre) */
+.pm-cn { display: block; font: 500 10.5px/1 var(--display); letter-spacing: 0.14em; margin-right: -0.14em; text-transform: uppercase; color: var(--soft); white-space: nowrap; transform: translateY(-0.13em); transition: color 0.25s var(--ease); }
 .pm-colbtn:hover .pm-cn { color: var(--ink); }
-.pm-cmp tbody th { text-align: left; padding: 13px 8px 13px var(--pm-pad); font-size: 12.5px; line-height: 1.35; color: var(--soft); text-wrap: pretty; }
-.pm-cmp tbody td { padding: 13px 2px; }
-.pm-cmp tbody tr + tr > * { border-top: 1px solid rgba(246, 242, 234, 0.07); }
+/* wide: one row per fact, its label on the grid's x, on one line */
+.pm-cmp tbody th { text-align: left; padding: 0 8px 0 var(--pm-pad); font-size: 12.5px; line-height: 1.35; color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pm-cmp tbody td { height: 48px; padding: 0 2px; }
+.pm-cmp .pm-lrow { display: none; }
+.pm-cmp .pm-crow:not(.first) > * { border-top: 1px solid rgba(246, 242, 234, 0.07); }
 /* the selected plan's column: a blue field, a 2 px blue line on its head, its name in blue */
 .pm-cmp thead th.on { background: linear-gradient(rgba(47, 107, 255, 0.1), rgba(47, 107, 255, 0.1)), #080808; box-shadow: inset 0 2px 0 var(--pro, #2f6bff); }
 .pm-cmp tbody td.on { background: rgba(47, 107, 255, 0.1); }
@@ -160,7 +164,7 @@
 .pm-yes { width: 16px; height: 16px; color: var(--pro-ink, #8fb0ff); stroke-width: 2; vertical-align: middle; }
 .pm-cmp td.free .pm-yes { color: var(--soft); }
 .pm-no { display: inline-block; width: 10px; height: 1.5px; border-radius: 1px; background: rgba(246, 242, 234, 0.2); vertical-align: middle; }
-.pm-qty { display: inline-block; font-size: 11.5px; line-height: 1.25; color: var(--ink); font-variant-numeric: tabular-nums; }
+.pm-qty { display: inline-block; font-size: 11.5px; line-height: 1.25; color: var(--ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .pm-cmp td.free .pm-qty { color: var(--soft); }
 
 .pm-free { margin: 14px 0 0; padding: 0 var(--pm-pad); font-size: 12.5px; line-height: 1.5; color: var(--mute); }
@@ -181,9 +185,28 @@
 /* =================== the member state =================== */
 .pm-member .pm-card .pm-card-name { color: var(--ink); }
 .pm-unlocked { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--hair); }
-.pm-unlocked li { display: grid; grid-template-columns: 18px minmax(0, 1fr); column-gap: 14px; align-items: start; padding: 14px 0 14px 2px; border-bottom: 1px solid rgba(246, 242, 234, 0.08); font-size: 14px; line-height: 1.45; color: var(--ink); }
+.pm-unlocked li { display: grid; grid-template-columns: 18px minmax(0, 1fr); column-gap: 14px; align-items: start; padding: 14px 0; border-bottom: 1px solid rgba(246, 242, 234, 0.08); font-size: 14px; line-height: 1.45; color: var(--ink); }
 .pm-unlocked .pm-yes { width: 18px; height: 18px; margin-top: 1px; color: var(--pro, #2f6bff); }
 .pm-continue { margin-top: 24px; }
+.pm .pm-cta.pm-continue { justify-content: center; padding: 0 20px; }
+
+/* =================== up to a wide desktop: each fact's label on its own full-width line, its four cells under it on one 44 px row
+   (the inline label column only where the table is wide enough for every label on one line) =================== */
+@media (max-width: 1079px) {
+  .pm-c0 { width: 0; }
+  .pm-cmp .pm-corner { padding: 0; }
+  .pm-cmp .pm-lrow { display: table-row; }
+  .pm-cmp .pm-lrow td {
+    height: auto; padding: 14px var(--pm-pad) 0; text-align: left; font-size: 12.5px; line-height: 1.35; color: var(--soft);
+    /* the selected plan's blue column runs on through the label line (four equal columns: --on is its index) */
+    background: linear-gradient(90deg, transparent calc(var(--on, 2) * 25%), rgba(47, 107, 255, 0.1) calc(var(--on, 2) * 25%), rgba(47, 107, 255, 0.1) calc((var(--on, 2) + 1) * 25%), transparent calc((var(--on, 2) + 1) * 25%));
+  }
+  .pm-cmp .pm-lrow:not(.first) td { border-top: 1px solid rgba(246, 242, 234, 0.07); }
+  .pm-cmp .pm-crow:not(.first) > * { border-top: 0; }
+  .pm-cmp tbody .pm-rl { padding: 0; overflow: hidden; }
+  .pm-rl-t { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .pm-cmp tbody td { height: 44px; }
+}
 
 /* =================== narrow phones (344 px) =================== */
 @media (max-width: 360px) {
@@ -196,10 +219,8 @@
   .prc-name { letter-spacing: 0.12em; }
   .prc-card .prc-tag { font-size: 8.5px; letter-spacing: 0.03em; padding: 0 5px; margin-left: 8px; }
   .prc-price { font-size: 24px; }
-  .pm-c0 { width: 31%; }
-  .pm-cn { letter-spacing: 0.02em; margin-right: -0.02em; font-size: 8.5px; }
-  .pm-cmp tbody th { font-size: 11.5px; padding-right: 4px; }
-  .pm-qty { font-size: 10.5px; }
+  .pm-cn { letter-spacing: 0.1em; margin-right: -0.1em; font-size: 10px; }
+  .pm-qty { font-size: 11px; }
   .pm .pm-cta { padding: 0 var(--pm-pad); font-size: 14.5px; }
   .pm-cta-p { font-size: 14px; padding-left: 12px; margin-left: 10px; }
 }
@@ -214,7 +235,12 @@
   .pm-hero .pm-card { margin-top: 36px; }
   .pm-main > .pm-sec:first-child { margin-top: 18px; }
   .pm-dock { margin: 4px 0 0; padding: 20px 0 16px; }
-  .pm-cmp tbody th { font-size: 13px; }
+}
+@media (min-width: 1080px) {
+  .pm-c0 { width: 44%; }
+  .pm-cn { letter-spacing: 0.1em; margin-right: -0.1em; }
+  /* the plans' column is fixed here (the page's 1080 px): every line and every "why" holds on one line, in both languages */
+  .prc-line, .prc-value { min-height: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -223,4 +249,4 @@
 }
 
 /* capitals set in a line box of 1 sit 0.13 em low in this face: lifted wherever they share a centre line with the mark or a cell */
-.pm-eyebrow > span:last-child, .pm-card-brand { transform: translateY(-0.13em); }
+.pm-card-brand { transform: translateY(-0.13em); }

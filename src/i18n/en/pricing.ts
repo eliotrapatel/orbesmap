@@ -73,4 +73,8 @@ export default {
   "par an": "per year",
   "par mois et par personne": "per month, per person",
   "Un paiement unique, sans abonnement.": "One payment, no subscription.",
+  // lot "pro", after the second review: one price pattern, a validity that holds on one line
+  "/ voyage": "/ trip",
+  "Illimité": "Unlimited",
+  "Valable jusqu'au": "Valid until",
 } satisfies Record<string, string>;

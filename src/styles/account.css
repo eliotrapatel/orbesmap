@@ -10,7 +10,7 @@
 .ac-who { padding-top: 6px; }
 .ac-mono { width: 64px; height: 64px; flex: none; border-radius: 50%; display: grid; place-items: center; font: 500 26px/1 var(--display); color: var(--ink);
   background: radial-gradient(120% 120% at 30% 18%, rgba(246, 242, 234, 0.11), rgba(246, 242, 234, 0.02) 62%); border: 1px solid var(--hair-strong); }
-.ac-mono.is-pro { color: var(--pro-ink, #8fb0ff); border-color: var(--pro, #2f6bff); outline: 1px solid rgba(47, 107, 255, 0.3); outline-offset: 3px; }
+.ac-mono.is-pro { color: var(--pro-ink, #8fb0ff); border: 1.5px solid var(--pro, #2f6bff); outline: none; }
 .ac-who { min-width: 0; flex: 1; }
 .ac-name { font-size: clamp(26px, 7.6vw, 32px); line-height: 0.95; margin: 0; overflow-wrap: anywhere; }
 .ac-mail { margin-top: 7px; font-size: 13.5px; color: var(--soft); overflow-wrap: anywhere; line-height: 1.35; }
@@ -34,6 +34,7 @@
 .ac-plan.is-pro { border-color: rgba(47, 107, 255, 0.5); background: linear-gradient(180deg, rgba(47, 107, 255, 0.1), rgba(47, 107, 255, 0.02)); }
 .ac-plan.is-pro:hover { border-color: rgba(47, 107, 255, 0.75); background: linear-gradient(180deg, rgba(47, 107, 255, 0.13), rgba(47, 107, 255, 0.03)); }
 .ac-plan.is-pro .ac-plan-k, .ac-plan.is-pro .ac-plan-cta { color: var(--pro-ink, #8fb0ff); }
+.ac-plan.is-pro:focus-visible { outline-color: var(--pro, #2f6bff); }
 .ac-plan.is-wait { cursor: default; }
 .ac-plan.is-wait:hover { border-color: var(--hair); background: rgba(246, 242, 234, 0.03); }
 .ac-plan.is-wait:active { transform: none; }
@@ -178,7 +179,8 @@
 .ac-av { transition: border-color 0.2s var(--ease), background 0.2s, transform 0.16s var(--ease); }
 .ac-av:hover { border-color: var(--hair-strong); background: var(--plate-3); }
 .ac-av:active { transform: scale(0.95); }
-.ac-av.is-pro { color: var(--pro-ink, #8fb0ff); border-color: var(--pro, #2f6bff); box-shadow: 0 0 0 2px #030303, 0 0 0 3px rgba(47, 107, 255, 0.35); }
+.ac-av.is-pro { color: var(--pro-ink, #8fb0ff); border-color: var(--pro, #2f6bff); box-shadow: none; }
+.ac-av.is-pro:focus-visible { outline-color: var(--pro, #2f6bff); }
 
 @media (prefers-reduced-motion: reduce) {
   .ac > *, .ac-pw, .ac-trip-body, .ac-screen, .ac-screen.is-leaving { animation: none; }

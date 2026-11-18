@@ -1,5 +1,5 @@
 import "../../styles/pricing.css";
-import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
+import { Fragment, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import { track } from "../../lib/track";
 import { closePro, useStore, type ProReason } from "../../lib/store";
 import { joinWaitlist, proDate, redeemCode, type SalePlan } from "../../lib/pro";
@@ -25,8 +25,13 @@ const FIRST: Record<ProReason, SalePlan> = { edit: "pass", export: "pass", prep:
 const eur = (n: number) =>
   new Intl.NumberFormat(locale(), { style: "currency", currency: "EUR", minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 }).format(n);
 
+/** A date set short, so it holds on one line of the card: "18 nov. 2027" / "18 Nov 2027" */
+const shortDate = (iso: string) =>
+  new Date(iso).toLocaleDateString(locale(), { day: "numeric", month: "short", year: "numeric", timeZone: "Europe/Paris" });
+
 /** A plan on sale: the figure (display capitals) with its period beside it on one baseline ("par an"),
- *  a short period for the card and the button ("/ an"), the line that says what it is, and why it is worth it */
+ *  a short period for the button ("/ an"), the line that says what it is, and why it is worth it.
+ *  One pattern everywhere: the card and the membership card say "9,99 € par voyage", the button "9,99 € / voyage". */
 type Offer = { id: SalePlan; name: string; amount: number; period: string; short: string; line: string; tag?: string; value: string; cta: string };
 const OFFERS: Offer[] = [
   {
@@ -34,7 +39,7 @@ const OFFERS: Offer[] = [
     name: "Pass voyage",
     amount: 9.99,
     period: "par voyage",
-    short: "",
+    short: "/ voyage",
     line: "Pro pour un voyage, jusqu'à 30 jours après le retour.",
     value: "Un paiement unique, sans abonnement.",
     cta: "Choisir le Pass voyage",
@@ -61,8 +66,8 @@ const OFFERS: Offer[] = [
     cta: "Choisir Business",
   },
 ];
-/** The card's price fact: "39 € / an", "19 € / mois", "9,99 € · une fois" */
-const priceOf = (o: Offer) => eur(o.amount) + (o.short ? " " + t(o.short) : " · " + t("une fois"));
+/** The membership card's price fact, worded like the plan cards: "9,99 € par voyage", "39 € par an", "19 € par mois et par personne" */
+const priceOf = (o: Offer) => eur(o.amount) + "\u00a0" + t(o.period);
 
 /** The comparison's columns: the free plan for reference, then the three plans on sale (short names: the prices are on the plans) */
 type Col = "free" | SalePlan;
@@ -77,7 +82,7 @@ type Cell = boolean | string;
  *  Same facts as the plan cards: Pass = Pro on one trip, Annuel = Pro on every trip and no monthly limit, Business = all of Pro and its extras. */
 const ROWS: { label: string; cells: [Cell, Cell, Cell, Cell] }[] = [
   { label: "Voyages en Pro", cells: [false, "1", "Tous", "Tous"] },
-  { label: "Voyages préparés par l'IA", cells: ["1 / mois", "1 / mois", "Sans limite", "Sans limite"] },
+  { label: "Voyages préparés par l'IA", cells: ["1 / mois", "1 / mois", "Illimité", "Illimité"] },
   { label: "Programme, partage, invités", cells: [true, true, true, true] },
   { label: "Modifier un programme validé", cells: [false, true, true, true] },
   { label: "Carte hors ligne et exports", cells: [false, true, true, true] },
@@ -199,7 +204,11 @@ export default function ProScreen() {
   };
   /** what the member card says about where Pro comes from: an access code, the team, or the plan itself */
   const origin = plan?.admin ? { k: t("Accès"), v: t("Équipe") } : plan?.granted ? { k: t("Accès"), v: t("Code d'accès") } : { k: t("Formule"), v: "Pro" };
-  const validity = plan?.granted && plan.until ? t("Jusqu'au {date}", { date: proDate(plan.until) }) : plan?.granted ? t("À vie") : t("Inclus avec votre accès");
+  /** validity: a dated code says "Valable jusqu'au" over the short date, so the fact never gets cut */
+  const validity =
+    plan?.granted && plan.until
+      ? { k: t("Valable jusqu'au"), v: shortDate(plan.until) }
+      : { k: t("Validité"), v: plan?.granted ? t("À vie") : t("Inclus avec votre accès") };
   const top = (
     <div className="v3-bar">
       <button className="v3-tool pm-close" onClick={closePro} aria-label={t("Fermer")}>
@@ -213,12 +222,8 @@ export default function ProScreen() {
       {pro ? (
         <div className="pm-grid">
           <div className="pm-hero">
-            <p className="pm-eyebrow pm-rise" style={rise(20)}>
-              <ProMark size="sm" />
-              <span>ORBES Trips</span>
-            </p>
-            <h1 className="v3-d v3-h1 pm-rise" style={rise(60)}>{t("Vous êtes Pro.")}</h1>
-            <MemberCard name={first || local} delay={140} facts={[origin, { k: t("Validité"), v: validity }]} />
+            <h1 className="v3-d v3-h1 pm-rise" style={rise(40)}>{t("Vous êtes Pro.")}</h1>
+            <MemberCard name={first || local} delay={140} facts={[origin, validity]} />
           </div>
           <div className="pm-main">
             <p className="v3-lbl pm-sec pm-rise" style={rise(220)}>{t("Ce qui est débloqué")}</p>
@@ -230,17 +235,13 @@ export default function ProScreen() {
                 </li>
               ))}
             </ul>
-            <button className="v3-btn pm-continue pm-rise" style={rise(340)} onClick={closePro}>{t("Continuer")}</button>
+            <button className="v3-btn pm-cta pm-continue pm-rise" style={rise(340)} onClick={closePro}>{t("Continuer")}</button>
           </div>
         </div>
       ) : (
         <div className="pm-grid">
           <div className="pm-hero">
-            <p className="pm-eyebrow pm-rise" style={rise(20)}>
-              <ProMark size="sm" />
-              <span>ORBES Trips</span>
-            </p>
-            <h1 className="v3-d v3-h1 pm-rise" style={rise(60)}>{t("Votre voyage, sans limite.")}</h1>
+            <h1 className="v3-d v3-h1 pm-rise" style={rise(40)}>{t("Votre voyage, sans limite.")}</h1>
             {WHY[why] && <p className="v3-lead pm-lead pm-rise" style={rise(100)}>{t(WHY[why])}</p>}
             <MemberCard preview delay={160} name={session ? first : ""} facts={[{ k: t("Formule"), v: t(offer.name) }, { k: t("Prix"), v: priceOf(offer) }]} />
           </div>
@@ -319,7 +320,7 @@ export default function ProScreen() {
                           <span className="pm-cta-l">{t(offer.cta)}</span>
                           <span key={sel} className="pm-cta-p">
                             {eur(offer.amount)}
-                            {offer.short && <span className="pm-cta-per">{t(offer.short)}</span>}
+                            <span className="pm-cta-per">{t(offer.short)}</span>
                           </span>
                         </>
                       )}
@@ -330,7 +331,7 @@ export default function ProScreen() {
             )}
 
             <p className="v3-lbl pm-sec pm-rise" style={rise(400)}>{t("Ce que comprend chaque formule")}</p>
-            <div className="pm-cmp-wrap pm-rise" style={rise(420)}>
+            <div className="pm-cmp-wrap pm-rise" style={{ ...rise(420), "--on": COLS.findIndex((c) => c.id === sel) } as CSSProperties}>
               <table className="pm-cmp">
                 <caption className="sr">{t("Ce que comprend chaque formule")}</caption>
                 <colgroup>
@@ -356,15 +357,23 @@ export default function ProScreen() {
                   </tr>
                 </thead>
                 <tbody>
-                  {ROWS.map((r) => (
-                    <tr key={r.label}>
-                      <th scope="row">{t(r.label)}</th>
-                      {r.cells.map((v, i) => (
-                        <td key={COLS[i].id} className={(COLS[i].id === sel ? "on" : "") + (i === 0 ? " free" : "")}>
-                          <Mark v={v} />
-                        </td>
-                      ))}
-                    </tr>
+                  {ROWS.map((r, n) => (
+                    <Fragment key={r.label}>
+                      {/* phones: the label on its own full-width line over its row (seen only; the row's own header is what is read) */}
+                      <tr className={"pm-lrow" + (n ? "" : " first")} aria-hidden="true">
+                        <td colSpan={COLS.length + 1}>{t(r.label)}</td>
+                      </tr>
+                      <tr className={"pm-crow" + (n ? "" : " first")}>
+                        <th scope="row" className="pm-rl">
+                          <span className="pm-rl-t">{t(r.label)}</span>
+                        </th>
+                        {r.cells.map((v, i) => (
+                          <td key={COLS[i].id} className={(COLS[i].id === sel ? "on" : "") + (i === 0 ? " free" : "")}>
+                            <Mark v={v} />
+                          </td>
+                        ))}
+                      </tr>
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
@@ -404,7 +413,7 @@ export default function ProScreen() {
       {done && !pro && (
         <>
           <p className="sr" role="status">{done}</p>
-          <button className="v3-btn pm-continue" onClick={closePro}>{t("Continuer")}</button>
+          <button className="v3-btn pm-cta pm-continue" onClick={closePro}>{t("Continuer")}</button>
         </>
       )}
       {done && pro && <p className="sr" role="status">{done}</p>}
