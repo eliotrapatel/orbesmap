@@ -101,7 +101,7 @@ function Figures() {
 }
 
 const AI_STEP: Record<string, string> = {
-  intake: "Lecture du collage", extract: "Lecture d'une réservation", outline: "Trame du voyage", essentials: "Essentiel pratique", day: "Préparation d'un jour",
+  intake: "Lecture du collage", concierge: "Échange avec le concierge", extract: "Lecture d'une réservation", outline: "Trame du voyage", essentials: "Essentiel pratique", day: "Préparation d'un jour",
   adjust: "Ajustement", enrich: "Fiche complète", place: "Recherche d'un lieu", ask: "Question à l'assistant", photo: "Photo traduite", interpret: "Interprète", inbound: "Réservation transférée",
 };
 const nf = (n: number) => new Intl.NumberFormat(locale()).format(Math.round(n));

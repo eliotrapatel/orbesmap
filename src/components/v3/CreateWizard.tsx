@@ -9,8 +9,8 @@ import { INTERESTS, PACES } from "./Onboarding";
 import Shell from "./Shell";
 import { t } from "../../lib/i18n";
 
-type Card<T> = T & { keep: boolean };
-type Wiz = {
+export type Card<T> = T & { keep: boolean };
+export type Wiz = {
   step: number;
   cities: Destination[];
   start: string;
@@ -28,7 +28,8 @@ type Wiz = {
   /** leisure or business (Pro) */
   mode?: "leisure" | "business";
 };
-const KEY = "orbes.wizard.v1";
+export const WIZARD_KEY = "orbes.wizard.v1";
+const KEY = WIZARD_KEY;
 const MONTHS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
 const WD = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
 const dayList = (start: string, end: string) => {
@@ -308,51 +309,7 @@ function Programme({ w, set, top, onCreated }: StepProps & { onCreated: (id: str
   const go = async () => {
     if (busy || !w.cities.length) return;
     setBusy(true);
-    const base = w.cities[0];
-    // the hotel on the map: its address, else the city
-    let hotelLL: [number, number] = [base.lng, base.lat];
-    if (w.hotelAddress.trim() || w.hotelName.trim()) {
-      const box: [number, number, number, number] = [base.lng - 0.6, base.lat - 0.6, base.lng + 0.6, base.lat + 0.6];
-      const g = (w.hotelAddress.trim() && (await geocode(w.hotelAddress.trim(), box, new AbortController().signal, base.country || ""))) || (w.hotelName.trim() && (await geocode(`${w.hotelName.trim()} ${base.name}`, box, new AbortController().signal, base.country || "")));
-      if (g) hotelLL = g.ll;
-    }
-    const rec = newTripRecord({ dest: base, start: w.start, end: w.end, hotel: w.hotelName });
-    // the flight that lands at the start of the trip (arrival) and the one that leaves at its end (departure);
-    // connections stay in the text given to the AI
-    const day = (iso: string) => (iso || "").slice(0, 10);
-    const arr = [...w.flights].filter((f) => f.arriveAt && day(f.arriveAt) <= w.start).sort((a, b) => b.arriveAt.localeCompare(a.arriveAt))[0] || w.flights.find((f) => day(f.arriveAt) === w.start);
-    const dep = [...w.flights].filter((f) => f !== arr && f.departAt && day(f.departAt) >= w.end).sort((a, b) => a.departAt.localeCompare(b.departAt))[0];
-    const flights = [arr && { f: arr, kind: "arrival" as const, at: arr.arriveAt }, dep && { f: dep, kind: "departure" as const, at: dep.departAt }]
-      .filter((x): x is { f: ExtractResult["flights"][number]; kind: "arrival" | "departure"; at: string } => !!x && !!x.at)
-      .map(({ f, kind, at }) => ({ code: f.code, airline: f.airline, from: f.from, to: f.to, fromCity: f.fromCity, toCity: f.toCity, terminal: f.terminal || undefined, departAt: f.departAt || undefined, arriveAt: f.arriveAt || undefined, kind, at }));
-    const flightsText = w.flights.map((f) => `${f.code} ${f.from}→${f.to} départ ${f.departAt} arrivée ${f.arriveAt}`).join(" ; ");
-    const draft: Draft = {
-      flightsText,
-      status: "preparing",
-      cities: w.cities.map((c) => ({ name: c.name, lat: c.lat, lng: c.lng, country: c.country })),
-      hotelText: [w.hotelName, w.hotelAddress].filter(Boolean).join(", "),
-      pace: w.pace,
-      interests: w.interests,
-      // what was typed stays as said (the cards are what the AI understood of it)
-      wishes: w.wishes.filter((x) => x.keep).map((x) => x.text).concat(w.know.trim() ? [`En vrac : ${w.know.trim().slice(0, 1500)}`] : [])
-        .concat(business ? ["Voyage d'affaires : rendez-vous avec des fournisseurs, usines, salons et marchés de gros ; garder des créneaux pour les rendez-vous."] : []),
-      dayWishes: w.dayWishes,
-      places: w.places.filter((p) => p.keep).map(({ keep: _k, ...p }) => p),
-      fixed: w.fixed.filter((f) => f.keep).map(({ keep: _k, ...f }) => f),
-      days: {},
-    };
-    const id = createTrip({
-      ...rec,
-      mode: business ? "business" : undefined,
-      title: w.cities.map((c) => c.name).join(" · "),
-      timezone: timezoneFor(base.country, base.lng),
-      hotel: { name: w.hotelName.trim() || "Hôtel à préciser", lat: hotelLL[1], lng: hotelLL[0] },
-      zones: w.cities.map((c) => ({ label: c.name, center: [c.lng, c.lat], zoom: 12 })),
-      flights,
-      draft,
-    });
-    switchTrip(id);
-    track("trip_created", null, id);
+    const id = await createTripFromWizard(w, business);
     onCreated(id);
   };
   const goSafe = () => go().catch(() => setBusy(false));
@@ -389,4 +346,54 @@ function Programme({ w, set, top, onCreated }: StepProps & { onCreated: (id: str
       <button className="v3-btn" disabled={busy || !days.length} onClick={() => void goSafe()}>{busy ? t("Création…") : t("✦ Préparer mon voyage")}</button>
     </Shell>
   );
+}
+
+/** Creates the trip from what was gathered (by the form or the concierge) and opens it; its preparation starts at once */
+export async function createTripFromWizard(w: Wiz, business: boolean): Promise<string> {
+  const base = w.cities[0];
+  // the hotel on the map: its address, else the city
+  let hotelLL: [number, number] = [base.lng, base.lat];
+  if (w.hotelAddress.trim() || w.hotelName.trim()) {
+    const box: [number, number, number, number] = [base.lng - 0.6, base.lat - 0.6, base.lng + 0.6, base.lat + 0.6];
+    const g = (w.hotelAddress.trim() && (await geocode(w.hotelAddress.trim(), box, new AbortController().signal, base.country || ""))) || (w.hotelName.trim() && (await geocode(`${w.hotelName.trim()} ${base.name}`, box, new AbortController().signal, base.country || "")));
+    if (g) hotelLL = g.ll;
+  }
+  const rec = newTripRecord({ dest: base, start: w.start, end: w.end, hotel: w.hotelName });
+  // the flight that lands at the start of the trip (arrival) and the one that leaves at its end (departure);
+  // connections stay in the text given to the AI
+  const day = (iso: string) => (iso || "").slice(0, 10);
+  const arr = [...w.flights].filter((f) => f.arriveAt && day(f.arriveAt) <= w.start).sort((a, b) => b.arriveAt.localeCompare(a.arriveAt))[0] || w.flights.find((f) => day(f.arriveAt) === w.start);
+  const dep = [...w.flights].filter((f) => f !== arr && f.departAt && day(f.departAt) >= w.end).sort((a, b) => a.departAt.localeCompare(b.departAt))[0];
+  const flights = [arr && { f: arr, kind: "arrival" as const, at: arr.arriveAt }, dep && { f: dep, kind: "departure" as const, at: dep.departAt }]
+    .filter((x): x is { f: ExtractResult["flights"][number]; kind: "arrival" | "departure"; at: string } => !!x && !!x.at)
+    .map(({ f, kind, at }) => ({ code: f.code, airline: f.airline, from: f.from, to: f.to, fromCity: f.fromCity, toCity: f.toCity, terminal: f.terminal || undefined, departAt: f.departAt || undefined, arriveAt: f.arriveAt || undefined, kind, at }));
+  const flightsText = w.flights.map((f) => `${f.code} ${f.from}→${f.to} départ ${f.departAt} arrivée ${f.arriveAt}`).join(" ; ");
+  const draft: Draft = {
+    flightsText,
+    status: "preparing",
+    cities: w.cities.map((c) => ({ name: c.name, lat: c.lat, lng: c.lng, country: c.country })),
+    hotelText: [w.hotelName, w.hotelAddress].filter(Boolean).join(", "),
+    pace: w.pace,
+    interests: w.interests,
+    // what was typed stays as said (the cards are what the AI understood of it)
+    wishes: w.wishes.filter((x) => x.keep).map((x) => x.text).concat(w.know.trim() ? [`En vrac : ${w.know.trim().slice(0, 1500)}`] : [])
+      .concat(business ? ["Voyage d'affaires : rendez-vous avec des fournisseurs, usines, salons et marchés de gros ; garder des créneaux pour les rendez-vous."] : []),
+    dayWishes: w.dayWishes,
+    places: w.places.filter((p) => p.keep).map(({ keep: _k, ...p }) => p),
+    fixed: w.fixed.filter((f) => f.keep).map(({ keep: _k, ...f }) => f),
+    days: {},
+  };
+  const id = createTrip({
+    ...rec,
+    mode: business ? "business" : undefined,
+    title: w.cities.map((c) => c.name).join(" · "),
+    timezone: timezoneFor(base.country, base.lng),
+    hotel: { name: w.hotelName.trim() || "Hôtel à préciser", lat: hotelLL[1], lng: hotelLL[0] },
+    zones: w.cities.map((c) => ({ label: c.name, center: [c.lng, c.lat], zoom: 12 })),
+    flights,
+    draft,
+  });
+  switchTrip(id);
+  track("trip_created", null, id);
+  return id;
 }

@@ -1,0 +1,20 @@
+// English texts of the concierge and the way-to-create choice (Nov 2026)
+export default {
+  "+ {n} autres": "+ {n} more", "4 étapes rapides et précises, à votre rythme.": "4 quick, precise steps, at your own pace.",
+  "Ajouter une capture ou une photo": "Add a screenshot or photo", "Arrêter la dictée": "Stop dictation", "Avec le concierge": "With the concierge",
+  "Bonjour {name}. Je suis votre concierge. Où partez-vous, et quand ? Vous pouvez aussi m'envoyer vos réservations, des captures ou des liens : je fais le tri.": "Hello {name}. I'm your concierge. Where are you going, and when? You can also send me your bookings, screenshots or links: I'll sort it all out.",
+  "Bonjour. Je suis votre concierge. Où partez-vous, et quand ? Vous pouvez aussi m'envoyer vos réservations, des captures ou des liens : je fais le tri.": "Hello. I'm your concierge. Where are you going, and when? You can also send me your bookings, screenshots or links: I'll sort it all out.",
+  "Capture jointe": "Screenshot attached", "Comment préférez-vous ?": "How would you like to do it?", "Concierge": "Concierge",
+  "Continuer la conversation": "Keep talking", "Créer un voyage": "Create a trip", "Dicter": "Dictate",
+  "Faire le point et lancer la préparation": "Review and start planning", "Florence 4 jours en décembre, avec ma femme. On adore la cuisine.": "Florence, 4 days in December with my wife. We love food.",
+  "Il me faut au moins la destination et les dates pour lancer la préparation.": "I need at least the destination and the dates to start planning.",
+  "Je préfère remplir le formulaire": "I'd rather fill in the form", "Je vous écoute…": "Listening…",
+  "La dictée n'est pas disponible dans ce navigateur.": "Dictation isn't available in this browser.", "Lancer la préparation": "Start planning",
+  "Le concierge ne répond pas. Réessayez.": "The concierge isn't answering. Try again.", "Le formulaire": "The form", "Le point": "Review",
+  "Le voyage n'a pas pu être créé. Réessayez.": "The trip couldn't be created. Try again.", "Message au concierge": "Message to the concierge",
+  "Parfait. Vous avez déjà réservé l'hôtel ou les vols ?": "Perfect. Have you already booked your hotel or flights?",
+  "Racontez votre voyage comme à un ami : texte, voix, captures ou liens. Il pose les bonnes questions.": "Tell it about your trip like you would a friend: text, voice, screenshots or links. It asks the right questions.",
+  "Retirer la capture": "Remove the screenshot", "Rien encore : parlez-moi de votre voyage.": "Nothing yet: tell me about your trip.",
+  "Votre voyage": "Your trip", "rythme {p}": "{p} pace", "Écrivez, collez un lien, ou dictez…": "Type, paste a link, or dictate…",
+  "Échange avec le concierge": "Concierge exchange", "déc.": "Dec",
+} satisfies Record<string, string>;

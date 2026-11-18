@@ -10,7 +10,7 @@ calls as (
   where lower(u.email) = lower(p.email) and x.at > now() - make_interval(hours => p.hours)
 ),
 labels(task, step) as (values
-  ('intake', 'lecture de ce que vous avez collé'), ('extract', 'lecture d''une réservation'), ('outline', 'trame du voyage'),
+  ('intake', 'lecture de ce que vous avez collé'), ('concierge', 'échange avec le concierge'), ('extract', 'lecture d''une réservation'), ('outline', 'trame du voyage'),
   ('essentials', 'essentiel pratique'), ('day', 'préparation d''un jour'), ('adjust', 'ajustement en une phrase'),
   ('enrich', 'fiche complète d''un lieu'), ('place', 'recherche d''un lieu'), ('ask', 'question à l''assistant'),
   ('photo', 'photo traduite'), ('interpret', 'interprète'), ('inbound', 'réservation transférée')

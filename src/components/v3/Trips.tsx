@@ -6,6 +6,8 @@ import { phase } from "../../lib/time";
 import OrbitMark from "../OrbitMark";
 import Shell, { Steps } from "./Shell";
 import CreateWizard from "./CreateWizard";
+import Concierge, { CreateChooser } from "./Concierge";
+import { track } from "../../lib/track";
 import AccountActions from "./AccountActions";
 import { t } from "../../lib/i18n";
 
@@ -20,13 +22,13 @@ export default function Trips({ onOpen, onClose }: { onOpen: (id: string) => voi
   const trips = useTrips();
   const profile = useStore((s) => s.profile);
   const email = useStore((s) => s.session?.user.email) || "";
-  const [creating, setCreatingRaw] = useState(false);
+  const [creating, setCreatingRaw] = useState<false | "choose" | "form" | "concierge">(false);
   const [menu, setMenu] = useState(false);
   // a free account prepares one trip per month with the AI: the next one asks for Pro
   const setCreating = (v: boolean) => {
     const p = getState().plan;
     if (v && p && !p.pro && p.prepLeft <= 0) return requestPro("prep");
-    setCreatingRaw(v);
+    setCreatingRaw(v ? "choose" : false);
   };
   const name = (profile.name as string) || "";
   const initial = (name || email || "·").slice(0, 1).toUpperCase();
@@ -36,6 +38,8 @@ export default function Trips({ onOpen, onClose }: { onOpen: (id: string) => voi
   }, [trips]);
   const [hero, ...rest] = sorted;
 
+  if (creating === "choose") return <CreateChooser onCancel={() => setCreating(false)} onPick={(k) => { track("tool_opened", `create_${k}`); setCreatingRaw(k); }} />;
+  if (creating === "concierge") return <Concierge onCancel={() => setCreating(false)} onForm={() => setCreatingRaw("form")} onCreated={(id) => { setCreating(false); onOpen(id); }} />;
   if (creating) return <CreateWizard onCancel={() => setCreating(false)} onCreated={(id) => { setCreating(false); onOpen(id); }} />;
 
   const top = (

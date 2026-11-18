@@ -64,7 +64,7 @@ export type EnrichResult = {
   confidence: "haute" | "moyenne" | "faible";
 };
 
-export type AiTask = "photo" | "interpret" | "place" | "ask" | "enrich" | "balance" | "extract" | "intake" | "outline" | "day" | "adjust" | "essentials";
+export type AiTask = "photo" | "interpret" | "place" | "ask" | "enrich" | "balance" | "extract" | "intake" | "concierge" | "outline" | "day" | "adjust" | "essentials";
 
 /** A booking or appointment at a fixed time (read from a confirmation or the paste box) */
 export type FixedItem = { kind: "reservation" | "rendez-vous" | "billet" | "autre"; name: string; date: string; time: string; endTime: string; address: string; notes: string; price?: number; currency?: string };
@@ -75,6 +75,22 @@ export type ExtractResult = {
   bookingCurrency?: string;
   fixed: FixedItem[];
   notes: string;
+};
+/** The concierge's answer: what to say, and everything understood so far about the trip */
+export type ConciergeResult = {
+  reply: string;
+  destinations: { name: string; country: string }[];
+  start: string;
+  end: string;
+  travel: string;
+  pace: string;
+  hotel: { name: string; address: string };
+  flights: ExtractResult["flights"];
+  places: IntakeResult["places"];
+  fixed: FixedItem[];
+  wishes: string[];
+  interests: string[];
+  ready: boolean;
 };
 export type IntakeResult = { places: { name: string; city: string; why: string; mustSee: boolean; source: string }[]; fixed: FixedItem[]; wishes: string[]; summary: string };
 export type OutlineResult = { days: { date: string; theme: string; area: string; include: string[]; fixed: string[] }[]; notes: string };
