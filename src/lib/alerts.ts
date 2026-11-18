@@ -5,6 +5,7 @@ import type { ExtractResult } from "./ai";
 import { t } from "./i18n";
 import { geocode } from "./placeSearch";
 import { createPlace, getState, updateProfile, updateTrip } from "./store";
+import { addExpense, travellersOf } from "./business";
 import { supabase } from "./supabase";
 
 const VAPID_PUBLIC = "BK5AQrfBJZC_DtZYyUGPrOeegzY8JzepoT5t6ia_5m1tF8sFZXySh39SlbBCQcfO6Ozc2lqdnQRCyID5f8O5ow4";
@@ -92,8 +93,9 @@ export async function addInbound(item: InboundItem, trip: Trip): Promise<{ added
     for (const f of fl) {
       if (cur.some((c) => c.code === f.code && (c.departAt || "").slice(0, 10) === (f.departAt || "").slice(0, 10))) continue;
       const kind: Flight["kind"] = (f.arriveAt || "").slice(0, 10) <= trip.start ? "arrival" : "departure";
-      cur.push({ code: f.code, airline: f.airline || undefined, from: f.from, to: f.to, fromCity: f.fromCity, toCity: f.toCity, terminal: f.terminal || undefined, departAt: f.departAt || undefined, arriveAt: f.arriveAt || undefined, kind, at: kind === "arrival" ? f.arriveAt || f.departAt : f.departAt || f.arriveAt });
+      cur.push({ code: f.code, airline: f.airline || undefined, from: f.from, to: f.to, fromCity: f.fromCity, toCity: f.toCity, terminal: f.terminal || undefined, departAt: f.departAt || undefined, arriveAt: f.arriveAt || undefined, kind, at: kind === "arrival" ? f.arriveAt || f.departAt : f.departAt || f.arriveAt, cabin: f.cabin || undefined, price: f.price || undefined, currency: f.currency || undefined });
       added++;
+      if (f.price && f.price > 0) await spend(trip, f.price, f.currency, `${f.code} ${f.from}→${f.to}`, "flights", (f.departAt || "").slice(0, 10));
     }
     updateTrip(trip.id, { flights: cur });
   }
@@ -102,9 +104,10 @@ export async function addInbound(item: InboundItem, trip: Trip): Promise<{ added
   if (h?.name && (!trip.hotel.name || /à préciser|to be confirmed/i.test(trip.hotel.name))) {
     const box: [number, number, number, number] = [trip.center[0] - 0.6, trip.center[1] - 0.6, trip.center[0] + 0.6, trip.center[1] + 0.6];
     const g = await geocode(h.address || `${h.name} ${trip.title}`, box, new AbortController().signal, trip.country || "").catch(() => null);
-    updateTrip(trip.id, { hotel: { name: h.name, lat: g ? g.ll[1] : trip.hotel.lat, lng: g ? g.ll[0] : trip.hotel.lng } });
+    updateTrip(trip.id, { hotel: { name: h.name, lat: g ? g.ll[1] : trip.hotel.lat, lng: g ? g.ll[0] : trip.hotel.lng, nights: h.nights || undefined, price: h.price || undefined, currency: h.currency || undefined } });
     added++;
   }
+  if (h?.name && h.price && h.price > 0) await spend(trip, h.price, h.currency, h.name, "lodging", h.checkIn);
   // bookings (restaurant, museum, meeting…): a place on its day and time
   for (const f of x.fixed || []) {
     if (!f.name) continue;
@@ -117,7 +120,29 @@ export async function addInbound(item: InboundItem, trip: Trip): Promise<{ added
     const day = trip.days.find((d) => d.dates?.includes(f.date))?.key || "ideas";
     const slot = f.time ? `${f.time.replace(":", "h")}${f.endTime ? `–${f.endTime.replace(":", "h")}` : ""}` : "";
     if (createPlace({ name: f.name, lat: g.ll[1], lng: g.ll[0], address: f.address, day, slot, type: "ajout", why: f.notes || "" })) added++;
+    if (f.price && f.price > 0) await spend(trip, f.price, f.currency, f.name, /restaurant|dîner|déjeuner|dinner|lunch/i.test(`${f.name} ${f.notes}`) ? "food" : "activities", f.date);
+  }
+  // one total for the whole booking
+  if (x.bookingPrice && x.bookingPrice > 0 && !(x.flights || []).some((f) => f.price) && !x.hotel?.price) {
+    await spend(trip, x.bookingPrice, x.bookingCurrency, item.subject || t("Réservation"), (x.flights || []).length ? "flights" : x.hotel?.name ? "lodging" : "activities", "");
   }
   await supabase?.from("inbound_items").update({ status: "added", trip_id: trip.id }).eq("id", item.id);
   return { added, manual };
+}
+
+/** A price read in a forwarded booking becomes an expense of the trip (category, euros at today's rate) */
+async function spend(trip: Trip, amount: number, currency: string | undefined, label: string, category: string, date: string) {
+  const cur = (currency || "EUR").toUpperCase().slice(0, 3);
+  let eur: number | null = cur === "EUR" ? amount : null;
+  if (eur == null) {
+    try {
+      const j = await fetch(`https://api.frankfurter.dev/v2/rates?base=EUR&quotes=${cur}`).then((r) => (r.ok ? r.json() : null));
+      const r = Number(Array.isArray(j) ? j[0]?.rate : j?.rates?.[cur]);
+      if (r) eur = amount / r;
+    } catch {
+      /* rate unknown: the amount stays in its currency */
+    }
+  }
+  const people = travellersOf(trip);
+  addExpense({ amount: Math.round(amount * 100) / 100, currency: cur, label: label.slice(0, 80), date: /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : new Date().toISOString().slice(0, 10), paidBy: people[0] || "", split: [], category, eur }, trip.id);
 }

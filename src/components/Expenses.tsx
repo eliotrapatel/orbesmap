@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import type { Trip } from "../data/types";
 import {
-  addExpense, deleteExpense, localCurrency, money, setTravellers, settle, symbolOf, toEur, travellersOf, useBusiness, useEurRate, useExpenses, type Expense,
+  addExpense, categoryOf, deleteExpense, EXPENSE_CATEGORIES, localCurrency, money, setTravellers, settle, symbolOf, toEur, travellersOf, useBusiness, useEurRate, useExpenses, type Expense,
 } from "../lib/business";
 import { locale, t } from "../lib/i18n";
 import { toast, useCanEdit, useStore } from "../lib/store";
@@ -43,6 +43,15 @@ export default function Expenses({ trip }: { trip: Trip }) {
         {missingRate && <small>{t("Taux de change indisponible hors connexion : certains montants ne sont pas comptés en euros.")}</small>}
       </div>
 
+      {list.length > 0 && (
+        <div className="exp-cats">
+          {EXPENSE_CATEGORIES.map((c) => {
+            const sum = list.filter((e) => e.category === c.key).reduce((s, e) => s + (toEur(e, rates) ?? e.eur ?? 0), 0);
+            return sum > 0 ? <span key={c.key} className="exp-cat">{c.icon} {t(c.label)} <b>{money(sum, "EUR", loc)}</b></span> : null;
+          })}
+        </div>
+      )}
+
       <People trip={trip} people={people} canEdit={canEdit} />
 
       {people.length > 1 && list.length > 0 && (
@@ -75,7 +84,7 @@ export default function Expenses({ trip }: { trip: Trip }) {
             return (
               <div key={e.id} className="exp-item">
                 <span className="exp-grow">
-                  <b>{e.label || t("Dépense")}</b>
+                  <b>{categoryOf(e.category).icon} {e.label || t(categoryOf(e.category).label)}</b>
                   <small>
                     {t("payé par {who}", { who: e.paidBy || "?" })}
                     {e.split.length && e.split.length < people.length ? ` · ${t("pour {list}", { list: e.split.join(", ") })}` : ""}
@@ -129,6 +138,8 @@ function AddForm({ trip, people, local, business, suppliers }: { trip: Trip; peo
   const [split, setSplit] = useState<string[]>([]);
   const [placeId, setPlaceId] = useState("");
   const [date, setDate] = useState(today);
+  const [category, setCategory] = useState("food");
+  const rate = useEurRate(local);
   const n = Number(amount.replace(/\s/g, "").replace(",", "."));
   const ok = Number.isFinite(n) && n > 0 && !!(paidBy || !people.length);
   if (!open) return <button className="btn primary block" style={{ marginTop: 14 }} onClick={() => { setPaidBy(people[0] || ""); setOpen(true); }}>{t("+ Ajouter une dépense")}</button>;
@@ -138,7 +149,8 @@ function AddForm({ trip, people, local, business, suppliers }: { trip: Trip; peo
       onSubmit={(e) => {
         e.preventDefault();
         if (!ok) return;
-        addExpense({ amount: Math.round(n * 100) / 100, currency, label: label.trim(), date: date || today, paidBy: paidBy || people[0] || "", split: split.length === people.length ? [] : split, placeId: business && placeId ? placeId : undefined });
+        const amt = Math.round(n * 100) / 100;
+        addExpense({ amount: amt, currency, label: label.trim(), date: date || today, paidBy: paidBy || people[0] || "", split: split.length === people.length ? [] : split, placeId: placeId || undefined, category, eur: currency === "EUR" ? amt : rate ? amt / rate : null }, trip.id);
         toast(t("Dépense ajoutée"));
         setAmount("");
         setLabel("");
@@ -155,6 +167,14 @@ function AddForm({ trip, people, local, business, suppliers }: { trip: Trip; peo
             {[...new Set([local, "EUR"])].map((c) => <option key={c} value={c}>{c} {symbolOf(c)}</option>)}
           </select>
         </label>
+      </div>
+      <div className="field">
+        <span>{t("Catégorie")}</span>
+        <div className="exp-chips">
+          {EXPENSE_CATEGORIES.map((c) => (
+            <button key={c.key} type="button" className={"fchip" + (category === c.key ? " on" : "")} aria-pressed={category === c.key} onClick={() => setCategory(c.key)}>{c.icon} {t(c.label)}</button>
+          ))}
+        </div>
       </div>
       <label className="field"><span>{t("Quoi")}</span><input className="input" value={label} onChange={(e) => setLabel(e.target.value)} placeholder={t("ex. dîner, taxi, échantillons")} maxLength={80} /></label>
       <div className="grid2">
@@ -183,9 +203,9 @@ function AddForm({ trip, people, local, business, suppliers }: { trip: Trip; peo
           </div>
         </div>
       )}
-      {business && (
+      {suppliers.length > 0 && (
         <label className="field">
-          <span>{t("Fournisseur (facultatif)")}</span>
+          <span>{business ? t("Fournisseur (facultatif)") : t("Lieu (facultatif)")}</span>
           <select className="input" value={placeId} onChange={(e) => setPlaceId(e.target.value)}>
             <option value="">{t("Aucun")}</option>
             {suppliers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}

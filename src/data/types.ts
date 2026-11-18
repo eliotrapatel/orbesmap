@@ -83,6 +83,10 @@ export interface Flight {
   arriveAt?: string;
   terminal?: string;
   airline?: string;
+  /** economy, premium, business, first (from a forwarded booking) */
+  cabin?: string;
+  price?: number;
+  currency?: string;
   kind: "arrival" | "departure";
 }
 
@@ -116,7 +120,7 @@ export interface Trip {
   travellers?: string[];
   /** main local language (interpreter, phrases) */
   lang?: { code: string; name: string; speech: string };
-  hotel: { name: string; lat: number; lng: number; placeId?: string };
+  hotel: { name: string; lat: number; lng: number; placeId?: string; nights?: number; price?: number; currency?: string };
   center: [number, number];
   days: Day[];
   places: Place[];

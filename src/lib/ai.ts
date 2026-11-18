@@ -67,10 +67,12 @@ export type EnrichResult = {
 export type AiTask = "photo" | "interpret" | "place" | "ask" | "enrich" | "balance" | "extract" | "intake" | "outline" | "day" | "adjust" | "essentials";
 
 /** A booking or appointment at a fixed time (read from a confirmation or the paste box) */
-export type FixedItem = { kind: "reservation" | "rendez-vous" | "billet" | "autre"; name: string; date: string; time: string; endTime: string; address: string; notes: string };
+export type FixedItem = { kind: "reservation" | "rendez-vous" | "billet" | "autre"; name: string; date: string; time: string; endTime: string; address: string; notes: string; price?: number; currency?: string };
 export type ExtractResult = {
-  flights: { code: string; airline: string; from: string; to: string; fromCity: string; toCity: string; departAt: string; arriveAt: string; terminal: string }[];
-  hotel: { name: string; address: string; addressCn: string; checkIn: string; checkOut: string };
+  flights: { code: string; airline: string; from: string; to: string; fromCity: string; toCity: string; departAt: string; arriveAt: string; terminal: string; cabin?: string; price?: number; currency?: string }[];
+  hotel: { name: string; address: string; addressCn: string; checkIn: string; checkOut: string; nights?: number; price?: number; currency?: string };
+  bookingPrice?: number;
+  bookingCurrency?: string;
   fixed: FixedItem[];
   notes: string;
 };

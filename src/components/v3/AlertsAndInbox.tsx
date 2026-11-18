@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { addInbound, alertPrefs, disablePush, dismissInbound, enablePush, inboundAddress, inboundItems, pushBlocker, pushEnabled, setAlertPrefs, type InboundItem } from "../../lib/alerts";
 import { t } from "../../lib/i18n";
-import { currentTrip, toast, useStore } from "../../lib/store";
+import { currentTrip, toast, updateProfile, useStore } from "../../lib/store";
 
 /** Alerts (morning e-mail, notifications on this phone) and the address to forward bookings to */
 export function AlertsBlock() {
   useStore((s) => s.profile.alerts);
+  const optOut = useStore((s) => s.profile.partnerOptOut === true);
   const prefs = alertPrefs();
   const [on, setOn] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
@@ -46,6 +47,10 @@ export function AlertsBlock() {
         {!blocker && <button type="button" className="v3-chip" disabled={busy || on === null} onClick={() => void togglePush()}>{on ? t("Désactiver") : t("Activer")}</button>}
       </div>
       {err && <p className="v3-err">{err}</p>}
+      <label className="alerts-row">
+        <span className="v3-grow"><b>{t("Offres de nos partenaires")}</b><small>{t("Des offres choisies d'après vos voyages et vos dépenses (hôtels, activités, transport, assurance…). Décochez pour ne plus en recevoir et ne plus figurer dans les données partagées avec nos partenaires.")}</small></span>
+        <input type="checkbox" checked={!optOut} onChange={(e) => updateProfile({ partnerOptOut: !e.target.checked, partnerOptOutAt: Date.now() })} />
+      </label>
       {addr && (
         <div className="alerts-inbound">
           <b>{t("Transférez vos réservations")}</b>

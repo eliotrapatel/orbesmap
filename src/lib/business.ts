@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Trip } from "../data/types";
 import { TRIP_BY_ID } from "../data/trip";
 import { currentAuthor, getState, requestPro, updateRecord, updateTrip, useStore } from "./store";
+import { track } from "./track";
 
 // ---------- mode ----------
 /** Business mode is on for this trip (and usable: Pro, the trip owner's Pro, or the shared space) */
@@ -92,8 +93,25 @@ export type Expense = {
   split: string[];
   /** business mode: the supplier (place id) it belongs to */
   placeId?: string;
+  /** what it was (see EXPENSE_CATEGORIES) */
+  category: string;
+  /** its value in euros when it was entered (null: the rate was unknown) */
+  eur?: number | null;
   createdBy?: string;
 };
+
+/** Kinds of expenses (the label is French, translated where shown) */
+export const EXPENSE_CATEGORIES: { key: string; label: string; icon: string }[] = [
+  { key: "flights", label: "Vols", icon: "✈" },
+  { key: "lodging", label: "Hébergement", icon: "🏨" },
+  { key: "transport", label: "Transport sur place", icon: "🚕" },
+  { key: "food", label: "Restaurants et cafés", icon: "🍽" },
+  { key: "activities", label: "Activités et visites", icon: "🎟" },
+  { key: "shopping", label: "Shopping", icon: "🛍" },
+  { key: "business", label: "Achats pro et échantillons", icon: "📦" },
+  { key: "other", label: "Autre", icon: "•" },
+];
+export const categoryOf = (k?: string) => EXPENSE_CATEGORIES.find((c) => c.key === k) || EXPENSE_CATEGORIES[EXPENSE_CATEGORIES.length - 1];
 const PREFIX = "_exp:";
 
 /** The trip's expenses, newest first */
@@ -107,6 +125,7 @@ export function expensesOf(records: Record<string, Record<string, unknown>>): Ex
       id: k.slice(PREFIX.length), amount, currency: String(r.currency || "EUR"), label: String(r.label || ""), date: String(r.date || ""),
       paidBy: String(r.paidBy || ""), split: Array.isArray(r.split) ? (r.split as unknown[]).map(String) : [],
       placeId: typeof r.placeId === "string" && r.placeId ? r.placeId : undefined, createdBy: typeof r.createdBy === "string" ? r.createdBy : undefined,
+      category: typeof r.category === "string" && r.category ? r.category : "other", eur: typeof r.eur === "number" ? r.eur : null,
     });
   }
   return out.sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
@@ -116,9 +135,10 @@ export function useExpenses(): Expense[] {
   return useMemo(() => expensesOf(records as Record<string, Record<string, unknown>>), [records]);
 }
 
-export function addExpense(e: Omit<Expense, "id" | "createdBy">) {
+export function addExpense(e: Omit<Expense, "id" | "createdBy">, tripId?: string) {
   const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
-  updateRecord(PREFIX + id, { ...e, placeId: e.placeId || null, createdBy: currentAuthor() || null });
+  updateRecord(PREFIX + id, { ...e, eur: e.eur == null ? null : Math.round(e.eur * 100) / 100, placeId: e.placeId || null, createdBy: currentAuthor() || null });
+  track("expense_added", e.category, tripId || getState().tripId);
 }
 export const deleteExpense = (id: string) => updateRecord(PREFIX + id, { deleted: true });
 

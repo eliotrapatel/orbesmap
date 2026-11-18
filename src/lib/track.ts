@@ -6,7 +6,7 @@ import { supabase } from "./supabase";
 export type Step =
   | "visit" | "signup_email" | "signup_done" | "sign_in" | "app_open" | "trip_created" | "trip_opened" | "trip_validated"
   | "place_added" | "invite_sent" | "export" | "pro_screen" | "code_redeemed" | "waitlist_join"
-  | "link_opened" | "public_view" | "trip_copied";
+  | "link_opened" | "public_view" | "trip_copied" | "expense_added";
 
 const VISITOR_KEY = "orbes.vid";
 /** This device's random identifier (made once) */
@@ -34,6 +34,8 @@ const referrer = () => {
 };
 const once = new Set<string>();
 
+const ENDPOINT = location.hostname.endsWith(".vercel.app") ? "/api/track" : "https://orbesmap.vercel.app/api/track";
+
 /** Records one step (`trip`: the trip it concerns). "visit" and "app_open" count once per opening of the app. */
 export function track(name: Step, detail?: string | null, trip?: string | null) {
   if (!supabase) return;
@@ -41,11 +43,20 @@ export function track(name: Step, detail?: string | null, trip?: string | null) 
     if (once.has(name)) return;
     once.add(name);
   }
-  void supabase
-    .rpc("track_event", {
-      p_name: name, p_detail: detail ?? null, p_device: device(), p_ref: name === "visit" ? referrer() : null, p_visitor: visitor(), p_trip: trip ?? null,
+  const body = { name, detail: detail ?? null, device: device(), ref: name === "visit" ? referrer() : null, visitor: visitor(), trip: trip ?? null };
+  // through api/track, which adds the city and the device of the connection; straight to the database if it fails
+  void supabase.auth
+    .getSession()
+    .then(({ data }) => {
+      const tok = data.session?.access_token;
+      return fetch(ENDPOINT, { method: "POST", keepalive: true, headers: { "content-type": "application/json", ...(tok ? { authorization: `Bearer ${tok}` } : {}) }, body: JSON.stringify(body) });
     })
-    .then(() => undefined, () => undefined);
+    .then((r) => {
+      if (!r.ok) throw new Error(String(r.status));
+    })
+    .catch(() =>
+      supabase!.rpc("track_event", { p_name: body.name, p_detail: body.detail, p_device: body.device, p_ref: body.ref, p_visitor: body.visitor, p_trip: body.trip }).then(() => undefined, () => undefined),
+    );
 }
 
 let linkedFor = "";

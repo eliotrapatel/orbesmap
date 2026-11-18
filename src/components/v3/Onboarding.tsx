@@ -37,16 +37,20 @@ export default function Onboarding() {
   const [budget, setBudget] = useState<number>(() => Number(profile.budget) || 3);
   const [lang, setLang] = useState<string>(() => (profile.lang as string) || getLang());
   const first = name.trim() || email.split("@")[0];
+  const [home, setHome] = useState<string>(() => (profile.home as string) || "");
+  const [age, setAge] = useState<string>(() => (profile.age as string) || "");
+  const [freq, setFreq] = useState<string>(() => (profile.tripsPerYear as string) || "");
+  const [heard, setHeard] = useState<string>(() => (profile.heard as string) || "");
 
   const finish = () => {
-    updateProfile({ name: name.trim(), travel, interests, pace, budget, lang, onboardedAt: Date.now() });
+    updateProfile({ name: name.trim(), travel, interests, pace, budget, lang, home: home.trim(), age, tripsPerYear: freq, heard, onboardedAt: Date.now() });
     track("signup_done");
   };
   const back = step > 1 ? () => setStep(step - 1) : undefined;
   const top = (
     <div className="v3-bar">
       {back ? <button className="v3-tool" onClick={back} aria-label={t("Retour")}>‹</button> : <span className="v3-tool ghost" />}
-      <Steps n={step} of={3} />
+      <Steps n={step} of={4} />
     </div>
   );
 
@@ -98,6 +102,33 @@ export default function Onboarding() {
       </Shell>
     );
 
+  if (step === 4)
+    return (
+      <Shell ring={false} top={top}>
+        <p className="v3-lbl" style={{ marginTop: 22 }}>{t("Facultatif")}</p>
+        <h1 className="v3-d v3-h2">{t("Un peu plus sur vous.")}</h1>
+        <p className="v3-note">{t("Pour des programmes et des offres qui vous ressemblent.")}</p>
+        <label className="v3-field col" style={{ marginTop: 16 }}>
+          <span>{t("Ville ou aéroport de départ")}</span>
+          <input value={home} onChange={(e) => setHome(e.target.value)} placeholder={t("ex. Paris, CDG")} maxLength={60} autoComplete="address-level2" />
+        </label>
+        <p className="v3-lbl" style={{ marginTop: 18 }}>{t("Âge")}</p>
+        <div className="v3-chips" style={{ marginTop: 10 }}>
+          {AGES.map((a) => <button key={a} type="button" className={"v3-chip" + (age === a ? " on" : "")} aria-pressed={age === a} onClick={() => setAge(age === a ? "" : a)}>{a}</button>)}
+        </div>
+        <p className="v3-lbl" style={{ marginTop: 18 }}>{t("Voyages par an")}</p>
+        <div className="v3-chips" style={{ marginTop: 10 }}>
+          {FREQS.map((f) => <button key={f.k} type="button" className={"v3-chip" + (freq === f.k ? " on" : "")} aria-pressed={freq === f.k} onClick={() => setFreq(freq === f.k ? "" : f.k)}>{t(f.l)}</button>)}
+        </div>
+        <p className="v3-lbl" style={{ marginTop: 18 }}>{t("Comment nous avez-vous connus ?")}</p>
+        <div className="v3-chips" style={{ marginTop: 10 }}>
+          {HEARD.map((h) => <button key={h.k} type="button" className={"v3-chip" + (heard === h.k ? " on" : "")} aria-pressed={heard === h.k} onClick={() => setHeard(heard === h.k ? "" : h.k)}>{t(h.l)}</button>)}
+        </div>
+        <div className="v3-spacer" />
+        <button className="v3-btn" onClick={finish}>{t("Terminer")}</button>
+      </Shell>
+    );
+
   return (
     <Shell ring={false} top={top}>
       <p className="v3-lbl" style={{ marginTop: 22 }}>{t("Votre façon")}</p>
@@ -125,7 +156,14 @@ export default function Onboarding() {
         ))}
       </div>
       <div className="v3-spacer" />
-      <button className="v3-btn" onClick={finish}>{t("Terminer")}</button>
+      <button className="v3-btn" onClick={() => setStep(4)}>{t("Continuer")}</button>
     </Shell>
   );
 }
+
+const AGES = ["18–24", "25–34", "35–44", "45–54", "55–64", "65+"];
+const FREQS: { k: string; l: string }[] = [{ k: "1", l: "1 par an" }, { k: "2-3", l: "2 à 3" }, { k: "4-6", l: "4 à 6" }, { k: "7+", l: "7 ou plus" }];
+const HEARD: { k: string; l: string }[] = [
+  { k: "instagram", l: "Instagram" }, { k: "tiktok", l: "TikTok" }, { k: "friend", l: "Un ami" }, { k: "search", l: "Recherche Google" },
+  { k: "press", l: "Presse ou blog" }, { k: "other", l: "Autre" },
+];

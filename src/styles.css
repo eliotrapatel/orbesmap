@@ -1321,3 +1321,6 @@ button.v3-brand { color: var(--ink); background: none; border: 0; padding: 0; cu
 .inbox-item b { display: block; font-weight: 500; }
 .inbox-item small { color: var(--mute); font-size: 12px; }
 .inbox-item p { color: var(--soft); font-size: 13px; margin-top: 4px; }
+.exp-cats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; } .exp-cat { font-size: 12.5px; color: var(--soft); padding: 4px 10px; border-radius: 999px; border: 1px solid var(--hair); } .exp-cat b { color: var(--ink); font-weight: 500; margin-left: 4px; }
+.adm-select { width: 100%; height: 44px; margin-top: 10px; border-radius: 12px; border: 1px solid var(--hair); background: var(--plate-2); color: var(--ink); padding: 0 12px; font-size: 14px; }
+.adm-step > .adm-step-bar { position: absolute; left: 0; top: 0; bottom: 0; }

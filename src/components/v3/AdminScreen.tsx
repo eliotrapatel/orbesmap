@@ -5,10 +5,13 @@ import {
   type AccountRow, type CodeRow, type Overview, type WaitRow,
 } from "../../lib/pro";
 import Shell from "./Shell";
+import { overview, partnerCsv, people, personasOf, totalSpend, type Person } from "../../lib/insights";
+import { EXPENSE_CATEGORIES } from "../../lib/business";
+import { TYPE_LABEL } from "../../data/trip";
 import { locale, t, tk } from "../../lib/i18n";
 
-type Tab = "figures" | "accounts" | "codes" | "waitlist";
-const TABS: [Tab, string][] = [["figures", "Chiffres"], ["accounts", "Comptes"], ["codes", "Codes"], ["waitlist", "Attente"]];
+type Tab = "figures" | "profiles" | "accounts" | "codes" | "waitlist";
+const TABS: [Tab, string][] = [["figures", "Chiffres"], ["profiles", "Profils"], ["accounts", "Comptes"], ["codes", "Codes"], ["waitlist", "Attente"]];
 const DURATIONS: [string, number | null][] = [["30 jours", 30], ["90 jours", 90], ["1 an", 365], ["À vie", null]];
 const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(locale(), { day: "numeric", month: "short", year: "2-digit", timeZone: "Europe/Paris" }) : "—");
 const usd = (n: number) => t("{n} $", { n: (Number(n) || 0).toFixed(2) });
@@ -36,6 +39,7 @@ export default function AdminScreen({ onClose }: { onClose: () => void }) {
       {tab === "accounts" && <Accounts />}
       {tab === "codes" && <Codes />}
       {tab === "waitlist" && <Waitlist />}
+      {tab === "profiles" && <Profiles />}
     </Shell>
   );
 }
@@ -263,6 +267,7 @@ function AccountSheet({ row, onClose }: { row: AccountRow; onClose: () => void }
                 <div key={k}><dt>{k}</dt><dd>{v}</dd></div>
               ))}
             </dl>
+            <Traveller userId={row.user_id} />
             <span className="v3-lbl adm-sub">{t("Voyages ({n})", { n: u.trips.length })}</span>
             <div className="adm-list">
               {u.trips.map((tr) => (
@@ -406,3 +411,95 @@ function Waitlist() {
   );
 }
 
+
+const eur = (n: number) => new Intl.NumberFormat(locale(), { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n || 0);
+
+/** Everyone: spending per category, destinations, airlines, cities, devices, personas; the partners' export */
+function Profiles() {
+  const { data, err } = useLoad<Person[]>(() => people());
+  const [persona, setPersona] = useState("");
+  if (err) return <p className="v3-err">{err}</p>;
+  if (!data) return <p className="v3-note">{t("Chargement…")}</p>;
+  const o = overview(data);
+  const exp = partnerCsv(data, persona || undefined);
+  const download = () => {
+    const url = URL.createObjectURL(new Blob(["\ufeff" + exp.csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `orbes-trips-profils${persona ? `-${persona.toLowerCase().replace(/[^a-z0-9]+/g, "-")}` : ""}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 5000);
+  };
+  const bars = (rows: [string, number][], fmt: (n: number) => string = String) => {
+    const max = Math.max(1, ...rows.map((r) => r[1]));
+    return (
+      <div className="adm-path">
+        {rows.map(([k, v]) => (
+          <div key={k} className="adm-step"><span className="adm-step-bar" style={{ width: `${Math.max(2, (v / max) * 100)}%` }} /><span className="v3-grow">{k}</span><b>{fmt(v)}</b></div>
+        ))}
+        {!rows.length && <p className="v3-note">{t("Pas encore de données.")}</p>}
+      </div>
+    );
+  };
+  return (
+    <>
+      <div className="adm-stats">
+        <div className="adm-stat"><span className="v3-lbl">{t("Dépenses suivies")}</span><b>{eur(o.total)}</b><small>{t("{n} voyages", { n: o.trips })}</small></div>
+        <div className="adm-stat"><span className="v3-lbl">{t("Par voyage")}</span><b>{eur(o.perTrip)}</b><small>{t("{e} par jour", { e: eur(o.perDay) })}</small></div>
+      </div>
+      <div className="v3-glass adm-card">
+        <span className="v3-lbl">{t("Dépenses par catégorie")}</span>
+        {bars(EXPENSE_CATEGORIES.map((c) => [`${c.icon} ${t(c.label)}`, Number(o.cat[c.key]) || 0] as [string, number]).filter((r) => r[1] > 0), eur)}
+      </div>
+      <div className="v3-glass adm-card">
+        <span className="v3-lbl">{t("Personas")}</span>
+        {bars(o.personas.map(([k, v]) => [t(k), v] as [string, number]))}
+      </div>
+      <div className="v3-glass adm-card"><span className="v3-lbl">{t("Destinations")}</span>{bars(o.dest)}</div>
+      <div className="v3-glass adm-card"><span className="v3-lbl">{t("Compagnies aériennes")}</span>{bars(o.air)}{o.cabin.length > 0 && <p className="v3-note">{t("Classes : {list}", { list: o.cabin.map(([k, v]) => `${k} (${v})`).join(", ") })}</p>}</div>
+      <div className="v3-glass adm-card"><span className="v3-lbl">{t("Villes des utilisateurs")}</span>{bars(o.city)}{o.os.length > 0 && <p className="v3-note">{t("Appareils : {list}", { list: o.os.map(([k, v]) => `${k} (${v})`).join(", ") })}</p>}</div>
+      <div className="v3-glass adm-card">
+        <span className="v3-lbl">{t("Export pour les partenaires")}</span>
+        <p className="v3-note">{t("Une ligne par personne : profil, voyages, dépenses par catégorie, vols, hôtels, personas. Les personnes qui ont refusé les offres partenaires n'y figurent pas.")}</p>
+        <select className="adm-select" value={persona} onChange={(e) => setPersona(e.target.value)} aria-label={t("Persona")}>
+          <option value="">{t("Tout le monde")}</option>
+          {o.personas.map(([k]) => <option key={k} value={k}>{t(k)}</option>)}
+        </select>
+        <button className="v3-btn" style={{ marginTop: 10 }} disabled={!exp.rows} onClick={download}>{exp.rows > 1 ? t("Télécharger le CSV ({n} personnes)", { n: exp.rows }) : t("Télécharger le CSV ({n} personne)", { n: exp.rows })}</button>
+      </div>
+    </>
+  );
+}
+
+/** One person's traveller profile: personas, spending, flights, hotels, places, cities, devices */
+function Traveller({ userId }: { userId: string }) {
+  const { data } = useLoad<Person[]>(() => people(userId), [userId]);
+  const p = data?.[0];
+  if (!p) return null;
+  const pr = p.profile || {};
+  const facts: [string, string][] = ([
+    [t("Ville de départ"), String(pr.home || "")],
+    [t("Âge"), String(pr.age || "")],
+    [t("Voyages par an"), String(pr.tripsPerYear || "")],
+    [t("Connu par"), String(pr.heard || "")],
+    [t("Offres partenaires"), pr.partnerOptOut === true ? t("refusées") : t("acceptées")],
+    [t("Villes"), p.seen.cities.map((c) => `${c.city}${c.country ? ` (${c.country})` : ""}`).join(", ")],
+    [t("Appareils"), [...Object.keys(p.seen.os || {}), ...Object.keys(p.seen.browsers || {})].join(", ")],
+    [t("Dépenses suivies"), `${eur(totalSpend(p))} (${p.expenses})`],
+  ] as [string, string][]).filter(([, v]) => v);
+  return (
+    <>
+      <span className="v3-lbl adm-sub">{t("Profil voyageur")}</span>
+      <div className="adm-counts">{personasOf(p).map((x) => <span key={x} className="v3-tag gold">{t(x)}</span>)}</div>
+      <dl className="adm-facts">{facts.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
+      {totalSpend(p) > 0 && (
+        <div className="adm-counts" style={{ marginTop: 10 }}>
+          {EXPENSE_CATEGORIES.filter((c) => p.spend?.[c.key]).map((c) => <span key={c.key} className="v3-tag dim">{c.icon} {t(c.label)} · {eur(Number(p.spend[c.key]))}</span>)}
+        </div>
+      )}
+      {p.flights.length > 0 && <p className="v3-note">{t("Vols : {list}", { list: p.flights.map((f) => [f.code, f.from && f.to ? `${f.from}→${f.to}` : "", f.cabin, f.price ? `${f.price} ${f.currency || ""}` : ""].filter(Boolean).join(" ")).join(" · ") })}</p>}
+      {p.hotels.some((h) => h.name && !/à préciser|to be confirmed/i.test(h.name)) && <p className="v3-note">{t("Hôtels : {list}", { list: p.hotels.filter((h) => h.name && !/à préciser|to be confirmed/i.test(h.name)).map((h) => [h.name, h.nights ? t("{n} nuits", { n: h.nights }) : "", h.price ? `${h.price} ${h.currency || ""}` : ""].filter(Boolean).join(" ")).join(" · ") })}</p>}
+      {Object.keys(p.places || {}).length > 0 && <p className="v3-note">{t("Lieux : {list}", { list: Object.entries(p.places).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, v]) => `${t(TYPE_LABEL[k as keyof typeof TYPE_LABEL] || k)} ${v}`).join(", ") })}</p>}
+    </>
+  );
+}
