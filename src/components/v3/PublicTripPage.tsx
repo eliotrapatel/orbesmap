@@ -15,6 +15,15 @@ import { t } from "../../lib/i18n";
 const leave = (hash = "") => location.assign(location.pathname + hash);
 const today = () => new Date().toISOString().slice(0, 10);
 
+/** "Préparez votre voyage": the click is counted before the page leaves (a plain click waits a moment; a new-tab click goes as is) */
+const openApp = (e: React.MouseEvent<HTMLAnchorElement>) => {
+  track("link_opened", "brand_cta");
+  if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+  e.preventDefault();
+  const href = e.currentTarget.href;
+  setTimeout(() => location.assign(href), 200);
+};
+
 /** A trip's programme opened from its public link: read only, without an account; "Copier ce voyage" */
 export default function PublicTripPage({ slug, copyNow }: { slug: string; copyNow: boolean }) {
   const signedIn = useStore((s) => !!s.session);
@@ -98,7 +107,7 @@ export default function PublicTripPage({ slug, copyNow }: { slug: string; copyNo
 
       <footer className="br-pub">
         <p className="br-pub-by"><OrbitMark size={14} /><span>{t("Préparé avec ORBES Trips")}</span></p>
-        <a className="v3-btn ghost br-pub-cta" href={appHome()} onClick={() => track("link_opened", "brand_cta")}>{t("Préparez votre voyage")}</a>
+        <a className="v3-btn ghost br-pub-cta" href={appHome()} onClick={openApp}>{t("Préparez votre voyage")}</a>
       </footer>
 
       <div className="pt-cta">

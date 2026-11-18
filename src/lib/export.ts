@@ -25,7 +25,8 @@ export const appHomeLabel = (href = appHome()) => href.replace(/^https?:\/\//, "
  * footer, its room kept free on each page by a repeated table footer), once at the end on screen.
  */
 const COLOPHON_CSS = `
-  .ob-pg{width:100%;border-collapse:collapse;margin:0}.ob-pg>tbody>tr>td,.ob-pg>tfoot>tr>td{padding:0;border:0}
+  .ob-pg{width:100%;table-layout:fixed;border-collapse:collapse;margin:0}.ob-pg>tbody>tr>td,.ob-pg>tfoot>tr>td{padding:0;border:0}
+  .ob-pg>tbody>tr>td{overflow-wrap:anywhere;word-break:break-word}
   .ob-colo{margin-top:36px;padding-top:10px;border-top:1px solid #e5e2dc;color:#8a8780;font-size:9.5px;letter-spacing:.06em;text-align:center}
   .ob-colo a{color:inherit;text-decoration:none}
   .ob-sp{display:none}
