@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { isMobileSheet, useSheetGesture } from "../lib/sheetDrag";
 import { onToast, currentTrip } from "../lib/store";
@@ -7,6 +7,63 @@ import { t } from "../lib/i18n";
 
 /** Overlays are rendered in <body> so they are never trapped inside a transformed panel */
 export const Portal = ({ children }: { children: ReactNode }) => createPortal(children, document.body);
+
+// ---------- exits: a still copy of what just closed plays out in its place ----------
+// React removes a closed sheet, dialog or screen at once. Just before that, a copy of its last frame is taken and
+// played out (opacity / transform only, never clickable, gone after the animation), so nothing vanishes in a cut.
+export const EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
+export const SHEET_EASE = "cubic-bezier(0.32, 0.72, 0, 1)";
+export const reducedMotion = () => {
+  try {
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  } catch {
+    return false;
+  }
+};
+const SCROLLERS = ".scroll, .drawer-body, .detail-scroll, .v3, .modal";
+/**
+ * Call from a layout-effect cleanup, while the element is still in the page; `play` starts the copy's animation.
+ * Nothing happens when the element is still there right after (React's development double mount), when its parent
+ * left the page too, when `skip()` says so, or when the device asks for reduced motion.
+ */
+export function ghostOut(el: HTMLElement | null, play: (copy: HTMLElement) => Animation | undefined, opts: { parent?: Node | null; skip?: () => boolean } = {}) {
+  if (!el || reducedMotion() || typeof el.animate !== "function") return;
+  const parent = opts.parent ?? el.parentNode;
+  if (!parent) return;
+  const copy = el.cloneNode(true) as HTMLElement;
+  // scroll positions are not copied by cloneNode: noted now, put back once the copy is in the page
+  const scrolled: [number, number][] = [];
+  [el, ...Array.from(el.querySelectorAll<HTMLElement>(SCROLLERS))].forEach((n, i) => {
+    if (n.scrollTop) scrolled.push([i, n.scrollTop]);
+  });
+  queueMicrotask(() => {
+    if (el.isConnected || !parent.isConnected || opts.skip?.()) return;
+    copy.classList.add("fl-ghost");
+    copy.setAttribute("aria-hidden", "true");
+    copy.inert = true;
+    copy.removeAttribute("id");
+    parent.appendChild(copy);
+    const twins = [copy, ...Array.from(copy.querySelectorAll<HTMLElement>(SCROLLERS))];
+    scrolled.forEach(([i, y]) => {
+      if (twins[i]) twins[i].scrollTop = y;
+    });
+    let a: Animation | undefined;
+    try {
+      a = play(copy);
+    } catch {
+      /* no animation: removed below */
+    }
+    const done = () => copy.remove();
+    if (a) {
+      a.onfinish = done;
+      a.oncancel = done;
+    }
+    window.setTimeout(done, a ? 900 : 0);
+  });
+}
+/** Fade (and slight move) of a whole copy */
+export const fadeOut = (copy: HTMLElement, ms = 200, to = "none") =>
+  copy.animate([{ opacity: 1, transform: "none" }, { opacity: 0, transform: to }], { duration: ms, easing: EASE, fill: "forwards" });
 
 // Escape — and the browser / iPhone "back" gesture — close only the topmost overlay (sheet, tool, dialog)
 const escStack: (() => void)[] = [];
@@ -65,11 +122,29 @@ export function useEscape(onClose: () => void) {
   }, []);
 }
 
+let modalMounts = 0;
 export function Modal({ title, intro, onClose, children, className }: { title: string; intro?: string; onClose: () => void; children: ReactNode; className?: string }) {
   useEscape(onClose);
+  const bg = useRef<HTMLDivElement>(null);
+  // closing: the dialog settles down while its veil fades (a dialog replaced by another one simply goes)
+  useLayoutEffect(() => {
+    const el = bg.current;
+    modalMounts++;
+    return () => {
+      const n = modalMounts;
+      ghostOut(
+        el,
+        (copy) => {
+          copy.querySelector<HTMLElement>(".modal")?.animate([{ transform: "none" }, { transform: "translateY(16px)" }], { duration: 220, easing: EASE, fill: "forwards" });
+          return copy.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 220, easing: EASE, fill: "forwards" });
+        },
+        { parent: document.body, skip: () => modalMounts !== n },
+      );
+    };
+  }, []);
   return (
     <Portal>
-      <div className="modal-bg" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div ref={bg} className="modal-bg" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
         <div className={"modal" + (className ? " " + className : "")} role="dialog" aria-modal="true" aria-label={title}>
           <h3>{title}</h3>
           {intro && <p>{intro}</p>}
@@ -131,20 +206,27 @@ export function Lightbox({ src, onClose }: { src: string; onClose: () => void })
 }
 
 export function Toaster() {
-  const [msg, setMsg] = useState<string | null>(null);
+  // the message, a number that changes with each new message (it rises again), and whether it is leaving
+  const [msg, setMsg] = useState<{ text: string; n: number; out: boolean } | null>(null);
   const t = useRef<number | undefined>(undefined);
   useEffect(
     () =>
       onToast((m) => {
-        setMsg(m);
+        setMsg((cur) => ({ text: m, n: (cur?.n || 0) + 1, out: false }));
         window.clearTimeout(t.current);
-        t.current = window.setTimeout(() => setMsg(null), 2600);
+        t.current = window.setTimeout(() => {
+          setMsg((cur) => (cur ? { ...cur, out: true } : cur));
+          t.current = window.setTimeout(() => setMsg(null), 220);
+        }, 2600);
       }),
     [],
   );
+  useEffect(() => {
+    return () => window.clearTimeout(t.current);
+  }, []);
   return msg ? (
     <Portal>
-      <div className="toast" role="status">{msg}</div>
+      <div key={msg.n} className={"toast" + (msg.out ? " out" : "")} role="status">{msg.text}</div>
     </Portal>
   ) : null;
 }
@@ -269,10 +351,38 @@ export function useSheetDrag(onClose: () => void, normal?: string) {
   return { ref, handlers };
 }
 
+// a tool replaced by another one in the same commit: the new drawer takes the old one's place without sliding in again
+let closingDrawer: HTMLElement | null = null;
+let drawerMounts = 0;
+
 /** Glass drawer used by every tool (desktop: right column, mobile: bottom sheet) */
 export function Drawer({ kicker, title, onClose, wide, children, sheetH, actions }: { kicker?: string; title: string; onClose: () => void; wide?: boolean; children: ReactNode; sheetH?: string; actions?: ReactNode }) {
   useEscape(onClose);
   const sheet = useSheetDrag(onClose, sheetH);
+  useLayoutEffect(() => {
+    const el = sheet.ref.current;
+    drawerMounts++;
+    if (el && closingDrawer && closingDrawer !== el) el.classList.add("swap");
+    return () => {
+      if (!el) return;
+      closingDrawer = el;
+      const n = drawerMounts;
+      queueMicrotask(() => {
+        if (closingDrawer === el) closingDrawer = null;
+      });
+      // closing: the sheet goes down from where it is (desktop: the panel slides back to the right)
+      const mobile = isMobileSheet();
+      const from = getComputedStyle(el).transform;
+      ghostOut(
+        el,
+        (copy) =>
+          mobile
+            ? copy.animate([{ transform: from && from !== "none" ? from : "none" }, { transform: "translateY(100%)" }], { duration: 320, easing: SHEET_EASE, fill: "forwards" })
+            : fadeOut(copy, 200, "translateX(18px)"),
+        { skip: () => drawerMounts !== n },
+      );
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <section
       ref={sheet.ref}
