@@ -1,0 +1,9 @@
+/* The signature card (lot CARTE SIGNATURE): its slot, the box that holds its place before it mounts, focus. */
+/* The dark card's halo bleeds about a third of its width to each side: clipped on x (20 px kept where the browser
+   allows it) so a phone never scrolls sideways; it stays visible above and below. */
+.peak-slot { display: block; width: 100%; position: relative; overflow-x: clip; overflow-clip-margin: 20px; letter-spacing: normal; text-transform: none; text-align: left; line-height: normal; }
+.peak-wait { display: block; background: transparent; }
+[data-peak-chart] button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.recap .peak-slot { margin-top: 20px; }
+.exp-total .peak-slot { margin: 2px 0 10px; }
+.adm-peak { margin: 12px 0 0; padding: 0; }

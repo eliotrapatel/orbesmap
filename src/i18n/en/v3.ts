@@ -534,4 +534,11 @@ export default {
   "{v}/{n} visités": "{v}/{n} visited",
   "Voir la préparation": "See the preparation",
   "Ouvrir le voyage": "Open the trip",
+  // admin, figures: the signature card of the AI cost per day (7 / 30 days)
+  "Coût IA": "AI cost",
+  "{n} demandes · le jour le plus cher : {day}, {usd}": "{n} requests · most expensive day: {day}, {usd}",
+  "Coût IA par jour sur {n} jours, total {total}": "AI cost per day over {n} days, total {total}",
+  "Aucune demande à l'IA sur 7 jours.": "No AI requests in the last 7 days.",
+  "{day} · {n} demandes": "{day} · {n} requests",
+  "{n} demandes": "{n} requests",
 } satisfies Record<string, string>;

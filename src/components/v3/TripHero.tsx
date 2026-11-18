@@ -6,9 +6,10 @@ import { liveTrip } from "../../lib/live";
 import type { PlaceState } from "../../lib/model";
 import { getState, toast, useStore } from "../../lib/store";
 import { clock, countdownParts, dayOfTrip, fmtDay, fmtMin, homeZone, localDate, phase, sameHour, tripEndMs, tripStartMs } from "../../lib/time";
-import { t } from "../../lib/i18n";
+import { locale, t, useLang } from "../../lib/i18n";
 import { dateLabel } from "../../lib/newTrip";
-import { coordText, PLANE_PATH, recapDue, recapImage, recapOf, recapStats, routeOf, shareRecapBlob, type Route } from "../../lib/recap";
+import { coordText, eurText, PLANE_PATH, recapDue, recapImage, recapOf, recapPeak, recapStats, routeOf, shareRecapBlob, type Route } from "../../lib/recap";
+import { PeakSlot } from "./ui/PeakCard";
 import { track } from "../../lib/track";
 import { setIntent } from "./nav";
 import { Band, hasBand } from "../PlacePhoto";
@@ -338,7 +339,7 @@ export default function TripHero({ trip: base, onOpen }: { trip: Trip; onOpen: (
 
 /** A click on the card's ground opens the trip; its buttons do their own thing */
 const onGround = (open: () => void) => (e: React.MouseEvent) => {
-  if (!(e.target as HTMLElement).closest?.("button,a")) open();
+  if (!(e.target as HTMLElement).closest?.("button,a,.peak-slot")) open();
 };
 
 /** On site: "Aujourd’hui", day X of N, the next stop and how its time stands, what is left today, and two ways in */
@@ -437,19 +438,27 @@ function RecapCard({ trip, top, route, onOpen }: {
   const draft = useStore((s) => s.trips[trip.id]?.draft);
   const r = useMemo(() => recapOf(trip), [trip, states, draft]); // eslint-disable-line react-hooks/exhaustive-deps
   const key = JSON.stringify(r);
-  // the image is drawn ahead, so the share sheet opens right on the touch (phones refuse it after a wait)
+  const lang = useLang();
+  // the signature card: spending per day, else places visited (stable across the hero's one-second re-renders)
+  const peak = useMemo(() => recapPeak(r), [key, lang]); // eslint-disable-line react-hooks/exhaustive-deps
+  // the image is drawn ahead, so the share sheet opens right on the touch (phones refuse it after a wait); in idle
+  // time, since its first drawing paints its own wide field (shared with the card on a computer, not on a phone)
   const [img, setImg] = useState<{ key: string; blob: Blob } | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     let live = true;
-    const id = window.setTimeout(() => {
+    const run = () => {
       recapImage(r).then((blob) => { if (live) setImg({ key, blob }); }, () => undefined);
-    }, 500);
+    };
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
+    const idle = w.requestIdleCallback ? w.requestIdleCallback(run, { timeout: 2000 }) : 0;
+    const id = idle ? 0 : window.setTimeout(run, 500);
     return () => {
       live = false;
+      if (idle) w.cancelIdleCallback?.(idle);
       window.clearTimeout(id);
     };
-  }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [key, lang]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const share = async () => {
     if (busy) return;
@@ -466,7 +475,8 @@ function RecapCard({ trip, top, route, onOpen }: {
     }
   };
 
-  const stats = recapStats(r);
+  // when the card carries the total, the euros are not printed twice
+  const stats = recapStats(r, { eur: peak?.mode !== "chart" });
   const showCities = r.cities.length > 1 || r.cities[0] !== r.title;
 
   return (
@@ -478,6 +488,7 @@ function RecapCard({ trip, top, route, onOpen }: {
         <small className="v3-hero-when">{r.dates}</small>
         {coordText(r.center) && <small className="hx-coord">{coordText(r.center)}</small>}
         {route}
+        {peak && <PeakSlot {...peak} locale={locale()} periodLabel={t("Période")} formatValue={(v) => eurText(Math.max(0, v))} />}
         <span className="v3-recap-stats">
           {stats.map(([v, l]) => (
             <span key={l}>

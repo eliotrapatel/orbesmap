@@ -9,6 +9,9 @@ import { locale, t } from "../lib/i18n";
 import { addPhoto, deletePhoto, getState, hasPro, photoSrc, requestPro, toast, useCanEdit, useStore } from "../lib/store";
 import { localDate } from "../lib/time";
 import { track } from "../lib/track";
+import { dateLabel } from "../lib/newTrip";
+import { currencyAffix, lineShown, seriesByDay } from "../lib/peakData";
+import { PeakSlot } from "./v3/ui/PeakCard";
 import { ICamera, IClose, IDownload } from "./Icons";
 import { Lightbox, Modal, compressImage } from "./ui";
 
@@ -34,6 +37,11 @@ export default function Expenses({ trip }: { trip: Trip }) {
     for (const e of list) m.set(e.date, [...(m.get(e.date) || []), e]);
     return [...m];
   }, [list]);
+  // euros per day for the signature card, from the same expenses as the total (the line adds up to the headline)
+  const spend = useMemo(
+    () => seriesByDay(known.map((e) => ({ date: e.date, value: toEur(e, rates) ?? 0 })), trip.start, trip.end),
+    [list, rates, trip.start, trip.end], // eslint-disable-line react-hooks/exhaustive-deps
+  );
   const [editing, setEditing] = useState<string | null>(null);
   const [report, setReport] = useState(false);
   const [view, setView] = useState<string | null>(null);
@@ -45,9 +53,35 @@ export default function Expenses({ trip }: { trip: Trip }) {
   return (
     <div className="exp">
       <div className="exp-total">
-        <span className="label">{t("Total du voyage")}</span>
-        <b>{money(totalEur, "EUR", loc)}</b>
-        {local !== "EUR" && <small>{money(totalLocal, local, loc)}{t(" en {cur}", { cur: local })}{rate ? ` · ${t("1 € = {r} {cur}", { r: rate.toLocaleString(loc, { maximumFractionDigits: 2 }), cur: symbolOf(local) })}` : ""}</small>}
+        {list.length === 0 ? (
+          <>
+            <span className="label">{t("Total du voyage")}</span>
+            <b>{money(totalEur, "EUR", loc)}</b>
+            {local !== "EUR" && <small>{money(totalLocal, local, loc)}{t(" en {cur}", { cur: local })}{rate ? ` · ${t("1 € = {r} {cur}", { r: rate.toLocaleString(loc, { maximumFractionDigits: 2 }), cur: symbolOf(local) })}` : ""}</small>}
+          </>
+        ) : (
+          <>
+            <PeakSlot
+              mode={lineShown(spend) ? "chart" : "number"}
+              data={spend.values}
+              labels={spend.days.map(dayName)}
+              value={totalEur}
+              decimals={Number.isInteger(Math.round(totalEur * 100) / 100) ? 0 : 2}
+              valuePrefix={currencyAffix(loc, "EUR").prefix}
+              valueSuffix={currencyAffix(loc, "EUR").suffix}
+              formatValue={(v) => money(Math.max(0, v), "EUR", loc)}
+              locale={loc}
+              periodLabel={t("Période")}
+              title={t("Total du voyage")}
+              caption={[
+                local !== "EUR" && `${money(totalLocal, local, loc)}${t(" en {cur}", { cur: local })}`,
+                lineShown(spend) && t("le plus cher : {day}, {amount}", { day: dayName(spend.allPeak.day), amount: money(spend.allPeak.value, "EUR", loc) }),
+              ].filter(Boolean).join(" · ")}
+              updatedText={`${trip.title} · ${dateLabel(trip.start, trip.end)}`}
+            />
+            {local !== "EUR" && !!rate && <small>{t("1 € = {r} {cur}", { r: rate.toLocaleString(loc, { maximumFractionDigits: 2 }), cur: symbolOf(local) })}</small>}
+          </>
+        )}
         {missingRate && <small>{t("Taux de change indisponible hors connexion : certains montants ne sont pas comptés en euros.")}</small>}
       </div>
 

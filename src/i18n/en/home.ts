@@ -42,4 +42,8 @@ export default {
   "Heure locale": "Local time",
   "avant l’arrivée": "until arrival",
   "Compte à rebours avant l’arrivée": "Countdown to arrival",
+  // the recap's signature card: spending per day, else places visited
+  "Dépenses du voyage": "Trip spending",
+  "Le plus gros jour : {day}, {amount}": "Biggest day: {day}, {amount}",
+  "{v} sur {n} lieux prévus": "{v} of {n} planned places",
 } satisfies Record<string, string>;

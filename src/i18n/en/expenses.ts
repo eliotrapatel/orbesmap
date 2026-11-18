@@ -39,4 +39,6 @@ export default {
   "{n} dépense(s) · {r} justificatif(s)": "{n} expense(s) · {r} receipt(s)",
   "{n} dépense(s) · {r} justificatif(s) · {total}": "{n} expense(s) · {r} receipt(s) · {total}",
   "Édité le": "Issued on",
+  // the signature card at the top of the drawer
+  "le plus cher : {day}, {amount}": "most expensive: {day}, {amount}",
 } satisfies Record<string, string>;
