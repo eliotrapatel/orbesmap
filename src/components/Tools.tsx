@@ -1,5 +1,5 @@
 // Phrases, converter, flights, practical info, export.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Trip } from "../data/types";
 import { exportCsv, exportPdf, exportReport } from "../lib/export";
 import { useBusiness } from "../lib/business";
@@ -10,7 +10,9 @@ import { ai, AiError, imageToBase64, type ExtractResult } from "../lib/ai";
 import { applyBookings } from "../lib/alerts";
 import { phase } from "../lib/time";
 import { ICalPlus, ICopy, IDownload, IOffline, IPlane, ISpeaker } from "./Icons";
-import { cancelOffline, deleteOffline, offlineSupported, prepareOffline, useOffline, verifyOffline } from "../lib/offline";
+import { cancelOffline, deleteOffline, offlineSupported, preparePack, useOffline, verifyPack } from "../lib/offline";
+import { packFor, reportReady } from "../lib/offlinePack";
+import { legacyPack, packSummary, type PackCheck } from "../lib/packPlan";
 import { ShowScreen, copy, speak } from "./ui";
 import { ExpenseReportSheet } from "./Expenses";
 import { track } from "../lib/track";
@@ -192,84 +194,129 @@ export function Flights({ trip }: { trip: Trip }) {
 
 export function OfflineCard({ trip }: { trip: Trip }) {
   const st = useOffline();
+  const states = useStore((s) => s.data.places);
   const mb = (b: number) => t("{n} Mo", { n: Math.max(1, Math.round(b / 1e6)) });
-  // places added in the app are already in trip.places
-  const points = [...trip.places, trip.hotel, ...trip.zones.map((z) => ({ lng: z.center[0], lat: z.center[1] }))];
+  // the pack of this trip (lot cycle): the map around its places (places added in the app are already in trip.places),
+  // each day's routes, the programme's photos
+  const spec = useMemo(() => packFor(trip, states), [trip, states]);
   const shellHost = location.hostname.endsWith(".vercel.app");
   const standalone = window.matchMedia?.("(display-mode: standalone)").matches || (navigator as unknown as { standalone?: boolean }).standalone === true;
   const ios = /iP(hone|ad|od)/.test(navigator.userAgent);
   // real check of what is on the phone (Safari may clear storage; places may have been added since)
-  const [check, setCheck] = useState<{ expected: number; missing: number } | null | "busy">(null);
-  const key = points.map((p) => `${p.lat.toFixed(4)},${p.lng.toFixed(4)}`).join("|");
+  const [check, setCheck] = useState<PackCheck | null | "busy">(null);
+  const key = `${spec.points.map((p) => `${p.lat.toFixed(4)},${p.lng.toFixed(4)}`).join("|")}#${spec.legs.length}#${spec.photos.length}`;
+  const running = st.state === "running" || !!st.phase;
   useEffect(() => {
-    if (st.state !== "ready") return setCheck(null);
+    if (st.state !== "ready" || st.phase) return setCheck(null);
     let alive = true;
     setCheck("busy");
-    verifyOffline(points).then((r) => alive && setCheck(r));
+    verifyPack(spec, trip).then((r) => {
+      if (!alive) return;
+      setCheck(r);
+      if (r) {
+        const s = packSummary(r);
+        if (s.mapOk) reportReady(trip.id, s.complete);
+      }
+    });
     return () => {
       alive = false;
     };
-  }, [st.state, st.at, key]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [st.state, st.at, st.phase, key]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!offlineSupported) return null;
-  // "Mode hors ligne" = the map of this trip downloaded on the phone (the trip itself is always on it)
-  const missing = st.state === "ready" && check && check !== "busy" ? check.missing : 0;
-  const on = st.state === "ready" && missing === 0;
+  // "Mode hors ligne" = the pack of this trip on the phone (the trip itself is always on it)
+  const checked = st.state === "ready" && !st.phase && check && check !== "busy" ? check : null;
+  const sum = checked ? packSummary(checked) : null;
+  const missing = checked?.map ? checked.map.missing : 0;
+  const on = !!sum?.complete;
   const pro = () => {
     if (!hasPro()) return false;
     track("export", "offline", trip.id);
-    prepareOffline(points);
+    void preparePack(spec);
     return true;
   };
   const activate = () => {
     if (!pro()) requestPro("export");
   };
+  // one bar over the whole pack: map, then routes, then photos
+  const rt = st.routes || { done: 0, total: 0, failed: 0 };
+  const ph = st.photos || { done: 0, total: 0 };
+  const mapDone = st.phase ? st.total : st.done;
+  const all = st.total + rt.total + ph.total;
+  const progress = all ? ((mapDone + (st.phase ? rt.done : 0) + (st.phase === "photos" ? ph.done : 0)) / all) * 100 : 0;
   return (
     <div className="card off-card" id="offline-mode">
       <h4>
         <IOffline width={18} height={18} /> {t("Mode hors ligne")}
-        <span className={"off-state " + (st.state === "running" ? "busy" : on ? "on" : st.state === "ready" ? "warn" : "")}>
-          {st.state === "running" ? t("Téléchargement") : on ? t("Activé") : st.state === "ready" ? t("À compléter") : t("Désactivé")}
+        <span className={"off-state " + (running ? "busy" : on ? "on" : st.state === "ready" ? "warn" : "")}>
+          {running ? t("Téléchargement") : on ? t("Activé") : st.state === "ready" ? t("À compléter") : t("Désactivé")}
         </span>
       </h4>
       {st.state === "none" && (
         <p>
           {t("Sans réseau, votre voyage reste disponible : programme, lieux, notes, statuts, check-list, dépenses et phrases sont toujours sur ce téléphone.")}{" "}
-          <b>{t("Seule la carte a besoin d'être téléchargée.")}</b>{" "}
+          <b>{t("La carte, les trajets et les photos se téléchargent en une fois.")}</b>{" "}
           {t("Activez le mode hors ligne une fois, de préférence en Wi-Fi, quelques jours avant le départ : la carte marchera ensuite sans réseau, même dans le métro, sans consommer de données.")}
         </p>
       )}
-      {st.state === "running" && (
+      {running && (
         <>
-          <p>{t("Téléchargement de la carte… {done} / {total} · {size}", { done: st.done, total: st.total, size: mb(st.bytes) })}</p>
-          <div className="bar"><span style={{ width: `${st.total ? (st.done / st.total) * 100 : 0}%` }} /></div>
+          <p>
+            {st.phase === "routes"
+              ? t("Calcul des trajets… {done} / {total}", { done: rt.done, total: rt.total })
+              : st.phase === "photos"
+                ? t("Photos des lieux… {done} / {total}", { done: ph.done, total: ph.total })
+                : t("Téléchargement de la carte… {done} / {total} · {size}", { done: st.done, total: st.total, size: mb(st.bytes) })}
+          </p>
+          <div className="bar"><span style={{ width: `${Math.min(100, progress)}%` }} /></div>
           <p className="em-small">{t("Vous pouvez continuer à utiliser l'app pendant le téléchargement.")}</p>
         </>
       )}
-      {st.state === "ready" && (
+      {st.state === "ready" && !st.phase && (
         <p>
           {st.at ? t("La carte de ce voyage est sur le téléphone ({size}, téléchargée le {date}).", { size: mb(st.bytes), date: new Date(st.at).toLocaleDateString(locale(), { day: "numeric", month: "long" }) }) : t("La carte de ce voyage est sur le téléphone ({size}).", { size: mb(st.bytes) })}{" "}
           {shellHost && standalone ? t("La carte, les lieux et votre position marchent sans réseau, même dans le métro.") : t("La carte, les lieux et votre position marchent sans réseau, même dans le métro, tant que cette page reste ouverte.")}
         </p>
       )}
-      {st.state === "ready" && check === "busy" && <p className="em-small">{t("Vérification du contenu…")}</p>}
-      {st.state === "ready" && check && check !== "busy" && (
-        check.missing === 0 ? (
-          <p className="off-ok">{t("✓ Complète : la carte autour de tous les lieux du voyage est sur ce téléphone.")}</p>
-        ) : (
-          <p className="tr-err">{check.missing > 1 ? t("{n} éléments manquants (lieux ajoutés depuis, ou stockage effacé) : touchez « Mettre à jour » en Wi-Fi.", { n: check.missing.toLocaleString(locale()) }) : t("{n} élément manquant (lieux ajoutés depuis, ou stockage effacé) : touchez « Mettre à jour » en Wi-Fi.", { n: check.missing.toLocaleString(locale()) })}</p>
-        )
+      {st.state === "ready" && !st.phase && check === "busy" && <p className="em-small">{t("Vérification du contenu…")}</p>}
+      {checked && (
+        <>
+          {checked.map && (missing === 0 ? (
+            <p className="em-small">{t("Carte : complète")}</p>
+          ) : (
+            <p className="tr-err">{missing > 1 ? t("{n} éléments manquants (lieux ajoutés depuis, ou stockage effacé) : touchez « Mettre à jour » en Wi-Fi.", { n: missing.toLocaleString(locale()) }) : t("{n} élément manquant (lieux ajoutés depuis, ou stockage effacé) : touchez « Mettre à jour » en Wi-Fi.", { n: missing.toLocaleString(locale()) })}</p>
+          ))}
+          {checked.routes.total > 0 && <p className="em-small">{t("Trajets : {done} / {total}", { done: checked.routes.have, total: checked.routes.total })}</p>}
+          {checked.routes.failed > 0 && <p className="em-small">{checked.routes.failed > 1 ? t("{n} trajets impossibles à calculer : une estimation s'affichera.", { n: checked.routes.failed }) : t("1 trajet impossible à calculer : une estimation s'affichera.")}</p>}
+          {checked.photos === null ? (
+            <p className="em-small">{t("Photos : hors ligne seulement dans l'app installée (orbesmap.vercel.app).")}</p>
+          ) : (
+            checked.photos.total > 0 && <p className="em-small">{t("Photos : {done} / {total}", { done: checked.photos.have, total: checked.photos.total })}</p>
+          )}
+          <p className="em-small">{checked.trip ? t("Voyage : programme, lieux et notes sur ce téléphone") : t("Voyage : à ouvrir une fois avec réseau")}</p>
+          {checked.cards.have > 0 && (
+            <>
+              <p className="em-small">{t("Cartes chauffeur : {n} / {total} lieux", { n: checked.cards.have, total: checked.cards.total })}</p>
+              {checked.cards.total > checked.cards.have && <p className="em-small">{t("{n} lieux sans nom local à montrer au chauffeur.", { n: checked.cards.total - checked.cards.have })}</p>}
+            </>
+          )}
+          {on ? (
+            <p className="off-ok">{t("✓ Complète : la carte, les trajets de chaque jour et les photos du programme sont sur ce téléphone.")}</p>
+          ) : (
+            legacyPack(st) && <p className="em-small">{t("La carte marche déjà sans réseau. Trajets et photos : touchez « Mettre à jour » pour les ajouter.")}</p>
+          )}
+        </>
       )}
-      {st.state === "ready" && st.error && <p className="tr-err">{st.error}</p>}
+      {st.state === "ready" && !st.phase && st.error && <p className="tr-err">{st.error}</p>}
       {st.state === "error" && <p className="tr-err">{st.error}</p>}
       <div className="em-actions">
-        {st.state === "running" ? (
+        {running ? (
           <button className="btn-sm" onClick={cancelOffline}>{t("Arrêter")}</button>
         ) : st.state === "ready" ? (
-          <button className={"btn-sm" + (missing ? " on" : "")} onClick={activate}>{t("Mettre à jour")}</button>
+          <button className={"btn-sm" + (missing || (sum && !sum.complete) ? " on" : "")} onClick={activate}>{t("Mettre à jour")}</button>
         ) : (
           <button className="btn-sm on" onClick={activate}>{t("Activer le mode hors ligne")}</button>
         )}
-        {st.state === "ready" && <button className="btn-sm" onClick={() => { if (confirm(t("Désactiver le mode hors ligne ? La carte téléchargée est retirée de ce téléphone ; votre voyage, lui, reste."))) deleteOffline(); }}>{t("Désactiver")}</button>}
+        {st.state === "ready" && !running && <button className="btn-sm" onClick={() => { if (confirm(t("Désactiver le mode hors ligne ? La carte téléchargée est retirée de ce téléphone ; votre voyage, lui, reste."))) deleteOffline(); }}>{t("Désactiver")}</button>}
       </div>
       <details className="off-more">
         <summary>{t("Ce qui marche sans réseau")}</summary>
@@ -277,7 +324,7 @@ export function OfflineCard({ trip }: { trip: Trip }) {
           {t("Inclus : la carte autour de chaque lieu du programme et de vos lieux ajoutés (rues jusqu'au détail) et leurs environs, pour qu'elle reste nette en dézoomant. Vos notes, statuts, check-list, horaires, fiche d'urgence et phrases sont toujours sur le téléphone, sans téléchargement.")}
         </p>
         <p>
-          {t("Pas inclus : les itinéraires jamais calculés (l'app affiche une estimation), les photos de l'autre téléphone pas encore ouvertes, et les fonctions IA (Traduire, Demander, Ajouter un lieu) qui ont besoin du réseau.")}
+          {t("Pas inclus : les trajets depuis un endroit hors du programme (l'app affiche une estimation), les photos de l'autre téléphone pas encore ouvertes, et les fonctions IA (Traduire, Demander, Ajouter un lieu) qui ont besoin du réseau.")}
         </p>
         <p>
           {t("Les mises à jour de l'app ne touchent pas à la carte téléchargée. Après un ajout de lieu, la vérification ci-dessus le signale : « Mettre à jour » ne télécharge que ce qui manque.")}

@@ -4,6 +4,11 @@
 import * as maplibregl from "maplibre-gl";
 import { useSyncExternalStore } from "react";
 import { t } from "./i18n";
+import type { Trip } from "../data/types";
+import { packSummary, phaseUpdate, readStatus, type PackCheck, type PackStatus } from "./packPlan";
+import { clearPack, fetchPhotos, flushOfflineUse, getLeg, markOfflineUse, packFor, photosHeld, putLeg, readyReportedToday, reportReady, routesHeld, tripHeld, type PackSpec } from "./offlinePack";
+import { osrmRoute } from "./route";
+import { currentTrip } from "./store";
 
 const HOST = "https://tiles.openfreemap.org";
 const CACHE = "orbes-map-v1";
@@ -51,7 +56,18 @@ async function cachedFetch(url: string, signal?: AbortSignal): Promise<Response>
   const key = keyOf(url);
   if (immutable(url)) {
     const hit = await cache.match(key);
-    if (hit) return hit;
+    if (hit) {
+      // the offline map used without network (recorded once per trip and day, when the network is back)
+      if (!mapUseMarked && typeof navigator !== "undefined" && navigator.onLine === false) {
+        mapUseMarked = true;
+        try {
+          markOfflineUse(currentTrip().id, "map");
+        } catch {
+          /* ignore */
+        }
+      }
+      return hit;
+    }
     // a tile missing from the copy must not hang the map: after 10 s MapLibre draws the stored zoomed-out tile
     const res = await fetchWithTimeout(url, 10000, signal);
     if (res.ok) cache.put(key, res.clone()).catch(() => {});
@@ -86,10 +102,22 @@ async function cachedFetch(url: string, signal?: AbortSignal): Promise<Response>
   });
 }
 
+let mapUseMarked = false;
 let registered = false;
 export function registerOfflineProtocol() {
   if (registered || !hasCache) return;
   registered = true;
+  if (typeof window !== "undefined") {
+    // the app opened without network; the steps kept from an earlier offline use are sent when online
+    try {
+      if (navigator.onLine === false) markOfflineUse(currentTrip().id, "app");
+      else window.setTimeout(flushOfflineUse, 8000);
+    } catch {
+      /* ignore */
+    }
+    // a pack ready for the open trip: checked quietly once a day, so the J-3 reminder knows it is there
+    window.setTimeout(() => void quietCheck(), 10000);
+  }
   maplibregl.addProtocol(PROTO, async (params, abort) => {
     const url = "https://" + params.url.slice(PROTO.length + 3);
     const res = await cachedFetch(url, abort.signal);
@@ -107,26 +135,37 @@ export function transformRequest(url: string): { url: string } | undefined {
 
 // ---------- pre-download ----------
 type LL = { lat: number; lng: number };
-export type OfflineStatus = { state: "none" | "running" | "ready" | "error"; done: number; total: number; bytes: number; at?: number; error?: string; points?: number };
+/** The map's state (state "ready" = the map is on the phone), and since the pack (lot cycle) its routes and photos */
+export type OfflineStatus = PackStatus;
 let status: OfflineStatus = (() => {
   try {
-    const s = JSON.parse(localStorage.getItem(STATUS_KEY) || "null");
-    return s && s.state === "ready" ? s : { state: "none", done: 0, total: 0, bytes: 0 };
+    return readStatus(JSON.parse(localStorage.getItem(STATUS_KEY) || "null"));
   } catch {
     return { state: "none", done: 0, total: 0, bytes: 0 };
   }
 })();
 const subs = new Set<() => void>();
-const setStatus = (s: Partial<OfflineStatus>) => {
-  status = { ...status, ...s };
+const save = () => {
   if (status.state === "ready" || status.state === "none") {
     try {
-      localStorage.setItem(STATUS_KEY, JSON.stringify(status));
+      // the phase lives in memory only
+      const { phase: _phase, ...kept } = status;
+      void _phase;
+      localStorage.setItem(STATUS_KEY, JSON.stringify(kept));
     } catch {
       /* ignore */
     }
   }
   subs.forEach((f) => f());
+};
+const setStatus = (s: Partial<OfflineStatus>) => {
+  status = { ...status, ...s };
+  save();
+};
+/** During the routes and photos: the map's state never changes (lib/packPlan.ts phaseUpdate) */
+const setPhase = (s: Partial<OfflineStatus>) => {
+  status = phaseUpdate(status, s);
+  save();
 };
 export function useOffline(): OfflineStatus {
   return useSyncExternalStore(
@@ -313,13 +352,121 @@ export async function prepareOffline(points: LL[]): Promise<void> {
 }
 
 export function cancelOffline() {
+  packStop = true;
   running?.abort();
 }
 
 export async function deleteOffline() {
   cancelOffline();
   if (hasCache) await caches.delete(CACHE);
-  setStatus({ state: "none", done: 0, total: 0, bytes: 0, at: undefined });
+  await clearPack();
+  setStatus({ state: "none", done: 0, total: 0, bytes: 0, at: undefined, trip: undefined, phase: undefined, routes: undefined, photos: undefined });
+}
+
+// ---------- the complete pack (lot cycle, R19): the map, then each day's routes, then the programme's photos ----------
+let packStop = false;
+let packing = false;
+const sleep = (ms: number, signal: AbortSignal) =>
+  new Promise<void>((resolve) => {
+    const tm = window.setTimeout(resolve, ms);
+    signal.addEventListener("abort", () => {
+      window.clearTimeout(tm);
+      resolve();
+    }, { once: true });
+  });
+/** OSRM answered that no route exists (an island, a closed area): kept as impossible, the app shows an estimate */
+const noRoute = (e: unknown) => /^(no route|400)$/.test(String((e as Error)?.message || ""));
+
+/**
+ * Downloads the whole pack of a trip: the map (same download as before, unchanged), then the routes one by one (at
+ * least 1.1 s apart, the OSRM servers are free), then the photos (3 at a time, the installed app only). A route or a
+ * photo that fails never touches the map: it is counted and fetched again at the next update.
+ */
+export async function preparePack(spec: PackSpec): Promise<void> {
+  if (running || packing) return;
+  packing = true;
+  packStop = false;
+  let reached = false;
+  let lock: { release: () => Promise<void> } | null = null;
+  try {
+    setStatus({ routes: { done: 0, total: spec.legs.length, failed: 0 }, photos: { done: 0, total: spec.photos.length } });
+    await prepareOffline(spec.points);
+    if (packStop || status.state !== "ready" || running) return;
+    reached = true;
+    const ctl = new AbortController();
+    running = ctl;
+    const signal = ctl.signal;
+    lock = await (navigator as unknown as { wakeLock?: { request: (t: string) => Promise<{ release: () => Promise<void> }> } }).wakeLock?.request("screen").catch(() => null) ?? null;
+    const total = spec.legs.length;
+    let done = 0;
+    let failed = 0;
+    setPhase({ phase: "routes", trip: spec.tripId, routes: { done, total, failed } });
+    let last = 0;
+    for (const leg of spec.legs) {
+      if (signal.aborted) break;
+      const have = await getLeg(leg.key);
+      if (have && !("failed" in have)) {
+        done++;
+        setPhase({ routes: { done, total, failed } });
+        continue;
+      }
+      const wait = last + 1100 - Date.now();
+      if (wait > 0) await sleep(wait, signal);
+      if (signal.aborted) break;
+      last = Date.now();
+      try {
+        await putLeg(leg.key, await osrmRoute(leg.from, leg.to, leg.mode, signal));
+        done++;
+      } catch (e) {
+        if (signal.aborted) break;
+        if (noRoute(e)) {
+          await putLeg(leg.key, { failed: true }).catch(() => undefined);
+          failed++;
+        }
+      }
+      setPhase({ routes: { done, total, failed } });
+    }
+    if (!signal.aborted) {
+      setPhase({ phase: "photos", photos: { done: 0, total: spec.photos.length } });
+      const kept = await fetchPhotos(spec.photos, signal, (d) => setPhase({ photos: { done: d, total: spec.photos.length } }));
+      if (kept === null) setPhase({ photos: null });
+    }
+  } catch {
+    /* the map stays as it is; what is missing shows in the check */
+  } finally {
+    if (reached) {
+      running = null;
+      setPhase({ phase: undefined, at: Date.now() });
+    }
+    packing = false;
+    lock?.release().catch(() => {});
+  }
+}
+
+/** What the pack of this trip holds on this phone right now */
+export async function verifyPack(spec: PackSpec, trip: Trip): Promise<PackCheck | null> {
+  try {
+    const map = await verifyOffline(spec.points);
+    const routes = await routesHeld(spec.legs);
+    const photos = await photosHeld(spec.photos);
+    return { map, routes: { total: spec.legs.length, ...routes }, photos, trip: tripHeld(trip), cards: spec.cards };
+  } catch {
+    return null;
+  }
+}
+
+async function quietCheck() {
+  try {
+    if (status.state !== "ready" || !status.trip || running || packing) return;
+    const trip = currentTrip();
+    if (trip.id !== status.trip || readyReportedToday(trip.id)) return;
+    const c = await verifyPack(packFor(trip), trip);
+    if (!c) return;
+    const s = packSummary(c);
+    if (s.mapOk) reportReady(trip.id, s.complete);
+  } catch {
+    /* ignore */
+  }
 }
 
 export const offlineSupported = hasCache;

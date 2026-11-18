@@ -85,9 +85,10 @@ type Field = "email" | "password";
  * The account form of the public page: "Créer un compte" (e-mail + password) and "Se connecter" (e-mail + password),
  * "Mot de passe oublié" (a link to choose a new one). No one-time link or code to sign in.
  */
-export default function AuthBox({ mode, onMode, focusKey }: { mode: AuthMode; onMode: (m: AuthMode) => void; focusKey?: number }) {
+export default function AuthBox({ mode, onMode, focusKey, lockedEmail }: { mode: AuthMode; onMode: (m: AuthMode) => void; focusKey?: number; lockedEmail?: string }) {
   const [view, setView] = useState<View>("form");
-  const [email, setEmail] = useState("");
+  // an invitation's address (JoinTripPage): filled in and kept, the trip opens for that address only
+  const [email, setEmail] = useState(lockedEmail || "");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -114,6 +115,7 @@ export default function AuthBox({ mode, onMode, focusKey }: { mode: AuthMode; on
     setFieldErr(null);
   };
   const onEmail = (v: string) => {
+    if (lockedEmail) return;
     setEmail(v);
     if (err || fieldErr) clearErr();
   };
@@ -261,7 +263,7 @@ export default function AuthBox({ mode, onMode, focusKey }: { mode: AuthMode; on
         >
           <p className="auth-title">{t("Mot de passe oublié")}</p>
           <p className="auth-sub">{t("Indiquez votre adresse : nous vous envoyons un lien pour choisir un nouveau mot de passe.")}</p>
-          <EmailField value={email} onChange={onEmail} inputRef={emailRef} error={emailErr} autoFocus={!validEmail} />
+          <EmailField value={email} onChange={onEmail} inputRef={emailRef} error={emailErr} autoFocus={!validEmail} locked={!!lockedEmail} />
           {errLine}
           <button className="v3-btn" disabled={busy}>{busy ? t("Un instant…") : t("Recevoir le lien")}</button>
           <button type="button" className="v3-link auth-back" onClick={() => switchMode("signin")}>{t("Retour à la connexion")}</button>
@@ -277,7 +279,7 @@ export default function AuthBox({ mode, onMode, focusKey }: { mode: AuthMode; on
           }}
         >
           {note && <p className="auth-note" role="status">{note}</p>}
-          <EmailField value={email} onChange={onEmail} inputRef={emailRef} error={emailErr} />
+          <EmailField value={email} onChange={onEmail} inputRef={emailRef} error={emailErr} locked={!!lockedEmail} />
           <PasswordField id={"auth-pw-" + mode} inputRef={pwRef} value={password} onChange={onPassword} label={mode === "signup" ? t("Choisissez un mot de passe") : t("Mot de passe")} autoComplete={mode === "signup" ? "new-password" : "current-password"} invalid={!!pwErr} describedBy={pwErr ? "auth-pw-err" : undefined} />
           {pwErr && <p className="auth-ferr" id="auth-pw-err">{pwErr}</p>}
           {mode === "signup" ? (
@@ -304,12 +306,12 @@ export default function AuthBox({ mode, onMode, focusKey }: { mode: AuthMode; on
   );
 }
 
-function EmailField({ value, onChange, inputRef, error, autoFocus }: { value: string; onChange: (v: string) => void; inputRef: React.RefObject<HTMLInputElement | null>; error?: string | null; autoFocus?: boolean }) {
+function EmailField({ value, onChange, inputRef, error, autoFocus, locked }: { value: string; onChange: (v: string) => void; inputRef: React.RefObject<HTMLInputElement | null>; error?: string | null; autoFocus?: boolean; locked?: boolean }) {
   return (
     <>
       <label className={"v3-field col auth-field" + (error ? " bad" : "")} htmlFor="v3-email">
-        <span>{t("Adresse e-mail")}</span>
-        <input ref={inputRef} id="v3-email" name="email" type="email" value={value} onChange={(e) => onChange(e.target.value)} autoComplete="username email" inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} aria-invalid={error ? true : undefined} aria-describedby={error ? "auth-email-err" : undefined} autoFocus={autoFocus} />
+        <span>{locked ? t("Adresse de l'invitation") : t("Adresse e-mail")}</span>
+        <input ref={inputRef} id="v3-email" name="email" type="email" value={value} onChange={(e) => onChange(e.target.value)} autoComplete="username email" inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} aria-invalid={error ? true : undefined} aria-describedby={error ? "auth-email-err" : undefined} autoFocus={autoFocus} readOnly={locked || undefined} aria-readonly={locked || undefined} />
       </label>
       {error && <p className="auth-ferr" id="auth-email-err">{error}</p>}
     </>

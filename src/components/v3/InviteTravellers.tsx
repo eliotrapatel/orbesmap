@@ -1,6 +1,7 @@
 import "../../styles/invite.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { invite, invites as listInvites, people as listPeople, sendInviteMessage, whatsappInviteUrl, type Invite, type Person } from "../../lib/share";
+import { invite, invites as listInvites, people as listPeople, type Invite, type Person } from "../../lib/share";
+import { inviteNote, sendInvite, shareInvite, whatsappUrl, type InviteMailResult } from "../../lib/inviteMail";
 import { currentAuthor, toast, useStore, useTrip } from "../../lib/store";
 import { setTravellers, travellersOf } from "../../lib/business";
 import { t } from "../../lib/i18n";
@@ -60,6 +61,10 @@ export default function InviteTravellers() {
   const [expanded, setExpanded] = useState(false);
   // the row just invited: it says how the person will find the trip
   const [just, setJust] = useState<string | null>(null);
+  // the invitation e-mail sent by the server (checked by default), and what it answered, per address: the link to the
+  // trip then goes into the message too (before saas-14: today's message)
+  const [byMail, setByMail] = useState(true);
+  const [mailed, setMailed] = useState<Record<string, InviteMailResult>>({});
 
   useEffect(() => {
     setSaved(readSaved(trip.id));
@@ -156,6 +161,7 @@ export default function InviteTravellers() {
     setErr(null);
     try {
       await invite(trip.id, to, "editor");
+      void sendInvite(trip.id, to, byMail).then((r) => setMailed((m) => ({ ...m, [to]: r })));
       if (name) save({ ...saved, emails: { ...saved.emails, [name]: to } });
       setPending((l) => (l.some((i) => i.email === to) ? l : [...l, { email: to, role: "editor", created_at: new Date().toISOString() }]));
       setJust(name || to);
@@ -217,6 +223,10 @@ export default function InviteTravellers() {
         <span className="sr">{name ? t("Adresse e-mail de {name}", { name }) : t("Adresse e-mail")}</span>
         <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={name ? t("Adresse e-mail de {name}", { name }) : t("Adresse e-mail de la personne")} autoComplete="off" autoFocus inputMode="email" />
       </label>
+      <label className="inv-check">
+        <input type="checkbox" checked={byMail} onChange={(e) => setByMail(e.target.checked)} />
+        <span>{t("Envoyer l'invitation par e-mail")}</span>
+      </label>
       <div className="inv-form-row">
         <button type="button" className="v3-chip" onClick={() => openRow(null)}>{t("Annuler")}</button>
         <button className="v3-chip on" disabled={busy || !EMAIL.test(email.trim())}>{busy ? t("Un instant…") : t("Inviter")}</button>
@@ -224,21 +234,30 @@ export default function InviteTravellers() {
     </form>
   );
   // how the person is told: the phone's share sheet (or a copy), or WhatsApp; `name` null for an address alone
-  const tell = (key: string, name: string | null, emailTo: string) => (
-    <div className="inv-tell">
-      {just === key && (
-        <p className="v3-note">
-          {name
-            ? t("Prévenez {name} : le voyage apparaîtra dès sa connexion avec {email}.", { name, email: emailTo })
-            : t("Prévenez cette personne : le voyage apparaîtra dès sa connexion avec cette adresse.")}
-        </p>
-      )}
-      <div className="inv-tell-row">
-        <button type="button" className="v3-chip" onClick={() => void sendInviteMessage(trip.title, myName, name || emailTo)}>{t("Envoyer le message")}</button>
-        <a className="v3-chip inv-wa" href={whatsappInviteUrl(trip.title, myName)} target="_blank" rel="noopener noreferrer">{t("Par WhatsApp")}</a>
+  const tell = (key: string, name: string | null, emailTo: string) => {
+    const sent = mailed[emailTo.toLowerCase()];
+    const note = inviteNote(sent, emailTo);
+    const link = sent?.link || null;
+    return (
+      <div className="inv-tell">
+        {note ? (
+          <p className="v3-note" role="status">{note}</p>
+        ) : (
+          just === key && (
+            <p className="v3-note">
+              {name
+                ? t("Prévenez {name} : le voyage apparaîtra dès sa connexion avec {email}.", { name, email: emailTo })
+                : t("Prévenez cette personne : le voyage apparaîtra dès sa connexion avec cette adresse.")}
+            </p>
+          )
+        )}
+        <div className="inv-tell-row">
+          <button type="button" className="v3-chip" onClick={() => void shareInvite(trip.title, myName, name || emailTo, link)}>{t("Envoyer le message")}</button>
+          <a className="v3-chip inv-wa" href={whatsappUrl(trip.title, myName, link)} target="_blank" rel="noopener noreferrer">{t("Par WhatsApp")}</a>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
   const benefit = <p className="v3-note inv-why">{t("Ils voient le programme, la carte et les notes, et peuvent les modifier. Tout reste synchronisé.")}</p>;
 
   // nobody named in the wizard (or only you): one compact entry

@@ -12,6 +12,9 @@ import ProScreen from "./ProScreen";
 import AdminScreen from "./AdminScreen";
 import Legal, { legalKind } from "./Legal";
 import PublicTripPage from "./PublicTripPage";
+import JoinTripPage from "./JoinTripPage";
+import { onboardingDeferred, useJoinGate } from "../../lib/join";
+import { entryHas, joinToken } from "../../lib/entry";
 import OrbitMark from "../OrbitMark";
 import { takeRememberedCopy } from "../../lib/publicTrip";
 import { track } from "../../lib/track";
@@ -169,6 +172,14 @@ function Screen() {
   const home = useHome();
   const share = useShare();
   const current = trips.some((t) => t.id === tripId);
+  // an invitation being opened (lot cycle): the screen waits for it instead of showing the onboarding
+  const joinHold = useJoinGate();
+  // a link from a cycle e-mail or notification: the trip creation or a booking opens from "Mes voyages", the offline
+  // card from its trip
+  useEffect(() => {
+    if (entryHas("new") || entryHas("booking")) openHome(true);
+    else if (entryHas("offline") && session && current) openHome(false);
+  }, [session?.user.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // the current trip is not one this account can open (another account's, or the shared space's): its first trip
   useEffect(() => {
@@ -179,8 +190,12 @@ function Screen() {
   // a phone that already holds trips opens on them at once (the session is checked in the background)
   // signed in on this phone: its trips open at once, even without network; signed out: only the sign-in
   if (supabase && !authReady && !(hasStoredSession && trips.length)) return splash;
-  if (supabase && authReady && !session) return <Stage key="welcome" kind="welcome"><Welcome /></Stage>;
-  if (session && member !== null && !profile.onboardedAt) return <Stage key="onboarding" kind="onboarding"><Onboarding /></Stage>;
+  if (supabase && authReady && !session) {
+    const join = joinToken();
+    return <Stage key="welcome" kind="welcome">{join ? <JoinTripPage token={join} /> : <Welcome />}</Stage>;
+  }
+  if (session && joinHold) return splash;
+  if (session && member !== null && !profile.onboardedAt && !onboardingDeferred()) return <Stage key="onboarding" kind="onboarding"><Onboarding /></Stage>;
   // "Copier ce voyage" asked before signing in: back to that programme, its copy sheet open
   if (session) {
     const pending = takeRememberedCopy();

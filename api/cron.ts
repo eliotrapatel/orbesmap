@@ -3,9 +3,13 @@
 // - around 7:30 local time on a trip day: the day by e-mail (Resend) and as a notification, with the places closed that day;
 // - 30 minutes before each place at a set time: a notification (Web Push);
 // - two days after a trip ends (lot retention): one "welcome back" e-mail, with a few figures of the trip and a way to the next one.
+// - after all of these (lot cycle, api/_cycle.ts): the invitation follow-ups, J-3 / J-2 before a trip, the first trip,
+//   the trip of the month and the detected bookings, each in its own try/catch (a failure never stops the alerts).
 // Needs on Vercel: SUPABASE_SERVICE_ROLE_KEY, VAPID_PRIVATE_KEY, RESEND_API_KEY (MAIL_FROM optional).
+// Optional: CYCLE_PAUSE=1 stops every message of the cycle, CYCLE_DAY_CAP (default 150 e-mails a day).
 import webpush from "web-push";
 import { kickStale } from "./prepare.js";
+import { deriveUnsub, restDeps, runCycle } from "./_cycle.js";
 
 type Json = Record<string, unknown>;
 const SUPA_URL = process.env.SUPABASE_URL || "https://ifugaqjneprbtigvegeb.supabase.co";
@@ -113,6 +117,7 @@ export async function POST(req: Request): Promise<Response> {
 }
 
 async function run(req: Request): Promise<Response> {
+  const started = Date.now();
   const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
   if (!key) return json({ error: "SUPABASE_SERVICE_ROLE_KEY missing" }, 503);
   // only the database's own wake-up may run this
@@ -135,7 +140,7 @@ async function run(req: Request): Promise<Response> {
   const from = process.env.MAIL_FROM || "ORBES Trips <trips@auth.theorbes.com>";
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
-  const sent = { emails: 0, pushes: 0, gone: 0, returns: 0 };
+  const sent: { emails: number; pushes: number; gone: number; returns: number; cycle?: Record<string, number> } = { emails: 0, pushes: 0, gone: 0, returns: 0 };
 
   // trips happening around now
   const allTrips = (await db("/rest/v1/trips?select=id,data", key)) as { id: string; data: Json }[];
@@ -246,6 +251,39 @@ ${FOOTER}</div>`;
     sent.returns = await welcomeBack(allTrips, key, resend, from, now);
   } catch (e) {
     warnings.push(`return: ${String((e as Error)?.message || e).slice(0, 120)}`);
+  }
+  // the cycle's messages, after every alert above, within 45 s of the start (the cron stops at 60 s)
+  try {
+    const deps = restDeps({
+      url: SUPA_URL,
+      key,
+      resend,
+      from,
+      pushTo: async (s, payload) => {
+        try {
+          await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(payload), { TTL: 6 * 3600 });
+          return "ok";
+        } catch (e) {
+          const code = (e as { statusCode?: number }).statusCode;
+          return code === 404 || code === 410 ? "gone" : "fail";
+        }
+      },
+    });
+    const cyc = await runCycle(deps, {
+      trips: allTrips,
+      now,
+      deadline: started + 45_000,
+      secret: deriveUnsub(key),
+      canMail: !!resend,
+      canPush: !!vapid,
+      pause: process.env.CYCLE_PAUSE === "1",
+      dayCap: Number(process.env.CYCLE_DAY_CAP) > 0 ? Number(process.env.CYCLE_DAY_CAP) : 150,
+      offlineFree: process.env.OFFLINE_REMINDER_FREE === "1",
+    });
+    if (Object.keys(cyc.sent).length) sent.cycle = cyc.sent;
+    warnings.push(...cyc.warnings);
+  } catch (e) {
+    warnings.push(`cycle: ${String((e as Error)?.message || e).slice(0, 120)}`);
   }
   return json({ ok: true, trips: trips.length, ...sent, ...(restarted ? { restarted } : {}), ...(warnings.length ? { warnings } : {}), ...(resend ? {} : { warning_mail: "RESEND_API_KEY missing" }) });
 }
@@ -390,10 +428,10 @@ ${figures.length > 1 ? `<p style="font-size:20px;font-weight:600;margin:10px 0 1
 <p style="font-size:15px;margin:10px 0 0">${esc(T.recap)}</p>
 <p style="margin:22px 0"><a href="${tripUrl}" style="display:inline-block;background:#0a0a0a;color:#f6f2ea;text-decoration:none;padding:12px 20px;border-radius:12px">${esc(T.openRecap)}</a></p>
 <p style="font-size:15px;margin:26px 0 4px">${esc(T.nextQ)}</p>
-<p style="margin:0 0 24px"><a href="${APP_URL}/" style="color:#0a0a0a">${esc(T.nextLink)}</a></p>
+<p style="margin:0 0 24px"><a href="${APP_URL}/?new=1&src=email_back" style="color:#0a0a0a">${esc(T.nextLink)}</a></p>
 <p style="font-size:12px;color:#6f6b65">${esc(T.stop)}</p>
 ${FOOTER}</div>`;
-      const text = [T.backHello(name), intro, figures.length > 1 ? figures.join(" · ") : "", T.recap, tripUrl, "", T.nextQ, T.nextLink, `${APP_URL}/`, "", T.stop, "ORBES Trips"].join("\n");
+      const text = [T.backHello(name), intro, figures.length > 1 ? figures.join(" · ") : "", T.recap, tripUrl, "", T.nextQ, T.nextLink, `${APP_URL}/?new=1&src=email_back`, "", T.stop, "ORBES Trips"].join("\n");
       const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { authorization: `Bearer ${resend}`, "content-type": "application/json" },

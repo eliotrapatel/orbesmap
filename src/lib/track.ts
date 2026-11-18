@@ -8,7 +8,10 @@ export type Step =
   | "place_added" | "invite_sent" | "export" | "pro_screen" | "code_redeemed" | "waitlist_join"
   | "link_opened" | "public_view" | "trip_copied" | "expense_added"
   | "place_opened" | "tool_opened" | "status_set" | "note_written" | "photo_added" | "vote" | "comment_added"
-  | "checklist_done" | "language_changed" | "alerts_changed" | "search" | "adjust_asked" | "day_redone";
+  | "checklist_done" | "language_changed" | "alerts_changed" | "search" | "adjust_asked" | "day_redone"
+  // lot cycle (supabase/saas-14.sql, track_event_cycle): the offline pack ready on this phone, used without network
+  | "offline_ready" | "offline_used";
+const CYCLE_STEPS = new Set<Step>(["offline_ready", "offline_used"]);
 
 const VISITOR_KEY = "orbes.vid";
 /** This device's random identifier (made once) */
@@ -46,6 +49,13 @@ export function track(name: Step, detail?: string | null, trip?: string | null) 
     once.add(name);
   }
   const body = { name, detail: detail ?? null, device: device(), ref: name === "visit" ? referrer() : null, visitor: visitor(), trip: trip ?? null };
+  // the cycle's two steps go straight to their own function (dropped silently before saas-14)
+  if (CYCLE_STEPS.has(name)) {
+    void supabase
+      .rpc("track_event_cycle", { p_name: body.name, p_detail: body.detail, p_device: body.device, p_ref: null, p_visitor: body.visitor, p_trip: body.trip, p_city: null, p_country: null, p_region: null, p_os: null, p_browser: null })
+      .then(() => undefined, () => undefined);
+    return;
+  }
   // through api/track, which adds the city and the device of the connection; straight to the database if it fails
   void supabase.auth
     .getSession()
