@@ -92,7 +92,7 @@ export type ConciergeResult = {
   interests: string[];
   ready: boolean;
 };
-export type IntakeResult = { places: { name: string; city: string; why: string; mustSee: boolean; source: string }[]; fixed: FixedItem[]; wishes: string[]; summary: string };
+export type IntakeResult = { places: { name: string; city: string; why: string; mustSee: boolean; source: string }[]; fixed: FixedItem[]; wishes: string[]; summary: string; flights?: ExtractResult["flights"]; hotel?: ExtractResult["hotel"] };
 export type OutlineResult = { days: { date: string; theme: string; area: string; include: string[]; fixed: string[] }[]; notes: string };
 export type DayPlace = {
   name: string; nameCn: string; address: string; addressCn: string; lat: number; lng: number; coordSystem: "WGS84" | "GCJ02" | "BD09" | "none";

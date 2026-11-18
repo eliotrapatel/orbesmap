@@ -16,5 +16,5 @@ export default {
   "Racontez votre voyage comme à un ami : texte, voix, captures ou liens. Il pose les bonnes questions.": "Tell it about your trip like you would a friend: text, voice, screenshots or links. It asks the right questions.",
   "Retirer la capture": "Remove the screenshot", "Rien encore : parlez-moi de votre voyage.": "Nothing yet: tell me about your trip.",
   "Votre voyage": "Your trip", "rythme {p}": "{p} pace", "Écrivez, collez un lien, ou dictez…": "Type, paste a link, or dictate…",
-  "Échange avec le concierge": "Concierge exchange", "déc.": "Dec",
+  "Échange avec le concierge": "Concierge exchange", "Ajouter un vol ou une réservation": "Add a flight or a booking", "Lecture de la réservation…": "Reading the booking…", "déc.": "Dec",
 } satisfies Record<string, string>;

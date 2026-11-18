@@ -1,11 +1,13 @@
 // Phrases, converter, flights, practical info, export.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Trip } from "../data/types";
 import { exportCsv, exportPdf, exportReport } from "../lib/export";
 import { useBusiness } from "../lib/business";
 import { exportIcs } from "../lib/ics";
 import { useLiveRate } from "../lib/rates";
-import { getState, hasPro, requestPro, setEurRate, toast, useStore } from "../lib/store";
+import { getState, hasPro, requestPro, setEurRate, toast, useCanEdit, useStore } from "../lib/store";
+import { ai, AiError, imageToBase64, type ExtractResult } from "../lib/ai";
+import { applyBookings } from "../lib/alerts";
 import { phase } from "../lib/time";
 import { ICalPlus, ICopy, IDownload, IOffline, IPlane, ISpeaker } from "./Icons";
 import { cancelOffline, deleteOffline, offlineSupported, prepareOffline, useOffline, verifyOffline } from "../lib/offline";
@@ -106,11 +108,50 @@ export function Converter() {
   );
 }
 
+/** A flight or a booking added to the trip: pasted confirmation or screenshot, read by the AI */
+function AddBooking({ trip }: { trip: Trip }) {
+  const canEdit = useCanEdit();
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const pick = useRef<HTMLInputElement>(null);
+  if (!canEdit) return null;
+  const read = async (shot?: File) => {
+    if ((!text.trim() && !shot) || busy) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const image = shot ? await imageToBase64(shot, 1600, 0.8) : undefined;
+      const r = await ai<ExtractResult>("extract", { text: text.trim(), image }, 100_000);
+      const res = await applyBookings(r, trip, text.trim().slice(0, 60));
+      setText("");
+      setMsg(res.added ? (res.manual.length ? t("{n} ajouté(s) · à placer à la main : {list}", { n: res.added, list: res.manual.join(", ") }) : t("{n} ajouté(s) au voyage", { n: res.added })) : t("Rien de lisible : collez le texte de la confirmation ou une capture plus nette."));
+    } catch (e) {
+      setMsg(e instanceof AiError ? e.message : t("La lecture a échoué. Réessayez."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="card" style={{ marginBottom: 14 }}>
+      <h4>{t("Ajouter un vol ou une réservation")}</h4>
+      <textarea className="input" rows={3} value={text} onChange={(e) => setText(e.target.value)} placeholder={t("Collez une confirmation de vol, d'hôtel ou de restaurant")} style={{ width: "100%", marginTop: 8 }} />
+      <div className="btn-row">
+        <button className="btn" disabled={busy} onClick={() => pick.current?.click()}>{t("＋ Capture")}</button>
+        <button className="btn primary" disabled={busy || !text.trim()} onClick={() => void read()}>{busy ? t("Lecture…") : t("Lire")}</button>
+      </div>
+      <input ref={pick} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void read(f); }} />
+      {msg && <p style={{ marginTop: 10, color: "var(--soft)", fontSize: 13 }}>{msg}</p>}
+    </div>
+  );
+}
+
 export function Flights({ trip }: { trip: Trip }) {
   const now = Date.now();
   const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(locale(), { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: iso.endsWith("+01:00") ? "Europe/Paris" : trip.timezone }) : "—");
   return (
     <div>
+      <AddBooking trip={trip} />
       {trip.flights.map((f) => {
         const dep = f.departAt || (f.kind === "departure" ? f.at : undefined);
         const arr = f.arriveAt || (f.kind === "arrival" ? f.at : undefined);

@@ -154,11 +154,13 @@ function When({ w, set, top }: StepProps) {
   const [err, setErr] = useState<string | null>(null);
   const file = useRef<HTMLInputElement>(null);
   const n = w.start && w.end && w.end >= w.start ? dayCount(w.start, w.end) : 0;
-  const read = async () => {
+  const read = async (pick?: File): Promise<boolean> => {
+    const img = pick || shot;
+    if (!paste.trim() && !img) return true;
     setBusy(true);
     setErr(null);
     try {
-      const image = shot ? await imageToBase64(shot, 1600, 0.8) : undefined;
+      const image = img ? await imageToBase64(img, 1600, 0.8) : undefined;
       const r = await ai<ExtractResult>("extract", { text: paste.trim(), image }, 100_000);
       const flights = [...w.flights, ...(r.flights || []).filter((f) => f.code && !w.flights.some((x) => x.code === f.code && x.departAt === f.departAt))].sort((a, b) => (a.departAt || "").localeCompare(b.departAt || ""));
       const patch: Partial<Wiz> = { flights };
@@ -176,8 +178,10 @@ function When({ w, set, top }: StepProps) {
       setPaste("");
       setShot(null);
       if (!r.flights?.length && !r.hotel?.name && !r.fixed?.length) setErr(t("Rien de lisible : collez le texte de la confirmation ou une capture plus nette."));
+      return true;
     } catch (e) {
       setErr(e instanceof AiError ? e.message : t("La lecture a échoué. Réessayez."));
+      return false;
     } finally {
       setBusy(false);
     }
@@ -199,8 +203,9 @@ function When({ w, set, top }: StepProps) {
           <span className="v3-grow" />
           <button type="button" className="v3-chip on" disabled={busy || (!paste.trim() && !shot)} onClick={() => void read()}>{busy ? t("Lecture…") : t("Lire")}</button>
         </div>
-        <input ref={file} type="file" accept="image/*" hidden onChange={(e) => { setShot(e.target.files?.[0] || null); e.target.value = ""; }} />
+        <input ref={file} type="file" accept="image/*" hidden onChange={(e) => { const f0 = e.target.files?.[0] || null; e.target.value = ""; setShot(f0); if (f0) void read(f0); }} />
       </div>
+      {busy && <p className="v3-note">{t("Lecture de la réservation…")}</p>}
       {err && <p className="v3-err">{err}</p>}
       {w.flights.map((f, i) => (
         <div key={i} className="v3-xchip"><span>✈</span><span className="v3-grow">{flightLine(f)}</span><button aria-label={t("Retirer")} onClick={() => set({ flights: w.flights.filter((_, k) => k !== i) })}>✕</button></div>
@@ -214,7 +219,7 @@ function When({ w, set, top }: StepProps) {
         <input value={w.hotelAddress} onChange={(e) => set({ hotelAddress: e.target.value })} placeholder={t("Adresse de l'hôtel (si vous l'avez)")} />
       </label>
       <div className="v3-spacer" />
-      <button className="v3-btn" disabled={!n} onClick={() => set({ step: 3 })}>{t("Continuer")}</button>
+      <button className="v3-btn" disabled={!n || busy} onClick={async () => { if (await read()) set({ step: 3 }); }}>{busy ? t("Lecture…") : t("Continuer")}</button>
     </Shell>
   );
 }
@@ -225,14 +230,21 @@ function Know({ w, set, top }: StepProps) {
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const file = useRef<HTMLInputElement>(null);
-  const sort = async () => {
+  const sorted = useRef("");
+  const sort = async (picked?: File[]): Promise<boolean> => {
+    const files = picked || shots;
+    const text = w.know.trim() && w.know.trim() !== sorted.current ? w.know.trim() : "";
+    if (!text && !files.length) return true;
     setBusy(true);
     setErr(null);
     try {
       const results: IntakeResult[] = [];
       try {
-        if (w.know.trim()) results.push(await ai<IntakeResult>("intake", { text: w.know.trim() }, 290_000));
-        for (const f of shots) results.push(await ai<IntakeResult>("intake", { image: await imageToBase64(f, 1600, 0.8) }, 290_000));
+        if (text) {
+          results.push(await ai<IntakeResult>("intake", { text }, 290_000));
+          sorted.current = text;
+        }
+        for (const f of files) results.push(await ai<IntakeResult>("intake", { image: await imageToBase64(f, 1600, 0.8) }, 290_000));
       } catch (e) {
         // what was already sorted is kept
         if (!results.length) throw e;
@@ -241,16 +253,26 @@ function Know({ w, set, top }: StepProps) {
       const places = [...w.places];
       const fixed = [...w.fixed];
       const wishes = [...w.wishes];
+      const flights = [...w.flights];
+      let hotelName = w.hotelName;
+      let hotelAddress = w.hotelAddress;
       for (const r of results) {
+        for (const f of r.flights || []) if (f.code && !flights.some((x) => x.code === f.code && x.departAt === f.departAt)) flights.push(f);
+        if (r.hotel?.name && !hotelName) {
+          hotelName = r.hotel.name;
+          hotelAddress = r.hotel.address || r.hotel.addressCn || "";
+        }
         for (const p of r.places || []) if (p.name && !places.some((x) => x.name.toLowerCase() === p.name.toLowerCase())) places.push({ ...p, keep: true });
         for (const f of r.fixed || []) if (f.name && !fixed.some((x) => x.name === f.name && x.date === f.date)) fixed.push({ ...f, keep: true });
         for (const t of r.wishes || []) if (t && !wishes.some((x) => x.text === t)) wishes.push({ text: t, keep: true });
       }
-      set({ places, fixed, wishes });
+      set({ places, fixed, wishes, flights: flights.sort((a, b) => (a.departAt || "").localeCompare(b.departAt || "")), hotelName, hotelAddress });
       setShots([]);
       setMsg(results.map((r) => r.summary).filter(Boolean).join(" · ") || t("C'est noté."));
+      return true;
     } catch (e) {
       setErr(e instanceof AiError ? e.message : t("Le tri a échoué. Réessayez."));
+      return false;
     } finally {
       setBusy(false);
     }
@@ -268,7 +290,7 @@ function Know({ w, set, top }: StepProps) {
           <span className="v3-grow" />
           <button type="button" className="v3-chip on" disabled={busy || (!w.know.trim() && !shots.length)} onClick={() => void sort()}>{busy ? t("Tri en cours…") : t("Trier")}</button>
         </div>
-        <input ref={file} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) setShots((s) => [...s, f].slice(0, 3)); e.target.value = ""; }} />
+        <input ref={file} type="file" accept="image/*" multiple hidden onChange={(e) => { const picked = Array.from(e.target.files || []).slice(0, 3); e.target.value = ""; if (picked.length) void sort(picked); }} />
       </div>
       {busy && <p className="v3-note">{t("L'IA lit vos liens et vos captures… quelques minutes. Gardez l'app ouverte.")}</p>}
       {w.know.length > 11000 && <p className="v3-note">{t("Texte très long : seuls les 12 000 premiers caractères seront lus.")}</p>}
@@ -295,7 +317,7 @@ function Know({ w, set, top }: StepProps) {
         </button>
       ))}
       <div className="v3-spacer" />
-      <button className="v3-btn" onClick={() => set({ step: 4 })}>{kept || w.know.trim() ? t("Continuer") : t("Passer cette étape")}</button>
+      <button className="v3-btn" disabled={busy} onClick={async () => { if (await sort()) set({ step: 4 }); }}>{kept || w.know.trim() ? t("Continuer") : t("Passer cette étape")}</button>
     </Shell>
   );
 }

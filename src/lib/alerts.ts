@@ -87,7 +87,13 @@ export async function dismissInbound(id: number) {
 
 /** Adds what a forwarded booking holds to the open trip: flights, the hotel, and bookings as places (located on the map) */
 export async function addInbound(item: InboundItem, trip: Trip): Promise<{ added: number; manual: string[] }> {
-  const x = item.extracted || {};
+  const r = await applyBookings(item.extracted || {}, trip, item.subject || "");
+  await supabase?.from("inbound_items").update({ status: "added", trip_id: trip.id }).eq("id", item.id);
+  return r;
+}
+
+/** Adds what a booking holds (read from an e-mail, a pasted text or a screenshot) to a trip: flights, hotel, bookings, prices */
+export async function applyBookings(x: Partial<ExtractResult>, trip: Trip, subject = ""): Promise<{ added: number; manual: string[] }> {
   let added = 0;
   const manual: string[] = [];
   // flights: kept as arrival (around the start) or departure (around the end), never twice
@@ -128,9 +134,8 @@ export async function addInbound(item: InboundItem, trip: Trip): Promise<{ added
   }
   // one total for the whole booking
   if (x.bookingPrice && x.bookingPrice > 0 && !(x.flights || []).some((f) => f.price) && !x.hotel?.price) {
-    await spend(trip, x.bookingPrice, x.bookingCurrency, item.subject || t("Réservation"), (x.flights || []).length ? "flights" : x.hotel?.name ? "lodging" : "activities", "");
+    await spend(trip, x.bookingPrice, x.bookingCurrency, subject || t("Réservation"), (x.flights || []).length ? "flights" : x.hotel?.name ? "lodging" : "activities", "");
   }
-  await supabase?.from("inbound_items").update({ status: "added", trip_id: trip.id }).eq("id", item.id);
   return { added, manual };
 }
 
