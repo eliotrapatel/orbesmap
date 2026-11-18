@@ -5,6 +5,9 @@ import Shell from "./Shell";
 
 type Mode = "email" | "sent" | "password";
 
+/** Google sign-in: shown once it is switched on in Supabase (later) */
+const GOOGLE = false;
+
 /** First screen when nobody is signed in: what ORBES Trips does, then an account (e-mail link, code, Google, password) */
 export default function Welcome() {
   const [mode, setMode] = useState<Mode>("email");
@@ -73,9 +76,11 @@ export default function Welcome() {
             <button className="v3-btn" disabled={busy || !valid || (mode === "password" && !password)}>
               {busy ? "Un instant…" : mode === "password" ? "Se connecter" : "Recevoir le lien de connexion"}
             </button>
-            <button type="button" className="v3-btn ghost" disabled={busy} onClick={() => void run(signInWithGoogle, "La connexion avec Google n'a pas pu démarrer.")}>
-              <GoogleG /> Continuer avec Google
-            </button>
+            {GOOGLE && (
+              <button type="button" className="v3-btn ghost" disabled={busy} onClick={() => void run(signInWithGoogle, "La connexion avec Google n'a pas pu démarrer.")}>
+                <GoogleG /> Continuer avec Google
+              </button>
+            )}
             <button type="button" className="v3-link" onClick={() => setMode(mode === "password" ? "email" : "password")}>
               {mode === "password" ? "Recevoir un lien à la place" : "J'ai un mot de passe"}
             </button>
