@@ -1,5 +1,5 @@
 import "../../styles/pricing.css";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { track } from "../../lib/track";
 import { closePro, useStore, type ProReason } from "../../lib/store";
 import { joinWaitlist, proDate, redeemCode, type SalePlan } from "../../lib/pro";
@@ -31,7 +31,7 @@ const OFFERS: Offer[] = [
     price: () => eur(9.99),
     per: "une fois",
     line: "Pro pour un voyage, jusqu'à 30 jours après le retour.",
-    items: ["Modifications illimitées du programme", "« Refaire ma journée » et ajustements par l'IA", "Mode hors ligne", "Exports PDF et calendrier"],
+    items: ["Modifications illimitées du programme", "« Refaire ma journée » et ajustements par l'IA", "Mode hors ligne", "Exports PDF et calendrier", "Mode affaires : fournisseurs, rendez-vous, comptes-rendus"],
     cta: "Choisir le Pass voyage",
   },
   {
@@ -51,6 +51,7 @@ const OFFERS: Offer[] = [
     price: () => t("{price} / mois", { price: eur(19) }),
     per: "par personne",
     line: "Pour les voyages professionnels : sourcing, salons, rendez-vous.",
+    value: "Tout Pro, et en plus : note de frais, plusieurs voyageurs, facture.",
     items: ["Mode affaires : fournisseurs, rendez-vous, comptes-rendus", "Note de frais avec justificatifs", "Plusieurs voyageurs", "Facture"],
     cta: "Choisir Business",
   },
@@ -87,6 +88,17 @@ export default function ProScreen() {
     setSel(FIRST[why]);
   }, [why]);
   const offer = OFFERS.find((o) => o.id === sel) || OFFERS[1];
+  /** The plan cards are one radio group: one tab stop (the selected card), the arrow keys move the selection */
+  const cards = useRef<Partial<Record<SalePlan, HTMLButtonElement | null>>>({});
+  const onArrows = (e: KeyboardEvent<HTMLDivElement>) => {
+    const step = e.key === "ArrowDown" || e.key === "ArrowRight" ? 1 : e.key === "ArrowUp" || e.key === "ArrowLeft" ? -1 : 0;
+    if (!step) return;
+    e.preventDefault();
+    const i = OFFERS.findIndex((o) => o.id === sel);
+    const next = OFFERS[(i + step + OFFERS.length) % OFFERS.length].id;
+    setSel(next);
+    cards.current[next]?.focus();
+  };
   /** The plan chosen: the account joins the waiting list (once) and the choice is recorded as purchase intent */
   const choose = () => {
     const p = sel;
@@ -136,13 +148,17 @@ export default function ProScreen() {
             <p>{t("1 voyage préparé par l'IA par mois, programme complet utilisable, partage et voyageurs invités.")}</p>
             {session && <span className="v3-tag dim">{t("Votre formule")}</span>}
           </div>
-          <div className="prc-list" role="radiogroup" aria-label={t("Les formules")}>
+          <div className="prc-list" role="radiogroup" aria-label={t("Les formules")} onKeyDown={onArrows}>
             {OFFERS.map((o) => {
               const on = o.id === sel;
               return (
                 <button
                   key={o.id}
+                  ref={(el) => {
+                    cards.current[o.id] = el;
+                  }}
                   type="button"
+                  tabIndex={on ? 0 : -1}
                   role="radio"
                   aria-checked={on}
                   className={"prc-card" + (on ? " on" : "")}

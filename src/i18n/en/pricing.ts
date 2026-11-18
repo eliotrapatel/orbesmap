@@ -30,4 +30,6 @@ export default {
   "Vous pouvez encore choisir votre formule.": "You can still choose your plan.",
   "Les paiements ne sont pas encore ouverts. Choisissez votre formule : nous vous prévenons par e-mail dès l'ouverture.": "Payments aren't open yet. Choose your plan: we'll email you as soon as they open.",
   "J'ai un code d'accès": "I have an access code",
+  "Mode affaires : fournisseurs, rendez-vous, comptes-rendus": "Business mode: suppliers, meetings, meeting notes",
+  "Tout Pro, et en plus : note de frais, plusieurs voyageurs, facture.": "All of Pro, plus: expense report, several travellers, invoice.",
 } satisfies Record<string, string>;
