@@ -126,7 +126,7 @@ const AI_TASK: Record<string, string> = {
   extract: "réservations lues", place: "lieux cherchés", ask: "questions", photo: "photos", interpret: "interprète",
 };
 const when = (iso: string) => new Date(iso).toLocaleString(locale(), { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" });
-const PRO_WHY: Record<string, string> = { edit: "modifier un voyage validé", prep: "voyage du mois utilisé", export: "exports et hors ligne", info: "depuis le compte" };
+const PRO_WHY: Record<string, string> = { edit: "modifier un voyage validé", prep: "voyage du mois utilisé", export: "exports et hors ligne", business: "mode affaires", info: "depuis le compte" };
 
 /** The visitor's path over 30 days (anonymous steps, supabase/saas-5.sql) */
 function Path() {

@@ -8,6 +8,8 @@ export interface PlaceState {
   price?: string;
   lead?: string;
   sample?: string;
+  /** business mode: what the supplier makes */
+  products?: string;
   note?: string;
   favorite?: boolean;
   visited?: boolean;

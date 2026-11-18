@@ -12,7 +12,7 @@ export type TripRec = PlaceDef;
 /** The fields of a trip kept in its record (places are records of their own) */
 export const TRIP_FIELDS = [
   "code", "title", "subtitle", "dateLabel", "start", "end", "timezone", "country", "lang", "hotel", "center",
-  "days", "flights", "phrases", "zones", "practical", "emergency", "checklist",
+  "days", "flights", "phrases", "zones", "practical", "emergency", "checklist", "mode", "travellers",
 ] as const;
 
 const SEED_AT = 1;
@@ -73,6 +73,8 @@ export function tripFromRecord(id: string, rec: TripRec | undefined, code: Trip 
     timezone: str(pick("timezone", ""), "Europe/Paris"),
     country: str(pick("country", "")) || (c ? "cn" : undefined),
     lang: pick<Trip["lang"] | undefined>("lang", undefined),
+    mode: pick<Trip["mode"] | undefined>("mode", undefined) === "business" ? "business" : undefined,
+    travellers: arr<string>(pick("travellers", []), []).filter((x) => typeof x === "string" && x.trim()).slice(0, 20),
     hotel: hotel && typeof hotel.lat === "number" ? hotel : { name: t("Hôtel à préciser"), lat: center?.[1] ?? 48.8566, lng: center?.[0] ?? 2.3522 },
     center: Array.isArray(center) && center.length === 2 ? center : hotel ? [hotel.lng, hotel.lat] : [2.3522, 48.8566],
     days: days.length ? days : baseDays(),

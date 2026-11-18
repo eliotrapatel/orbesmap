@@ -7,6 +7,7 @@ import DayBar from "./components/DayBar";
 import { ICube, ILink, ILocate, IPinPlus } from "./components/Icons";
 import AddPlace, { type Found } from "./components/AddPlace";
 import { placeSearch } from "./lib/placeSearch";
+import Expenses from "./components/Expenses";
 import Checklist from "./components/Checklist";
 import Emergency from "./components/Emergency";
 import Translate from "./components/Translate";
@@ -585,6 +586,7 @@ export default function App() {
                 />
               )}
               {tool === "checklist" && <Checklist trip={trip} />}
+              {tool === "expenses" && <Expenses trip={trip} />}
               {tool === "emergency" && <Emergency trip={trip} />}
               {tool === "phrases" && <Phrases trip={trip} />}
               {tool === "converter" && <Converter />}

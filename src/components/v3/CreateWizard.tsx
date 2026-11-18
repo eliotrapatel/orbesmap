@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { ai, AiError, imageToBase64, type ExtractResult, type FixedItem, type IntakeResult } from "../../lib/ai";
 import { dayCount, newTripRecord, searchCities, timezoneFor, type Destination } from "../../lib/newTrip";
 import { geocode } from "../../lib/placeSearch";
-import { createTrip, switchTrip, useStore } from "../../lib/store";
+import { createTrip, switchTrip, useStore, requestPro } from "../../lib/store";
 import type { Draft } from "../../lib/draft";
 import { INTERESTS, PACES } from "./Onboarding";
 import Shell from "./Shell";
@@ -25,6 +25,8 @@ type Wiz = {
   pace: string;
   interests: string[];
   dayWishes: Record<string, string>;
+  /** leisure or business (Pro) */
+  mode?: "leisure" | "business";
 };
 const KEY = "orbes.wizard.v1";
 const MONTHS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
@@ -52,6 +54,7 @@ export default function CreateWizard({ onCancel, onCreated }: { onCancel: () => 
     return {
       step: 1, cities: [], start: "", end: "", hotelName: "", hotelAddress: "", flights: [], know: "", places: [], fixed: [], wishes: [],
       pace: (profile.pace as string) || "balanced", interests: (profile.interests as string[]) || [], dayWishes: {},
+      mode: profile.travel === "business" ? "business" : "leisure",
     };
   });
   useEffect(() => {
@@ -299,6 +302,9 @@ function Know({ w, set, top }: StepProps) {
 function Programme({ w, set, top, onCreated }: StepProps & { onCreated: (id: string) => void }) {
   const [busy, setBusy] = useState(false);
   const days = dayList(w.start, w.end);
+  const plan = useStore((s) => s.plan);
+  const canBusiness = !plan || plan.pro;
+  const business = w.mode === "business" && canBusiness;
   const go = async () => {
     if (busy || !w.cities.length) return;
     setBusy(true);
@@ -328,7 +334,8 @@ function Programme({ w, set, top, onCreated }: StepProps & { onCreated: (id: str
       pace: w.pace,
       interests: w.interests,
       // what was typed stays as said (the cards are what the AI understood of it)
-      wishes: w.wishes.filter((x) => x.keep).map((x) => x.text).concat(w.know.trim() ? [`En vrac : ${w.know.trim().slice(0, 1500)}`] : []),
+      wishes: w.wishes.filter((x) => x.keep).map((x) => x.text).concat(w.know.trim() ? [`En vrac : ${w.know.trim().slice(0, 1500)}`] : [])
+        .concat(business ? ["Voyage d'affaires : rendez-vous avec des fournisseurs, usines, salons et marchés de gros ; garder des créneaux pour les rendez-vous."] : []),
       dayWishes: w.dayWishes,
       places: w.places.filter((p) => p.keep).map(({ keep: _k, ...p }) => p),
       fixed: w.fixed.filter((f) => f.keep).map(({ keep: _k, ...f }) => f),
@@ -336,6 +343,7 @@ function Programme({ w, set, top, onCreated }: StepProps & { onCreated: (id: str
     };
     const id = createTrip({
       ...rec,
+      mode: business ? "business" : undefined,
       title: w.cities.map((c) => c.name).join(" · "),
       timezone: timezoneFor(base.country, base.lng),
       hotel: { name: w.hotelName.trim() || "Hôtel à préciser", lat: hotelLL[1], lng: hotelLL[0] },
@@ -351,6 +359,12 @@ function Programme({ w, set, top, onCreated }: StepProps & { onCreated: (id: str
   return (
     <Shell ring={false} top={top}>
       <h1 className="v3-d v3-h2" style={{ marginTop: 22 }}>{t("Votre programme idéal")}</h1>
+      <p className="v3-lbl" style={{ marginTop: 18 }}>{t("Type de voyage")}</p>
+      <div className="v3-seg" role="radiogroup" aria-label={t("Type de voyage")}>
+        <button role="radio" aria-checked={!business} className={!business ? "on" : ""} onClick={() => set({ mode: "leisure" })}>{t("Loisirs")}</button>
+        <button role="radio" aria-checked={business} className={business ? "on" : ""} onClick={() => (canBusiness ? set({ mode: "business" }) : requestPro("business"))}>{t("Affaires")} <span className="pro-tag">PRO</span></button>
+      </div>
+      {business && <p className="v3-note">{t("Fournisseurs, rendez-vous, dépenses par fournisseur et comptes-rendus.")}</p>}
       <p className="v3-lbl" style={{ marginTop: 18 }}>{t("Rythme")}</p>
       <div className="v3-seg" role="radiogroup" aria-label={t("Rythme")}>
         {PACES.map((p) => <button key={p.key} role="radio" aria-checked={w.pace === p.key} className={w.pace === p.key ? "on" : ""} onClick={() => set({ pace: p.key })}>{t(p.label)}</button>)}

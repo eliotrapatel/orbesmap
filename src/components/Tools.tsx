@@ -1,7 +1,8 @@
 // Phrases, converter, flights, practical info, export.
 import { useEffect, useState } from "react";
 import type { Trip } from "../data/types";
-import { exportCsv, exportPdf } from "../lib/export";
+import { exportCsv, exportPdf, exportReport } from "../lib/export";
+import { useBusiness } from "../lib/business";
 import { exportIcs } from "../lib/ics";
 import { useLiveRate } from "../lib/rates";
 import { getState, hasPro, requestPro, setEurRate, toast, useStore } from "../lib/store";
@@ -244,11 +245,19 @@ export function Practical({ trip }: { trip: Trip }) {
 }
 
 export function ExportPanel({ trip }: { trip: Trip }) {
+  const business = useBusiness(trip);
   const ph = phase(trip);
   return (
     <div>
       <p style={{ color: "var(--soft)", fontSize: 13.5, marginBottom: 16 }}>{ph !== "before" ? t("Tout le carnet {title} : lieux, statuts, notes, fiches fournisseurs, contacts et visites.", { title: trip.title }) : t("Tout le carnet {title} : lieux, statuts, notes, fiches fournisseurs, contacts.", { title: trip.title })}</p>
       <div className="cards">
+        {business && (
+          <button className="card" style={{ textAlign: "left" }} onClick={() => { if (!hasPro()) return requestPro("business"); track("export", "report", trip.id); if (!exportReport(trip, getState().data)) toast(t("Autorisez les fenêtres pop-up pour imprimer le PDF")); }}>
+            <IDownload width={20} height={20} />
+            <h4 style={{ marginTop: 10 }}>{t("Compte-rendu fournisseurs")}</h4>
+            <p>{t("Chaque fournisseur : fiche, statut, rendez-vous, contacts, notes, photos et dépenses. À envoyer à l'équipe.")}</p>
+          </button>
+        )}
         <button className="card" style={{ textAlign: "left" }} onClick={() => { if (!hasPro()) return requestPro("export"); track("export", "pdf", trip.id); if (!exportPdf(trip, getState().data)) toast(t("Autorisez les fenêtres pop-up pour imprimer le PDF")); }}>
           <IDownload width={20} height={20} />
           <h4 style={{ marginTop: 10 }}>PDF</h4>

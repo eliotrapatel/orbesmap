@@ -4,7 +4,7 @@ import type { Place, Trip } from "../data/types";
 import { amapDirections, formatMinutes, googleDirections, travelMinutes } from "../lib/geo";
 import { isHotel, stopTime } from "../lib/plan";
 import { checkVisit, hoursLine, liveStatus } from "../lib/hours";
-import { addContact, addPhoto, currentAuthor, deleteContact, deletePhoto, deletePin, photoSrc, toast, updateDef, updatePin, updatePlace, updateRecord, useCanEdit, useStore, needPro, requestPro, useProgrammeLocked } from "../lib/store";
+import { addContact, addPhoto, currentAuthor, deleteContact, deletePhoto, deletePin, photoSrc, toast, updateDef, updatePin, updatePlace, updateRecord, useCanEdit, useStore, needPro, requestPro, useProgrammeLocked, getState } from "../lib/store";
 import { enrichPlace, restorePrevSheet, useEnrich } from "../lib/enrich";
 import EditSheet from "./EditSheet";
 import { fitAll, slotText } from "../lib/slots";
@@ -16,7 +16,9 @@ import { IBack, ICamera, ICheck, IClock, IClose, ICopy, IEdit, IExpand, IGlobe, 
 import { Lightbox, Modal, SavedInput, ShowScreen, compressImage, copy, speak, useEscape, useSheetDrag } from "./ui";
 import { GoBlock } from "./Nav";
 import type { Mode } from "../lib/route";
-import { t } from "../lib/i18n";
+import { t, locale } from "../lib/i18n";
+import { money, useBusiness, useExpenses } from "../lib/business";
+import { exportReport } from "../lib/export";
 
 export default function PlaceDetail({ trip, place, onBack, onGo, sheetH, onMovePoint }: { trip: Trip; place: Place; onBack: () => void; onGo: (m: Mode) => void; sheetH?: string; onMovePoint?: () => void }) {
   const state = useStore((s) => s.data.places[place.id]) || {};
@@ -48,6 +50,7 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH, onMoveP
   // a reader of a shared trip sees the sheet without anything to change
   const canEdit = useCanEdit();
   const locked = useProgrammeLocked();
+  const business = useBusiness(trip);
   const [editing, setEditing] = useState(false);
   const [secs, setSecs] = useState(0);
   useEffect(() => {
@@ -194,7 +197,7 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH, onMoveP
           <div className="sec">
             <span className="label">{t("Suivi")}</span>
             <div className="seg" role="group" aria-label={t("Statut")}>
-              {STATUSES.map((s) => (
+              {STATUSES.filter((s) => !s.business || business).map((s) => (
                 <button key={s.key} className={state.status === s.key ? "on" : ""} style={{ ["--c" as string]: s.color }} aria-pressed={state.status === s.key} onClick={() => updatePlace(place.id, { status: state.status === s.key ? null : s.key })}>
                   <i /> {t(s.label)}
                 </button>
@@ -223,15 +226,17 @@ export default function PlaceDetail({ trip, place, onBack, onGo, sheetH, onMoveP
           </div>
         )}
 
-        {supplier && (
+        {(supplier || (business && place.type !== "transport")) && !hotel && (
           <div className="sec">
             <span className="label">{t("Fiche fournisseur")}</span>
+            {business && <label className="field"><span>{t("Produits")}</span><SavedInput value={state.products || ""} placeholder={t("ex. sacs en cuir, petite maroquinerie")} onSave={(v) => updatePlace(place.id, { products: v })} /></label>}
             <div className="grid2">
               <label className="field"><span>MOQ</span><SavedInput value={state.moq || ""} placeholder={t("ex. 50 pcs")} onSave={(v) => updatePlace(place.id, { moq: v })} /></label>
               <label className="field"><span>{t("Prix unitaire")}</span><SavedInput value={state.price || ""} placeholder={t("ex. 4,20 $")} onSave={(v) => updatePlace(place.id, { price: v })} /></label>
               <label className="field"><span>{t("Délai de production")}</span><SavedInput value={state.lead || ""} placeholder={t("ex. 15 jours")} onSave={(v) => updatePlace(place.id, { lead: v })} /></label>
               <label className="field"><span>{t("Échantillon")}</span><SavedInput value={state.sample || ""} placeholder={t("ex. commandé")} onSave={(v) => updatePlace(place.id, { sample: v })} /></label>
             </div>
+            {business && <SupplierMoney trip={trip} placeId={place.id} />}
           </div>
         )}
 
@@ -390,5 +395,22 @@ function ContactForm({ placeName, onClose, onSave }: { placeName: string; onClos
         </div>
       </form>
     </Modal>
+  );
+}
+
+/** Business mode: what was spent at this supplier, and its report */
+function SupplierMoney({ trip, placeId }: { trip: Trip; placeId: string }) {
+  const list = useExpenses().filter((e) => e.placeId === placeId);
+  const totals = new Map<string, number>();
+  for (const e of list) totals.set(e.currency, (totals.get(e.currency) || 0) + e.amount);
+  return (
+    <div className="sup-money">
+      <span className="em-small">
+        {list.length
+          ? t("Dépensé ici : {sum} ({n} dépense(s))", { sum: [...totals].map(([c, v]) => money(v, c, locale())).join(" + "), n: list.length })
+          : t("Aucune dépense chez ce fournisseur. Ajoutez-en depuis l'outil Dépenses.")}
+      </span>
+      <button className="btn-sm" onClick={() => { if (!exportReport(trip, getState().data, placeId)) toast(t("Autorisez les fenêtres pop-up pour imprimer le PDF")); }}>{t("Compte-rendu PDF")}</button>
+    </div>
   );
 }

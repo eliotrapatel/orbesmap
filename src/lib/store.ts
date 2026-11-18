@@ -71,7 +71,7 @@ interface State {
 
 /** Pro = the paid version (opened by codes for now): see supabase/saas-4.sql */
 export type Plan = { uid: string; pro: boolean; until: string | null; granted: boolean; admin: boolean; waitlisted: boolean; prepLeft: number; proTrips: string[] };
-export type ProReason = "edit" | "prep" | "export" | "info";
+export type ProReason = "edit" | "prep" | "export" | "info" | "business";
 
 // ---------- toasts (queued until the UI subscribes) ----------
 type ToastListener = (msg: string) => void;

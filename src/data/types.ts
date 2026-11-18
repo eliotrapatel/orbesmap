@@ -110,6 +110,10 @@ export interface Trip {
   timezone: string;
   /** country code of the destination (OpenStreetMap, e.g. "jp"); the first trips are in China */
   country?: string;
+  /** leisure (default) or business: suppliers, meetings, reports (Pro) */
+  mode?: "leisure" | "business";
+  /** who shares the trip's expenses (first names) */
+  travellers?: string[];
   /** main local language (interpreter, phrases) */
   lang?: { code: string; name: string; speech: string };
   hotel: { name: string; lat: number; lng: number; placeId?: string };
@@ -135,4 +139,4 @@ export interface Emergency {
   hospitals: { name: string; cn: string; address: string; addressCn: string; lat: number; lng: number; phone: string; er24: boolean; english: boolean; directBilling: string; note: string }[];
 }
 
-export type Status = "todo" | "scheduled" | "visited" | "sample";
+export type Status = "todo" | "scheduled" | "visited" | "sample" | "ordered";

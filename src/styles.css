@@ -1263,3 +1263,26 @@ button.v3-brand { color: var(--ink); background: none; border: 0; padding: 0; cu
 .pt-sheet { position: relative; width: min(480px, 100%); padding: 20px 20px calc(20px + var(--safe-b)); border-radius: 24px 24px 0 0; background: rgba(14, 13, 12, 0.96); display: flex; flex-direction: column; animation: pop 0.2s var(--ease); }
 @media (min-width: 900px) { .pt-sheet-wrap { align-items: center; } .pt-sheet { border-radius: 24px; } }
 .acct-lang { margin-top: 4px; }
+
+/* =================== business mode, expenses (lot 6e) =================== */
+.sup-money { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+.exp-total { padding: 4px 0 14px; border-bottom: 1px solid var(--hair); }
+.exp-total b { display: block; font: 500 34px/1.05 var(--display); margin-top: 6px; font-variant-numeric: tabular-nums; }
+.exp-total small { display: block; color: var(--soft); font-size: 12.5px; margin-top: 4px; }
+.exp-people { margin-top: 14px; }
+.exp-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; }
+.exp-chips .fchip button { margin-left: 4px; color: inherit; opacity: 0.6; }
+.exp-name { height: 32px !important; width: 120px; padding: 0 10px !important; font-size: 13px; }
+.exp-bal { margin-top: 14px; }
+.exp-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13.5px; }
+.exp-grow { flex: 1; min-width: 0; }
+.exp-plus { color: var(--ok); font-variant-numeric: tabular-nums; }
+.exp-minus { color: var(--warn); font-variant-numeric: tabular-nums; }
+.exp-moves { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--hair); display: grid; gap: 4px; font-size: 13.5px; }
+.exp-form { margin-top: 14px; display: grid; gap: 10px; }
+.exp-day { margin-top: 18px; }
+.exp-day > .label { display: block; margin-bottom: 4px; }
+.exp-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid rgba(246, 242, 234, 0.07); }
+.exp-item b { font-weight: 500; display: block; }
+.exp-item small { color: var(--soft); font-size: 12px; display: block; }
+.exp-amt { text-align: right; font-variant-numeric: tabular-nums; flex: none; }

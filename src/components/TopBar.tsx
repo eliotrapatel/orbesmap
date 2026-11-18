@@ -7,13 +7,14 @@ import { useSyncState } from "./Account";
 import { ICal, IChat, IChevron, IDownload, IGrid, IInfo, IPlane, ISearch, IUser, ICheck, ITranslate, IChecklist, ISos, IAsk } from "./Icons";
 import { WxIcon } from "./WxIcon";
 import { useChecklist } from "./Checklist";
-import { useStore, useTrips } from "../lib/store";
+import { useStore, useTrips, useCanEdit } from "../lib/store";
 import { openHome, openShare } from "./v3/nav";
 import { supabaseConfigured } from "../lib/supabase";
 import { useEscape } from "./ui";
 import { t } from "../lib/i18n";
+import { setMode } from "../lib/business";
 
-export type ToolKey = "overview" | "agenda" | "ask" | "translate" | "phrases" | "converter" | "checklist" | "flights" | "practical" | "emergency" | "export" | "account";
+export type ToolKey = "overview" | "agenda" | "ask" | "translate" | "phrases" | "converter" | "expenses" | "checklist" | "flights" | "practical" | "emergency" | "export" | "account";
 
 export const TOOLS: { key: ToolKey; label: string; icon: React.ReactElement; wide?: boolean }[] = [
   { key: "overview", label: "Aperçu", icon: <IGrid />, wide: true },
@@ -23,6 +24,7 @@ export const TOOLS: { key: ToolKey; label: string; icon: React.ReactElement; wid
   { key: "emergency", label: "Urgence", icon: <ISos /> },
   { key: "phrases", label: "Phrases", icon: <IChat /> },
   { key: "converter", label: "Devises", icon: <span style={{ fontWeight: 600, fontSize: 15, lineHeight: 1 }}>¥</span> },
+  { key: "expenses", label: "Dépenses", icon: <span style={{ fontWeight: 600, fontSize: 15, lineHeight: 1 }}>€</span> },
   { key: "checklist", label: "Check-list", icon: <IChecklist /> },
   { key: "flights", label: "Vols", icon: <IPlane /> },
   { key: "practical", label: "Infos", icon: <IInfo /> },
@@ -43,6 +45,7 @@ export function TripMenu({ trip, onPick, onClose, anchor }: { trip: Trip; onPick
   const ref = useRef<HTMLDivElement>(null);
   const trips = useTrips();
   const signedIn = useStore((s) => !!s.session);
+  const canEditTrip = useCanEdit(trip.id);
   useEscape(onClose);
   useEffect(() => {
     const f = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && onClose();
@@ -71,6 +74,15 @@ export function TripMenu({ trip, onPick, onClose, anchor }: { trip: Trip; onPick
           <small>{t("Inviter par e-mail · modifier ou lecture seule")}</small>
         </span>
       </button>}
+      {canEditTrip && (
+        <button role="menuitemcheckbox" aria-checked={trip.mode === "business"} className="menu-item" onClick={() => { onClose(); setMode(trip, trip.mode === "business" ? "leisure" : "business"); }}>
+          <span>
+            <span className="label">{t("Mode affaires")} <span className="pro-tag">PRO</span></span>
+            <small>{trip.mode === "business" ? t("Activé · fournisseurs, rendez-vous, comptes-rendus") : t("Fournisseurs, rendez-vous, dépenses par fournisseur, comptes-rendus")}</small>
+          </span>
+          {trip.mode === "business" && <ICheck className="chk" />}
+        </button>
+      )}
       <button role="menuitem" className="menu-item" onClick={() => { onClose(); openHome(); }}>
         <span>
           <span className="label">{t("Mes voyages")}</span>

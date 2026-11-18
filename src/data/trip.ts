@@ -11,11 +11,13 @@ export const TYPE_LABEL: Record<PlaceType, string> = {
   ajout: "Mon lieu",
 };
 
-export const STATUSES: { key: Status; label: string; color: string }[] = [
+/** `business`: shown only in a trip's business mode */
+export const STATUSES: { key: Status; label: string; color: string; business?: boolean }[] = [
   { key: "todo", label: "À contacter", color: "#7D8288" },
   { key: "scheduled", label: "RDV pris", color: "#B7791F" },
   { key: "visited", label: "Visité", color: "#2F5A86" },
   { key: "sample", label: "Échantillon reçu", color: "#2B7363" },
+  { key: "ordered", label: "Commandé", color: "#7A5BB5", business: true },
 ];
 
 export const dayMap = (days: { key: string }[]) => Object.fromEntries(days.map((d) => [d.key, d]));

@@ -9,6 +9,7 @@ const WHY: Record<ProReason, string> = {
   edit: "Ce voyage est validé. Pour modifier son programme, ajouter ou déplacer des lieux, passez à Pro.",
   prep: "Votre voyage offert de ce mois a déjà été préparé. Avec Pro, préparez tous vos voyages.",
   export: "La carte hors ligne et les exports font partie de Pro.",
+  business: "Le mode affaires (fournisseurs, rendez-vous, comptes-rendus) fait partie de Pro.",
   info: "",
 };
 
