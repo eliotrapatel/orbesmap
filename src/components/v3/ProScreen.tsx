@@ -1,9 +1,11 @@
 import "../../styles/pricing.css";
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import { track } from "../../lib/track";
 import { closePro, useStore, type ProReason } from "../../lib/store";
 import { joinWaitlist, proDate, redeemCode, type SalePlan } from "../../lib/pro";
 import Shell from "./Shell";
+import ProMark from "./ProMark";
+import { ICheck, IClose } from "../Icons";
 import { locale, t, useLang } from "../../lib/i18n";
 
 const WHY: Record<ProReason, string> = {
@@ -57,12 +59,89 @@ const OFFERS: Offer[] = [
   },
 ];
 
-/** ORBES Trips Pro: the plans and their prices, the reason the screen opened, "choose this plan" until it goes on sale, a code to activate it */
+/** The comparison's columns: the free plan for reference, then the three plans on sale (short name, price, period) */
+type Col = "free" | SalePlan;
+const COLS: { id: Col; name: string; price: () => string; per: string }[] = [
+  { id: "free", name: "Gratuit", price: () => eur(0), per: "" },
+  { id: "pass", name: "Pass", price: () => eur(9.99), per: "une fois" },
+  { id: "annual", name: "Annuel", price: () => eur(39), per: "/ an" },
+  { id: "business", name: "Business", price: () => eur(19), per: "/ mois" },
+];
+type Cell = boolean | string;
+/** What each plan gives, in one glance (true = included, false = not included, text = how much).
+ *  Same facts as the plan cards: Pass = Pro on one trip, Annuel = Pro on every trip and no monthly limit, Business = all of Pro and its extras. */
+const ROWS: { label: string; cells: [Cell, Cell, Cell, Cell] }[] = [
+  { label: "Voyages en Pro", cells: [false, "1", "Tous", "Tous"] },
+  { label: "Voyages préparés par l'IA", cells: ["1 / mois", "1 / mois", "Sans limite", "Sans limite"] },
+  { label: "Programme, partage, invités", cells: [true, true, true, true] },
+  { label: "Modifier un programme validé", cells: [false, true, true, true] },
+  { label: "Carte hors ligne et exports", cells: [false, true, true, true] },
+  { label: "Mode affaires", cells: [false, true, true, true] },
+  { label: "Note de frais et facture", cells: [false, false, false, true] },
+];
+/** What a member has unlocked (under the membership card) */
+const UNLOCKED = [
+  "Modifier le programme à tout moment : ajouter, déplacer, retirer des lieux",
+  "Des voyages préparés par l'IA sans limite mensuelle, et bien plus de demandes",
+  "La carte hors ligne et les exports (PDF, calendrier)",
+  "Le mode affaires : fournisseurs, rendez-vous, comptes-rendus",
+];
+/** The staged reveal on enter: each block rises a little after the one before */
+const rise = (ms: number) => ({ "--d": ms + "ms" }) as CSSProperties;
+
+/** The membership card: the mark, the account's first name, two facts (plan and price, or plan and validity).
+ *  A changed value cross-fades (keyed); the gold sheen passes once, when the card appears. */
+function MemberCard({ name, facts, member }: { name: string; facts: { k: string; v: string }[]; member?: boolean }) {
+  return (
+    <div className={"pm-card pm-rise" + (member ? " is-member" : "")} style={rise(0)}>
+      <svg className="pm-card-orbit" viewBox="0 0 700 300" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
+        <ellipse cx="350" cy="150" rx="330" ry="88" transform="rotate(-18 350 150)" />
+        <ellipse cx="350" cy="150" rx="236" ry="58" transform="rotate(-18 350 150)" />
+      </svg>
+      <div className="pm-card-top">
+        <ProMark size="md" />
+        <span className="pm-card-brand">ORBES Trips</span>
+      </div>
+      <div className="pm-card-name v3-d">{name || t("Membre Pro")}</div>
+      <div className="pm-card-foot">
+        {facts.map((f, i) => (
+          <span key={i} className={"pm-fact" + (i ? " r" : "")}>
+            <span className="pm-k">{f.k}</span>
+            <span key={f.v} className="pm-v">{f.v}</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** One cell of the comparison: a gold check, a hairline dash, or a short quantity */
+function Mark({ v }: { v: Cell }) {
+  if (v === true)
+    return (
+      <>
+        <ICheck className="pm-yes" />
+        <span className="sr">{t("Inclus")}</span>
+      </>
+    );
+  if (v === false)
+    return (
+      <>
+        <span className="pm-no" aria-hidden="true" />
+        <span className="sr">{t("Non inclus")}</span>
+      </>
+    );
+  return <span className="pm-qty">{t(v)}</span>;
+}
+
+/** ORBES Trips Pro: a membership card, the plans compared in one glance, "choose this plan" until it goes on sale, a code to activate it.
+ *  A member sees their card (first name, validity) and what is unlocked. */
 export default function ProScreen() {
   useLang();
   const why = useStore((s) => s.proAsk) || "info";
   const plan = useStore((s) => s.plan);
   const session = useStore((s) => s.session);
+  const first = useStore((s) => ((s.profile.name as string) || "").trim().split(/\s+/)[0] || "");
   const [sel, setSel] = useState<SalePlan>(FIRST[why]);
   const [chosen, setChosen] = useState<SalePlan | null>(null);
   const [code, setCode] = useState("");
@@ -113,42 +192,84 @@ export default function ProScreen() {
       setChosen(p);
     });
   };
+  const validity = plan?.granted && plan.until ? t("Jusqu'au {date}", { date: proDate(plan.until) }) : plan?.granted ? t("À vie") : t("Inclus avec votre accès");
   const top = (
     <div className="v3-bar">
-      <button className="v3-tool" onClick={closePro} aria-label={t("Fermer")}>✕</button>
+      <button className="v3-tool pm-close" onClick={closePro} aria-label={t("Fermer")}>
+        <IClose />
+      </button>
       <span className="v3-grow" />
     </div>
   );
   return (
-    <Shell className={"v3-pro" + (pro ? "" : " prc")} top={top}>
-      <p className="v3-lbl" style={{ marginTop: 18 }}>ORBES Trips <span className="pro-tag">PRO</span></p>
-      <h1 className="v3-d v3-h1">{pro ? t("Vous êtes Pro.") : t("Votre voyage, sans limite.")}</h1>
-      {!pro && WHY[why] && <p className="v3-lead">{t(WHY[why])}</p>}
-      {pro && (
+    <Shell className={"v3-pro pm" + (pro ? " pm-member" : " prc")} top={top} ring={false}>
+      {pro ? (
         <>
-          <p className="v3-lead">
-            {plan?.granted && plan.until ? t("Pro jusqu'au {date}.", { date: proDate(plan.until) }) : plan?.granted ? t("Pro à vie.") : t("Pro est inclus avec votre accès.")}
-          </p>
-          <ul className="v3-vp" style={{ marginTop: 26 }}>
-            <li><span>01</span>{t("Modifier le programme à tout moment : ajouter, déplacer, retirer des lieux")}</li>
-            <li><span>02</span>{t("Des voyages préparés par l'IA sans limite mensuelle, et bien plus de demandes")}</li>
-            <li><span>03</span>{t("La carte hors ligne et les exports (PDF, calendrier)")}</li>
-            <li><span>04</span>{t("Le mode affaires : fournisseurs, rendez-vous, comptes-rendus")}</li>
+          <h1 className="v3-d v3-h1 pm-rise" style={rise(60)}>{t("Vous êtes Pro.")}</h1>
+          <MemberCard member name={first} facts={[{ k: t("Formule"), v: "Pro" }, { k: t("Validité"), v: validity }]} />
+          <p className="v3-lbl pm-sec pm-rise" style={rise(220)}>{t("Ce qui est débloqué")}</p>
+          <ul className="pm-unlocked pm-rise" style={rise(280)}>
+            {UNLOCKED.map((u) => (
+              <li key={u}>
+                <ICheck className="pm-yes" />
+                <span>{t(u)}</span>
+              </li>
+            ))}
           </ul>
+          <div className="v3-spacer" />
         </>
-      )}
-      {!pro && (
+      ) : (
         <>
-          <p className="v3-lbl prc-lbl">{t("Les formules")}</p>
-          <div className="prc-free">
-            <div className="prc-row">
-              <b>{t("Gratuit")}</b>
-              <span className="prc-price">{eur(0)}</span>
-            </div>
-            <p>{t("1 voyage préparé par l'IA par mois, programme complet utilisable, partage et voyageurs invités.")}</p>
-            {session && <span className="v3-tag dim">{t("Votre formule")}</span>}
+          <MemberCard name={session ? first : ""} facts={[{ k: t("Formule"), v: t(offer.name) }, { k: t("Prix"), v: offer.price() + (offer.per ? " · " + t(offer.per) : "") }]} />
+          <h1 className="v3-d v3-h1 pm-rise" style={rise(120)}>{t("Votre voyage, sans limite.")}</h1>
+          {WHY[why] && <p className="v3-lead pm-rise" style={rise(180)}>{t(WHY[why])}</p>}
+
+          <p className="v3-lbl prc-lbl pm-rise" style={rise(240)}>{t("Les formules")}</p>
+          <div className="pm-cmp-wrap pm-rise" style={rise(280)}>
+            <table className="pm-cmp">
+              <caption className="sr">{t("Ce que comprend chaque formule")}</caption>
+              <colgroup>
+                <col className="pm-c0" />
+                {COLS.map((c) => <col key={c.id} />)}
+              </colgroup>
+              <thead>
+                <tr>
+                  <td />
+                  {COLS.map((c) => (
+                    <th
+                      key={c.id}
+                      scope="col"
+                      className={(c.id === sel ? "on" : "") + (c.id !== "free" ? " pick" : "")}
+                      onClick={c.id !== "free" ? () => setSel(c.id as SalePlan) : undefined}
+                    >
+                      <span className="pm-cn">{t(c.name)}</span>
+                      <span className="pm-cp">{c.price()}</span>
+                      <span className="pm-cper">{c.per ? t(c.per) : " "}</span>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {ROWS.map((r) => (
+                  <tr key={r.label}>
+                    <th scope="row">{t(r.label)}</th>
+                    {r.cells.map((v, i) => (
+                      <td key={COLS[i].id} className={(COLS[i].id === sel ? "on" : "") + (i === 0 ? " free" : "")}>
+                        <Mark v={v} />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          <div className="prc-list" role="radiogroup" aria-label={t("Les formules")} onKeyDown={onArrows}>
+          <p className="pm-free pm-rise" style={rise(320)}>
+            {session && <span className="v3-tag dim">{t("Votre formule")}</span>}
+            <b>{t("Gratuit")}</b> {t("1 voyage préparé par l'IA par mois, programme complet utilisable, partage et voyageurs invités.")}
+          </p>
+
+          <p className="v3-lbl prc-lbl pm-rise" style={rise(340)}>{t("Choisissez votre formule")}</p>
+          <div className="prc-list pm-rise" style={rise(360)} role="radiogroup" aria-label={t("Les formules")} onKeyDown={onArrows}>
             {OFFERS.map((o) => {
               const on = o.id === sel;
               return (
@@ -191,7 +312,7 @@ export default function ProScreen() {
             })}
           </div>
           <div className="v3-spacer" />
-          <div className="v3-glass v3-auth prc-buy">
+          <div className="v3-glass v3-auth prc-buy pm-rise" style={rise(400)}>
             {!session ? (
               <p className="v3-msg">{t("Connectez-vous pour activer un code ou être prévenu à l'ouverture des ventes.")}</p>
             ) : (
@@ -199,10 +320,16 @@ export default function ProScreen() {
                 <div role="status" aria-live="polite">
                   {chosen === sel ? (
                     <p className="v3-msg prc-ok">
-                      <b>{t("✓ C'est noté : {plan}.", { plan: t(offer.name) })}</b> {t("Les paiements ouvrent très bientôt. Nous vous prévenons par e-mail dès l'ouverture, avec ce plan.")}
+                      <ICheck className="prc-ok-ic" />
+                      <span>
+                        <b>{t("C'est noté : {plan}.", { plan: t(offer.name) })}</b> {t("Les paiements ouvrent très bientôt. Nous vous prévenons par e-mail dès l'ouverture, avec ce plan.")}
+                      </span>
                     </p>
                   ) : plan?.waitlisted ? (
-                    <p className="v3-msg">{t("✓ Vous serez prévenu à l'ouverture des ventes.")} {t("Vous pouvez encore choisir votre formule.")}</p>
+                    <p className="v3-msg prc-ok">
+                      <ICheck className="prc-ok-ic" />
+                      <span>{t("Vous serez prévenu à l'ouverture des ventes.")} {t("Vous pouvez encore choisir votre formule.")}</span>
+                    </p>
                   ) : (
                     <p className="v3-msg">{t("Les paiements ne sont pas encore ouverts. Choisissez votre formule : nous vous prévenons par e-mail dès l'ouverture.")}</p>
                   )}
@@ -238,11 +365,10 @@ export default function ProScreen() {
           </div>
         </>
       )}
-      {pro && <div className="v3-spacer" />}
       {(pro || done) && (
         <>
           {done && <p className="sr" role="status">{done}</p>}
-          <button className="v3-btn" onClick={closePro}>{t("Continuer")}</button>
+          <button className="v3-btn pm-continue" onClick={closePro}>{t("Continuer")}</button>
         </>
       )}
     </Shell>

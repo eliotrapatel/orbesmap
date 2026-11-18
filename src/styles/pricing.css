@@ -58,3 +58,132 @@
   .prc-more { animation: none; }
   .prc-card, .prc-dot::after { transition: none; }
 }
+
+/* =================== Pro identity (lot "pro"): the mark, the membership card, the comparison, the member state =================== */
+
+/* The mark: "PRO" in the display capitals inside a gold hairline frame; lg adds an inner hairline, like a hallmark */
+.pro-mark {
+  display: inline-flex; align-items: center; justify-content: center; flex: none; box-sizing: border-box;
+  font-family: var(--display); font-weight: 500; text-transform: uppercase; line-height: 1; color: var(--gold);
+  border: 1px solid rgba(216, 196, 126, 0.62); background: rgba(216, 196, 126, 0.05); vertical-align: middle;
+}
+.pro-mark > span { display: block; margin-right: -0.24em; letter-spacing: 0.24em; transform: translateY(0.04em); }
+.pro-mark-sm { height: 18px; padding: 0 6px; border-radius: 4px; font-size: 9px; }
+.pro-mark-md { height: 26px; padding: 0 9px; border-radius: 6px; font-size: 11.5px; }
+.pro-mark-lg { height: 40px; padding: 0 15px; border-radius: 9px; font-size: 17px; box-shadow: inset 0 0 0 3px #050505, inset 0 0 0 4px rgba(216, 196, 126, 0.3); }
+
+/* Existing "PRO" tags across the app take the mark's look (doubled class: wins over the base rule wherever it loads) */
+.pro-tag.pro-tag {
+  height: 18px; padding: 0 calc(6px - 0.2em) 0 6px; border-radius: 4px; box-sizing: border-box;
+  font: 500 9px/1 var(--display); letter-spacing: 0.2em; color: var(--gold);
+  background: rgba(216, 196, 126, 0.05); border: 1px solid rgba(216, 196, 126, 0.62); vertical-align: 1px;
+}
+/* on an ivory selected segment the frame turns ink so it stays legible */
+.v3-seg button.on .pro-tag.pro-tag { color: #0a0a0a; border-color: rgba(10, 10, 10, 0.55); background: transparent; }
+
+/* ---- the Pro screen frame ---- */
+.pm .v3-bg { background:
+  radial-gradient(70% 34% at 50% -2%, rgba(216, 196, 126, 0.14), transparent 72%),
+  radial-gradient(60% 34% at 110% 70%, rgba(246, 242, 234, 0.05), transparent 70%); }
+.pm-close svg { width: 18px; height: 18px; }
+
+/* staged reveal on enter: opacity + a short rise, once */
+.pm-rise { animation: pm-rise 0.8s var(--ease) both; animation-delay: var(--d, 0ms); }
+@keyframes pm-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+/* ---- the membership card ---- */
+.pm-card {
+  position: relative; isolation: isolate; overflow: hidden; width: 100%; max-width: 400px; margin: 14px auto 0;
+  aspect-ratio: 1.72 / 1; border-radius: 20px; padding: 18px 20px 17px; display: flex; flex-direction: column;
+  border: 1px solid rgba(216, 196, 126, 0.42);
+  background:
+    radial-gradient(90% 70% at 100% 0%, rgba(216, 196, 126, 0.16), transparent 62%),
+    radial-gradient(70% 60% at 0% 100%, rgba(246, 242, 234, 0.05), transparent 70%),
+    linear-gradient(150deg, #17150f 0%, #0b0a08 46%, #060606 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 242, 210, 0.1), 0 28px 60px -28px rgba(0, 0, 0, 0.95), 0 2px 0 rgba(0, 0, 0, 0.6);
+  animation-name: pm-card-in; animation-duration: 1s;
+}
+@keyframes pm-card-in { from { opacity: 0; transform: translateY(14px) scale(0.985); } to { opacity: 1; transform: none; } }
+/* one slow sheen across the card when it appears, then nothing moves */
+.pm-card::after {
+  content: ""; position: absolute; inset: -2px; z-index: 2; pointer-events: none;
+  background: linear-gradient(104deg, transparent 34%, rgba(255, 240, 205, 0.07) 45%, rgba(255, 240, 205, 0.16) 50%, rgba(255, 240, 205, 0.07) 55%, transparent 66%);
+  transform: translateX(-110%); animation: pm-sheen 2.2s cubic-bezier(0.45, 0, 0.2, 1) 0.55s 1 both;
+}
+@keyframes pm-sheen { from { transform: translateX(-110%); } to { transform: translateX(110%); } }
+.pm-card-orbit { position: absolute; z-index: -1; left: -18%; top: 4%; width: 136%; height: 100%; fill: none; stroke: rgba(216, 196, 126, 0.22); stroke-width: 1; pointer-events: none; }
+.pm-card-orbit ellipse + ellipse { stroke: rgba(246, 242, 234, 0.08); stroke-width: 0.8; }
+.pm-card-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.pm-card-brand { font: 500 10.5px/1 var(--display); letter-spacing: 0.3em; margin-right: -0.3em; text-transform: uppercase; color: var(--soft); white-space: nowrap; }
+.pm-card-name { margin-top: auto; font-size: clamp(24px, 7.4vw, 30px); line-height: 1; letter-spacing: 0.04em; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pm-card-foot { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(216, 196, 126, 0.2); }
+.pm-fact { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.pm-fact.r { text-align: right; align-items: flex-end; }
+.pm-k { font-size: 9.5px; line-height: 1; letter-spacing: 0.16em; text-transform: uppercase; color: var(--mute); }
+.pm-v { font-size: 13.5px; line-height: 1.2; font-weight: 500; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; font-variant-numeric: tabular-nums; animation: pm-swap 0.45s var(--ease) both; }
+.pm-fact.r .pm-v { color: var(--gold); }
+@keyframes pm-swap { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+
+.pm .v3-h1 { margin: 26px 0 12px; }
+
+/* ---- the comparison, in one glance ---- */
+.pm-cmp-wrap { margin-top: 2px; border: 1px solid var(--hair); border-radius: 18px; background: rgba(14, 13, 12, 0.6); padding: 4px 6px 6px; }
+.pm-cmp { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
+.pm-c0 { width: 35%; }
+.pm-cmp th, .pm-cmp td { padding: 0; font-weight: 400; text-align: center; vertical-align: middle; }
+.pm-cmp thead th { padding: 12px 2px 11px; vertical-align: bottom; border-radius: 12px 12px 0 0; }
+.pm-cmp thead th.pick { cursor: pointer; }
+.pm-cn { display: block; font-size: 9.5px; line-height: 1.1; letter-spacing: 0.06em; text-transform: uppercase; color: var(--soft); white-space: nowrap; transition: color 0.3s var(--ease); }
+.pm-cp { display: block; margin-top: 6px; font: 500 14px/1 var(--display); color: var(--ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pm-cper { display: block; margin-top: 4px; font-size: 9.5px; line-height: 1.1; color: var(--mute); white-space: nowrap; }
+.pm-cmp tbody th { text-align: left; padding: 10px 8px 10px 8px; font-size: 12px; line-height: 1.3; color: var(--soft); }
+.pm-cmp tbody td { padding: 10px 2px; }
+.pm-cmp tbody tr > * { border-top: 1px solid rgba(246, 242, 234, 0.07); }
+.pm-cmp tbody tr:first-child > * { border-top-color: var(--hair); }
+/* the selected plan's column: a faint gold field, gold name */
+.pm-cmp .on { background: rgba(216, 196, 126, 0.075); transition: background 0.35s var(--ease); }
+.pm-cmp thead th.on .pm-cn { color: var(--gold); }
+.pm-cmp tbody tr:last-child td.on { border-radius: 0 0 12px 12px; }
+.pm-cmp td:not(.on), .pm-cmp thead th:not(.on) { transition: background 0.35s var(--ease); }
+.pm-yes { width: 15px; height: 15px; color: var(--gold); stroke-width: 2; vertical-align: middle; }
+.pm-cmp td.free .pm-yes { color: var(--soft); }
+.pm-no { display: inline-block; width: 9px; height: 1px; background: rgba(246, 242, 234, 0.22); vertical-align: middle; }
+.pm-qty { font-size: 11.5px; line-height: 1.2; color: var(--ink); display: inline-block; }
+.pm-cmp td.free .pm-qty { color: var(--soft); }
+
+.pm-free { margin: 12px 2px 0; font-size: 12.5px; line-height: 1.45; color: var(--mute); }
+.pm-free b { font-weight: 600; color: var(--soft); }
+.pm-free .v3-tag { margin-right: 8px; vertical-align: 1px; height: 19px; font-size: 9.5px; }
+
+/* the confirmation line with its check */
+.prc-buy .prc-ok { display: flex; gap: 10px; align-items: flex-start; }
+.prc-ok-ic { flex: none; width: 16px; height: 16px; margin-top: 2px; color: var(--ok); stroke-width: 2; }
+
+/* ---- the member state ---- */
+.pm-member .v3-h1 { margin: 22px 0 6px; }
+.pm-member .pm-card { margin-top: 18px; }
+.pm-sec { margin: 30px 0 4px; }
+.pm-unlocked { list-style: none; margin: 0; padding: 0; }
+.pm-unlocked li { display: flex; gap: 14px; align-items: flex-start; padding: 13px 2px; border-bottom: 1px solid rgba(246, 242, 234, 0.08); font-size: 14px; line-height: 1.4; color: var(--ink); }
+.pm-unlocked li:first-child { border-top: 1px solid var(--hair); }
+.pm-unlocked .pm-yes { flex: none; margin-top: 2px; }
+.pm-continue { margin-top: 18px; }
+
+@media (max-width: 360px) {
+  .pm-card { padding: 15px 16px 14px; border-radius: 18px; }
+  .pm-card-brand { font-size: 9.5px; letter-spacing: 0.26em; margin-right: -0.26em; }
+  .pm-cmp-wrap { padding: 2px 3px 4px; }
+  .pm-c0 { width: 33%; }
+  .pm-cn { font-size: 8.5px; letter-spacing: 0.04em; }
+  .pm-cp { font-size: 12.5px; }
+  .pm-cmp tbody th { font-size: 11.5px; padding-left: 6px; padding-right: 4px; }
+  .pm-qty { font-size: 10.5px; }
+}
+@media (min-width: 720px) {
+  .pm-cmp tbody th { font-size: 12.5px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pm-rise, .pm-card, .pm-v { animation: none; }
+  .pm-card::after { display: none; }
+  .pm-cmp .on, .pm-cmp td, .pm-cmp th, .pm-cn { transition: none; }
+}
